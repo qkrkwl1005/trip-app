@@ -6,6 +6,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0f1115">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<link rel="manifest" href="manifest.json">
 <title>TripSync Master</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
@@ -19,7 +21,7 @@ header{padding:calc(12px + env(safe-area-inset-top)) 16px 12px;display:flex;just
 .brand{display:flex;gap:10px;align-items:center}.brand b{display:block;font-size:17px;font-weight:800}.brand small{font-size:11px;color:var(--sub)}
 .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#2563eb,#8b5cf6,#f59e0b);display:flex;align-items:center;justify-content:center}
 #nav{display:grid;grid-template-columns:repeat(5,1fr);padding:4px 8px;border-bottom:1px solid var(--bd);background:var(--s)}
-.tab-btn{display:flex;flex-direction:column;align-items:center;padding:5px 2px;background:none;border:0;border-radius:9px;color:var(--sub);font-family:inherit;font-size:11px;font-weight:700;line-height:1.3;cursor:pointer}
+.tab-btn{display:flex;flex-direction:column;align-items:center;padding:5px 2px;background:none;border:0;border-radius:9px;color:var(--sub);font-family:inherit;font-size:11px;font-weight:700;line-height:1.3;cursor:pointer;touch-action:manipulation}
 .tab-btn i{font-style:normal;font-size:19px;line-height:1.2}.tab-btn.active{color:var(--pr);background:rgba(59,130,246,.14)}.tab-btn[data-tab=map]{display:none}
 .tab-content{display:none;flex:1;overflow-y:auto;padding:16px;flex-direction:column;gap:10px}.tab-content.active{display:flex}
 .card{background:var(--s2);border:1px solid var(--bd);border-radius:16px;padding:14px}
@@ -28,7 +30,7 @@ input[type=text],input[type=password],textarea{width:100%;padding:11px 12px;bord
 input:focus,textarea:focus{border-color:var(--pr)}textarea{min-height:76px;resize:vertical}
 .seg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--s);padding:4px;border:1px solid var(--bd);border-radius:12px;margin-bottom:12px}
 .seg div{padding:8px 2px;text-align:center;font-size:12.5px;font-weight:700;border-radius:9px;color:var(--sub);cursor:pointer}.seg .on{background:rgba(59,130,246,.18);color:var(--pr)}
-.btn{width:100%;padding:12px;background:var(--pr);color:#fff;border:0;border-radius:12px;font:inherit;font-weight:700;cursor:pointer}.btn:disabled{opacity:.6}.btn.g{background:var(--s3);color:var(--tx);margin-bottom:8px}
+.btn{width:100%;padding:12px;background:var(--pr);color:#fff;border:0;border-radius:12px;font:inherit;font-weight:700;cursor:pointer;touch-action:manipulation}.btn:disabled{opacity:.6}.btn.g{background:var(--s3);color:var(--tx);margin-bottom:8px}
 .item{background:var(--s2);border:1px solid var(--bd);border-radius:14px;padding:10px;display:flex;gap:12px;align-items:center;cursor:pointer}.item.done{opacity:.55}
 .pic{position:relative;width:78px;height:78px;flex:none;border-radius:12px;background:var(--s3);display:grid;place-items:center;font-size:30px;overflow:hidden}
 .pic img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
@@ -36,7 +38,7 @@ input:focus,textarea:focus{border-color:var(--pr)}textarea{min-height:76px;resiz
 .mid{flex:1;min-width:0}.nm{font-weight:700;font-size:15px;word-break:keep-all}.ds{font-size:12px;color:var(--sub);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.ds.in{color:var(--pr)}
 .ok{font-size:12px;color:var(--pr);white-space:nowrap}
 .act{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
-.mb{padding:7px 11px;border-radius:8px;font-family:inherit;font-size:12px;font-weight:700;border:1px solid var(--bd);background:var(--s);color:var(--tx);cursor:pointer;text-decoration:none}
+.mb{padding:7px 11px;border-radius:8px;font-family:inherit;font-size:12px;font-weight:700;border:1px solid var(--bd);background:var(--s);color:var(--tx);cursor:pointer;text-decoration:none;touch-action:manipulation}
 .mb.pr{background:var(--pr);color:#fff;border-color:var(--pr)}.mb.dg{color:var(--dg)}
 .empty{text-align:center;padding:48px 0;color:var(--sub);font-size:13px}.empty i{display:block;font-style:normal;font-size:40px}
 #map-wrap{flex:1;position:relative;height:100%;z-index:0}#map{width:100%;height:100%}
@@ -82,13 +84,17 @@ input[type=text],input[type=password],textarea{font-size:16px}
     <label>Gemini API 키 (사진 인식 + AI 검색, 선택)</label>
     <input type="password" id="gkey" placeholder="AIzaSy...">
     <button id="savek" class="btn g">키 저장</button>
+    <label style="margin-top:14px">Google Maps API 키 (지도 임베드, 선택)</label>
+    <input type="password" id="gmapkey" placeholder="AIzaSy...">
+    <button id="savegmap" class="btn g">지도 키 저장</button>
+    <label style="margin-top:14px">지도 타일이 안 보이면 브라우저(Safari/Chrome)에서 직접 열어주세요. 미리보기에서는 외부 이미지가 차단될 수 있어요.</label>
     <label style="margin-top:14px">백업 / 복원 (데이터는 이 브라우저에만 저장돼요)</label>
     <textarea id="bk" placeholder="복사된 백업이 여기에 나와요. 복원하려면 붙여넣기"></textarea>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><button id="bkOut" class="btn g">백업 복사</button><button id="bkIn" class="btn g">복원하기</button></div>
   </div></section>
 </aside>
 
-<main id="map-wrap"><div id="mapmsg">지도 이미지를 불러오지 못했어요. Claude 앱 미리보기에서는 외부 이미지가 막힐 수 있어요. Safari나 GitHub Pages 주소로 열어보세요. 항목 상세의 🗺️ 지도는 구글지도로 열려요.</div><div id="map"></div></main>
+<main id="map-wrap"><div id="mapmsg">지도 타일을 불러오지 못했어요. Safari/Chrome에서 직접 열거나 네트워크를 확인해 주세요.</div><div id="map"></div></main>
 <div id="sheet"><div class="sh" id="sbody"></div></div>
 <input type="file" id="own" accept="image/*" hidden>
 <div id="toast"></div>
@@ -98,17 +104,57 @@ input[type=text],input[type=password],textarea{font-size:16px}
 const $=id=>document.getElementById(id);
 const ls={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v);return 1}catch(e){return 0}}};
 const CATS={PLACE:{n:'장소',e:'📍',b:'여행 장소/식당'},FOOD:{n:'먹거리',e:'🍙',b:'편의점 음식/먹거리'},SHOP:{n:'쇼핑',e:'🛍️',b:'구매 물건'}};
-const MODELS=['gemini-flash-latest','gemini-2.5-flash'],SUF=['',' 사진',' 후기',' 메뉴',' 외관'];
+const MODELS=['gemini-3.8-flash','gemini-flash-latest'];
+const SUF=['',' photo',' review',' menu',' exterior'];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-const pic=(q,v=0)=>'https://tse1.mm.bing.net/th?w=480&h=360&c=7&rs=1&p=0&q='+encodeURIComponent(q.trim()+SUF[v%5]);
-const ph=(e,src,c='')=>`<div class="pic ${c}">${e}${src?`<img loading="lazy" referrerpolicy="no-referrer" src="${esc(src)}" onerror="this.remove()">`:''}</div>`;
-const tu=()=>`https://{s}.basemaps.cartocdn.com/${document.documentElement.dataset.theme==='dark'?'dark':'light'}_all/{z}/{x}/{y}{r}.png`;
-let items=[],cat='PLACE',pend=[],res=[],lm=null,tl=null,layer=null,pins={},lastGeo=0,tt,cur=null,emb=false;
+const pic=(q,v=0)=>'https://tse1.mm.bing.net/th?w=480&h=360&c=7&rs=1&p=0&q='+encodeURIComponent(String(q||'').trim()+SUF[v%5]);
+let items=[],cat='PLACE',pend=[],res=[],lm=null,tl=null,layer=null,pins={},lastGeo=0,tt,cur=null,emb=false,tileIndex=0,tileFails=0;
 try{items=JSON.parse(ls.get('TRIP_MASTER_ITEMS')||'[]')}catch(e){items=[]}
+let photoCache={};try{photoCache=JSON.parse(ls.get('TRIP_PHOTO_CACHE')||'{}')}catch(e){photoCache={}}
+function savePhotoCache(){ls.set('TRIP_PHOTO_CACHE',JSON.stringify(photoCache))}
 
 function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),4500)}
-function setTheme(t){document.documentElement.dataset.theme=t;ls.set('TRIP_THEME',t);$('themeBtn').textContent=t==='dark'?'☀️':'🌙';if(tl)tl.setUrl(tu())}
+window.addEventListener('error',e=>{try{toast('오류: '+(e.message||'알 수 없는 오류'))}catch(_){}});
+function currentTileUrl(){return tileIndex===0?`https://{s}.basemaps.cartocdn.com/${document.documentElement.dataset.theme==='dark'?'dark':'light'}_all/{z}/{x}/{y}{r}.png`:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'}
+function rebuildTiles(){
+  if(!lm)return;
+  if(tl)lm.removeLayer(tl);
+  const carto=tileIndex===0;
+  tl=L.tileLayer(currentTileUrl(),{maxZoom:19,subdomains:carto?'abcd':'abc',attribution:'© OpenStreetMap © CARTO'}).addTo(lm);
+  tl.on('tileerror',onTileError);tl.on('tileload',onTileLoad);
+}
+function onTileError(){tileFails++;if(tileIndex===0&&tileFails>3){tileIndex=1;tileFails=0;rebuildTiles();toast('지도 타일을 전환했어요')}else if(tileIndex===1){$('mapmsg').style.display='block'}}
+function onTileLoad(){tileFails=0;$('mapmsg').style.display='none'}
+function setTheme(t){document.documentElement.dataset.theme=t;ls.set('TRIP_THEME',t);$('themeBtn').textContent=t==='dark'?'☀️':'🌙';if(lm)rebuildTiles()}
+
+async function fetchRepPhoto(q){
+  q=(q||'').trim(); if(!q) return null;
+  if(photoCache[q]) return photoCache[q];
+  const tryWiki=async(lang)=>{
+    try{
+      const s=await fetch(`https://${lang}.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(q)}&limit=1&namespace=0&format=json&origin=*`);
+      const arr=await s.json();
+      const title=Array.isArray(arr)&&arr[1]&&arr[1][0];
+      if(!title) return null;
+      const r=await fetch(`https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`);
+      const d=await r.json();
+      if(d&&d.thumbnail&&d.thumbnail.source) return d.thumbnail.source;
+    }catch(e){}
+    return null;
+  };
+  for(const lang of ['ko','en','ja']){
+    const u=await tryWiki(lang);
+    if(u){photoCache[q]=u;savePhotoCache();return u;}
+  }
+  try{
+    const r=await fetch(`https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(q)}&gsrlimit=1&prop=imageinfo&iiprop=url&iiurlwidth=480&format=json&origin=*`);
+    const d=await r.json();
+    const pages=d&&d.query&&d.query.pages;
+    if(pages){for(const p in pages){const ii=pages[p].imageinfo&&pages[p].imageinfo[0]; if(ii&&(ii.thumburl||ii.url)){const u=ii.thumburl||ii.url;photoCache[q]=u;savePhotoCache();return u;}}}
+  }catch(e){}
+  return null;
+}
 
 (function build(){
   const tabs=[['add','🔎','찾기'],['PLACE','📍','장소'],['FOOD','🍙','먹거리'],['SHOP','🛍️','쇼핑'],['map','🗺️','지도'],['set','⚙️','설정']];
@@ -128,18 +174,17 @@ function tab(k){
   if(k==='map')setTimeout(()=>{if(lm){lm.invalidateSize();fit()}},80);
 }
 
-/* 지도 */
-function fit(){if(!lm)return;const b=layer.getBounds();if(b.isValid())lm.fitBounds(b,{padding:[40,40],maxZoom:15})}
+function fit(){if(!lm||!layer)return;const b=layer.getBounds();if(b.isValid())lm.fitBounds(b,{padding:[40,40],maxZoom:15})}
 function draw(){
-  if(!lm)return;layer.clearLayers();pins={};
+  if(!lm||!layer)return;layer.clearLayers();pins={};
   items.filter(i=>i.lat&&i.lng).forEach(i=>{
     pins[i.id]=L.marker([i.lat,i.lng],{icon:L.divIcon({className:'',html:`<div class="pin ${i.category}"></div>`,iconSize:[20,20],iconAnchor:[10,10]})})
       .bindPopup(`<b>${esc(i.name)}</b><br>${esc(i.address||'')}<br><span class="lnk" data-act="open" data-id="${i.id}">사진·상세 보기 ›</span>`).addTo(layer);
   });
 }
 
-/* 목록 */
-const card=i=>`<div class="item${i.done?' done':''}" data-act="open" data-id="${i.id}">${ph(CATS[i.category].e,i.img)}<div class="mid"><div class="nm">${esc(i.name)}</div><div class="ds">${esc(i.address||i.note||i.memo||'')}</div>${i.info?`<div class="ds in">${esc(i.info)}</div>`:''}</div><input type="checkbox" data-act="done" data-id="${i.id}"${i.done?' checked':''}></div>`;
+const card=i=>`<div class="item${i.done?' done':''}" data-act="open" data-id="${i.id}">${ph(CATS[i.category].e,i.img)}<div class="mid"><div class="nm">${esc(i.name)}</div><div class="ds">${esc(i.address||i.note||'')}</div>${i.info?`<div class="ds in">${esc(i.info)}</div>`:''}</div><input type="checkbox" data-act="done" data-id="${i.id}"${i.done?' checked':''}></div>`;
+function ph(e,src,c=''){return `<div class="pic ${c}">${e}${src?`<img loading="lazy" referrerpolicy="no-referrer" src="${esc(src)}" onerror="this.remove()">`:''}</div>`}
 function render(){
   for(const c in CATS){
     const kw=($('q-'+c).value||'').trim().toLowerCase(),all=items.filter(i=>i.category===c);
@@ -151,27 +196,31 @@ function render(){
 function persist(){if(!ls.set('TRIP_MASTER_ITEMS',JSON.stringify(items)))toast('저장 공간이 부족해요. 설정에서 백업 후 정리하세요')}
 function save(){persist();render();draw()}
 
-/* 상세 시트 */
 function showSheet(){
   const i=items.find(x=>x.id===cur);if(!i)return closeSheet();
   const q=encodeURIComponent((i.name+' '+(i.address||'')).trim());
-  $('sbody').innerHTML=(emb?`<iframe class="big" src="https://maps.google.com/maps?q=${q}&hl=ko&z=15&output=embed"></iframe>`:ph(CATS[i.category].e,i.img,'big'))
+  const _gk=ls.get('TRAVEL_GMAP_KEY')||''; const gkey=/^AIza[\w-]{20,}$/.test(_gk)?_gk:'';
+  let mapFrame='';
+  if(emb){
+    if(gkey) mapFrame=`<iframe class="big" src="https://www.google.com/maps/embed/v1/search?key=${encodeURIComponent(gkey)}&q=${q}&zoom=15" allowfullscreen loading="lazy"></iframe>`;
+    else if(i.lat&&i.lng) mapFrame=`<iframe class="big" src="https://www.openstreetmap.org/export/embed.html?bbox=${i.lng-0.01},${i.lat-0.01},${i.lng+0.01},${i.lat+0.01}&layer=mapnik&marker=${i.lat},${i.lng}"></iframe>`;
+    else mapFrame=`<div class="empty"><i>🗺️</i>지도 API 키가 없어요. 설정 탭에서 Google Maps API 키를 넣거나 아래 구글지도 링크를 사용하세요.</div>`;
+  }
+  $('sbody').innerHTML=(emb?mapFrame:ph(CATS[i.category].e,i.img,'big'))
   +`<div class="nm" style="font-size:19px">${esc(i.name)}</div><div class="ds" style="-webkit-line-clamp:4">${esc(i.address||'')}</div>${i.info?`<div class="ds in">${esc(i.info)}</div>`:''}
-  <div class="act"><button class="mb" data-act="rot">↻ 다른 사진</button><button class="mb" data-act="own">📷 내 사진</button><button class="mb" data-act="emb">${emb?'🖼️ 사진':'🗺️ 지도'}</button>${i.lat?'<button class="mb" data-act="pin">📍 지도 탭</button>':''}</div>
+  <div class="act"><button class="mb" data-act="rot">↻ 다른 사진</button><button class="mb" data-act="photo">🖼️ 대표 사진</button><button class="mb" data-act="own">📷 내 사진</button><button class="mb" data-act="emb">${emb?'🖼️ 사진':'🗺️ 지도'}</button>${i.lat?'<button class="mb" data-act="pin">📍 지도 탭</button>':''}<button class="mb" data-act="share">↗ 공유</button></div>
   <textarea id="memo" placeholder="메모 (가격, 영업시간, 같이 갈 사람...)">${esc(i.note||'')}</textarea>
   <div class="act"><a class="mb pr" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${q}">구글지도 ↗</a><a class="mb" target="_blank" rel="noopener" href="https://www.google.com/search?q=${encodeURIComponent(i.name)}">검색 ↗</a><button class="mb dg" data-act="del">삭제</button><button class="mb" data-act="close" style="margin-left:auto">닫기</button></div>`;
   $('sheet').classList.add('on');
 }
 function closeSheet(){$('sheet').classList.remove('on');cur=null}
 
-/* 사진 */
 const shrink=(f,m=1024,q=.8)=>new Promise((ok,no)=>{
   const u=URL.createObjectURL(f),im=new Image();
   im.onload=()=>{URL.revokeObjectURL(u);const s=Math.min(1,m/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);c.getContext('2d').drawImage(im,0,0,c.width,c.height);ok(c.toDataURL('image/jpeg',q))};
   im.onerror=()=>no(new Error('사진을 읽을 수 없어요'));im.src=u;
 });
 
-/* 인터넷 검색 */
 const mkPrompt=(h,q)=>`입력(텍스트·사진)에 해당하는 실제 ${CATS[cat].b} 후보를 구글 검색으로 확인해 가능성 높은 순서로 최대 4개, 다른 설명 없이 JSON 배열만 출력하세요.
 형식: {"name":"한국어 이름 (현지어)","address":"현지어 주소 또는 빈 문자열","lat":숫자 또는 null,"lng":숫자 또는 null,"info":"한 줄 정보(영업시간·가격·특징)"}
 ${cat==='PLACE'?'주소와 위도·경도를 꼭 찾으세요.':'제품명, 대략 가격, 살 수 있는 곳을 info에 쓰세요.'}
@@ -221,37 +270,43 @@ async function find(){
     }else if(pend.length)note='사진 인식은 설정 탭에서 Gemini 키가 필요해요';
     if((!list||!list.length)&&cat==='PLACE'&&q){list=await nomi((h+' '+q).trim());if(!list.length&&h)list=await nomi(q)}
     list=(list||[]).filter(c=>c&&c.name).slice(0,5);
-    if(q&&!list.some(c=>c.name===q))list.push({name:q,raw:1});
-    res=list.map(c=>({...c,h,v:0,cat}));
+    const seen=new Set();
+    list=list.filter(c=>{const k=String(c.name).toLowerCase().replace(/\s+/g,'');if(seen.has(k))return false;seen.add(k);return true});
+    if(q&&!list.some(c=>String(c.name).toLowerCase().replace(/\s+/g,'')===String(q).toLowerCase().replace(/\s+/g,'')))list.push({name:q,raw:1});
+    res=list.map(c=>({...c,h,v:0,cat,img:pic(c.name+' '+(h||''))}));
     drawRes();
+    res.forEach(c=>{fetchRepPhoto(c.name+' '+(c.address||h||'')).then(u=>{if(u){c.img=u;drawRes()}})});
     if(note)toast(note);
   }catch(e){toast('오류: '+e.message)}
   finally{btn.disabled=false;btn.textContent='🔎 인터넷에서 찾기'}
 }
-const cc=(c,k)=>`<div class="item" data-act="pick" data-k="${k}">${ph(CATS[c.cat].e,pic(c.name+' '+c.h,c.v))}<div class="mid"><div class="nm">${esc(c.name)}</div><div class="ds">${c.raw?'입력한 그대로 저장':esc(c.address||'')}</div>${c.info?`<div class="ds in">${esc(c.info)}</div>`:''}<button class="mb" style="margin-top:5px" data-act="sw" data-k="${k}">↻ 다른 사진</button></div><b class="ok">${c.saved?'✓ 저장됨':'선택'}</b></div>`;
+const cc=(c,k)=>`<div class="item" data-act="pick" data-k="${k}">${ph(CATS[c.cat].e,c.img)}<div class="mid"><div class="nm">${esc(c.name)}</div><div class="ds">${c.raw?'입력한 그대로 저장':esc(c.address||'')}</div>${c.info?`<div class="ds in">${esc(c.info)}</div>`:''}<button class="mb" style="margin-top:5px" data-act="sw" data-k="${k}">↻ 다른 사진</button></div><b class="ok">${c.saved?'✓ 저장됨':'선택'}</b></div>`;
 function drawRes(){$('rs').innerHTML=res.length?`<div class="ds" style="margin:2px 2px 8px">맞는 항목을 눌러 저장하세요. 사진이 다르면 ↻</div><div style="display:flex;flex-direction:column;gap:8px">${res.map(cc).join('')}</div>`:''}
 async function pick(k){
   const c=res[k];if(!c||c.saved)return;
   c.saved=1;drawRes();
   let p=c.lat&&c.lng?{lat:c.lat,lng:c.lng}:null;
   if(c.cat==='PLACE'&&!p){toast('위치 확인 중...');p=await locate(c,c.h)}
-  items.unshift({id:'i'+Date.now()+Math.random().toString(36).slice(2,5),category:c.cat,name:c.name,address:c.address||'',info:c.info||'',lat:p?p.lat:0,lng:p?p.lng:0,img:pic(c.name+' '+c.h,c.v),q:c.name+' '+c.h,v:c.v,done:false});
+  const id='i'+Date.now()+Math.random().toString(36).slice(2,5);
+  items.unshift({id,category:c.cat,name:c.name,address:c.address||'',info:c.info||'',lat:p?p.lat:0,lng:p?p.lng:0,img:c.img||pic(c.name+' '+c.h,c.v),q:c.name+' '+c.h,v:c.v||0,done:false});
   save();fit();toast('저장했어요 · '+CATS[c.cat].n+' 탭에서 볼 수 있어요');
+  fetchRepPhoto(c.name+' '+(c.address||c.h||'')).then(u=>{if(u){const it=items.find(x=>x.id===id);if(it){it.img=u;save();if(cur===id)showSheet()}}});
 }
 
-/* 이벤트 */
 document.addEventListener('click',e=>{
   if(e.target.id==='sheet')return closeSheet();
   const b=e.target.closest('[data-act]');if(!b)return;
   const a=b.dataset.act,i=items.find(x=>x.id===(b.dataset.id||cur));
-  if(a==='sw'){res[b.dataset.k].v++;drawRes()}
+  if(a==='sw'){res[b.dataset.k].v++;const c=res[b.dataset.k];c.img=pic(c.name+' '+c.h,c.v);drawRes()}
   else if(a==='pick')pick(+b.dataset.k);
   else if(a==='open'){emb=false;cur=b.dataset.id;showSheet()}
   else if(a==='close')closeSheet();
   else if(a==='rot'&&i){i.v=(i.v||0)+1;i.img=pic(i.q||i.name,i.v);save();showSheet()}
+  else if(a==='photo'&&i){(async()=>{toast('대표 사진 찾는 중...');const u=await fetchRepPhoto(i.name+' '+(i.address||''));if(u){i.img=u;save();showSheet();toast('대표 사진을 찾았어요')}else toast('대표 사진을 찾지 못했어요')})()}
   else if(a==='own')$('own').click();
   else if(a==='emb'){emb=!emb;showSheet()}
   else if(a==='pin'&&i){closeSheet();tab('map');setTimeout(()=>{if(lm){lm.setView([i.lat,i.lng],16);pins[i.id]&&pins[i.id].openPopup()}},200)}
+  else if(a==='share'&&i){if(navigator.share){navigator.share({title:i.name,text:i.address||'',url:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(i.name+' '+(i.address||''))}`}).catch(()=>{})}else toast('공유를 지원하지 않는 브라우저예요')}
   else if(a==='del'&&i){if(b.dataset.sure){items=items.filter(x=>x.id!==i.id);closeSheet();save()}else{b.dataset.sure=1;b.textContent='한 번 더 누르면 삭제'}}
 });
 document.addEventListener('change',e=>{
@@ -269,19 +324,23 @@ $('file').onchange=e=>{pend=[...e.target.files];e.target.value='';$('pc').textCo
 $('go').onclick=find;
 $('q').onkeydown=e=>{if(e.key==='Enter')find()};
 $('themeBtn').onclick=()=>setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
-$('savek').onclick=()=>{ls.set('TRAVEL_GEMINI_KEY',$('gkey').value.trim());toast('API 키가 저장되었습니다.')};
+$('savek').onclick=()=>{const v=$('gkey').value.trim(); if(v&&!/^AIza[\w-]{20,}$/.test(v)){toast('올바른 Gemini API 키 형식이 아니에요');return;} ls.set('TRAVEL_GEMINI_KEY',v);toast('API 키가 저장되었습니다.')};
+$('savegmap').onclick=()=>{const v=$('gmapkey').value.trim(); if(v&&!/^AIza[\w-]{20,}$/.test(v)){toast('올바른 Google Maps API 키 형식이 아니에요');return;} ls.set('TRAVEL_GMAP_KEY',v);toast('지도 API 키가 저장되었습니다.')};
 $('bkOut').onclick=()=>{const t=JSON.stringify(items);$('bk').value=t;$('bk').select();try{navigator.clipboard.writeText(t).then(()=>toast('백업을 복사했어요. 메모 앱 등에 붙여넣어 보관하세요')).catch(()=>toast('위 내용을 직접 복사해 보관하세요'))}catch(e){toast('위 내용을 직접 복사해 보관하세요')}};
 $('bkIn').onclick=()=>{try{const d=JSON.parse($('bk').value);if(!Array.isArray(d))throw 0;items=d;save();fit();toast(d.length+'개 항목을 복원했어요')}catch(e){toast('백업 내용이 올바르지 않아요')}};
 addEventListener('resize',()=>lm&&lm.invalidateSize());
 
-/* 시작 */
 setTheme(ls.get('TRIP_THEME')||'dark');
+const _gk=ls.get('TRAVEL_GEMINI_KEY')||''; if(_gk&&!/^AIza[\w-]{20,}$/.test(_gk)) ls.set('TRAVEL_GEMINI_KEY','');
+const _gm=ls.get('TRAVEL_GMAP_KEY')||''; if(_gm&&!/^AIza[\w-]{20,}$/.test(_gm)) ls.set('TRAVEL_GMAP_KEY','');
 $('gkey').value=ls.get('TRAVEL_GEMINI_KEY')||'';
+$('gmapkey').value=ls.get('TRAVEL_GMAP_KEY')||'';
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{})}
+if(!ls.get('TRIP_ONBOARD')){setTimeout(()=>toast('찾기 탭에서 장소를 추가해 보세요. 사진·이름으로 검색할 수 있어요.'),800);ls.set('TRIP_ONBOARD','1')}
 if(window.L){
   lm=L.map('map').setView([36.5,128],6);
-  tl=L.tileLayer(tu(),{maxZoom:19,subdomains:'abcd',attribution:'© OpenStreetMap © CARTO'}).addTo(lm);
-  tl.on('tileerror',()=>{$('mapmsg').style.display='block'});tl.on('tileload',()=>{$('mapmsg').style.display='none'});
   layer=L.featureGroup().addTo(lm);
+  rebuildTiles();
 }else $('mapmsg').style.display='block';
 render();draw();fit();
 </script>
