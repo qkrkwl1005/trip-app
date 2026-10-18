@@ -43,6 +43,7 @@ input:focus,textarea:focus{border-color:var(--pr)}textarea{min-height:76px;resiz
 .empty{text-align:center;padding:48px 0;color:var(--sub);font-size:13px}.empty i{display:block;font-style:normal;font-size:40px}
 #map-wrap{flex:1;position:relative;height:100%;z-index:0}#map{width:100%;height:100%}
 #mapmsg{display:none;position:absolute;left:12px;right:12px;top:12px;z-index:1100;background:var(--s);color:var(--tx);border:1px solid var(--bd);border-radius:12px;padding:10px 12px;font-size:12.5px;box-shadow:0 6px 20px rgba(0,0,0,.35)}
+#locBtn{position:absolute;right:12px;bottom:12px;z-index:1100;padding:10px 14px;border:0;border-radius:12px;background:var(--s);color:var(--tx);font-family:inherit;font-size:13px;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.35);cursor:pointer;touch-action:manipulation}
 .pin{width:20px;height:20px;border-radius:50%;border:3px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.5);background:var(--PLACE)}.pin.FOOD{background:var(--FOOD)}.pin.SHOP{background:var(--SHOP)}
 .lnk{color:#2563eb;font-weight:700;cursor:pointer}
 #sheet{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center}#sheet.on{display:flex}
@@ -94,7 +95,7 @@ input[type=text],input[type=password],textarea{font-size:16px}
   </div></section>
 </aside>
 
-<main id="map-wrap"><div id="mapmsg">지도 타일을 불러오지 못했어요. Safari/Chrome에서 직접 열거나 네트워크를 확인해 주세요.</div><div id="map"></div></main>
+<main id="map-wrap"><div id="mapmsg">지도를 불러오지 못했어요. API 키 또는 네트워크를 확인해 주세요.</div><div id="map"></div><button id="locBtn">📍 내 위치</button></main>
 <div id="sheet"><div class="sh" id="sbody"></div></div>
 <input type="file" id="own" accept="image/*" hidden>
 <div id="toast"></div>
@@ -109,7 +110,7 @@ const SUF=['',' photo',' review',' menu',' exterior'];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const pic=(q,v=0)=>'https://tse1.mm.bing.net/th?w=480&h=360&c=7&rs=1&p=0&q='+encodeURIComponent(String(q||'').trim()+SUF[v%5]);
-let items=[],cat='PLACE',pend=[],res=[],lm=null,tl=null,layer=null,pins={},lastGeo=0,tt,cur=null,emb=false,tileIndex=0,tileFails=0;
+let items=[],cat='PLACE',pend=[],res=[],lm=null,tl=null,layer=null,pins={},lastGeo=0,tt,cur=null,emb=false,tileIndex=1,tileFails=0,gmap=null,gmarkers=[],glocMarker=null;
 try{items=JSON.parse(ls.get('TRIP_MASTER_ITEMS')||'[]')}catch(e){items=[]}
 let photoCache={};try{photoCache=JSON.parse(ls.get('TRIP_PHOTO_CACHE')||'{}')}catch(e){photoCache={}}
 function savePhotoCache(){ls.set('TRIP_PHOTO_CACHE',JSON.stringify(photoCache))}
@@ -127,6 +128,19 @@ function rebuildTiles(){
 function onTileError(){tileFails++;if(tileIndex===0&&tileFails>3){tileIndex=1;tileFails=0;rebuildTiles();toast('지도 타일을 전환했어요')}else if(tileIndex===1){$('mapmsg').style.display='block'}}
 function onTileLoad(){tileFails=0;$('mapmsg').style.display='none'}
 function setTheme(t){document.documentElement.dataset.theme=t;ls.set('TRIP_THEME',t);$('themeBtn').textContent=t==='dark'?'☀️':'🌙';if(lm)rebuildTiles()}
+function fallbackToOsm(){
+  if(lm) return; // already osm
+  gmap=null;
+  if(window.L){
+    lm=L.map('map').setView([36.5,128],6);
+    layer=L.featureGroup().addTo(lm);
+    rebuildTiles();
+    render(); draw(); fit();
+    toast('Google 지도를 불러오지 못해 OpenStreetMap으로 표시합니다. API 키/도메인 설정을 확인하세요.');
+  } else {
+    $('mapmsg').style.display='block';
+  }
+}
 
 async function fetchRepPhoto(q){
   q=(q||'').trim(); if(!q) return null;
@@ -171,11 +185,29 @@ function tab(k){
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===k));
   document.querySelectorAll('.tab-content').forEach(c=>c.classList.toggle('active',c.id==='tab-'+k));
   document.body.classList.toggle('show-map',k==='map');
-  if(k==='map')setTimeout(()=>{if(lm){lm.invalidateSize();fit()}},80);
+  if(k==='map')setTimeout(()=>{if(gmap){google.maps.event.trigger(gmap,'resize');fit()}else if(lm){lm.invalidateSize();fit()}},80);
 }
 
-function fit(){if(!lm||!layer)return;const b=layer.getBounds();if(b.isValid())lm.fitBounds(b,{padding:[40,40],maxZoom:15})}
+function fit(){
+  if(gmap){
+    if(!gmarkers.length)return;
+    const bounds=new google.maps.LatLngBounds();
+    gmarkers.forEach(m=>bounds.extend(m.getPosition()));
+    gmap.fitBounds(bounds);
+    return;
+  }
+  if(!lm||!layer)return;const b=layer.getBounds();if(b.isValid())lm.fitBounds(b,{padding:[40,40],maxZoom:15})
+}
 function draw(){
+  if(gmap){
+    gmarkers.forEach(m=>m.setMap(null));gmarkers=[];
+    items.filter(i=>i.lat&&i.lng).forEach(i=>{
+      const m=new google.maps.Marker({position:{lat:i.lat,lng:i.lng},map:gmap,title:i.name});
+      m.addListener('click',()=>{emb=false;cur=i.id;showSheet()});
+      gmarkers.push(m);
+    });
+    return;
+  }
   if(!lm||!layer)return;layer.clearLayers();pins={};
   items.filter(i=>i.lat&&i.lng).forEach(i=>{
     pins[i.id]=L.marker([i.lat,i.lng],{icon:L.divIcon({className:'',html:`<div class="pin ${i.category}"></div>`,iconSize:[20,20],iconAnchor:[10,10]})})
@@ -337,11 +369,49 @@ $('gkey').value=ls.get('TRAVEL_GEMINI_KEY')||'';
 $('gmapkey').value=ls.get('TRAVEL_GMAP_KEY')||'';
 if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{})}
 if(!ls.get('TRIP_ONBOARD')){setTimeout(()=>toast('찾기 탭에서 장소를 추가해 보세요. 사진·이름으로 검색할 수 있어요.'),800);ls.set('TRIP_ONBOARD','1')}
-if(window.L){
+const _gk2=ls.get('TRAVEL_GMAP_KEY')||''; const _gkey=/^AIza[\w-]{20,}$/.test(_gk2)?_gk2:'';
+let locating=false;
+function requestLocation(){
+  if(locating) return;
+  if(!navigator.geolocation){ toast('이 브라우저는 위치 정보를 지원하지 않아요'); return; }
+  if(location.protocol!=='https:'&&location.hostname!=='localhost'){ toast('위치 기능은 HTTPS에서만 동작해요 (GitHub Pages는 HTTPS)'); return; }
+  locating=true; toast('현재 위치 확인 중...');
+  navigator.geolocation.getCurrentPosition(pos=>{
+    locating=false;
+    const lat=pos.coords.latitude,lng=pos.coords.longitude;
+    if(gmap){
+      if(glocMarker) glocMarker.setMap(null);
+      glocMarker=new google.maps.Marker({position:{lat,lng},map:gmap,title:'내 위치',icon:{path:google.maps.SymbolPath.CIRCLE,scale:8,fillColor:'#2563eb',fillOpacity:1,strokeColor:'#fff',strokeWeight:2}});
+      gmap.setCenter({lat,lng}); gmap.setZoom(15);
+    } else if(lm){
+      if(glocMarker&&lm.hasLayer&&lm.hasLayer(glocMarker)) lm.removeLayer(glocMarker);
+      glocMarker=L.circleMarker([lat,lng],{radius:8,color:'#fff',fillColor:'#2563eb',fillOpacity:1}).addTo(lm);
+      lm.setView([lat,lng],15);
+    }
+    toast('현재 위치로 이동했어요');
+  },err=>{
+    locating=false;
+    if(err.code===1) toast('위치 권한이 거부되었어요. 브라우저/휴대폰 설정에서 허용해 주세요');
+    else if(err.code===2) toast('위치를 확인할 수 없어요. GPS/네트워크를 확인해 주세요');
+    else toast('위치 확인 시간이 초과되었어요');
+  },{enableHighAccuracy:true,timeout:10000,maximumAge:60000});
+}
+$('locBtn').onclick=requestLocation;
+
+if(_gkey){
+  let gLoaded=false;
+  const s=document.createElement('script');
+  s.src='https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(_gkey)+'&loading=async';
+  s.async=true;s.defer=true;
+  s.onload=()=>{ try{ if(!window.google||!google.maps) throw new Error('google.maps 없음'); gmap=new google.maps.Map($('map'),{center:{lat:36.5,lng:128},zoom:6}); gLoaded=true; draw(); fit(); setTimeout(()=>{ if(gmap && !document.querySelector('.gm-style')) fallbackToOsm() },4000); }catch(e){ fallbackToOsm() } };
+  s.onerror=()=>{ fallbackToOsm() };
+  const gTimer=setTimeout(()=>{ if(!gLoaded) fallbackToOsm() },8000);
+  document.head.appendChild(s);
+} else if(window.L){
   lm=L.map('map').setView([36.5,128],6);
   layer=L.featureGroup().addTo(lm);
   rebuildTiles();
-}else $('mapmsg').style.display='block';
+} else $('mapmsg').style.display='block';
 render();draw();fit();
 </script>
 </body>
