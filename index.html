@@ -102,9 +102,13 @@ input[type=text],input[type=password],textarea{font-size:16px}
     <button id="savenaver" class="btn g">Naver 키 저장</button>
     <label style="margin-top:14px">지도 타일이 안 보이면 브라우저(Safari/Chrome)에서 직접 열어주세요. 미리보기에서는 외부 이미지가 차단될 수 있어요.</label>
     <label style="margin-top:14px">Google My Maps URL (내 지도)</label>
-    <input type="text" id="mymapsUrl" placeholder="https://www.google.com/maps/d/...">
+    <input type="text" id="mymapsUrl" placeholder="https://www.google.com/maps/d/viewer?mid=...">
     <button id="saveMyMaps" class="btn g">내 지도 URL 저장</button>
     <button id="openMyMapsBtn" class="btn g">🗺️ 내 지도 열기</button>
+    <small style="display:block;margin-top:6px;color:var(--sub);font-size:11px">Google My Maps → 지도 열기 → 공유 → 링크 복사 (mid= 포함된 주소)</small>
+    <label style="margin-top:14px">Google My Maps 임베드 URL (선택)</label>
+    <input type="text" id="mymapsEmbed" placeholder="https://www.google.com/maps/d/u/0/embed?mid=...">
+    <button id="saveMyMapsEmbed" class="btn g">임베드 URL 저장</button>
     <label style="margin-top:14px">KMZ 내보내기 (Google Earth/Maps)</label>
     <button id="exportKmzBtn" class="btn g">📤 KMZ 파일 다운로드</button>
     <label style="margin-top:14px">KMZ 가져오기 (Google My Maps)</label>
@@ -277,9 +281,11 @@ function showSheet(){
   const i=items.find(x=>x.id===cur);if(!i)return closeSheet();
   const q=encodeURIComponent((i.name+' '+(i.address||'')).trim());
   const gkey=(ls.get('TRAVEL_GMAP_KEY')||'').trim();
+  const myEmbed=(ls.get('TRIP_MYMMaps_EMBED')||'').trim();
   let mapFrame='';
   if(emb){
-    if(gkey) mapFrame=`<iframe class="big" src="https://www.google.com/maps/embed/v1/search?key=${encodeURIComponent(gkey)}&q=${q}&zoom=15" allowfullscreen loading="lazy"></iframe>`;
+    if(myEmbed) mapFrame=`<iframe class="big" src="${esc(myEmbed)}" allowfullscreen loading="lazy"></iframe>`;
+    else if(gkey) mapFrame=`<iframe class="big" src="https://www.google.com/maps/embed/v1/search?key=${encodeURIComponent(gkey)}&q=${q}&zoom=15" allowfullscreen loading="lazy"></iframe>`;
     else if(i.lat&&i.lng) mapFrame=`<iframe class="big" src="https://www.openstreetmap.org/export/embed.html?bbox=${i.lng-0.01},${i.lat-0.01},${i.lng+0.01},${i.lat+0.01}&layer=mapnik&marker=${i.lat},${i.lng}"></iframe>`;
     else mapFrame=`<div class="empty"><i>🗺️</i>지도 API 키가 없어요. 설정 탭에서 Google Maps API 키를 넣거나 아래 구글지도 링크를 사용하세요.</div>`;
   }
@@ -409,31 +415,16 @@ $('mapProvider').onchange=()=>{ls.set('TRIP_MAP_PROVIDER',$('mapProvider').value
 $('bkOut').onclick=()=>{const t=JSON.stringify(items);$('bk').value=t;$('bk').select();try{navigator.clipboard.writeText(t).then(()=>toast('백업을 복사했어요. 메모 앱 등에 붙여넣어 보관하세요')).catch(()=>toast('위 내용을 직접 복사해 보관하세요'))}catch(e){toast('위 내용을 직접 복사해 보관하세요')}};
 $('bkIn').onclick=()=>{try{const d=JSON.parse($('bk').value);if(!Array.isArray(d))throw 0;items=d;save();fit();toast(d.length+'개 항목을 복원했어요')}catch(e){toast('백업 내용이 올바르지 않아요')}};
 $('saveMyMaps').onclick=()=>{const v=$('mymapsUrl').value.trim(); ls.set('TRIP_MYMMaps_URL',v); toast(v?'내 지도 URL이 저장되었어요':'URL이 비워졌어요');};
+$('saveMyMapsEmbed').onclick=()=>{const v=$('mymapsEmbed').value.trim(); ls.set('TRIP_MYMMaps_EMBED',v); toast(v?'임베드 URL이 저장되었어요':'URL이 비워졌어요');};
 $('openMyMapsBtn').onclick=()=>{
-  const url=ls.get('TRIP_MYMMaps_URL')||'';
-  if(url){ window.open(url,'_blank'); toast('내 지도를 열었어요'); }
-  else { window.open('https://www.google.com/maps/d/','_blank'); toast('Google My Maps에서 새 지도를 만들거나 가져오기(KMZ)를 사용하세요'); }
-};
-function splitCSV(line){const res=[];let cur='';let inQ=false;for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"'){inQ=!inQ;}else if(ch===','&&!inQ){res.push(cur);cur='';}else cur+=ch;}res.push(cur);return res.map(s=>s.trim().replace(/^"|"$/g,''));}
-function parseCSV(text){const lines=text.trim().split(/\r?\n/);if(!lines.length)return[];const first=lines[0].toLowerCase();const hasHeader=first.includes('name')||first.includes('이름')||first.includes('주소')||first.includes('address');const header=hasHeader?lines[0].split(',').map(h=>h.trim().toLowerCase()):null;const rows=hasHeader?lines.slice(1):lines;return rows.filter(r=>r.trim()).map(row=>{const cols=splitCSV(row);if(header){const obj={};header.forEach((h,i)=>{obj[h]=cols[i]||'';});return obj;}return{name:cols[0],address:cols[1],lat:cols[2],lng:cols[3]};});}
-$('importBtn').onclick=()=>$('importFile').click();
-$('importFile').onchange=async e=>{
-  const f=e.target.files[0];e.target.value='';if(!f)return;
-  try{
-    const text=await f.text();
-    const rows=parseCSV(text);
-    let count=0;
-    rows.forEach(r=>{
-      const name=r.name||r.이름||r.title||r.장소; if(!name) return;
-      const catRaw=(r.category||r.카테고리||r.type||'PLACE').toString().toUpperCase();
-      const cat=CATS[catRaw]?catRaw:'PLACE';
-      const lat=parseFloat(r.lat||r.위도||r.latitude||0)||0;
-      const lng=parseFloat(r.lng||r.경도||r.longitude||0)||0;
-      items.unshift({id:'i'+Date.now()+Math.random().toString(36).slice(2,5),category:cat,name,address:r.address||r.주소||'',info:r.info||r.정보||r.note||'',lat,lng,img:pic(name,0),q:name,v:0,done:false});
-      count++;
-    });
-    save();fit();toast(count+'개 항목을 가져왔어요');
-  }catch(err){toast('CSV 가져오기 실패: '+err.message)}
+  const url=(ls.get('TRIP_MYMMaps_URL')||'').trim();
+  if(url){
+    if(!url.includes('maps/d') && !url.includes('mid=')){ toast('Google My Maps 공유 링크(mid= 포함)를 넣어주세요'); return; }
+    window.open(url,'_blank'); toast('내 지도를 열었어요');
+  } else {
+    window.open('https://www.google.com/maps/d/','_blank');
+    toast('Google My Maps에서 지도를 만들고 공유 링크를 복사해 넣어주세요');
+  }
 };
 $('exportKmzBtn').onclick=async()=>{
   if(!items.length){toast('내보낼 항목이 없어요');return;}
@@ -460,6 +451,27 @@ $('exportKmzBtn').onclick=async()=>{
     setTimeout(()=>URL.revokeObjectURL(a.href),1000);
     toast('KMZ 파일을 다운로드했어요');
   }catch(e){toast('KMZ 내보내기 실패: '+e.message)}
+};
+function splitCSV(line){const res=[];let cur='';let inQ=false;for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"'){inQ=!inQ;}else if(ch===','&&!inQ){res.push(cur);cur='';}else cur+=ch;}res.push(cur);return res.map(s=>s.trim().replace(/^"|"$/g,''));}
+function parseCSV(text){const lines=text.trim().split(/\r?\n/);if(!lines.length)return[];const first=lines[0].toLowerCase();const hasHeader=first.includes('name')||first.includes('이름')||first.includes('주소')||first.includes('address');const header=hasHeader?lines[0].split(',').map(h=>h.trim().toLowerCase()):null;const rows=hasHeader?lines.slice(1):lines;return rows.filter(r=>r.trim()).map(row=>{const cols=splitCSV(row);if(header){const obj={};header.forEach((h,i)=>{obj[h]=cols[i]||'';});return obj;}return{name:cols[0],address:cols[1],lat:cols[2],lng:cols[3]};});}
+$('importBtn').onclick=()=>$('importFile').click();
+$('importFile').onchange=async e=>{
+  const f=e.target.files[0];e.target.value='';if(!f)return;
+  try{
+    const text=await f.text();
+    const rows=parseCSV(text);
+    let count=0;
+    rows.forEach(r=>{
+      const name=r.name||r.이름||r.title||r.장소; if(!name) return;
+      const catRaw=(r.category||r.카테고리||r.type||'PLACE').toString().toUpperCase();
+      const cat=CATS[catRaw]?catRaw:'PLACE';
+      const lat=parseFloat(r.lat||r.위도||r.latitude||0)||0;
+      const lng=parseFloat(r.lng||r.경도||r.longitude||0)||0;
+      items.unshift({id:'i'+Date.now()+Math.random().toString(36).slice(2,5),category:cat,name,address:r.address||r.주소||'',info:r.info||r.정보||r.note||'',lat,lng,img:pic(name,0),q:name,v:0,done:false});
+      count++;
+    });
+    save();fit();toast(count+'개 항목을 가져왔어요');
+  }catch(err){toast('CSV 가져오기 실패: '+err.message)}
 };
 $('importKmzBtn').onclick=()=>$('importKmzFile').click();
 $('importKmzFile').onchange=async e=>{
@@ -498,6 +510,7 @@ $('gkey').value=ls.get('TRAVEL_GEMINI_KEY')||'';
 $('gmapkey').value=ls.get('TRAVEL_GMAP_KEY')||'';
 $('naverkey').value=ls.get('TRAVEL_NAVER_KEY')||'';
 $('mymapsUrl').value=ls.get('TRIP_MYMMaps_URL')||'';
+$('mymapsEmbed').value=ls.get('TRIP_MYMMaps_EMBED')||'';
 if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{})}
 if(!ls.get('TRIP_ONBOARD')){setTimeout(()=>toast('찾기 탭에서 장소를 추가해 보세요. 사진·이름으로 검색할 수 있어요.'),800);ls.set('TRIP_ONBOARD','1')}
 const _gkey=(ls.get('TRAVEL_GMAP_KEY')||'').trim();
