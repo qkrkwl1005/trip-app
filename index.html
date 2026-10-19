@@ -103,6 +103,9 @@ input[type=text],input[type=password],textarea{font-size:16px}
     <label style="margin-top:14px">지도 타일이 안 보이면 브라우저(Safari/Chrome)에서 직접 열어주세요. 미리보기에서는 외부 이미지가 차단될 수 있어요.</label>
     <label style="margin-top:14px">KMZ 내보내기 (Google Earth/Maps)</label>
     <button id="exportKmzBtn" class="btn g">📤 KMZ 파일 다운로드</button>
+    <label style="margin-top:14px">KMZ 가져오기 (Google My Maps)</label>
+    <button id="importKmzBtn" class="btn g">📥 KMZ 파일 선택</button>
+    <input type="file" id="importKmzFile" accept=".kmz,application/vnd.google-earth.kmz" hidden>
     <label style="margin-top:14px">CSV 가져오기 (Google My Maps / Takeout)</label>
     <button id="importBtn" class="btn g">📥 CSV 파일 선택</button>
     <input type="file" id="importFile" accept=".csv,text/csv" hidden>
@@ -116,6 +119,7 @@ input[type=text],input[type=password],textarea{font-size:16px}
 <div id="sheet"><div class="sh" id="sbody"></div></div>
 <input type="file" id="own" accept="image/*" hidden>
 <input type="file" id="importFile" accept=".csv,text/csv" hidden>
+<input type="file" id="importKmzFile" accept=".kmz,application/vnd.google-earth.kmz" hidden>
 <div id="toast"></div>
 <div id="ptr">↻ 새로고침</div>
 
@@ -420,6 +424,35 @@ $('importFile').onchange=async e=>{
     });
     save();fit();toast(count+'개 항목을 가져왔어요');
   }catch(err){toast('CSV 가져오기 실패: '+err.message)}
+};
+$('importKmzBtn').onclick=()=>$('importKmzFile').click();
+$('importKmzFile').onchange=async e=>{
+  const f=e.target.files[0];e.target.value='';if(!f)return;
+  try{
+    const zip=await JSZip.loadAsync(await f.arrayBuffer());
+    const kmlFile=zip.file(/\.kml$/i)[0];
+    if(!kmlFile) throw new Error('KMZ 안에 KML이 없어요');
+    const text=await kmlFile.async('text');
+    const xml=new DOMParser().parseFromString(text,'application/xml');
+    const placemarks=xml.getElementsByTagName('Placemark');
+    let count=0;
+    for(const pm of placemarks){
+      const name=pm.getElementsByTagName('name')[0]?.textContent?.trim();
+      if(!name) continue;
+      const desc=pm.getElementsByTagName('description')[0]?.textContent?.trim()||'';
+      const coordNode=pm.querySelector('Point coordinates') || pm.getElementsByTagName('coordinates')[0];
+      const coordText=coordNode?.textContent?.trim();
+      if(!coordText) continue;
+      const parts=coordText.split(/[\s,]+/).filter(Boolean);
+      const lng=parseFloat(parts[0]); const lat=parseFloat(parts[1]);
+      if(isNaN(lat)||isNaN(lng)) continue;
+      const folder=pm.closest?.('Folder')?.getElementsByTagName('name')[0]?.textContent?.trim()||'';
+      const cat= /food|먹|restaurant/i.test(folder+name+desc)?'FOOD':/shop|구매|buy/i.test(folder+name+desc)?'SHOP':'PLACE';
+      items.unshift({id:'i'+Date.now()+Math.random().toString(36).slice(2,5),category:cat,name,address:desc,lat,lng,img:pic(name,0),q:name,v:0,done:false,info:desc});
+      count++;
+    }
+    save();fit();toast(count+'개 장소를 KMZ에서 가져왔어요');
+  }catch(err){toast('KMZ 가져오기 실패: '+err.message)}
 };
 $('exportKmzBtn').onclick=async()=>{
   if(!items.length){toast('내보낼 항목이 없어요');return;}
