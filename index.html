@@ -101,6 +101,8 @@ input[type=text],input[type=password],textarea{font-size:16px}
     <input type="password" id="naverkey" placeholder="NCP API Key ID">
     <button id="savenaver" class="btn g">Naver 키 저장</button>
     <label style="margin-top:14px">지도 타일이 안 보이면 브라우저(Safari/Chrome)에서 직접 열어주세요. 미리보기에서는 외부 이미지가 차단될 수 있어요.</label>
+    <label style="margin-top:14px">KMZ 내보내기 (Google Earth/Maps)</label>
+    <button id="exportKmzBtn" class="btn g">📤 KMZ 파일 다운로드</button>
     <label style="margin-top:14px">CSV 가져오기 (Google My Maps / Takeout)</label>
     <button id="importBtn" class="btn g">📥 CSV 파일 선택</button>
     <input type="file" id="importFile" accept=".csv,text/csv" hidden>
@@ -118,6 +120,7 @@ input[type=text],input[type=password],textarea{font-size:16px}
 <div id="ptr">↻ 새로고침</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
 const $=id=>document.getElementById(id);
 const ls={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v);return 1}catch(e){return 0}}};
@@ -417,6 +420,32 @@ $('importFile').onchange=async e=>{
     });
     save();fit();toast(count+'개 항목을 가져왔어요');
   }catch(err){toast('CSV 가져오기 실패: '+err.message)}
+};
+$('exportKmzBtn').onclick=async()=>{
+  if(!items.length){toast('내보낼 항목이 없어요');return;}
+  try{
+    const kml=`<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Document>
+  <name>TripSync Master</name>
+  <description>여행 장소·먹거리·쇼핑</description>
+  ${items.filter(i=>i.lat&&i.lng).map(i=>`<Placemark>
+    <name>${esc(i.name)}</name>
+    <description>${esc((i.address||'')+' '+(i.info||'')+' '+(i.note||''))}</description>
+    <Point><coordinates>${i.lng},${i.lat},0</coordinates></Point>
+  </Placemark>`).join('\n')}
+</Document>
+</kml>`;
+    const zip=new JSZip();
+    zip.file('doc.kml', kml);
+    const blob=await zip.generateAsync({type:'blob'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='tripsync.kmz';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+    toast('KMZ 파일을 다운로드했어요');
+  }catch(e){toast('KMZ 내보내기 실패: '+e.message)}
 };
 addEventListener('resize',()=>lm&&lm.invalidateSize());
 
