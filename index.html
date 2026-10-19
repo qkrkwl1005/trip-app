@@ -49,6 +49,8 @@ input:focus,textarea:focus{border-color:var(--pr)}textarea{min-height:76px;resiz
 #sheet{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center}#sheet.on{display:flex}
 .sh{background:var(--s);width:100%;max-width:520px;max-height:92dvh;overflow-y:auto;border-radius:22px 22px 0 0;padding:16px 16px calc(18px + env(safe-area-inset-bottom))}
 #toast{position:fixed;left:50%;bottom:20px;transform:translate(-50%,150%);max-width:90vw;z-index:9999;background:var(--s);color:var(--tx);border:1px solid var(--bd);border-left:4px solid var(--pr);padding:12px 16px;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,.4);font-size:13px;font-weight:600;opacity:0;transition:.25s}#toast.show{transform:translate(-50%,0);opacity:1}
+#ptr{position:fixed;top:0;left:50%;transform:translate(-50%,-100%);z-index:100000;padding:10px 18px;background:var(--s);color:var(--tx);border-radius:0 0 14px 14px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;font-weight:700;transition:transform .2s,opacity .2s;opacity:0}
+#ptr.show{transform:translate(-50%,0);opacity:1}
 @media(max-width:820px){
 #side{width:100%;min-width:0;border:0}
 #nav{position:fixed;left:0;right:0;bottom:0;z-index:40;grid-template-columns:repeat(6,1fr);border:0;border-top:1px solid var(--bd);padding:4px 4px calc(4px + env(safe-area-inset-bottom))}
@@ -108,6 +110,7 @@ input[type=text],input[type=password],textarea{font-size:16px}
 <div id="sheet"><div class="sh" id="sbody"></div></div>
 <input type="file" id="own" accept="image/*" hidden>
 <div id="toast"></div>
+<div id="ptr">↻ 새로고침</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
@@ -137,9 +140,10 @@ function rebuildTiles(){
 function onTileError(){tileFails++;if(tileIndex===0&&tileFails>3){tileIndex=1;tileFails=0;rebuildTiles();toast('지도 타일을 전환했어요')}else if(tileIndex===1){$('mapmsg').style.display='block'}}
 function onTileLoad(){tileFails=0;$('mapmsg').style.display='none'}
 function setTheme(t){document.documentElement.dataset.theme=t;ls.set('TRIP_THEME',t);$('themeBtn').textContent=t==='dark'?'☀️':'🌙';if(lm)rebuildTiles()}
-function fallbackToOsm(){
+function fallbackToOsm(reason){
   if(lm) return; // already osm
   gmap=null;
+  console.warn('fallbackToOsm:',reason||'unknown');
   if(window.L){
     lm=L.map('map').setView([36.5,128],6);
     layer=L.featureGroup().addTo(lm);
@@ -256,7 +260,7 @@ function save(){persist();render();draw()}
 function showSheet(){
   const i=items.find(x=>x.id===cur);if(!i)return closeSheet();
   const q=encodeURIComponent((i.name+' '+(i.address||'')).trim());
-  const _gk=ls.get('TRAVEL_GMAP_KEY')||''; const gkey=/^AIza[\w-]{20,}$/.test(_gk)?_gk:'';
+  const gkey=(ls.get('TRAVEL_GMAP_KEY')||'').trim();
   let mapFrame='';
   if(emb){
     if(gkey) mapFrame=`<iframe class="big" src="https://www.google.com/maps/embed/v1/search?key=${encodeURIComponent(gkey)}&q=${q}&zoom=15" allowfullscreen loading="lazy"></iframe>`;
@@ -381,8 +385,8 @@ $('file').onchange=e=>{pend=[...e.target.files];e.target.value='';$('pc').textCo
 $('go').onclick=find;
 $('q').onkeydown=e=>{if(e.key==='Enter')find()};
 $('themeBtn').onclick=()=>setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
-$('savek').onclick=()=>{const v=$('gkey').value.trim(); if(v&&!/^AIza[\w-]{20,}$/.test(v)){toast('올바른 Gemini API 키 형식이 아니에요');return;} ls.set('TRAVEL_GEMINI_KEY',v);toast('API 키가 저장되었습니다.')};
-$('savegmap').onclick=()=>{const v=$('gmapkey').value.trim(); if(v&&!/^AIza[\w-]{20,}$/.test(v)){toast('올바른 Google Maps API 키 형식이 아니에요');return;} ls.set('TRAVEL_GMAP_KEY',v);toast('Google 키가 저장되었습니다.')};
+$('savek').onclick=()=>{const v=$('gkey').value.trim(); ls.set('TRAVEL_GEMINI_KEY',v);toast(v?'API 키가 저장되었습니다.':'API 키가 비워졌어요.')};
+$('savegmap').onclick=()=>{const v=$('gmapkey').value.trim(); ls.set('TRAVEL_GMAP_KEY',v);toast(v?'Google 키가 저장되었습니다.':'Google 키가 비워졌어요.')};
 $('savenaver').onclick=()=>{const v=$('naverkey').value.trim(); if(!v){toast('Naver 키를 입력하세요');return;} ls.set('TRAVEL_NAVER_KEY',v);toast('Naver 키가 저장되었습니다.')};
 $('mapProvider').onchange=()=>{ls.set('TRIP_MAP_PROVIDER',$('mapProvider').value);toast('지도 제공자가 변경되었습니다. 페이지를 새로고침하세요.')};
 $('bkOut').onclick=()=>{const t=JSON.stringify(items);$('bk').value=t;$('bk').select();try{navigator.clipboard.writeText(t).then(()=>toast('백업을 복사했어요. 메모 앱 등에 붙여넣어 보관하세요')).catch(()=>toast('위 내용을 직접 복사해 보관하세요'))}catch(e){toast('위 내용을 직접 복사해 보관하세요')}};
@@ -390,14 +394,13 @@ $('bkIn').onclick=()=>{try{const d=JSON.parse($('bk').value);if(!Array.isArray(d
 addEventListener('resize',()=>lm&&lm.invalidateSize());
 
 setTheme(ls.get('TRIP_THEME')||'dark');
-const _gk=ls.get('TRAVEL_GEMINI_KEY')||''; if(_gk&&!/^AIza[\w-]{20,}$/.test(_gk)) ls.set('TRAVEL_GEMINI_KEY','');
-const _gm=ls.get('TRAVEL_GMAP_KEY')||''; if(_gm&&!/^AIza[\w-]{20,}$/.test(_gm)) ls.set('TRAVEL_GMAP_KEY','');
+// API 키는 형식 검증 없이 그대로 사용 (Google AI Studio 키 등 다양한 형식 지원)
 $('gkey').value=ls.get('TRAVEL_GEMINI_KEY')||'';
 $('gmapkey').value=ls.get('TRAVEL_GMAP_KEY')||'';
 $('naverkey').value=ls.get('TRAVEL_NAVER_KEY')||'';
 if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{})}
 if(!ls.get('TRIP_ONBOARD')){setTimeout(()=>toast('찾기 탭에서 장소를 추가해 보세요. 사진·이름으로 검색할 수 있어요.'),800);ls.set('TRIP_ONBOARD','1')}
-const _gk2=ls.get('TRAVEL_GMAP_KEY')||''; const _gkey=/^AIza[\w-]{20,}$/.test(_gk2)?_gk2:'';
+const _gkey=(ls.get('TRAVEL_GMAP_KEY')||'').trim();
 const _nkey=ls.get('TRAVEL_NAVER_KEY')||'';
 mapProvider=ls.get('TRIP_MAP_PROVIDER')||'osm';
 $('mapProvider').value=mapProvider;
@@ -433,14 +436,16 @@ function requestLocation(){
 }
 $('locBtn').onclick=requestLocation;
 
+window.gm_authFailure = function(){ toast('Google Maps 인증 실패: API 키/도메인/결제 설정을 확인하세요 (F12 콘솔 참고)'); fallbackToOsm('gm_authFailure'); };
+
 if(mapProvider==='google' && _gkey){
   let gLoaded=false;
   const s=document.createElement('script');
   s.src='https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(_gkey)+'&loading=async';
   s.async=true;s.defer=true;
-  s.onload=()=>{ try{ if(!window.google||!google.maps) throw new Error('google.maps 없음'); gmap=new google.maps.Map($('map'),{center:{lat:36.5,lng:128},zoom:6}); gLoaded=true; draw(); fit(); setTimeout(()=>{ if(gmap && !document.querySelector('.gm-style')) fallbackToOsm() },4000); }catch(e){ fallbackToOsm() } };
-  s.onerror=()=>{ fallbackToOsm() };
-  const gTimer=setTimeout(()=>{ if(!gLoaded) fallbackToOsm() },8000);
+  s.onload=()=>{ setTimeout(()=>{ try{ if(!window.google||!google.maps) throw new Error('google.maps 없음'); gmap=new google.maps.Map($('map'),{center:{lat:36.5,lng:128},zoom:6}); gLoaded=true; draw(); fit(); console.log('Google Map initialized'); }catch(e){ console.error('Google init error:',e); fallbackToOsm('init-error') } },100); };
+  s.onerror=(e)=>{ console.error('Google script error:',e); fallbackToOsm('script-error') };
+  const gTimer=setTimeout(()=>{ if(!gLoaded) fallbackToOsm('timeout') },8000);
   document.head.appendChild(s);
 } else if(mapProvider==='naver' && _nkey){
   const s=document.createElement('script');
@@ -454,6 +459,29 @@ if(mapProvider==='google' && _gkey){
   layer=L.featureGroup().addTo(lm);
   rebuildTiles();
 } else $('mapmsg').style.display='block';
+// Pull-to-refresh (iOS PWA)
+let ptrStartY=0, ptrDy=0, ptrActive=false;
+document.addEventListener('touchstart',e=>{
+  if(window.scrollY===0 && e.touches.length===1){ ptrStartY=e.touches[0].clientY; ptrDy=0; ptrActive=true; }
+}, {passive:true});
+document.addEventListener('touchmove',e=>{
+  if(!ptrActive) return;
+  ptrDy=e.touches[0].clientY-ptrStartY;
+  if(ptrDy>0){
+    const p=Math.min(ptrDy,90);
+    const el=$('ptr');
+    el.classList.add('show');
+    el.style.transform=`translate(-50%, ${p-90}px)`;
+  }
+}, {passive:true});
+document.addEventListener('touchend',()=>{
+  if(!ptrActive) return;
+  ptrActive=false;
+  const el=$('ptr');
+  el.classList.remove('show');
+  el.style.transform='translate(-50%,-100%)';
+  if(ptrDy>80){ location.reload(); }
+});
 render();draw();fit();
 </script>
 </body>
