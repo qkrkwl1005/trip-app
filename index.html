@@ -8,6 +8,7 @@
 <meta name="theme-color" content="#0f1115">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%231e3a8a'/%3E%3Cpath d='M256 96 L416 224 L256 208 L96 224 Z' fill='white'/%3E%3Cpath d='M256 208 L256 384 L224 416 L288 416 L256 384' fill='white'/%3E%3Cpath d='M256 208 L320 320 L288 320 L256 288 L224 320 L192 320 Z' fill='white'/%3E%3C/svg%3E">
 <title>TripSync Master</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
@@ -249,7 +250,7 @@ function draw(){
     gmarkers.forEach(m=>m.setMap(null));gmarkers=[];
     items.filter(i=>i.lat&&i.lng).forEach(i=>{
       const m=new google.maps.Marker({position:{lat:i.lat,lng:i.lng},map:gmap,title:i.name});
-      m.addListener('click',()=>{view='photo';cur=i.id;showSheet()});
+      m.addListener('click',()=>{emb=false;cur=i.id;showSheet()});
       gmarkers.push(m);
     });
     return;
@@ -258,7 +259,7 @@ function draw(){
     nmarkers.forEach(m=>m.setMap(null));nmarkers=[];
     items.filter(i=>i.lat&&i.lng).forEach(i=>{
       const m=new naver.maps.Marker({position:new naver.maps.LatLng(i.lat,i.lng),map:nmap,title:i.name});
-      naver.maps.Event.addListener(m,'click',()=>{view='photo';cur=i.id;showSheet()});
+      naver.maps.Event.addListener(m,'click',()=>{emb=false;cur=i.id;showSheet()});
       nmarkers.push(m);
     });
     return;
