@@ -142,7 +142,7 @@ const SUF=['',' photo',' review',' menu',' exterior'];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const pic=(q,v=0)=>'https://tse1.mm.bing.net/th?w=480&h=360&c=7&rs=1&p=0&q='+encodeURIComponent(String(q||'').trim()+SUF[v%5]);
-let items=[],cat='PLACE',pend=[],res=[],lm=null,tl=null,layer=null,pins={},lastGeo=0,tt,cur=null,emb=false,tileIndex=1,tileFails=0,gmap=null,gmarkers=[],glocMarker=null,nmap=null,nmarkers=[],nlocMarker=null,mapProvider='osm';
+let items=[],cat='PLACE',pend=[],res=[],lm=null,tl=null,layer=null,pins={},lastGeo=0,tt,cur=null,view='photo',tileIndex=1,tileFails=0,gmap=null,gmarkers=[],glocMarker=null,nmap=null,nmarkers=[],nlocMarker=null,mapProvider='osm';
 try{items=JSON.parse(ls.get('TRIP_MASTER_ITEMS')||'[]')}catch(e){items=[]}
 let photoCache={};try{photoCache=JSON.parse(ls.get('TRIP_PHOTO_CACHE')||'{}')}catch(e){photoCache={}}
 function savePhotoCache(){ls.set('TRIP_PHOTO_CACHE',JSON.stringify(photoCache))}
@@ -243,7 +243,7 @@ function draw(){
     gmarkers.forEach(m=>m.setMap(null));gmarkers=[];
     items.filter(i=>i.lat&&i.lng).forEach(i=>{
       const m=new google.maps.Marker({position:{lat:i.lat,lng:i.lng},map:gmap,title:i.name});
-      m.addListener('click',()=>{emb=false;cur=i.id;showSheet()});
+      m.addListener('click',()=>{view='photo';cur=i.id;showSheet()});
       gmarkers.push(m);
     });
     return;
@@ -252,7 +252,7 @@ function draw(){
     nmarkers.forEach(m=>m.setMap(null));nmarkers=[];
     items.filter(i=>i.lat&&i.lng).forEach(i=>{
       const m=new naver.maps.Marker({position:new naver.maps.LatLng(i.lat,i.lng),map:nmap,title:i.name});
-      naver.maps.Event.addListener(m,'click',()=>{emb=false;cur=i.id;showSheet()});
+      naver.maps.Event.addListener(m,'click',()=>{view='photo';cur=i.id;showSheet()});
       nmarkers.push(m);
     });
     return;
@@ -282,16 +282,17 @@ function showSheet(){
   const q=encodeURIComponent((i.name+' '+(i.address||'')).trim());
   const gkey=(ls.get('TRAVEL_GMAP_KEY')||'').trim();
   const myEmbed=(ls.get('TRIP_MYMMaps_EMBED')||'').trim();
+  const isMap=view!=='photo';
   let mapFrame='';
-  if(emb){
-    if(myEmbed) mapFrame=`<iframe class="big" src="${esc(myEmbed)}" allowfullscreen loading="lazy"></iframe>`;
-    else if(gkey) mapFrame=`<iframe class="big" src="https://www.google.com/maps/embed/v1/search?key=${encodeURIComponent(gkey)}&q=${q}&zoom=15" allowfullscreen loading="lazy"></iframe>`;
-    else if(i.lat&&i.lng) mapFrame=`<iframe class="big" src="https://www.openstreetmap.org/export/embed.html?bbox=${i.lng-0.01},${i.lat-0.01},${i.lng+0.01},${i.lat+0.01}&layer=mapnik&marker=${i.lat},${i.lng}"></iframe>`;
+  if(isMap){
+    if(view==='mymaps' && myEmbed) mapFrame=`<iframe class="big" src="${esc(myEmbed)}" allowfullscreen loading="lazy" style="min-height:300px"></iframe>`;
+    else if(view==='google' && gkey) mapFrame=`<iframe class="big" src="https://www.google.com/maps/embed/v1/search?key=${encodeURIComponent(gkey)}&q=${q}&zoom=15" allowfullscreen loading="lazy" style="min-height:300px"></iframe>`;
+    else if(i.lat&&i.lng) mapFrame=`<iframe class="big" src="https://www.openstreetmap.org/export/embed.html?bbox=${i.lng-0.01},${i.lat-0.01},${i.lng+0.01},${i.lat+0.01}&layer=mapnik&marker=${i.lat},${i.lng}" style="min-height:300px"></iframe>`;
     else mapFrame=`<div class="empty"><i>🗺️</i>지도 API 키가 없어요. 설정 탭에서 Google Maps API 키를 넣거나 아래 구글지도 링크를 사용하세요.</div>`;
   }
-  $('sbody').innerHTML=(emb?mapFrame:ph(CATS[i.category].e,i.img,'big'))
+  $('sbody').innerHTML=(isMap?mapFrame:ph(CATS[i.category].e,i.img,'big'))
   +`<div class="nm" style="font-size:19px">${esc(i.name)}</div><div class="ds" style="-webkit-line-clamp:4">${esc(i.address||'')}</div>${i.info?`<div class="ds in">${esc(i.info)}</div>`:''}
-  <div class="act"><button class="mb" data-act="rot">↻ 다른 사진</button><button class="mb" data-act="photo">🖼️ 대표 사진</button><button class="mb" data-act="own">📷 내 사진</button><button class="mb" data-act="emb">${emb?'🖼️ 사진':'🗺️ 지도'}</button>${i.lat?'<button class="mb" data-act="pin">📍 지도 탭</button>':''}<button class="mb" data-act="share">↗ 공유</button></div>
+  <div class="act"><button class="mb" data-act="rot">↻ 다른 사진</button><button class="mb" data-act="photo">🖼️ 사진</button><button class="mb" data-act="view" data-view="google">🗺️ 구글지도</button><button class="mb" data-act="view" data-view="mymaps">🗺️ 내지도</button><button class="mb" data-act="view" data-view="osm">🗺️ OSM</button><button class="mb" data-act="own">📷 내 사진</button>${i.lat?'<button class="mb" data-act="pin">📍 지도 탭</button>':''}<button class="mb" data-act="share">↗ 공유</button></div>
   <textarea id="memo" placeholder="메모 (가격, 영업시간, 같이 갈 사람...)">${esc(i.note||'')}</textarea>
   <div class="act"><a class="mb pr" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${q}">구글지도 ↗</a><a class="mb" target="_blank" rel="noopener" href="https://www.google.com/search?q=${encodeURIComponent(i.name)}">검색 ↗</a><button class="mb dg" data-act="del">삭제</button><button class="mb" data-act="close" style="margin-left:auto">닫기</button></div>`;
   $('sheet').classList.add('on');
@@ -382,12 +383,13 @@ document.addEventListener('click',e=>{
   const a=b.dataset.act,i=items.find(x=>x.id===(b.dataset.id||cur));
   if(a==='sw'){res[b.dataset.k].v++;const c=res[b.dataset.k];c.img=pic(c.name+' '+c.h,c.v);drawRes()}
   else if(a==='pick')pick(+b.dataset.k);
-  else if(a==='open'){emb=false;cur=b.dataset.id;showSheet()}
+  else if(a==='open'){view='photo';cur=b.dataset.id;showSheet()}
   else if(a==='close')closeSheet();
   else if(a==='rot'&&i){i.v=(i.v||0)+1;i.img=pic(i.q||i.name,i.v);save();showSheet()}
-  else if(a==='photo'&&i){(async()=>{toast('대표 사진 찾는 중...');const u=await fetchRepPhoto(i.name+' '+(i.address||''));if(u){i.img=u;save();showSheet();toast('대표 사진을 찾았어요')}else toast('대표 사진을 찾지 못했어요')})()}
-  else if(a==='own')$('own').click();
-  else if(a==='emb'){emb=!emb;showSheet()}
+  else if(a==='photo'){view='photo';showSheet()}
+  else if(a==='view'){view=b.dataset.view;showSheet()}
+  else if(a==='own'){$('own').click()}
+  else if(a==='emb'){view=view==='photo'?'google':'photo';showSheet()}
   else if(a==='pin'&&i){closeSheet();tab('map');setTimeout(()=>{if(lm){lm.setView([i.lat,i.lng],16);pins[i.id]&&pins[i.id].openPopup()}},200)}
   else if(a==='share'&&i){if(navigator.share){navigator.share({title:i.name,text:i.address||'',url:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(i.name+' '+(i.address||''))}`}).catch(()=>{})}else toast('공유를 지원하지 않는 브라우저예요')}
   else if(a==='del'&&i){if(b.dataset.sure){items=items.filter(x=>x.id!==i.id);closeSheet();save()}else{b.dataset.sure=1;b.textContent='한 번 더 누르면 삭제'}}
@@ -399,7 +401,7 @@ document.addEventListener('change',e=>{
 document.addEventListener('input',e=>{if(e.target.id==='memo'){const i=items.find(x=>x.id===cur);if(i){i.note=e.target.value;persist()}}});
 $('own').onchange=async e=>{
   const f=e.target.files[0],i=items.find(x=>x.id===cur);e.target.value='';if(!f||!i)return;
-  try{i.img=await shrink(f,480,.72);emb=false;save();showSheet()}catch(err){toast(err.message)}
+  try{i.img=await shrink(f,480,.72);view='photo';save();showSheet()}catch(err){toast(err.message)}
 };
 $('nav').onclick=e=>{const b=e.target.closest('[data-tab]');if(b)tab(b.dataset.tab)};
 $('seg').onclick=e=>{const d=e.target.closest('[data-cat]');if(!d)return;cat=d.dataset.cat;[...$('seg').children].forEach(x=>x.classList.toggle('on',x===d))};
@@ -414,10 +416,12 @@ $('savenaver').onclick=()=>{const v=$('naverkey').value.trim(); if(!v){toast('Na
 $('mapProvider').onchange=()=>{ls.set('TRIP_MAP_PROVIDER',$('mapProvider').value);toast('지도 제공자가 변경되었습니다. 페이지를 새로고침하세요.')};
 $('bkOut').onclick=()=>{const t=JSON.stringify(items);$('bk').value=t;$('bk').select();try{navigator.clipboard.writeText(t).then(()=>toast('백업을 복사했어요. 메모 앱 등에 붙여넣어 보관하세요')).catch(()=>toast('위 내용을 직접 복사해 보관하세요'))}catch(e){toast('위 내용을 직접 복사해 보관하세요')}};
 $('bkIn').onclick=()=>{try{const d=JSON.parse($('bk').value);if(!Array.isArray(d))throw 0;items=d;save();fit();toast(d.length+'개 항목을 복원했어요')}catch(e){toast('백업 내용이 올바르지 않아요')}};
-$('saveMyMaps').onclick=()=>{const v=$('mymapsUrl').value.trim(); ls.set('TRIP_MYMMaps_URL',v); toast(v?'내 지도 URL이 저장되었어요':'URL이 비워졌어요');};
+$('saveMyMaps').onclick=()=>{let v=$('mymapsUrl').value.trim(); const m=v.match(/src=["']([^"']+)["']/); if(m) v=m[1]; ls.set('TRIP_MYMMaps_URL',v); $('mymapsUrl').value=v; const midMatch=v.match(/mid=([^&]+)/); if(midMatch){const embedUrl='https://www.google.com/maps/d/u/0/embed?mid='+midMatch[1]+'&ehbc=2E312F'; ls.set('TRIP_MYMMaps_EMBED',embedUrl); $('mymapsEmbed').value=embedUrl; toast('내 지도 URL + 임베드 URL이 자동 저장되었어요');} else toast(v?'내 지도 URL이 저장되었어요':'URL이 비워졌어요');};
+$('saveMyMapsEmbed').onclick=()=>{let v=$('mymapsEmbed').value.trim(); const m=v.match(/src=["']([^"']+)["']/); if(m) v=m[1]; ls.set('TRIP_MYMMaps_EMBED',v); $('mymapsEmbed').value=v; toast(v?'임베드 URL이 저장되었어요':'URL이 비워졌어요');};
 $('saveMyMapsEmbed').onclick=()=>{const v=$('mymapsEmbed').value.trim(); ls.set('TRIP_MYMMaps_EMBED',v); toast(v?'임베드 URL이 저장되었어요':'URL이 비워졌어요');};
 $('openMyMapsBtn').onclick=()=>{
-  const url=(ls.get('TRIP_MYMMaps_URL')||'').trim();
+  let url=(ls.get('TRIP_MYMMaps_URL')||'').trim();
+  const m=url.match(/src=["']([^"']+)["']/); if(m) url=m[1];
   if(url){
     if(!url.includes('maps/d') && !url.includes('mid=')){ toast('Google My Maps 공유 링크(mid= 포함)를 넣어주세요'); return; }
     window.open(url,'_blank'); toast('내 지도를 열었어요');
