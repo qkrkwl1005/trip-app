@@ -142,7 +142,7 @@ const SUF=['',' photo',' review',' menu',' exterior'];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const pic=(q,v=0)=>'https://tse1.mm.bing.net/th?w=480&h=360&c=7&rs=1&p=0&q='+encodeURIComponent(String(q||'').trim()+SUF[v%5]);
-let items=[],cat='PLACE',pend=[],res=[],lm=null,tl=null,layer=null,pins={},lastGeo=0,tt,cur=null,view='photo',tileIndex=1,tileFails=0,gmap=null,gmarkers=[],glocMarker=null,nmap=null,nmarkers=[],nlocMarker=null,mapProvider='osm';
+let items=[],cat='PLACE',pend=[],res=[],lm=null,tl=null,layer=null,pins={},lastGeo=0,tt,cur=null,view='photo',tileIndex=1,tileFails=0,gmap=null,gmarkers=[],glocMarker=null,nmap=null,nmarkers=[],nlocMarker=null,mapProvider='osm',editMode={},selected=new Set();
 try{items=JSON.parse(ls.get('TRIP_MASTER_ITEMS')||'[]')}catch(e){items=[]}
 let photoCache={};try{photoCache=JSON.parse(ls.get('TRIP_PHOTO_CACHE')||'{}')}catch(e){photoCache={}}
 function savePhotoCache(){ls.set('TRIP_PHOTO_CACHE',JSON.stringify(photoCache))}
@@ -208,7 +208,7 @@ async function fetchRepPhoto(q){
   $('nav').innerHTML=tabs.map(([k,e,n])=>`<button class="tab-btn${k==='add'?' active':''}" data-tab="${k}"><i>${e}</i><span>${n}${CATS[k]?` <span id="cnt-${k}">0</span>`:''}</span></button>`).join('');
   Object.keys(CATS).forEach(c=>{
     const s=document.createElement('section');s.id='tab-'+c;s.className='tab-content';
-    s.innerHTML=`<input type="text" id="q-${c}" placeholder="${CATS[c].n} 검색..." oninput="render()"><div id="list-${c}" style="display:flex;flex-direction:column;gap:8px"></div>`;
+    s.innerHTML=`<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><input type="text" id="q-${c}" placeholder="${CATS[c].n} 검색..." oninput="render()" style="flex:1;margin-bottom:0"><button class="mb" data-act="toggleEdit" data-cat="${c}" style="flex:none">✏️</button></div><div id="bulk-${c}" style="display:none;margin-bottom:8px;gap:8px;align-items:center"><label style="display:flex;align-items:center;gap:4px;margin:0"><input type="checkbox" data-act="selectAll" data-cat="${c}"> 전체</label><button class="mb dg" data-act="bulkDelete" data-cat="${c}">선택 삭제</button><span id="selCount-${c}" style="font-size:12px;color:var(--sub)"></span></div><div id="list-${c}" style="display:flex;flex-direction:column;gap:8px"></div>`;
     $('side').appendChild(s);
   });
 })();
@@ -264,7 +264,7 @@ function draw(){
   });
 }
 
-const card=i=>`<div class="item${i.done?' done':''}" data-act="open" data-id="${i.id}">${ph(CATS[i.category].e,i.img)}<div class="mid"><div class="nm">${esc(i.name)}</div><div class="ds">${esc(i.address||i.note||'')}</div>${i.info?`<div class="ds in">${esc(i.info)}</div>`:''}</div><input type="checkbox" data-act="done" data-id="${i.id}"${i.done?' checked':''}></div>`;
+const card=i=>`<div class="item${i.done?' done':''}${selected.has(i.id)?' selected':''}" data-act="${editMode[i.category]?'toggleSel':'open'}" data-id="${i.id}" style="${selected.has(i.id)?'outline:2px solid var(--pr)':''}">${editMode[i.category]?`<input type="checkbox" data-act="sel" data-id="${i.id}"${selected.has(i.id)?' checked':''} style="width:18px;height:18px;margin-right:8px">`:''}${ph(CATS[i.category].e,i.img)}<div class="mid"><div class="nm">${esc(i.name)}</div><div class="ds">${esc(i.address||i.note||'')}</div>${i.price?`<div class="ds" style="color:var(--FOOD);font-weight:700">${esc(i.price)}</div>`:''}${i.info?`<div class="ds in">${esc(i.info)}</div>`:''}</div><input type="checkbox" data-act="done" data-id="${i.id}"${i.done?' checked':''}></div>`;
 function ph(e,src,c=''){return `<div class="pic ${c}">${e}${src?`<img loading="lazy" referrerpolicy="no-referrer" src="${esc(src)}" onerror="this.remove()">`:''}</div>`}
 function render(){
   for(const c in CATS){
@@ -272,6 +272,8 @@ function render(){
     $('cnt-'+c).textContent=all.length;
     const l=all.filter(i=>!kw||((i.name||'')+(i.address||'')).toLowerCase().includes(kw));
     $('list-'+c).innerHTML=l.length?l.map(card).join(''):`<div class="empty"><i>${CATS[c].e}</i>${all.length?'검색 결과가 없어요':'찾기 탭에서 추가해 보세요'}</div>`;
+    const bulk=$('bulk-'+c); if(bulk) bulk.style.display=editMode[c]?'flex':'none';
+    const sc=$('selCount-'+c); if(sc) sc.textContent=editMode[c]?`선택 ${selected.size}개`:'';
   }
 }
 function persist(){if(!ls.set('TRIP_MASTER_ITEMS',JSON.stringify(items)))toast('저장 공간이 부족해요. 설정에서 백업 후 정리하세요')}
@@ -291,7 +293,7 @@ function showSheet(){
     else mapFrame=`<div class="empty"><i>🗺️</i>지도 API 키가 없어요. 설정 탭에서 Google Maps API 키를 넣거나 아래 구글지도 링크를 사용하세요.</div>`;
   }
   $('sbody').innerHTML=(isMap?mapFrame:ph(CATS[i.category].e,i.img,'big'))
-  +`<div class="nm" style="font-size:19px">${esc(i.name)}</div><div class="ds" style="-webkit-line-clamp:4">${esc(i.address||'')}</div>${i.info?`<div class="ds in">${esc(i.info)}</div>`:''}
+  +`<div class="nm" style="font-size:19px">${esc(i.name)}</div><div class="ds" style="-webkit-line-clamp:4">${esc(i.address||'')}</div>${i.price?`<div class="ds" style="color:var(--FOOD);font-weight:700;font-size:16px">${esc(i.price)}</div>`:''}${i.info?`<div class="ds in">${esc(i.info)}</div>`:''}
   <div class="act"><button class="mb" data-act="rot">↻ 다른 사진</button><button class="mb" data-act="photo">🖼️ 사진</button><button class="mb" data-act="view" data-view="google">🗺️ 구글지도</button><button class="mb" data-act="view" data-view="mymaps">🗺️ 내지도</button><button class="mb" data-act="view" data-view="osm">🗺️ OSM</button><button class="mb" data-act="own">📷 내 사진</button>${i.lat?'<button class="mb" data-act="pin">📍 지도 탭</button>':''}<button class="mb" data-act="share">↗ 공유</button></div>
   <textarea id="memo" placeholder="메모 (가격, 영업시간, 같이 갈 사람...)">${esc(i.note||'')}</textarea>
   <div class="act"><a class="mb pr" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${q}">구글지도 ↗</a><a class="mb" target="_blank" rel="noopener" href="https://www.google.com/search?q=${encodeURIComponent(i.name)}">검색 ↗</a><button class="mb dg" data-act="del">삭제</button><button class="mb" data-act="close" style="margin-left:auto">닫기</button></div>`;
@@ -306,7 +308,7 @@ const shrink=(f,m=1024,q=.8)=>new Promise((ok,no)=>{
 });
 
 const mkPrompt=(h,q)=>`입력(텍스트·사진)에 해당하는 실제 ${CATS[cat].b} 후보를 구글 검색으로 확인해 가능성 높은 순서로 최대 4개, 다른 설명 없이 JSON 배열만 출력하세요.
-형식: {"name":"한국어 이름 (현지어)","address":"현지어 주소 또는 빈 문자열","lat":숫자 또는 null,"lng":숫자 또는 null,"info":"한 줄 정보(영업시간·가격·특징)"}
+형식: {"name":"한국어 이름 (현지어)","address":"현지어 주소 또는 빈 문자열","lat":숫자 또는 null,"lng":숫자 또는 null,"price":"가격(통화 기호 포함, 예: ¥398, ₩1200, $5.99)","info":"한 줄 정보(영업시간·가격·특징)"}
 ${cat==='PLACE'?'주소와 위도·경도를 꼭 찾으세요.':'제품명, 대략 가격, 살 수 있는 곳을 info에 쓰세요.'}
 지역: ${h||'없음'}
 입력: ${q||'(사진만)'}`;
@@ -357,7 +359,7 @@ async function find(){
     const seen=new Set();
     list=list.filter(c=>{const k=String(c.name).toLowerCase().replace(/\s+/g,'');if(seen.has(k))return false;seen.add(k);return true});
     if(q&&!list.some(c=>String(c.name).toLowerCase().replace(/\s+/g,'')===String(q).toLowerCase().replace(/\s+/g,'')))list.push({name:q,raw:1});
-    res=list.map(c=>({...c,h,v:0,cat,img:pic(c.name+' '+(h||''))}));
+    res=list.map(c=>({...c,h,v:0,cat,img:pic(c.name+' '+(h||'')),price:c.price||''}));
     drawRes();
     res.forEach(c=>{fetchRepPhoto(c.name+' '+(c.address||h||'')).then(u=>{if(u){c.img=u;drawRes()}})});
     if(note)toast(note);
@@ -372,9 +374,9 @@ async function pick(k){
   let p=c.lat&&c.lng?{lat:c.lat,lng:c.lng}:null;
   if(c.cat==='PLACE'&&!p){toast('위치 확인 중...');p=await locate(c,c.h)}
   const id='i'+Date.now()+Math.random().toString(36).slice(2,5);
-  items.unshift({id,category:c.cat,name:c.name,address:c.address||'',info:c.info||'',lat:p?p.lat:0,lng:p?p.lng:0,img:c.img||pic(c.name+' '+c.h,c.v),q:c.name+' '+c.h,v:c.v||0,done:false});
+  items.unshift({id,category:c.cat,name:c.name,address:c.address||'',info:c.info||'',price:c.price||'',lat:p?p.lat:0,lng:p?p.lng:0,img:c.img||pic(c.name+' '+c.h,c.v),q:c.name+' '+c.h,v:c.v||0,done:false});
   save();fit();toast('저장했어요 · '+CATS[c.cat].n+' 탭에서 볼 수 있어요');
-  fetchRepPhoto(c.name+' '+(c.address||c.h||'')).then(u=>{if(u){const it=items.find(x=>x.id===id);if(it){it.img=u;save();if(cur===id)showSheet()}}});
+  fetchRepPhoto(c.name+' '+(c.address||c.h||'')).then(u=>{if(u){const it=items.find(x=>x.id===id);if(it){it.img=u;save();}}});
 }
 
 document.addEventListener('click',e=>{
@@ -393,6 +395,10 @@ document.addEventListener('click',e=>{
   else if(a==='pin'&&i){closeSheet();tab('map');setTimeout(()=>{if(lm){lm.setView([i.lat,i.lng],16);pins[i.id]&&pins[i.id].openPopup()}},200)}
   else if(a==='share'&&i){if(navigator.share){navigator.share({title:i.name,text:i.address||'',url:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(i.name+' '+(i.address||''))}`}).catch(()=>{})}else toast('공유를 지원하지 않는 브라우저예요')}
   else if(a==='del'&&i){if(b.dataset.sure){items=items.filter(x=>x.id!==i.id);closeSheet();save()}else{b.dataset.sure=1;b.textContent='한 번 더 누르면 삭제'}}
+  else if(a==='toggleEdit'){const c=b.dataset.cat; editMode[c]=!editMode[c]; if(!editMode[c]) selected.clear(); render()}
+  else if(a==='sel'||a==='toggleSel'){const id=b.dataset.id; if(selected.has(id)) selected.delete(id); else selected.add(id); render()}
+  else if(a==='selectAll'){const c=b.dataset.cat; const inCat=items.filter(i=>i.category===c); if(b.checked) inCat.forEach(i=>selected.add(i.id)); else inCat.forEach(i=>selected.delete(i.id)); render()}
+  else if(a==='bulkDelete'){const c=b.dataset.cat; if(!selected.size){toast('선택된 항목이 없어요');return;} if(!confirm('선택한 '+selected.size+'개 항목을 삭제할까요?')) return; items=items.filter(i=>!selected.has(i.id)); selected.clear(); editMode[c]=false; save(); toast('삭제했어요')}
 });
 document.addEventListener('change',e=>{
   const b=e.target.closest('[data-act="done"]');if(!b)return;
@@ -600,6 +606,18 @@ document.addEventListener('touchend',()=>{
   el.style.transform='translate(-50%,-100%)';
   if(ptrDy>80){ location.reload(); }
 });
+// 배경에서 대표 사진 보강 (Bing 썸네일 → Wikipedia/Commons)
+setTimeout(async()=>{
+  let changed=false;
+  for(const it of items){
+    if(it.img && it.img.includes('tse1.mm.bing.net')){
+      const u=await fetchRepPhoto(it.name+' '+(it.address||''));
+      if(u){ it.img=u; changed=true; }
+      await new Promise(r=>setTimeout(r,300));
+    }
+  }
+  if(changed){ save(); }
+},2000);
 render();draw();fit();
 </script>
 </body>
