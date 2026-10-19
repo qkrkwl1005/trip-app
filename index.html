@@ -389,7 +389,7 @@ document.addEventListener('click',e=>{
   else if(a==='close')closeSheet();
   else if(a==='rot'&&i){i.v=(i.v||0)+1;i.img=pic(i.q||i.name,i.v);save();showSheet()}
   else if(a==='photo'){view='photo';showSheet()}
-  else if(a==='view'){view=b.dataset.view;showSheet()}
+  else if(a==='view'){view=b.dataset.view;toast('지도: '+view);showSheet()}
   else if(a==='own'){$('own').click()}
   else if(a==='emb'){view=view==='photo'?'google':'photo';showSheet()}
   else if(a==='pin'&&i){closeSheet();tab('map');setTimeout(()=>{if(lm){lm.setView([i.lat,i.lng],16);pins[i.id]&&pins[i.id].openPopup()}},200)}
@@ -430,9 +430,16 @@ $('openMyMapsBtn').onclick=()=>{
   const m=url.match(/src=["']([^"']+)["']/); if(m) url=m[1];
   if(url){
     if(!url.includes('maps/d') && !url.includes('mid=')){ toast('Google My Maps 공유 링크(mid= 포함)를 넣어주세요'); return; }
-    window.open(url,'_blank'); toast('내 지도를 열었어요');
+    const a=document.createElement('a');
+    a.href=url; a.target='_blank'; a.rel='noopener noreferrer';
+    document.body.appendChild(a); a.click(); a.remove();
+    toast('내 지도를 열었어요');
   } else {
-    window.open('https://www.google.com/maps/d/','_blank');
+    const a=document.createElement('a');
+    a.href='https://www.google.com/maps/d/';
+    a.target='_blank';
+    a.rel='noopener noreferrer';
+    document.body.appendChild(a); a.click(); a.remove();
     toast('Google My Maps에서 지도를 만들고 공유 링크를 복사해 넣어주세요');
   }
 };
