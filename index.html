@@ -44,6 +44,11 @@ input:focus,textarea:focus{border-color:var(--pr)}textarea{min-height:76px;resiz
 #map-wrap{flex:1;position:relative;height:100%;z-index:0}#map{width:100%;height:100%}
 #mapmsg{display:none;position:absolute;left:12px;right:12px;top:12px;z-index:1100;background:var(--s);color:var(--tx);border:1px solid var(--bd);border-radius:12px;padding:10px 12px;font-size:12.5px;box-shadow:0 6px 20px rgba(0,0,0,.35)}
 #locBtn{position:absolute;right:12px;bottom:12px;z-index:1100;padding:10px 14px;border:0;border-radius:12px;background:var(--s);color:var(--tx);font-family:inherit;font-size:13px;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.35);cursor:pointer;touch-action:manipulation}
+#myMapsBtn{position:absolute;left:12px;bottom:12px;z-index:1100;padding:10px 14px;border:0;border-radius:12px;background:var(--s);color:var(--tx);font-family:inherit;font-size:13px;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.35);cursor:pointer;touch-action:manipulation}
+#myMapsOverlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.85);display:none;flex-direction:column}
+#myMapsOverlay.show{display:flex}
+#myMapsOverlay iframe{flex:1;border:0}
+#myMapsClose{position:absolute;top:12px;right:12px;padding:8px 14px;border:0;border-radius:10px;background:var(--s);color:var(--tx);font-weight:700;cursor:pointer;z-index:201}
 .pin{width:20px;height:20px;border-radius:50%;border:3px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.5);background:var(--PLACE)}.pin.FOOD{background:var(--FOOD)}.pin.SHOP{background:var(--SHOP)}
 .lnk{color:#2563eb;font-weight:700;cursor:pointer}
 #sheet{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center}#sheet.on{display:flex}
@@ -123,7 +128,8 @@ input[type=text],input[type=password],textarea{font-size:16px}
   </div></section>
 </aside>
 
-<main id="map-wrap"><div id="mapmsg">지도를 불러오지 못했어요. API 키 또는 네트워크를 확인해 주세요.</div><div id="map"></div><button id="locBtn">📍 내 위치</button></main>
+<main id="map-wrap"><div id="mapmsg">지도를 불러오지 못했어요. API 키 또는 네트워크를 확인해 주세요.</div><div id="map"></div><button id="locBtn">📍 내 위치</button><button id="myMapsBtn">🗺️ 내지도</button></main>
+<div id="myMapsOverlay"><button id="myMapsClose">✕ 닫기</button><iframe id="myMapsFrame" src=""></iframe></div>
 <div id="sheet"><div class="sh" id="sbody"></div></div>
 <input type="file" id="own" accept="image/*" hidden>
 <input type="file" id="importFile" accept=".csv,text/csv" hidden>
@@ -294,7 +300,7 @@ function showSheet(){
   }
   $('sbody').innerHTML=(isMap?mapFrame:ph(CATS[i.category].e,i.img,'big'))
   +`<div class="nm" style="font-size:19px">${esc(i.name)}</div><div class="ds" style="-webkit-line-clamp:4">${esc(i.address||'')}</div>${i.price?`<div class="ds" style="color:var(--FOOD);font-weight:700;font-size:16px">${esc(i.price)}</div>`:''}${i.info?`<div class="ds in">${esc(i.info)}</div>`:''}
-  <div class="act"><button class="mb" data-act="rot">↻ 다른 사진</button><button class="mb" data-act="photo">🖼️ 사진</button><button class="mb" data-act="view" data-view="google">🗺️ 구글지도</button><button class="mb" data-act="view" data-view="mymaps">🗺️ 내지도</button><button class="mb" data-act="view" data-view="osm">🗺️ OSM</button><button class="mb" data-act="own">📷 내 사진</button>${i.lat?'<button class="mb" data-act="pin">📍 지도 탭</button>':''}<button class="mb" data-act="share">↗ 공유</button></div>
+  <div class="act"><button class="mb" data-act="rot">↻ 다른 사진</button><button class="mb" data-act="emb">🗺️ 지도</button><button class="mb" data-act="own">📷 내 사진</button>${i.lat?'<button class="mb" data-act="pin">📍 지도 탭</button>':''}<button class="mb" data-act="share">↗ 공유</button></div>
   <textarea id="memo" placeholder="메모 (가격, 영업시간, 같이 갈 사람...)">${esc(i.note||'')}</textarea>
   <div class="act"><a class="mb pr" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${q}">구글지도 ↗</a><a class="mb" target="_blank" rel="noopener" href="https://www.google.com/search?q=${encodeURIComponent(i.name)}">검색 ↗</a><button class="mb dg" data-act="del">삭제</button><button class="mb" data-act="close" style="margin-left:auto">닫기</button></div>`;
   $('sheet').classList.add('on');
@@ -391,7 +397,7 @@ document.addEventListener('click',e=>{
   else if(a==='photo'){view='photo';showSheet()}
   else if(a==='view'){view=b.dataset.view;toast('지도: '+view);showSheet()}
   else if(a==='own'){$('own').click()}
-  else if(a==='emb'){view=view==='photo'?'google':'photo';showSheet()}
+  else if(a==='emb'){view=view==='photo'?'google':'photo';toast('지도: '+view);showSheet()}
   else if(a==='pin'&&i){closeSheet();tab('map');setTimeout(()=>{if(lm){lm.setView([i.lat,i.lng],16);pins[i.id]&&pins[i.id].openPopup()}},200)}
   else if(a==='share'&&i){if(navigator.share){navigator.share({title:i.name,text:i.address||'',url:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(i.name+' '+(i.address||''))}`}).catch(()=>{})}else toast('공유를 지원하지 않는 브라우저예요')}
   else if(a==='del'&&i){if(b.dataset.sure){items=items.filter(x=>x.id!==i.id);closeSheet();save()}else{b.dataset.sure=1;b.textContent='한 번 더 누르면 삭제'}}
@@ -625,6 +631,14 @@ setTimeout(async()=>{
   }
   if(changed){ save(); }
 },2000);
+// My Maps overlay (main map bottom-left button)
+$('myMapsBtn').onclick=()=>{
+  const url=(ls.get('TRIP_MYMMaps_EMBED')||'').trim();
+  if(!url){ toast('설정 탭에서 Google My Maps 임베드 URL을 먼저 저장하세요'); return; }
+  $('myMapsFrame').src=url;
+  $('myMapsOverlay').classList.add('show');
+};
+$('myMapsClose').onclick=()=>{ $('myMapsOverlay').classList.remove('show'); $('myMapsFrame').src=''; };
 render();draw();fit();
 </script>
 </body>
