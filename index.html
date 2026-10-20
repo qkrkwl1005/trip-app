@@ -919,6 +919,31 @@ function mkReelsPrompt(d){
 async function jinaRead(url){
   try{const r=await fetch('https://r.jina.ai/'+url,{headers:{'Accept':'text/plain'}});if(!r.ok)return '';return await r.text();}catch(e){return ''}
 }
+// 릴스/틱톡 메타: r.jina.ai 2회 재시도 → 실패 시 allorigins 프록시로 정적 og: 메타 파싱 (jina 무료 한도 대비)
+async function fetchIGMeta(url){
+  for(let i=0;i<2;i++){
+    const t=await jinaRead(url);
+    if(t&&t.length>60&&!/rate\s*limit|too many|429/i.test(t.slice(0,200)))return {text:t};
+    await new Promise(r=>setTimeout(r,i===0?600:1200));
+  }
+  try{
+    const r=await fetch('https://api.allorigins.win/raw?url='+encodeURIComponent(url));
+    if(r.ok){
+      const h=await r.text();
+      const doc=new DOMParser().parseFromString(h,'text/html');
+      const q=s=>{const el=doc.querySelector('meta[property="'+s+'"]');return el?(el.getAttribute('content')||''):''};
+      const t=q('og:title'),d=q('og:description'),img=q('og:image');
+      if(t||d){
+        let user='',cap='';
+        const dm=d.match(/[\d.,]+\s*(?:likes|좋아요)[^-]*-\s*(.+?)\s+on\s+[^:]*:\s*([\s\S]+)$/);
+        if(dm){user=dm[1].trim();cap=dm[2].trim()}
+        if(!cap&&t){const tm=t.match(/^(.*?)on (?:Instagram|TikTok)\s*:\s*([\s\S]*)$/);if(tm){user=user||tm[1].trim();cap=tm[2].trim()}}
+        if(cap||user)return {user,caption:cap.replace(/&quot;/g,'"').replace(/&amp;/g,'&').trim(),thumb:img};
+      }
+    }
+  }catch(e){}
+  return null;
+}
 function thumbFromJina(txt){
   if(!txt)return '';
   const urls=[...txt.matchAll(/\((https:[^)\s]+)\)/g)].map(m=>m[1]);
@@ -960,37 +985,65 @@ async function askShared(key,parts){
   try{return await ask(key,parts,[{google_search:{}},{url_context:{}}])}
   catch(e){return await ask(key,parts)}
 }
-// AI 없이 캡션에서 장소 후보를 직접 추출 (🍴이름 → 📍주소 → ⏰시간 구조, 해시태그로 지역/카테고리 추정) (🍴이름 → 📍주소 → ⏰시간 구조, 해시태그로 지역/카테고리 추정)
+// AI 없이 캡션에서 장소 후보를 직접 추출 (주소가 맨 앞에 오는 구조도 지원: 영문 도시 힌트 + ✨불릿 이름 + ¥메뉴 정보)
+const CITY_EN={osaka:'오사카',kyoto:'교토',tokyo:'도쿄',nagoya:'나고야',sapporo:'삿포로',fukuoka:'후쿠오카',okinawa:'오키나와',kobe:'고베',hiroshima:'히로시마',kanazawa:'가나자와',seoul:'서울',busan:'부산',daegu:'대구',jeju:'제주',gangneung:'강릉',jeonju:'전주',bangkok:'방콕',singapore:'싱가포르',rome:'로마',milan:'밀라노',london:'런던',paris:'파리',berlin:'베를린'};
 function parseCaptionPlaces(cap){
   if(!cap)return [];
   const txt=String(cap);
   const lines=txt.split(/\n+/).map(s=>s.trim()).filter(Boolean);
   const tags=(txt.match(/#[^\s#\n]+/g)||[]).map(t=>t.slice(1));
-  const RK=['오사카','도쿄','교토','후쿠오카','나고야','삿포로','오키나와','서울','부산','대구','제주','강릉','전주','속초','경주','여수','포항','방콕','싱가포르','발리','호치민','다낭','로마','밀라노','런던','파리','베를린','시드니'];
+  // 지역 힌트: 1) 본문(주소 포함)의 영문 도시명 2) 해시태그·본문 한글
   let hint='';
-  for(const ko of RK){ if(tags.some(t=>t.includes(ko))||txt.includes(ko)){hint=ko;break} }
-  const isAddr=l=>/^[📍📌🗺]/.test(l)||/\b\d{2,3}-\d{3,4}\b/.test(l)||/\b\w+\s+(?:Ward|Building|City|Prefecture|Road|Street|Dong|Gu|si)/.test(l);
+  const cm=txt.match(new RegExp('\\b('+Object.keys(CITY_EN).join('|')+')\\b','i'));
+  if(cm)hint=CITY_EN[cm[1].toLowerCase()]||cm[1];
+  if(!hint){
+    const RK=[...new Set(Object.values(CITY_EN)),'속초','여수','포항','호치민','다낭','발리','시드니'];
+    for(const ko of RK){ if(tags.some(t=>t.includes(ko))||txt.includes(ko)){hint=ko;break} }
+  }
+  const isAddr=l=>/^\s*[\u{1F4CD}\u{1F4CC}\u{1F5FA}]/u.test(l)||/\b\d{2,3}-\d{3,4}\b/.test(l)||/\b\w+\s+(?:Ward|Building|City|Prefecture|Road|Street|Dong|Gu|si)\b/.test(l);
   const isHours=l=>/^[⏰🕐⏱]/.test(l)||/\d{1,2}:\d{2}\s*[~–-]/.test(l);
+  const isPrice=l=>/[¥$₩]\s?\d/.test(l);
+  const clean=s=>String(s||'').replace(/^[^\w가-힣一-龥ぁ-んァ-ヶ]{1,3}\s*/,'').trim();
   const out=[];
   for(let i=0;i<lines.length;i++){
     const L=lines[i];
     if(!isAddr(L))continue;
     const addr=L.replace(/^[^A-Za-z0-9가-힣]{0,3}\s*/,'').trim();
     if(addr.length<8)continue;
-    let nm='',info='';
-    for(let j=i-1;j>=Math.max(0,i-4);j--){
+    let nm='',info='',menu=[];
+    for(let j=Math.max(0,i-4);j<i;j++){ // 주소 앞줄: 이름·영업시간 (가격 줄은 제외)
       const P=lines[j];
-      if(isHours(P)&&!info){info=P.replace(/^[^A-Za-z가-힣]{1,2}\s*/,'').slice(0,60);continue}
-      if(isAddr(P))continue;
-      const cleaned=P.replace(/^[^\w가-힣一-龥ぁ-んァ-ヶ]{1,3}\s*/,'').trim();
-      if(cleaned&&cleaned.length<=44){nm=cleaned;break}
+      if(isHours(P)&&!info){info=clean(P).slice(0,60);continue}
+      if(isAddr(P)||/#/.test(P)||isPrice(P))continue;
+      const c=clean(P);
+      if(c&&c.length<=44){nm=c;break}
+    }
+    if(!nm){ // 주소 뒤 불릿에서 '맛집/식당' 등 포함 줄 찾기 (주소가 맨 앞에 오는 캡션 대응)
+      for(let j=i+1;j<=Math.min(lines.length-1,i+8);j++){
+        const P=lines[j];
+        if(isPrice(P))continue;
+        const c=clean(P);
+        if(c&&c.length<=60&&/맛집|식당|카페|스시|라멘|규카츠|돈카츠|레스토랑|restaurant|cafe|food|market/i.test(c)){nm=c;break}
+      }
+    }
+    for(let j=i+1;j<=Math.min(lines.length-1,i+10);j++){ // 메뉴 가격(¥/$/₩) 줄 → 정보
+      const P=lines[j];
+      if(isAddr(P))break;
+      if(isPrice(P)&&P.length<=48){menu.push(clean(P));if(menu.length>=4)break}
+      else if(isHours(P)&&!info)info=clean(P).slice(0,60);
+    }
+    if(!nm){ // 한 줄로 합쳐진 캡션(og:description 등)의 ✨'맛집/식당' 이름 패턴
+      const b=txt.match(/✨\s*([^✨#\n]{3,44}?)\s*(?:맛집|식당)/);
+      if(b)nm=b[1].trim();
     }
     if(!nm)nm=addr.slice(0,28);
+    nm=nm.replace(/\s*맛집\s*$/,'');
     let cc='PLACE';
     const blob=(tags.join(' ')+' '+txt);
-    if(/맛집|먹는|음식|카페|식당|food|cafe|restaurant|食堂|ラーメン|먹방/i.test(blob))cc='FOOD';
+    if(/맛집|먹는|음식|카페|식당|규카츠|돈카츠|sushi|ramen|cafe|food|食堂|ラーメン|먹방/i.test(blob))cc='FOOD';
     else if(/쇼핑|shop|market|mall|스토어|백화점/i.test(blob))cc='SHOP';
-    out.push({name:nm,address:addr,info:(info?info+' · ':'')+'캡션에서 직접 추출',category:cc,h:hint});
+    const infoAll=[info,...menu].filter(Boolean).slice(0,5).join(' · ');
+    out.push({name:nm,address:addr,info:(infoAll?infoAll+' · ':'')+'캡션에서 직접 추출',category:cc,h:hint});
     if(out.length>=3)break;
   }
   return out;
@@ -1007,18 +1060,21 @@ async function processShared(raw){
     const sd=parseShare(raw);
     if(!sd.url&&!sd.clean){toast('분석할 내용이 없어요');return}
     let user='',caption=sd.clean,vThumb='';
-    if(sd.kind==='instagram'&&sd.code){
-      toast('릴스 정보 불러오는 중...');
-      const j=await withTimeout(jinaRead(sd.url),9000);
-      if(j){const m=metaFromJina(j);if(m&&m.caption){user=m.user;caption=m.caption}vThumb=thumbFromJina(j)}
+    if((sd.kind==='instagram'||sd.kind==='tiktok')&&sd.url){
+      toast((sd.kind==='tiktok'?'틱톡':'릴스')+' 정보 불러오는 중...');
+      const meta=await withTimeout(fetchIGMeta(sd.url),15000);
+      if(meta){
+        let u2='',c2='',t2='';
+        if(meta.text){const m=metaFromJina(meta.text);if(m){u2=m.user;c2=m.caption||''}t2=thumbFromJina(meta.text)||''}
+        else{u2=meta.user||'';c2=meta.caption||'';t2=meta.thumb||''}
+        if(c2)caption=c2;
+        if(u2)user=u2;
+        if(t2)vThumb=t2;
+      }
     }else if(sd.kind==='youtube'&&sd.code){
       const y=await withTimeout(ytMeta(sd.code),7000);
       if(y&&y.title){user=y.author;caption=y.title}
       vThumb='https://i.ytimg.com/vi/'+sd.code+'/hqdefault.jpg';
-    }else if(sd.kind==='tiktok'){
-      toast('틱톡 정보 불러오는 중...');
-      const j=await withTimeout(jinaRead(sd.url),9000);
-      if(j){const m=metaFromJina(j);if(m&&m.caption){user=m.user;caption=m.caption}vThumb=thumbFromJina(j)}
     }
     const vmeta=(sd.kind!=='text'&&sd.code)?{platform:sd.kind,code:sd.code,fmt:sd.fmt||'',thumb:vThumb}:null;
     toast('AI가 영상 속 장소를 찾는 중...');
@@ -1036,7 +1092,10 @@ async function processShared(raw){
       if(parsed.length)list=parsed;
       else{
         try{const g=await nomi((caption||'').replace(/#[^\s#]+/g,'').trim().slice(0,90));if(g.length)list=g.slice(0,4).map(c=>({name:c.name,address:c.address,lat:c.lat,lng:c.lng,category:'PLACE',info:'공유 텍스트 기반 추정'}))}catch(e){}
-        if(!list||!list.length)list=[{name:(caption||sd.code||'공유 항목').slice(0,60)||'공유 항목',category:'PLACE',info:'자동 분석 실패 — 직접 확인 후 메모 남기세요',raw:1}];
+        if(!list||!list.length){
+          const kindKo={instagram:'릴스',youtube:'쇼츠',tiktok:'틱톡'}[sd.kind]||'링크';
+          list=[{name:'공유 '+kindKo+(user?' · '+user:''),address:'',category:'PLACE',info:'장소 자동 인식 실패 — 시트의 영상/원본 보고 직접 확인하세요',raw:1}]
+        }
       }
     }
     const seen=new Set();
