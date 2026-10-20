@@ -4,14 +4,25 @@
   "description": "여행 장소·먹거리·쇼핑 플래너",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#0f1115",
-  "theme_color": "#0f1115",
+  "share_target": {
+    "action": "./index.html?share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "background_color": "#1e3a8a",
+  "theme_color": "#1e3a8a",
   "lang": "ko",
   "icons": [
     {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' rx='28' fill='%230f1115'/%3E%3Ctext x='64' y='86' font-size='72' text-anchor='middle'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E",
-      "sizes": "128x128",
-      "type": "image/svg+xml"
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%231e3a8a'/%3E%3Cpath d='M256 96 L416 224 L256 208 L96 224 Z' fill='white'/%3E%3Cpath d='M256 208 L256 384 L224 416 L288 416 L256 384' fill='white'/%3E%3Cpath d='M256 208 L320 320 L288 320 L256 288 L224 320 L192 320 Z' fill='white'/%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
     }
   ]
 }
