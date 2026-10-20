@@ -111,7 +111,9 @@ input[type=text],input[type=password],textarea{font-size:16px}
     <label>AI 제공자 키 (선택 — 여러 개 가능, 위부터 순서대로 시도하고 실패하면 자동으로 다음 제공자)</label>
     <div id="aiProv"></div>
     <small style="display:block;margin-top:6px;color:var(--sub);font-size:11px">시도 순서: <span id="aiChain">-</span></small>
+    <div id="usageBox" style="margin-top:10px;padding:10px;border:1px solid var(--bd);border-radius:12px;background:var(--s2);font-size:12px;line-height:1.8"></div>
     <div style="display:flex;gap:6px"><button id="aiSaveAll" class="mb">💾 지금 화면의 키 저장</button><button id="aiClearAll" class="mb">🧹 모두 지우기</button><button id="diagBtn" class="mb">🔍 환경 진단</button></div>
+    <small style="display:block;margin-top:6px;color:var(--sub);font-size:11px">📊 사용량 안내: OpenRouter는 잔액·한도를 실시간으로 서버에서 조회 가능 / Gemini·Google Maps는 서버 잔량 조회가 구조적으로 없어(no key-only API) 앱이 직접 세어 표시합니다 — 숫자는 이 앱에서 호출한 횟수일 뿐입니다.</small>
     <small style="display:block;margin-top:6px;color:var(--sub);font-size:11px">OpenRouter 키는 무료 모델도 사용 가능 — 모델칸을 비우면 무료 라우터(openrouter/free)를 씁니다. Gemini는 무료 쿼터(분당 횟수 제한)라 순서는 Gemini → OpenRouter로 돌아요.</small>
     <label style="margin-top:14px">지도 제공자</label>
     <select id="mapProvider" class="btn g" style="margin-bottom:10px">
@@ -524,6 +526,44 @@ function aiList(K){
   return out;
 }
 function aiProviderName(id){const row=AIS.find(a=>a[0]===id);return row?row[1]:id}
+// ===== 키 사용량 추적 (오늘/day 단위 로컬 계수 + OpenRouter 잔액 실시간 조회) =====
+function aiUsageGet(){
+  const today=new Date().toISOString().slice(0,10);
+  let d=null;
+  try{d=JSON.parse(ls.get('TRIP_AI_USAGE')||'{}')}catch(e){}
+  if(!d||d.date!==today)d={date:today};
+  d.gemini=d.gemini||{n:0,ok:0,fail:0,quotaAt:0};
+  d.openrouter=d.openrouter||{n:0,ok:0,fail:0};
+  d.gmap=d.gmap||{n:0,ok:0,places:0};
+  return d;
+}
+function aiUsageSave(u){ls.set('TRIP_AI_USAGE',JSON.stringify(u))}
+function usageTick(id,okFlag,errMsg,extra){
+  try{
+    const u=aiUsageGet();const p=u[id];
+    p.n++;
+    if(okFlag)p.ok++;else p.fail++;
+    if(id==='gemini'&&errMsg&&/quota|429|RESOURCE_EXHAUSTED/i.test(String(errMsg)))p.quotaAt=Date.now();
+    if(extra)extra(u,p);
+    aiUsageSave(u);
+    const box=document.getElementById('usageBox');
+    if(box)box.innerHTML=usageHtml();
+  }catch(e){}
+}
+function fmtTime(t){const d=new Date(t);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
+function usageHtml(){
+  const u=aiUsageGet();
+  const g=u.gemini,o=u.openrouter,m=u.gmap;
+  const gquota=g.quotaAt?(' <span style="color:var(--dg);font-weight:700">⚠️ 무료한도 도달 '+fmtTime(g.quotaAt)+'</span>'):'';
+  const md=new Date().getMonth()+1+'월 '+new Date().getDate()+'일';
+  const hasOr=!!((aiKeys()||{}).openrouter||{}).key;
+  const orBtn=hasOr?'<button class="mb" data-aiaction="orkey" style="margin:4px 4px 0 0">💰 OpenRouter 잔액 실시간 조회</button><span id="orRes" style="font-size:11px;color:var(--sub)"></span>':'<span style="color:var(--sub)">OpenRouter 키 없음</span>';
+  return '<b style="font-size:12px">📊 오늘('+md+') 사용량</b><br>'
+    +'● Gemini: '+g.n+'회 <span style="color:var(--sub)">(성공 '+g.ok+' / 실패 '+g.fail+')'+gquota+'</span><br>'
+    +'● OpenRouter: '+o.n+'회 <span style="color:var(--sub)">(성공 '+o.ok+' / 실패 '+o.fail+')</span><br>'
+    +'● Google 지오코딩: '+m.n+'회 <span style="color:var(--sub)">(Places '+m.places+'회 — 서버랑 계산 방식이 달라서 참고용)</span><br>'
+    +orBtn;
+}
 function toOpenAIMessages(parts){
   const content=[];
   for(const p of parts||[]){
@@ -637,8 +677,9 @@ async function ask(K,parts,tools){
       const j=JSON.parse(t.slice(a,b+1));
       if(!Array.isArray(j))throw new Error('AI 응답 형식 오류');
       lastAIP=aiProviderName(p.id);
+      usageTick(p.id,1,'');
       return j;
-    }catch(e){errs.push(aiProviderName(p.id)+': '+e.message)}
+    }catch(e){errs.push(aiProviderName(p.id)+': '+e.message);usageTick(p.id,0,e.message)}
   }
   throw new Error('모든 AI 제공자 실패 — '+errs.join(' / '));
 }
@@ -701,10 +742,11 @@ async function gPlaces(q){
       headers:{'Content-Type':'application/json','X-Goog-Api-Key':window._gkey,
         'X-Goog-FieldMask':'places.displayName,places.formattedAddress,places.location'},
       body:JSON.stringify({textQuery:String(q).slice(0,200),languageCode:'ko'})});
-    if(!r.ok){if(r.status===403||r.status===400)_noPlaces=true;return null}
+    if(!r.ok){if(r.status===403||r.status===400)_noPlaces=true;usageTick('gmap',false,'http '+r.status,(u,f)=>f.places++);return null}
     const d=await r.json();
     const p=(d.places||[])[0];
-    if(!p||!p.location||!isFinite(p.location.latitude))return null;
+    if(!p||!p.location||!isFinite(p.location.latitude)){usageTick('gmap',true,'',(u,f)=>f.places++);return null}
+    usageTick('gmap',true,'',(u,f)=>f.places++);
     return {lat:p.location.latitude,lng:p.location.longitude,address:p.formattedAddress||''};
   }catch(e){return null}
 }
@@ -813,7 +855,15 @@ async function find(){
   finally{btn.disabled=false;btn.textContent='🔎 인터넷에서 찾기'}
 }
 const cc=(c,k)=>`<div class="item" data-act="pick" data-k="${k}">${ph(CATS[c.cat].e,itemThumb(c),'',c.img)}<div class="mid"><div class="nm">${esc(c.name)}${c.vid?' 🎬':''}</div><div class="ds">${c.raw?'입력한 그대로 저장':esc(c.address||'')}</div>${c.info?`<div class="ds in">${esc(c.info)}</div>`:''}<button class="mb" style="margin-top:5px" data-act="sw" data-k="${k}">↻ 다른 사진</button></div><b class="ok">${c.saved?'✓ 저장됨':'선택'}</b></div>`;
-function drawRes(){$('rs').innerHTML=res.length?`<div class="ds" style="margin:2px 2px 8px">맞는 항목을 눌러 저장하세요. 사진이 다르면 ↻</div><div style="display:flex;flex-direction:column;gap:8px">${res.map(cc).join('')}</div>`:''}
+function drawRes(){
+  let head='';
+  if(res.length){
+    head=`<div class="ds" style="margin:2px 2px 8px">맞는 항목을 눌러 저장하세요. 사진이 다르면 ↻</div>`;
+    const unpicked=res.filter(c=>!c.saved);
+    if(res.length>1&&unpicked.length)head+=`<button class="btn" style="margin-bottom:8px" data-act="saveAll">✅ 전체 저장 (${unpicked.length}건 — 지도에 각각 표시)</button>`;
+  }
+  $('rs').innerHTML=head+(res.length?`<div style="display:flex;flex-direction:column;gap:8px">${res.map(cc).join('')}</div>`:'');
+}
 async function pick(k){
   const c=res[k];if(!c||c.saved)return;
   c.saved=1;drawRes();
@@ -951,6 +1001,13 @@ document.addEventListener('click',async e=>{
       }catch(e){toast('클립보드 읽기 권한이 없어요 — 입력칸에 캡션을 직접 붙여넣어 주세요')}
     })();
   }
+  else if(a==='saveAll'){
+    let n=0;
+    toast('전체 저장 중... (각 장소 위치 검색)');
+    for(let k=0;k<res.length;k++){ if(!res[k].saved){ await pick(k); n++; } }
+    drawRes();
+    if(n){ fit(); tab('map'); toast('📍 장소 '+n+'건을 한 번에 저장했어요 — 지도에 각각 표시돼요'); }
+  }
   else if(a==='del'&&i){if(b.dataset.sure){items=items.filter(x=>x.id!==i.id);closeSheet();save()}else{b.dataset.sure=1;b.textContent='한 번 더 누르면 삭제'}}
   else if(a==='toggleEdit'){const c=b.dataset.cat; editMode[c]=!editMode[c]; if(!editMode[c]) selected.clear(); render()}
   else if(a==='sel'||a==='toggleSel'){const id=b.dataset.id; if(selected.has(id)) selected.delete(id); else selected.add(id); render()}
@@ -1002,10 +1059,12 @@ document.addEventListener('paste',e=>{
 });
 
 // 시트에서 [📋 복사한 캡션/주소 붙여넣기] — 지금 항목에 즉시 반영(이름·주소·정보 추출 후 좌표 검색)
+// 캡션에 장소가 여러 개(①②③·📌 여러 곳)면 나머지는 개별 항목으로 저장해 지도에 핀이 하나씩 생긴다.
 async function applyTextToSheetItem(i,rawText){
   rawText=String(rawText||'').trim();
   if(!rawText){toast('붙여넣을 텍스트가 없어요');return}
   const parsed=parseCaptionPlaces(rawText);
+  let extras=[];
   if(parsed.length){
     const p0=parsed[0];
     if(p0.name&&(isGenericSharedName(i.name)||!i.name))i.name=p0.name;
@@ -1013,6 +1072,7 @@ async function applyTextToSheetItem(i,rawText){
     if(p0.info)i.info=p0.info;
     if(p0.category&&CATS[p0.category])i.category=p0.category;
     if(p0.h)i.h=p0.h;
+    if(parsed.length>1)extras=parsed.slice(1);
   }else{
     const lines=rawText.split(/\r?\n+/).map(s=>s.trim()).filter(Boolean);
     if(lines.length>=2){
@@ -1035,9 +1095,26 @@ async function applyTextToSheetItem(i,rawText){
     save();fit();
     view='google';
     showSheet();
-    toast('위치 좌표를 찾았어요! ('+i.lat.toFixed(4)+', '+i.lng.toFixed(4)+')');
   }else{
     toast('텍스트는 반영했지만 좌표를 못 찾았어요. 가게 이름이나 주소를 확인해 주세요');
+  }
+  // 같은 캡션의 나머지 장소 → 개별 항목으로 저장 (지도에 각각 핀)
+  let made=0,noGeo=0;
+  for(const p of extras){
+    const id='i'+Date.now()+Math.random().toString(36).slice(2,5);
+    const nit={id,category:CATS[p.category]?p.category:(i.category||'PLACE'),name:p.name||'',address:normalizeOcrAddr(p.address||''),info:p.info||'',price:p.price||'',lat:0,lng:0,img:vidThumbUrl(i.vid)||((i.vid&&i.vid.thumb)||''),q:(p.name||'')+' '+(p.h||''),v:0,done:false,vid:i.vid?{...i.vid}:null,vfy:0,raw:0,h:p.h||''};
+    items.unshift(nit);
+    const gg=await geoFill(nit);
+    if(gg&&gg.lat&&gg.lng){nit.lat=gg.lat;nit.lng=gg.lng;nit.vfy=1;if(!nit.address&&gg.address)nit.address=gg.address}
+    else noGeo++;
+    made++;
+    save();
+  }
+  if(made){
+    fit();
+    closeSheet();
+    tab('map');
+    toast('📍 장소 '+(made+1)+'건을 나눠 저장했어요 — 지도에 각각 표시돼요'+(noGeo?' ('+noGeo+'건은 좌표를 못 찾았어요)':''));
   }
 }
 
@@ -1106,10 +1183,33 @@ function renderAI(){
   }).join('');
   const chain=aiList(K).map(p=>aiProviderName(p.id)).join(' → ')||'설정된 AI 없음 (캡션 파서로만 분석)';
   const el=document.getElementById('aiChain');if(el)el.textContent=chain;
+  const ub=document.getElementById('usageBox');if(ub)ub.innerHTML=usageHtml();
 }
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-aiaction]');if(!b)return;
   const id=b.dataset.ai,K=aiKeys();
+  if(b.dataset.aiaction==='orkey'){
+    const key=(K.openrouter||{}).key,res=$('orRes');
+    if(!key){toast('OpenRouter 키가 없어요');return}
+    if(res){res.textContent=' 조회 중...';res.style.color='var(--pr)'}
+    fetchTO('https://openrouter.ai/api/v1/key',{headers:{'Authorization':'Bearer '+key}},8000)
+      .then(r=>r.json())
+      .then(d=>{
+        const k=(d&&d.data)||{};
+        if(!d||!k.label&&!k.usage&&!k.limit){throw new Error('조회 실패')}
+        const usage='$'+(+k.usage||0).toFixed(3);
+        const limit=k.limit===null||k.limit===undefined?'한도 없음(충전제)':'$'+(+k.limit).toFixed(2);
+        const remain=k.limit!==null&&k.limit!==undefined?' / 남은 $'+(Math.max(0,(+k.limit)-(+k.usage||0))).toFixed(2):'';
+        const tier=k.is_free_tier?' <span style="color:var(--pr);font-weight:700">무료티어</span>':'';
+        const rl=k.rate_limit?(' · 분당제한 '+k.rate_limit.requests+'회/'+(k.rate_limit.interval||'10s')):'';
+        if(res){res.innerHTML='<b style="color:var(--tx)">'+usage+' 사용'+remain+tier+'</b><br>'+limit+rl}
+      })
+      .catch(e=>{
+        if(res){res.textContent=' 조회 실패: '+String(e.message||e).slice(0,60);res.style.color='var(--dg)'}
+        toast('OpenRouter 잔액 조회 실패 — 키가 유효한지 확인하세요 (진단에서 ⊙/× 표시만 나올 수 있어요)');
+      });
+    return;
+  }
   if(b.dataset.aiaction==='del'){
     delete K[id];
     if(id==='gemini')ls.set('TRAVEL_GEMINI_KEY','');
@@ -1413,6 +1513,7 @@ function mkReelsPrompt(d){
   return `아래는 SNS 영상(인스타 릴스/유튜브 쇼츠/틱톡)을 공유한 내용입니다.
 ${d.screen?'중요: 첨부된 사진은 영상 화면의 스크린샷입니다. 이미지 속 글자(캡션·주소·가게명·영업시간·해시태그)를 그대로 읽어 그 텍스트를 기준으로 장소를 찾으세요. 링크/공유 텍스트보다 이미지 글자가 우선입니다.\n':''}영상이 소개하는 실제 장소(식당·카페·숙소·명소·관광지) 또는 구매 상품 후보를 가능성 높은 순서로 최대 4개 찾고, JSON 배열만 출력하세요. 장소를 특정할 수 없는 영상이면 []만 출력하세요.
 중요: 영상이 여러 장소를 소개하면(예: 오사카 카페 명소 5선) 각각을 개별 후보로 분리하고, 각자 정확한 현지어 주소(지방/도시/구까지)를 적으세요.
+중요: 캡션에 ①②③·📌·📍으로 구분된 장소가 여러 개면 하나도 빠뜨리지 말고 각각 별도 후보로 만드세요. 각 장소의 상호명과 주소는 짝이 어긋나지 않게 캡션 순서대로 정리하세요.
 좌표(lat/lng)는 확신할 때만 넣고 불확실하면 null로 남기세요. 주소가 정확한 것이 좌표보다 우선입니다.
 형식: {"name":"한국어 또는 현지어 장소명","address":"현지어 주소 또는 빈 문자열","lat":숫자 또는 null,"lng":숫자 또는 null,"category":"PLACE(장소/명소)·FOOD(식당/음식)·SHOP(쇼핑/상품) 중 하나","price":"가격(통화 기호 포함, 없으면 '')","info":"한 줄 정보(영업시간·특징 등)"}
 플랫폼: ${d.kind}${d.code?` (코드 ${d.code})`:''}
@@ -1635,22 +1736,23 @@ function parseCaptionPlaces(cap){
     }
     if(!nm)nm=addr.slice(0,28);
     nm=nm.replace(/\s*맛집\s*$/,'');
+    nm=nm.replace(/\s*(@[^\s]+)\s*$/,'').trim(); // @계정태그는 이름에서 제외
     let cc='PLACE';
     const blob=(tags.join(' ')+' '+txt);
     if(/맛집|먹는|음식|카페|식당|규카츠|돈카츠|sushi|ramen|cafe|food|食堂|ラーメン|먹방/i.test(blob))cc='FOOD';
     else if(/쇼핑|shop|market|mall|스토어|백화점/i.test(blob))cc='SHOP';
     const infoAll=[info,...menu].filter(Boolean).slice(0,5).join(' · ');
     out.push({name:nm,address:addr,info:(infoAll?infoAll+' · ':'')+'캡션에서 직접 추출',category:cc,h:hint});
-    if(out.length>=3)break;
+    if(out.length>=4)break;
   }
   // 📌상호줄(핀만 있고 주소형 아님) 바로 다음 줄에 실제 주소가 오는 표준 릴스 포맷 별도 패스
-  if(out.length<3){
+  if(out.length<4){
     for(let i=0;i<lines.length-1;i++){
       const A=lines[i],B=lines[i+1];
       if(!pinName(A))continue;
       if(clean(A).length<3||clean(A).length>44)continue;
       if(!isAddr(B)||pinName(B))continue;
-      const nm2=clean(A).replace(/\s*맛집\s*$/,'');
+      const nm2=clean(A).replace(/\s*맛집\s*$/,'').replace(/\s*(@[^\s]+)\s*$/,'').trim();
       if(!nm2||out.some(o=>o.name===nm2))continue;
       const addr2=B.replace(/^\s*(?:[\u{1F4CD}\u{1F4CC}\u{1F5FA}][\s·]*)+/u,'').trim();
       let cc='PLACE';
@@ -1659,7 +1761,7 @@ function parseCaptionPlaces(cap){
       else if(/쇼핑|shop|market|mall|스토어|백화점/i.test(blob))cc='SHOP';
       const hInfo=lines.slice(i+2,i+6).filter(isHours).map(s=>clean(s)).slice(0,2).join(' · ');
       out.push({name:nm2,address:addr2,info:(hInfo?hInfo+' · ':'')+'캡션 📍상호+주소 포맷에서 추출',category:cc,h:hint});
-      if(out.length>=3)break;
+      if(out.length>=4)break;
     }
   }
   if(!out.length){ // 주소 라인이 전혀 없는 산문형 캡션: 일본식 상호명(店/食堂/カフェ…) + 랜드마크로 후보 생성
