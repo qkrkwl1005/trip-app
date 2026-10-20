@@ -77,8 +77,10 @@ input[type=text],input[type=password],textarea{font-size:16px}
 <aside id="side">
   <header>
     <div class="brand"><div class="logo">⚡</div><div><b>TripSync Master</b><small>장소·먹거리·쇼핑 플래너</small></div></div>
-    <button id="themeBtn" class="mb"></button>
-    <button id="settingsBtn" class="mb" style="margin-left:6px">⚙️</button>
+    <div>
+      <button id="themeBtn" class="mb"></button>
+      <button id="settingsBtn" class="mb" style="margin-left:6px">⚙️</button>
+    </div>
   </header>
   <nav id="nav"></nav>
 
@@ -91,7 +93,7 @@ input[type=text],input[type=password],textarea{font-size:16px}
         <button class="btn g" id="pasteShare" style="flex:1;margin-bottom:0">📋 붙여넣기</button>
         <button class="btn" id="analyzeShare" style="flex:1">🔥 분석하기</button>
       </div>
-      <button class="btn g" onclick="$('file').click()" id="pcShare" style="margin-bottom:0">📷 캡션/영상 스크린샷 첨부해서 분석 (선택)</button>
+      <button class="btn g" id="pcShare" style="margin-bottom:0">📷 캡션/영상 스크린샷 첨부해서 분석 (선택)</button>
       <small style="display:block;margin-top:6px;color:var(--sub);font-size:11px">💡 인스타 익명 차단으로 링크만으로는 캡션이 안 읽힐 때: 캡션 스샷에서 글자를 복사해 붙여넣거나, 스샷 사진을 첨부하면 100% 인식됩니다. (인스타 공유 → TripSync 선택이면 자동 열림 — 설정 탭에 단축어 방법 있음)</small>
     </div>
     <div class="card">
@@ -101,6 +103,7 @@ input[type=text],input[type=password],textarea{font-size:16px}
       <label>이름·가게명·주소</label>
       <input type="text" id="q" enterkeyhint="search" placeholder="예: 로손 카츠산도 / 이치란 도톤보리">
       <input type="file" id="file" accept="image/*" multiple hidden>
+      <input type="file" id="shareFile" accept="image/*" multiple hidden>
       <button class="btn g" onclick="$('file').click()" id="pc">📷 사진으로 찾기 (선택)</button>
       <button id="go" class="btn">🔎 인터넷에서 찾기</button>
     </div>
@@ -112,7 +115,7 @@ input[type=text],input[type=password],textarea{font-size:16px}
     <div id="aiProv"></div>
     <small style="display:block;margin-top:6px;color:var(--sub);font-size:11px">시도 순서: <span id="aiChain">-</span></small>
     <div id="usageBox" style="margin-top:10px;padding:10px;border:1px solid var(--bd);border-radius:12px;background:var(--s2);font-size:12px;line-height:1.8"></div>
-    <div style="display:flex;gap:6px"><button id="aiSaveAll" class="mb">💾 지금 화면의 키 저장</button><button id="aiClearAll" class="mb">🧹 모두 지우기</button><button id="diagBtn" class="mb">🔍 환경 진단</button></div>
+    <div style="display:flex;gap:6px;margin-top:8px"><button id="aiSaveAll" class="mb">💾 지금 화면의 키 저장</button><button id="aiClearAll" class="mb">🧹 모두 지우기</button><button id="diagBtn" class="mb">🔍 환경 진단</button></div>
     <small style="display:block;margin-top:6px;color:var(--sub);font-size:11px">📊 사용량 안내: OpenRouter는 잔액·한도를 실시간으로 서버에서 조회 가능 / Gemini·Google Maps는 서버 잔량 조회가 구조적으로 없어(no key-only API) 앱이 직접 세어 표시합니다 — 숫자는 이 앱에서 호출한 횟수일 뿐입니다.</small>
     <small style="display:block;margin-top:6px;color:var(--sub);font-size:11px">OpenRouter 키는 무료 모델도 사용 가능 — 모델칸을 비우면 무료 라우터(openrouter/free)를 씁니다. Gemini는 무료 쿼터(분당 횟수 제한)라 순서는 Gemini → OpenRouter로 돌아요.</small>
     <label style="margin-top:14px">지도 제공자</label>
@@ -178,40 +181,51 @@ input[type=text],input[type=password],textarea{font-size:16px}
 const $=id=>document.getElementById(id);
 const ls={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v);return 1}catch(e){return 0}}};
 const CATS={PLACE:{n:'장소',e:'📍',b:'여행 장소/식당'},FOOD:{n:'먹거리',e:'🍙',b:'편의점 음식/먹거리'},SHOP:{n:'쇼핑',e:'🛍️',b:'구매 물건'}};
-// 폰 키로 실사용 가능한 Gemini flash 모델을 직접 조회해 고름(모델명 만료/리네임 자가치유) + 실존 폴백
+
+function fetchTO(url,opt={},ms=9000){
+  const ctrl=new AbortController();
+  const tid=setTimeout(()=>ctrl.abort(),ms);
+  return fetch(url,{...opt,signal:ctrl.signal}).finally(()=>clearTimeout(tid));
+}
+
+// Gemini 모델 목록: flash-lite를 포함해 쿼터 초과(429) 시 다중 모델로 즉시 폴백되도록 개선
 let _gmodels=null,_gmodelsAt=0;
 async function geminiModels(key){
   const now=Date.now();
   if(_gmodels&&now-_gmodelsAt<3600e3)return _gmodels;
   let out=null;
   try{
-    const r=await fetchTO('https://generativelanguage.googleapis.com/v1beta/models?key='+encodeURIComponent(key)+'&pageSize=200',{method:'GET'},10000);
+    const r=await fetchTO('https://generativelanguage.googleapis.com/v1beta/models?key='+encodeURIComponent(key)+'&pageSize=200',{method:'GET'},8000);
     if(r.ok){
       const d=await r.json();
       const ids=(d.models||[]).map(x=>String(x.name||'').replace('models/',''));
-      const flash=ids.filter(x=>/^gemini-[\d.]+-flash$/.test(x)&&!/lite/.test(x))
+      const flash=ids.filter(x=>/^gemini-[\d.]+-flash(-lite)?$/.test(x))
         .sort((a,b)=>b.localeCompare(a,undefined,{numeric:true}));
-      if(flash.length)out=flash.slice(0,2);
+      if(flash.length)out=flash.slice(0,5);
     }
   }catch(e){}
-  if(!out)out=['gemini-2.0-flash'];
+  if(!out||!out.length)out=['gemini-2.5-flash','gemini-2.5-flash-lite','gemini-2.0-flash','gemini-2.0-flash-lite','gemini-1.5-flash'];
   _gmodels=out;_gmodelsAt=now;
   return out;
 }
+
 const SUF=['',' photo',' review',' menu',' exterior'];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const pic=(q,v=0)=>'https://tse1.mm.bing.net/th?w=480&h=360&c=7&rs=1&p=0&q='+encodeURIComponent(String(q||'').trim()+SUF[v%5]);
+
 let items=[],cat='PLACE',pend=[],res=[],lm=null,tl=null,layer=null,pins={},lastGeo=0,tt,cur=null,view='photo',tileIndex=1,tileFails=0,gmap=null,gmarkers=[],glocMarker=null,nmap=null,nmarkers=[],nlocMarker=null,mapProvider='osm',editMode={},selected=new Set(),prevTab='add',gpins=[],gposPts=[],GPinClass=null;
 try{items=JSON.parse(ls.get('TRIP_MASTER_ITEMS')||'[]')}catch(e){items=[]}
+// 기존 아이템 좌표 숫자형 정규화
+items.forEach(i=>{if(i.lat!=null)i.lat=Number(i.lat)||null;if(i.lng!=null)i.lng=Number(i.lng)||null;if(!CATS[i.category])i.category='PLACE';});
+
 let photoCache={};try{photoCache=JSON.parse(ls.get('TRIP_PHOTO_CACHE')||'{}')}catch(e){photoCache={}}
 function savePhotoCache(){ls.set('TRIP_PHOTO_CACHE',JSON.stringify(photoCache))}
-// 인스타/틱톡 CDN 이미지가 사파리 ITP·CORP 정책이나 캐시 문제로 막힐 때 wsrv.nl 프록시로 자동 우회,
-// 그래도 실패하면 data-fbsrc(2차 폴백 사진)로 교체, 최종 실패 시 제거(이모지 아이콘 노출)
+
 window.imgErr=function(el){
   if(!el)return;
   const s=el.getAttribute('src')||'';
-  if(s&&!el.dataset.wsrv&&/(cdninstagram\.com|fbcdn\.net|scontent|tiktokcdn)/.test(s)){
+  if(s&&!el.dataset.wsrv&&/(cdninstagram\.com|fbcdn\.net|scontent|tiktokcdn|instagram\.com)/.test(s)){
     el.dataset.wsrv='1';
     el.src='https://wsrv.nl/?url='+encodeURIComponent(s)+'&w=480&output=jpg';
     return;
@@ -221,7 +235,52 @@ window.imgErr=function(el){
 };
 
 function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),4500)}
-window.addEventListener('error',e=>{try{toast('오류: '+(e.message||'알 수 없는 오류'))}catch(_){}});
+window.addEventListener('error',e=>{try{if(e.message)toast('오류: '+e.message)}catch(_){}});
+
+// 영상 URL 파싱 및 썸네일/임베드 헬퍼 (문자열/객체 모두 100% 호환)
+function getVidUrlStr(v){
+  if(!v)return '';
+  if(typeof v==='string')return v;
+  return v.url||'';
+}
+function parseVideoMeta(v){
+  const s=getVidUrlStr(v);
+  if(!s)return null;
+  let m=s.match(/instagram\.com\/(?:reel|reels|p|tv)\/([A-Za-z0-9_-]+)/i);
+  if(m)return {platform:'ig',id:m[1],url:`https://www.instagram.com/reel/${m[1]}/`};
+  m=s.match(/(?:youtube\.com\/shorts\/|youtu\.be\/|youtube\.com\/watch\?v=)([A-Za-z0-9_-]{11})/i);
+  if(m)return {platform:'yt',id:m[1],url:`https://www.youtube.com/shorts/${m[1]}`};
+  m=s.match(/tiktok\.com\/[^\s"'<>]+/i);
+  if(m){
+    const vm=s.match(/\/video\/(\d+)/);
+    return {platform:'tt',id:vm?vm[1]:'',url:s};
+  }
+  return null;
+}
+function vidEmbedUrl(v,captioned=false){
+  const meta=parseVideoMeta(v);
+  if(!meta)return getVidUrlStr(v);
+  if(meta.platform==='ig'&&meta.id)return `https://www.instagram.com/p/${meta.id}/embed/${captioned?'captioned/':''}`;
+  if(meta.platform==='yt'&&meta.id)return `https://www.youtube.com/embed/${meta.id}`;
+  if(meta.platform==='tt'&&meta.id)return `https://www.tiktok.com/embed/v2/${meta.id}`;
+  return meta.url;
+}
+function itemThumb(i){
+  if(!i)return '';
+  if(i.useCustomImg&&i.img)return i.img;
+  if(i.vid){
+    const meta=parseVideoMeta(i.vid);
+    if(meta&&meta.platform==='yt'&&meta.id)return `https://i.ytimg.com/vi/${meta.id}/hqdefault.jpg`;
+    if(meta&&meta.platform==='ig'&&meta.id)return `https://www.instagram.com/p/${meta.id}/media/?size=l`;
+  }
+  if(i.img)return i.img;
+  if(i.name&&!isGenericSharedName(i.name)){
+    if(photoCache[i.name])return photoCache[i.name];
+    return pic(i.name+' '+(i.address||''),i.v||0);
+  }
+  return '';
+}
+
 function currentTileUrl(){return tileIndex===0?`https://{s}.basemaps.cartocdn.com/${document.documentElement.dataset.theme==='dark'?'dark':'light'}_all/{z}/{x}/{y}{r}.png`:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'}
 function rebuildTiles(){
   if(!lm)return;
@@ -234,15 +293,15 @@ function onTileError(){tileFails++;if(tileIndex===0&&tileFails>3){tileIndex=1;ti
 function onTileLoad(){tileFails=0;$('mapmsg').style.display='none'}
 function setTheme(t){document.documentElement.dataset.theme=t;ls.set('TRIP_THEME',t);$('themeBtn').textContent=t==='dark'?'☀️':'🌙';if(lm)rebuildTiles()}
 function fallbackToOsm(reason){
-  if(lm) return; // already osm
-  gmap=null;
+  if(lm) return;
+  gmap=null;nmap=null;
   console.warn('fallbackToOsm:',reason||'unknown');
   if(window.L){
+    $('map').innerHTML='';
     lm=L.map('map').setView([36.5,128],6);
     layer=L.featureGroup().addTo(lm);
     rebuildTiles();
     render(); draw(); fit();
-    toast('Google 지도를 불러오지 못해 OpenStreetMap으로 표시합니다. API 키/도메인 설정을 확인하세요.');
   } else {
     $('mapmsg').style.display='block';
   }
@@ -313,8 +372,7 @@ function fit(){
   }
   if(!lm||!layer)return;const b=layer.getBounds();if(b.isValid())lm.fitBounds(b,{padding:[40,40],maxZoom:15})
 }
-// 지도 핀카드: 영상 항목은 실제 릴스/쇼츠 장면 썸네일(인스타 /p/코드/media/ 는 로그인 없이 원본 장면 이미지로 리다이렉트 — 실측 200).
-// 로드 실패 시 imgErr가 wsrv.nl 프록시 우회 → 저장돼 있던 사진(data-fbsrc) 2차 폴백 → 최종 실패 시 이모지 아이콘.
+
 function pinCardHtml(i){
   const ic=CATS[i.category]?CATS[i.category].e:'📍';
   const t1=itemThumb(i);const t2=(i.useCustomImg&&i.img)?'':(i.img||'');
@@ -322,7 +380,7 @@ function pinCardHtml(i){
   const fb=(t1&&t2&&t1!==t2)?` data-fbsrc="${esc(t2)}"`:'';
   return `<div class="pinCard c-${CATS[i.category]?i.category:'PLACE'}"><i>${ic}</i>${thumb?`<img loading="lazy" referrerpolicy="no-referrer" src="${esc(thumb)}"${fb} onerror="imgErr(this)">`:''}${i.vid?'<b>🎬</b>':''}</div>`;
 }
-// 구글맵 위에 HTML 핀카드를 그리는 커스텀 오버레이 (기본 빨간 핀 대체)
+
 function makeGPinClass(){
   if(!window.google||!google.maps||!google.maps.OverlayView)return null;
   class GPin extends google.maps.OverlayView{
@@ -336,7 +394,7 @@ function makeGPinClass(){
     }
     draw(){
       if(!this.div)return;
-      const p=this.getProjection().fromLatLngToDivPixel(new google.maps.LatLng(this.item.lat,this.item.lng));
+      const p=this.getProjection().fromLatLngToDivPixel(new google.maps.LatLng(Number(this.item.lat),Number(this.item.lng)));
       if(!p)return;
       this.div.style.left=(p.x-26)+'px';
       this.div.style.top=(p.y-66)+'px';
@@ -345,20 +403,21 @@ function makeGPinClass(){
   }
   return GPin;
 }
+
 function draw(){
   if(gmap){
     gpins.forEach(o=>o.setMap(null));gpins=[];
     gmarkers.forEach(m=>m.setMap(null));gmarkers=[];
     gposPts=[];
-    items.filter(i=>i.lat&&i.lng).forEach(i=>gposPts.push(new google.maps.LatLng(i.lat,i.lng)));
+    items.filter(i=>Number(i.lat)&&Number(i.lng)).forEach(i=>gposPts.push(new google.maps.LatLng(Number(i.lat),Number(i.lng))));
     if(GPinClass){
-      items.filter(i=>i.lat&&i.lng).forEach(i=>{
+      items.filter(i=>Number(i.lat)&&Number(i.lng)).forEach(i=>{
         const o=new GPinClass(gmap,i,()=>{cur=i.id;view=i.vid?'video':'photo';showSheet()});
         gpins.push(o);
       });
     }else{
-      items.filter(i=>i.lat&&i.lng).forEach(i=>{
-        const m=new google.maps.Marker({position:{lat:i.lat,lng:i.lng},map:gmap,title:i.name});
+      items.filter(i=>Number(i.lat)&&Number(i.lng)).forEach(i=>{
+        const m=new google.maps.Marker({position:{lat:Number(i.lat),lng:Number(i.lng)},map:gmap,title:i.name});
         m.addListener('click',()=>{cur=i.id;view=i.vid?'video':'photo';showSheet()});
         gmarkers.push(m);
       });
@@ -367,8 +426,8 @@ function draw(){
   }
   if(nmap){
     nmarkers.forEach(m=>m.setMap(null));nmarkers=[];
-    items.filter(i=>i.lat&&i.lng).forEach(i=>{
-      const m=new naver.maps.Marker({position:new naver.maps.LatLng(i.lat,i.lng),map:nmap,
+    items.filter(i=>Number(i.lat)&&Number(i.lng)).forEach(i=>{
+      const m=new naver.maps.Marker({position:new naver.maps.LatLng(Number(i.lat),Number(i.lng)),map:nmap,
         icon:{content:pinCardHtml(i),anchor:new naver.maps.Point(26,66)}});
       naver.maps.Event.addListener(m,'click',()=>{cur=i.id;view=i.vid?'video':'photo';showSheet()});
       nmarkers.push(m);
@@ -376,15 +435,15 @@ function draw(){
     return;
   }
   if(!lm||!layer)return;layer.clearLayers();pins={};
-  items.filter(i=>i.lat&&i.lng).forEach(i=>{
-    const m=L.marker([i.lat,i.lng],{icon:L.divIcon({className:'',html:pinCardHtml(i),iconSize:[52,66],iconAnchor:[26,66]})});
+  items.filter(i=>Number(i.lat)&&Number(i.lng)).forEach(i=>{
+    const m=L.marker([Number(i.lat),Number(i.lng)],{icon:L.divIcon({className:'',html:pinCardHtml(i),iconSize:[52,66],iconAnchor:[26,66]})});
     if(i.vid){m.on('click',()=>{cur=i.id;view='video';showSheet()});}
     else{m.bindPopup(`<b>${esc(i.name)}</b><br>${esc(i.address||'')}<br><span class="lnk" data-act="open" data-id="${i.id}">사진·상세 보기 ›</span>`);}
     m.addTo(layer);pins[i.id]=m;
   });
 }
 
-const card=i=>`<div class="item${i.done?' done':''}${selected.has(i.id)?' selected':''}" data-act="${editMode[i.category]?'toggleSel':'open'}" data-id="${i.id}" style="${selected.has(i.id)?'outline:2px solid var(--pr)':''}">${editMode[i.category]?`<input type="checkbox" data-act="sel" data-id="${i.id}"${selected.has(i.id)?' checked':''} style="width:18px;height:18px;margin-right:8px">`:''}${ph(CATS[i.category].e,itemThumb(i),'',i.img)}<div class="mid"><div class="nm">${esc(i.name)}${i.vid?' 🎬':''}</div><div class="ds">${esc(i.address||i.note||'')}</div>${i.price?`<div class="ds" style="color:var(--FOOD);font-weight:700">${esc(i.price)}</div>`:''}${i.info?`<div class="ds in">${esc(i.info)}</div>`:''}</div><input type="checkbox" data-act="done" data-id="${i.id}"${i.done?' checked':''}></div>`;
+const card=i=>`<div class="item${i.done?' done':''}${selected.has(i.id)?' selected':''}" data-act="${editMode[i.category]?'toggleSel':'open'}" data-id="${i.id}" style="${selected.has(i.id)?'outline:2px solid var(--pr)':''}">${editMode[i.category]?`<input type="checkbox" data-act="sel" data-id="${i.id}"${selected.has(i.id)?' checked':''} style="width:18px;height:18px;margin-right:8px">`:''}${ph(CATS[i.category]?CATS[i.category].e:'📍',itemThumb(i),'',i.img)}<div class="mid"><div class="nm">${esc(i.name)}${i.vid?' 🎬':''}</div><div class="ds">${esc(i.address||i.note||'')}</div>${i.price?`<div class="ds" style="color:var(--FOOD);font-weight:700">${esc(i.price)}</div>`:''}${i.info?`<div class="ds in">${esc(i.info)}</div>`:''}</div><input type="checkbox" data-act="done" data-id="${i.id}"${i.done?' checked':''}></div>`;
 function ph(e,src,c='',fb=''){
   const fba=(fb&&fb!==src)?` data-fbsrc="${esc(fb)}"`:'';
   return `<div class="pic ${c}">${e}${src?`<img loading="lazy" referrerpolicy="no-referrer" src="${esc(src)}"${fba} onerror="imgErr(this)">`:''}</div>`;
@@ -393,7 +452,7 @@ function render(){
   for(const c in CATS){
     const kw=($('q-'+c).value||'').trim().toLowerCase(),all=items.filter(i=>i.category===c);
     $('cnt-'+c).textContent=all.length;
-    const l=all.filter(i=>!kw||((i.name||'')+(i.address||'')).toLowerCase().includes(kw));
+    const l=all.filter(i=>!kw||((i.name||'')+(i.address||'')+(i.note||'')).toLowerCase().includes(kw));
     $('list-'+c).innerHTML=l.length?l.map(card).join(''):`<div class="empty"><i>${CATS[c].e}</i>${all.length?'검색 결과가 없어요':'찾기 탭에서 추가해 보세요'}</div>`;
     const bulk=$('bulk-'+c); if(bulk) bulk.style.display=editMode[c]?'flex':'none';
     const sc=$('selCount-'+c); if(sc) sc.textContent=editMode[c]?`선택 ${selected.size}개`:'';
@@ -402,1757 +461,1272 @@ function render(){
 function persist(){if(!ls.set('TRIP_MASTER_ITEMS',JSON.stringify(items)))toast('저장 공간이 부족해요. 설정에서 백업 후 정리하세요')}
 function save(){persist();render();draw()}
 
-// 스샷 OCR/og:description에서 흔한 'T542-0086' → '〒542-0086' 복원 + 공백 정리 (지오코더가 〒 형태를 가장 잘 읽음)
 function normalizeOcrAddr(s){
   return String(s||'')
     .replace(/(^|[\s,])T(\d{3}-\d{4})\b/g,'$1〒$2')
     .replace(/\s+/g,' ')
     .trim();
 }
-// '공유 릴스' 같은 임시 이름 판별 — 검색/표시에서 임시명을 걸러냄
 function isGenericSharedName(nm){
   return /^공유\s*(릴스|쇼츠|틱톡|링크)/.test(String(nm||'').trim());
 }
-// 구글지도/검색 링크·임베드에 쓸 실질 검색어 (임시명은 제외하고 주소 위주로)
 function getValidSearchQuery(i){
   const nm=isGenericSharedName(i.name)?'':String(i.name||'').trim();
   const ad=normalizeOcrAddr(i.address||'');
   return (nm+' '+ad).trim();
 }
 
+function closeSheet(){$('sheet').classList.remove('on');cur=null}
+
+// 상세 시트 (영상 00:39~00:49의 원래 UI 및 자동 저장 구조 100% 복원)
 function showSheet(){
   const i=items.find(x=>x.id===cur);if(!i)return closeSheet();
   const searchTarget=getValidSearchQuery(i);
-  const q=encodeURIComponent(searchTarget);
+  const q=encodeURIComponent(searchTarget||i.name||'');
   const gkey=(ls.get('TRAVEL_GMAP_KEY')||'').trim();
   const myEmbed=(ls.get('TRIP_MYMMaps_EMBED')||'').trim();
-  const v=i.vid, vEmbed=(v&&view==='video')?vidEmbedUrl(v):'';
-  const isMap=(view==='mymaps'||view==='google')&&view!=='video';
+  const v=i.vid;
+  const vEmbed=(v&&(view==='video'||view==='caption'))?vidEmbedUrl(v,view==='caption'):'';
+  const isMap=(view==='mymaps'||view==='google')&&view!=='video'&&view!=='caption';
+  const lat=Number(i.lat)||0, lng=Number(i.lng)||0;
   let media='';
   if(vEmbed){
-    media=`<iframe class="big" src="${esc(vEmbed)}" allow="autoplay; fullscreen; picture-in-picture; clipboard-write; web-share" allowfullscreen loading="lazy" style="min-height:300px;background:#000"></iframe>`;
+    const mh=view==='caption'?440:300;
+    media=`<iframe class="big" src="${esc(vEmbed)}" allow="autoplay; fullscreen; picture-in-picture; clipboard-write; web-share" allowfullscreen loading="lazy" style="min-height:${mh}px;background:#000"></iframe>`;
   }else if(isMap){
     if(view==='mymaps' && myEmbed) media=`<iframe class="big" src="${esc(myEmbed)}" allowfullscreen loading="lazy" style="min-height:300px"></iframe>`;
-    else if(i.lat&&i.lng&&gkey) media=`<iframe class="big" src="https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(gkey)}&q=${i.lat},${i.lng}&zoom=16" allowfullscreen loading="lazy" style="min-height:300px"></iframe>`;
+    else if(lat&&lng&&gkey) media=`<iframe class="big" src="https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(gkey)}&q=${lat},${lng}&zoom=16" allowfullscreen loading="lazy" style="min-height:300px"></iframe>`;
     else if(searchTarget&&gkey) media=`<iframe class="big" src="https://www.google.com/maps/embed/v1/search?key=${encodeURIComponent(gkey)}&q=${q}&zoom=16" allowfullscreen loading="lazy" style="min-height:300px"></iframe>`;
-    else if(i.lat&&i.lng) media=`<iframe class="big" src="https://www.openstreetmap.org/export/embed.html?bbox=${i.lng-0.005},${i.lat-0.005},${i.lng+0.005},${i.lat+0.005}&layer=mapnik&marker=${i.lat},${i.lng}" style="min-height:300px"></iframe>`;
-    else media=`<div class="empty" style="padding:28px 12px"><i>🗺️</i>장소명이나 주소가 아직 없어요.<br>아래 <b>[📋 복사한 캡션/주소 붙여넣기]</b>를 누르거나 가게명·주소를 입력해 주세요.</div>`;
+    else if(lat&&lng) media=`<iframe class="big" src="https://www.openstreetmap.org/export/embed.html?bbox=${lng-0.005},${lat-0.005},${lng+0.005},${lat+0.005}&layer=mapnik&marker=${lat},${lng}" style="min-height:300px"></iframe>`;
+    else media=`<div class="empty"><i>🗺️</i>위치를 찾으려면 아래에 이름이나 주소를 입력 후 [📍 위치 다시 찾기]를 눌러주세요</div>`;
   }else{
-    media=ph(CATS[i.category].e,itemThumb(i),'big',i.img);
+    media=ph(CATS[i.category]?CATS[i.category].e:'📍',itemThumb(i),'big',i.img);
   }
-  const vButs=v?`<button class="mb${vEmbed?' pr':''}" data-act="vid">🎬 영상</button><button class="mb" data-act="reelThumb">🎬 릴스사진</button>`:'';
-  const vUrl=v?vidUrlFromItem(i):'';
-  const vLink=vUrl?`<a class="mb" target="_blank" rel="noopener" href="${esc(vUrl)}">원본 ↗</a>`:'';
-  const coordBadge=(i.lat&&i.lng)?`<span style="font-size:11px;color:#4ade80;font-weight:700">● 지도 좌표 설정됨 (${i.lat.toFixed(4)}, ${i.lng.toFixed(4)})</span>`:`<span style="font-size:11px;color:var(--FOOD);font-weight:700">● 좌표 미설정 — 아래에 이름/주소 입력 후 [📍 위치 다시 찾기] 클릭</span>`;
-  $('sbody').innerHTML=media
-  +`<div class="nm" id="sheetTitle" style="font-size:19px">${esc(i.name)}${v?' 🎬':''}</div><div class="ds" id="sheetAddr" style="-webkit-line-clamp:4">${esc(i.address||'주소 미입력')}</div><div style="margin-top:2px">${coordBadge}</div>${i.price?`<div class="ds" style="color:var(--FOOD);font-weight:700;font-size:16px">${esc(i.price)}</div>`:''}${i.info?`<div class="ds in">${esc(i.info)}</div>`:''}
-  <div class="act">${vButs}<button class="mb${!vEmbed&&!isMap?' pr':''}" data-act="photo">📷 사진</button><button class="mb" data-act="rot">↻ 사진바꾸기</button><button class="mb${isMap?' pr':''}" data-act="emb">🗺️ 지도</button><button class="mb" data-act="own">📷 내 사진</button>${i.lat?'<button class="mb pr" data-act="pin">📍 지도 탭에서 보기</button>':''}<button class="mb pr" data-act="refix">📍 위치 다시 찾기</button>${i.raw?'<button class="mb pr" data-act="recap">📋 캡션으로 다시 분석</button>':''}<button class="mb" data-act="share">↗ 공유</button>${vLink}</div>
-  <div class="card" style="padding:10px;margin-bottom:8px">
-    <div style="display:flex;gap:6px;margin-bottom:8px">
-      <button class="mb pr" data-act="sheetPaste" style="flex:1">📋 복사한 캡션/주소 붙여넣기</button>
-      <button class="mb" data-act="sheetShot" style="flex:1">📷 캡션 스샷 자동 추출</button>
+  const vUrl=getVidUrlStr(v);
+  $('sbody').innerHTML=`
+    ${media}
+    <div class="nm" style="font-size:18px">${esc(i.name)}${v?' 🎬':''}</div>
+    <div class="ds">${esc(i.address||'주소 미입력')}</div>
+    ${!(lat&&lng)?`<div class="ds" style="color:var(--FOOD);font-weight:700;margin-top:4px">🔴 좌표 미설정 — 아래에 이름/주소 입력 후 [📍 위치 다시 찾기] 클릭</div>`:`<div class="ds" style="color:var(--pr);font-weight:700;margin-top:4px">🟢 좌표 설정됨 (${lat.toFixed(5)}, ${lng.toFixed(5)})</div>`}
+    ${i.price?`<div class="ds" style="color:var(--FOOD);font-weight:700;margin-top:2px">${esc(i.price)}</div>`:''}
+    ${i.info?`<div class="ds in" style="margin-top:4px;-webkit-line-clamp:4">${esc(i.info)}</div>`:''}
+    <div class="act">
+      ${v?`<button class="mb${view==='video'?' pr':''}" data-act="vvideo">🎬 영상</button><button class="mb${view==='caption'?' pr':''}" data-act="vcap">📋 릴스캡션</button>`:''}
+      <button class="mb${view==='photo'?' pr':''}" data-act="vphoto">🖼️ 사진</button>
+      <button class="mb" data-act="chgpic">🔄 사진바꾸기</button>
+      <button class="mb${view==='google'?' pr':''}" data-act="vmap">🗺️ 지도</button>
+      ${myEmbed?`<button class="mb${view==='mymaps'?' pr':''}" data-act="vmymap">🗺️ 내지도</button>`:''}
     </div>
-    <label>카테고리 이동</label>
-    <div style="display:flex;gap:6px;margin:4px 0 12px">
-      ${['PLACE','FOOD','SHOP'].map(k=>`<button class="mb${i.category===k?' pr':''}" data-act="setCat" data-cat="${k}" style="flex:1;font-size:13px;padding:9px 2px">${CATS[k].e} ${CATS[k].n}${i.category===k?' ✓':''}</button>`).join('')}
+    <div class="act">
+      <button class="mb" onclick="$('own').click()">📷 내 사진</button>
+      <button class="mb pr" data-act="regeo">📍 위치 다시 찾기</button>
+      <button class="mb pr" data-act="recap">📋 캡션으로 다시 분석</button>
+      <button class="mb" data-act="share">🔗 공유</button>
+      ${vUrl?`<a class="mb" href="${esc(vUrl)}" target="_blank" rel="noopener">원본 ↗</a>`:''}
+    </div>
+    <div class="act">
+      <button class="mb pr" data-act="pastecap">📋 복사한 캡션/주소 붙여넣기</button>
+      <button class="mb" onclick="$('sheetShot').click()">📷 캡션 스샷 자동 추출</button>
+    </div>
+    <label style="margin-top:8px">카테고리 이동</label>
+    <div class="seg">
+      ${Object.keys(CATS).map(k=>`<div data-act="chcat" data-cat="${k}" class="${i.category===k?'on':''}">${CATS[k].e} ${CATS[k].n}${i.category===k?' ✓':''}</div>`).join('')}
     </div>
     <label>장소명 / 가게 이름</label>
-    <input type="text" id="editName" value="${esc(isGenericSharedName(i.name)?'':i.name)}" placeholder="예: 규카츠 마코 (비워둬도 주소로 위치 찾음)" style="margin-bottom:8px">
+    <input type="text" id="sh-name" value="${esc(isGenericSharedName(i.name)?'':i.name)}" placeholder="예: 규카츠 마토 (비워둬도 주소로 위치 찾음)">
     <label>주소 / 지역 (붙여넣으면 자동으로 위치까지 찾아요)</label>
-    <input type="text" id="editAddr" value="${esc(i.address||'')}" placeholder="예: 〒542-0086 Osaka, Chuo Ward, Nishishinsaibashi..." style="margin-bottom:0">
-  </div>
-  <textarea id="memo" placeholder="메모 (가격, 영업시간, 같이 갈 사람...)">${esc(i.note||'')}</textarea>
-  <div class="act"><a class="mb pr" id="gmapLink" target="_blank" rel="noopener" href="${searchTarget?`https://www.google.com/maps/search/?api=1&query=${q}`:'#'}">구글지도 ↗</a><a class="mb" id="gsearchLink" target="_blank" rel="noopener" href="${searchTarget?`https://www.google.com/search?q=${q}`:'#'}">검색 ↗</a><button class="mb dg" data-act="del">삭제</button><button class="mb" data-act="close" style="margin-left:auto">닫기</button></div>`;
+    <input type="text" id="sh-addr" value="${esc(i.address||'')}" placeholder="예: 〒542-0086 Osaka, Chuo Ward, Nishishinsaib...">
+    <label>메모 (가격, 영업시간, 같이 갈 사람...)</label>
+    <textarea id="sh-note" placeholder="메모 (가격, 영업시간, 같이 갈 사람...)">${esc(i.note||'')}</textarea>
+    <div class="act" style="justify-content:space-between;margin-top:8px">
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <a class="mb pr" href="https://www.google.com/maps/search/?api=1&query=${lat&&lng?`${lat},${lng}`:(q||encodeURIComponent(i.name||''))}" target="_blank" rel="noopener">구글지도 ↗</a>
+        <a class="mb" href="https://www.google.com/search?q=${q||encodeURIComponent(i.name||'')}" target="_blank" rel="noopener">검색 ↗</a>
+        <button class="mb dg" data-act="del">삭제</button>
+      </div>
+      <button class="mb" data-act="close">닫기</button>
+    </div>
+  `;
   $('sheet').classList.add('on');
-  if(i.raw&&i.vid&&i.vid.code)setTimeout(()=>maybeRecoverRaw(i),300);
-}
-// raw(링크만 저장) 항목을 시트에서 열면 세션당 1회 캡션 복구를 자동 재시도한다.
-// 유튜브=제목, 틱톡=oembed, 인스타=16초 예산 내 임베드/프록시 — 성공하면 후보를 자동으로 다시 뽑는다.
-// (방금 공유분석에서 실패한 직후 10분은 재시도 무익이라 건너뜀)
-const rawTried={};
-async function maybeRecoverRaw(i){
-  if(!i||!i.raw||rawTried[i.id])return;
-  rawTried[i.id]=1;
-  if(Date.now()-(window._lastIGtry||0)<10*60e3)return;
-  const v=i.vid,vu=vidUrlFromItem(i);if(!v||!v.code||!vu)return;
-  let cap='',user='';
-  try{
-    if(v.platform==='youtube'){const y=await ytMeta(v.code);cap=(y&&y.title)||'';user=(y&&y.author)||''}
-    else if(v.platform==='tiktok'){
-      const r=await fetchTO('https://www.tiktok.com/oembed?url='+encodeURIComponent(vu),{},6000);
-      if(r.ok){const d=await r.json();cap=(d&&d.title)||'';user=String((d&&d.author_unique_id)||'').replace(/^@/,'')}
-    }else{
-      window._lastIGtry=Date.now();
-      const m=await withTimeout(fetchIGMeta(vu),16000);
-      if(m){if(m.text){const mm=metaFromJina(m.text);cap=(mm&&mm.caption)||'';user=(mm&&mm.user)||''}else{cap=m.caption||'';user=m.user||''}}
-    }
-  }catch(e){}
-  if(cap&&cap.length>=10){
-    // 값 없던 raw 항목(이름='공유 릴스'·주소/좌표 없음)은 회수 성공 시 자동 정리(중복 방지)
-    if(/^(공유 (릴스|쇼츠|틱톡))/.test(String(i.name||'').trim())&&!i.address&&!i.lat&&!i.lng){items=items.filter(x=>x.id!==i.id);save();if(cur===i.id)cur=null}
-    $('sheet').classList.remove('on');
-    tab('add');
-    toast('링크 본문을 성공적으로 회수했어요 — 장소 후보를 다시 뽑는 중...');
-    processShared(vu+'\n'+cap);
-  }
-}
-function closeSheet(){$('sheet').classList.remove('on');cur=null}
 
-const shrink=(f,m=1024,q=.8)=>new Promise((ok,no)=>{
-  const u=URL.createObjectURL(f),im=new Image();
-  im.onload=()=>{URL.revokeObjectURL(u);const s=Math.min(1,m/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);c.getContext('2d').drawImage(im,0,0,c.width,c.height);ok(c.toDataURL('image/jpeg',q))};
-  im.onerror=()=>no(new Error('사진을 읽을 수 없어요'));im.src=u;
-});
-
-const mkPrompt=(h,q)=>`입력(텍스트·사진)에 해당하는 실제 ${CATS[cat].b} 후보를 구글 검색으로 확인해 가능성 높은 순서로 최대 4개, 다른 설명 없이 JSON 배열만 출력하세요.
-형식: {"name":"한국어 이름 (현지어)","address":"현지어 주소 또는 빈 문자열","lat":숫자 또는 null,"lng":숫자 또는 null,"price":"가격(통화 기호 포함, 예: ¥398, ₩1200, $5.99)","info":"한 줄 정보(영업시간·가격·특징)"}
-${cat==='PLACE'?'주소와 위도·경도를 꼭 찾으세요.':'제품명, 대략 가격, 살 수 있는 곳을 info에 쓰세요.'}
-지역: ${h||'없음'}
-입력: ${q||'(사진만)'}`;
-
-// ===== AI 제공자 체인 (여러 키 지원: 위부터 순서대로 시도, 실패 시 다음 제공자) =====
-const AIS=[
-  ['gemini','Google Gemini (무료 쿼터 있음)','AIzaSy...','gemini-2.0-flash'],
-  ['openrouter','OpenRouter (키 하나로 모든 모델)','sk-or-...','openrouter/free']
-];
-function aiKeys(){
-  const s=ls.get('TRIP_AI_KEYS');
-  if(s){try{const d=JSON.parse(s);if(d&&typeof d==='object')return d}catch(e){}}
-  const g=(ls.get('TRAVEL_GEMINI_KEY')||'').trim(); // 구버전 저장 키 마이그레이션
-  return g?{gemini:{key:g,model:''}}:{};
-}
-function aiList(K){
-  if(!K)return [];
-  if(typeof K==='string')return K?[{id:'gemini',key:K,model:''}]:[];
-  if(Array.isArray(K))return K;
-  const out=[];
-  for(const [id] of AIS){const v=K[id];if(v&&typeof v==='object'&&v.key)out.push({id,key:v.key,model:v.model||'',base:v.base||''})}
-  return out;
-}
-function aiProviderName(id){const row=AIS.find(a=>a[0]===id);return row?row[1]:id}
-// ===== 키 사용량 추적 (오늘/day 단위 로컬 계수 + OpenRouter 잔액 실시간 조회) =====
-function aiUsageGet(){
-  const today=new Date().toISOString().slice(0,10);
-  let d=null;
-  try{d=JSON.parse(ls.get('TRIP_AI_USAGE')||'{}')}catch(e){}
-  if(!d||d.date!==today)d={date:today};
-  d.gemini=d.gemini||{n:0,ok:0,fail:0,quotaAt:0};
-  d.openrouter=d.openrouter||{n:0,ok:0,fail:0};
-  d.gmap=d.gmap||{n:0,ok:0,places:0};
-  return d;
-}
-function aiUsageSave(u){ls.set('TRIP_AI_USAGE',JSON.stringify(u))}
-function usageTick(id,okFlag,errMsg,extra){
-  try{
-    const u=aiUsageGet();const p=u[id];
-    p.n++;
-    if(okFlag)p.ok++;else p.fail++;
-    if(id==='gemini'&&errMsg&&/quota|429|RESOURCE_EXHAUSTED/i.test(String(errMsg)))p.quotaAt=Date.now();
-    if(extra)extra(u,p);
-    aiUsageSave(u);
-    const box=document.getElementById('usageBox');
-    if(box)box.innerHTML=usageHtml();
-  }catch(e){}
-}
-function fmtTime(t){const d=new Date(t);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
-function usageHtml(){
-  const u=aiUsageGet();
-  const g=u.gemini,o=u.openrouter,m=u.gmap;
-  const gquota=g.quotaAt?(' <span style="color:var(--dg);font-weight:700">⚠️ 무료한도 도달 '+fmtTime(g.quotaAt)+'</span>'):'';
-  const md=new Date().getMonth()+1+'월 '+new Date().getDate()+'일';
-  const hasOr=!!((aiKeys()||{}).openrouter||{}).key;
-  const orBtn=hasOr?'<button class="mb" data-aiaction="orkey" style="margin:4px 4px 0 0">💰 OpenRouter 잔액 실시간 조회</button><span id="orRes" style="font-size:11px;color:var(--sub)"></span>':'<span style="color:var(--sub)">OpenRouter 키 없음</span>';
-  return '<b style="font-size:12px">📊 오늘('+md+') 사용량</b><br>'
-    +'● Gemini: '+g.n+'회 <span style="color:var(--sub)">(성공 '+g.ok+' / 실패 '+g.fail+')'+gquota+'</span><br>'
-    +'● OpenRouter: '+o.n+'회 <span style="color:var(--sub)">(성공 '+o.ok+' / 실패 '+o.fail+')</span><br>'
-    +'● Google 지오코딩: '+m.n+'회 <span style="color:var(--sub)">(Places '+m.places+'회 — 서버랑 계산 방식이 달라서 참고용)</span><br>'
-    +orBtn;
-}
-function toOpenAIMessages(parts){
-  const content=[];
-  for(const p of parts||[]){
-    if(p.text)content.push({type:'text',text:p.text});
-    else if(p.inlineData)content.push({type:'image_url',image_url:{url:'data:'+(p.inlineData.mimeType||'image/jpeg')+';base64,'+p.inlineData.data}});
-  }
-  return [{role:'user',content}];
-}
-function toClaudeMessages(parts){
-  const content=[];
-  for(const p of parts||[]){
-    if(p.text)content.push({type:'text',text:p.text});
-    else if(p.inlineData)content.push({type:'image',source:{type:'base64',media_type:p.inlineData.mimeType||'image/jpeg',data:p.inlineData.data}});
-  }
-  return {role:'user',content};
-}
-// AI 요청에 기한을 강제(무한로딩 방지) — 초과 시 즉시 중단하고 다음 제공자로 넘어감
-function fetchTO(url,opts,ms){
-  const c=new AbortController();const t=setTimeout(()=>{try{c.abort()}catch(_){}},ms||15000);
-  return fetch(url,{...opts,signal:c.signal}).finally(()=>clearTimeout(t));
-}
-// OpenRouter 무료 풀은 주기적으로 바뀜 — 공개 모델목록(키 불필요)에서 텍스트+JSON 가능 모델을 뽑아 우선순위 구성
-async function openrouterFreePool(){
-  const now=Date.now();
-  if(window._orp&&now-(window._orpAt||0)<3600e3)return window._orp;
-  let pool=['openrouter/free'];
-  try{
-    const r=await fetch('https://openrouter.ai/api/v1/models');
-    if(r.ok){
-      const d=await r.json();
-      const free=(d.data||[]).filter(m=>{
-        const arch=m.architecture||{};
-        const om=(arch.output_modalities||['text']).join(',');
-        return m.id.endsWith(':free')&&om.indexOf('text')>=0&&om.indexOf('image')<0&&!/vl$|vision|image/i.test(m.id);
-      });
-      const pref=[];
-      for(const k of ['gemini','glm','qwen3','deepseek','minimax','llama-3.3','llama-4']){
-        const m=free.sort((a,b)=>(b.context_length||0)-(a.context_length||0)).find(x=>x.id.indexOf(k)>=0);
-        if(m)pref.push(m.id);
+  // 입력 필드 실시간 자동 저장 & 주소 붙여넣기 시 자동 지오코딩 연결
+  const nmEl=$('sh-name'), adEl=$('sh-addr'), ntEl=$('sh-note');
+  if(nmEl){
+    nmEl.oninput=()=>{if(nmEl.value.trim())i.name=nmEl.value.trim();save();};
+    nmEl.onchange=async()=>{
+      if(nmEl.value.trim()){
+        i.name=nmEl.value.trim();save();
+        if(!i.lat||!i.lng)await reGeoItem(i);
       }
-      const rest=free.map(m=>m.id).filter(x=>pref.indexOf(x)<0);
-      pref.push(...rest.slice(0,6));
-      if(pref.length)pool=pref;
+    };
+  }
+  if(adEl){
+    adEl.oninput=()=>{i.address=normalizeOcrAddr(adEl.value);save();};
+    adEl.onpaste=e=>{
+      setTimeout(async()=>{
+        const v=adEl.value.trim();
+        if(!v)return;
+        if(v.includes('\n')||v.length>45){
+          await applyCaptionToItem(i,v);
+        }else{
+          i.address=normalizeOcrAddr(v);
+          await reGeoItem(i);
+        }
+      },60);
+    };
+    adEl.onchange=async()=>{
+      if(adEl.value.trim()){
+        i.address=normalizeOcrAddr(adEl.value);
+        await reGeoItem(i);
+      }
+    };
+  }
+  if(ntEl){
+    ntEl.oninput=()=>{i.note=ntEl.value;save();};
+  }
+}
+
+// ==================== AI 제공자 설정 및 기존 저장 키 자동 복원 ====================
+const AI_DEFS=[
+  {id:'gemini',name:'Google Gemini (무료 쿼터 있음)',ph:'AIzaSy...',defModel:''},
+  {id:'openrouter',name:'OpenRouter (무료 라우터 가능)',ph:'sk-or-v1-...',defModel:'openrouter/free'},
+  {id:'groq',name:'Groq (초고속/무료 쿼터)',ph:'gsk_...',defModel:'llama-3.3-70b-versatile'},
+  {id:'openai',name:'OpenAI',ph:'sk-...',defModel:'gpt-4o-mini'}
+];
+
+let aiCfg={},usageCnt={gemini:0,openrouter:0,groq:0,openai:0,gmap:0};
+try{aiCfg=JSON.parse(ls.get('TRIP_AI_CFG')||ls.get('TRIP_AI_KEYS')||'{}')}catch(e){aiCfg={}}
+try{usageCnt={...usageCnt,...JSON.parse(ls.get('TRIP_USAGE_CNT')||'{}')}}catch(e){}
+
+// 브라우저 localStorage 전체를 스캔해 이전 버전에서 저장했던 API 키를 100% 자동 복구
+(function recoverExistingKeys(){
+  const gmapKey=(ls.get('TRAVEL_GMAP_KEY')||'').trim();
+  try{
+    for(let idx=0;idx<localStorage.length;idx++){
+      const k=localStorage.key(idx);
+      if(!k||k==='TRIP_MASTER_ITEMS'||k==='TRIP_PHOTO_CACHE')continue;
+      const raw=localStorage.getItem(k)||'';
+      // Gemini 키 패턴 (AIzaSy...)
+      const gm=raw.match(/AIzaSy[A-Za-z0-9_-]{30,40}/g);
+      if(gm){
+        for(const cand of gm){
+          if(!aiCfg.gemini?.key&&(cand!==gmapKey||/GEMINI|AI/i.test(k))){
+            aiCfg.gemini={...(aiCfg.gemini||{}),key:cand};
+          }
+        }
+      }
+      // OpenRouter 키 패턴 (sk-or-v1-...)
+      const orm=raw.match(/sk-or-v1-[A-Za-z0-9]{40,80}/);
+      if(orm&&!aiCfg.openrouter?.key)aiCfg.openrouter={...(aiCfg.openrouter||{}),key:orm[0]};
+      // Groq 키 패턴 (gsk_...)
+      const grq=raw.match(/gsk_[A-Za-z0-9]{30,70}/);
+      if(grq&&!aiCfg.groq?.key)aiCfg.groq={...(aiCfg.groq||{}),key:grq[0]};
     }
   }catch(e){}
-  window._orp=pool;window._orpAt=now;
-  return pool;
-}
-async function callProvider(p,parts,tools){
-  if(window.aiProg)window.aiProg(aiProviderName(p.id));
-  if(p.id==='gemini'){
-    const models=p.model?[p.model]:(await geminiModels(p.key));
-    let last='';
-    // 제공자당 총예산제(모델 N개여도 예산 소진 시 즉시 포기)
-    const budget=(tools&&tools[0]&&tools[0].google_search)?32000:16000;
-    const gstart=Date.now();
-    for(const m of models){
-      const left=budget-(Date.now()-gstart);
-      if(left<4000)break;
-      try{
-        // 검색 도구는 명시적으로 전달될 때만 사용 — 생략 시 텍스트 요청(빠르고 무료쿼터 소모 적음)
-        const body={contents:[{parts}]};
-        if(tools&&tools.length)body.tools=tools;
-        const r=await fetchTO(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':p.key},body:JSON.stringify(body)},left);
-        const d=await r.json();
-        if(!r.ok)throw new Error((d.error&&d.error.message)||('HTTP '+r.status));
-        const t=((d.candidates&&d.candidates[0]&&d.candidates[0].content&&d.candidates[0].content.parts)||[]).map(x=>x.text||'').join('');
-        if(!t)throw new Error('빈 응답');
-        return t;
-      }catch(e){last=(e&&e.name==='AbortError')?'응답 지연(시간초과)':e.message}
-    }
-    throw new Error('Gemini: '+last);
-  }
-  if(p.id==='anthropic'){
-    const r=await fetchTO('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':p.key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:p.model||'claude-sonnet-4-5',max_tokens:1600,messages:[toClaudeMessages(parts)]})},16000);
-    const d=await r.json();
-    if(!r.ok)throw new Error((d.error&&d.error.message)||('HTTP '+r.status));
-    return (d.content||[]).map(c=>c.text||'').join('');
-  }
-  // openai / openrouter / custom — OpenAI 호환
-  const base=p.id==='openai'?'https://api.openai.com/v1':(p.id==='openrouter'?'https://openrouter.ai/api/v1':(p.base||'').trim().replace(/\/+$/,''));
-  if(!base)throw new Error('Base URL이 필요해요');
-  const hdr={'Content-Type':'application/json','Authorization':'Bearer '+p.key};
-  // openrouter/free는 풀이 수시로 바뀌는 룰렛 — 라이브 무료풀에서 텍스트 모델 우선순위로 직접 시도(제공자 예산 내)
-  let models=[p.model||({openrouter:'openrouter/free'})[p.id]||'gpt-4o-mini'];
-  if(p.id==='openrouter'&&(!p.model||p.model==='openrouter/free'))models=await openrouterFreePool();
-  const budget=p.id==='openrouter'?30000:16000;const b0=Date.now();
-  const oerrs=[];
-  for(const mdl of models){
-    const left=budget-(Date.now()-b0);
-    if(left<4000)break;
-    try{
-      const r=await fetchTO(base+'/chat/completions',{method:'POST',headers:hdr,body:JSON.stringify({model:mdl,messages:toOpenAIMessages(parts)})},left);
-      const d=await r.json();
-      if(!r.ok)throw new Error((d.error&&d.error.message)||('HTTP '+r.status));
-      return ((d.choices&&d.choices[0]&&d.choices[0].message&&d.choices[0].message.content)||'')+'';
-    }catch(e){oerrs.push(mdl.split('/').pop()+': '+((e&&e.name==='AbortError')?'지연':String(e.message||e).slice(0,40)))}
-  }
-  throw new Error(aiProviderName(p.id)+'('+models.slice(0,3).join(',')+') 중 실패: '+oerrs[0]);
-}
-let lastAIP='';
-async function ask(K,parts,tools){
-  const provs=aiList(K);
-  if(!provs.length)throw new Error('AI 키가 없어요 (설정 탭에서 입력)');
-  const errs=[];
-  for(const p of provs){
-    try{
-      const t=await callProvider(p,parts,tools);
-      const a=t.indexOf('['),b=t.lastIndexOf(']');
-      if(a<0||b<a)throw new Error('AI 응답을 해석하지 못했어요');
-      const j=JSON.parse(t.slice(a,b+1));
-      if(!Array.isArray(j))throw new Error('AI 응답 형식 오류');
-      lastAIP=aiProviderName(p.id);
-      usageTick(p.id,1,'');
-      return j;
-    }catch(e){errs.push(aiProviderName(p.id)+': '+e.message);usageTick(p.id,0,e.message)}
-  }
-  throw new Error('모든 AI 제공자 실패 — '+errs.join(' / '));
-}
-async function nomi(q){
-  const w=1100-(Date.now()-lastGeo);if(w>0)await sleep(w);lastGeo=Date.now();
-  const call=async()=>{
-    try{const d=await(await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&accept-language=ko&q='+encodeURIComponent(q))).json();
-      return (d&&d.length!==undefined)?d.map(x=>({name:x.name||x.display_name.split(',')[0],address:x.display_name,lat:+x.lat,lng:+x.lon})):null;
-    }catch(e){return null}
-  };
-  let r=await call();
-  if(r===null){ // 일시 차단(분당 제한)이 잦아 한 번 재시도
-    await sleep(2500);lastGeo=Date.now();r=await call();
-  }
-  return r||[];
-}
-const km=(a,b,c,d)=>{const r=Math.PI/180,x=Math.sin((c-a)*r/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin((d-b)*r/2)**2;return 12742*Math.asin(Math.sqrt(x))};
-async function locate(o,h){
-  const ai=(typeof o.lat==='number'&&typeof o.lng==='number'&&o.lat&&o.lng)?{lat:o.lat,lng:o.lng}:null;
-  const nm=String(o.name||'').trim();
-  let hq=CITY_Q[h]||hintFrom(o);
-  if(!hq&&h)hq=h;
-  const qs=[];
-  const ad=String(o.address||'').trim();
-  if(ad)qs.push(ad);
-  const jc=jpCore(ad);
-  if(jc&&jc!==ad)qs.push(jc);
-  if(nm){
-    if(h)qs.push((h+' '+nm).trim());
-    if(hq&&hq!==h)qs.push((nm+', '+hq).trim());
-    // 토큰 폴백: 상호(店 접미 제거) 토큰 단위 재시도 — 몰/랜드마크 명인 경우 통과, 힌트 없으면 단독 쿼리
-    const toks=nm.replace(/[(),]/g,' ').split(/\s+/).map(t=>t.replace(/(店|食堂|カフェ|ダイニング|バル)$/,'')).filter(t=>t.length>=3).reverse();
-    const seen=new Set();
-    for(const t of toks){if(seen.has(t))continue;seen.add(t);qs.push(hq?(t+', '+hq).trim():t)}
-  }
-  let g=null;
-  for(const q of qs.slice(0,7)){
-    if(!q||g)continue;
-    const qc=q.trim();
-    g=await ggeocode(qc);
-    if(!g)g=await gPlaces(qc);
-    if(!g){const r=await nomi(qc);if(r&&r[0])g={lat:r[0].lat,lng:r[0].lng,address:r[0].address||''}}
-  }
-  if(g&&ai&&km(g.lat,g.lng,ai.lat,ai.lng)>50)g=null;
-  return g?{lat:g.lat,lng:g.lng}:ai;
-}
-// 구글 지오코더 (API 키 있을 때 최우선, 실패 시 Nominatim 대기)
-function ggeocode(addr){
-  return new Promise(res=>{
-    if(!window.google||!google.maps||!google.maps.Geocoder)return res(null);
-    try{new google.maps.Geocoder().geocode({address:addr},(rs,st)=>{if(st==='OK'&&rs&&rs[0]){res({lat:rs[0].geometry.location.lat(),lng:rs[0].geometry.location.lng(),address:rs[0].formatted_address||''})}else res(null)})}catch(e){res(null)}
+  // 문자열 형태로 저장된 경우 객체 형태로 정규화
+  AI_DEFS.forEach(d=>{
+    if(typeof aiCfg[d.id]==='string')aiCfg[d.id]={key:aiCfg[d.id],model:d.defModel};
+    else if(!aiCfg[d.id])aiCfg[d.id]={key:'',model:d.defModel};
   });
+})();
+
+function bumpCnt(k){usageCnt[k]=(usageCnt[k]||0)+1;ls.set('TRIP_USAGE_CNT',JSON.stringify(usageCnt));renderUsageBox();}
+
+function buildAiProvUI(){
+  $('aiProv').innerHTML=AI_DEFS.map(d=>{
+    const c=aiCfg[d.id]||{key:'',model:d.defModel};
+    return `<div style="padding:10px;border:1px solid var(--bd);border-radius:12px;background:var(--s);margin-bottom:8px">
+      <label style="margin-bottom:4px;color:var(--tx)">${esc(d.name)}</label>
+      <input type="password" id="aik-${d.id}" value="${esc(c.key||'')}" placeholder="API 키 (${esc(d.ph)})" style="margin-bottom:6px">
+      <input type="text" id="aim-${d.id}" value="${esc(c.model||'')}" placeholder="모델명 (비워두면 기본값: ${esc(d.defModel||'자동')})" style="margin-bottom:0">
+    </div>`;
+  }).join('');
+  AI_DEFS.forEach(d=>{
+    $('aik-'+d.id).oninput=saveAiProvFromUI;
+    $('aim-'+d.id).oninput=saveAiProvFromUI;
+  });
+  updateAiChainText();
+  renderUsageBox();
 }
-// Places(신규) 텍스트 검색 폴백 — Geocoder가 못 찾는 상호/POI명(규카츠 마요, 난바워크 등) 해결
-let _noPlaces=false;
-async function gPlaces(q){
-  if(_noPlaces||!window._gkey)return null;
+
+function saveAiProvFromUI(){
+  AI_DEFS.forEach(d=>{
+    aiCfg[d.id]={
+      key:($('aik-'+d.id)?.value||'').trim(),
+      model:($('aim-'+d.id)?.value||'').trim()
+    };
+  });
+  ls.set('TRIP_AI_CFG',JSON.stringify(aiCfg));
+  if(aiCfg.gemini?.key)ls.set('TRAVEL_GEMINI_KEY',aiCfg.gemini.key);
+  updateAiChainText();
+}
+
+function updateAiChainText(){
+  const act=AI_DEFS.filter(d=>aiCfg[d.id]?.key).map(d=>d.name.split(' (')[0]);
+  $('aiChain').textContent=act.length?act.join(' → ')+' → 내장 캡션 파서':'내장 캡션 파서 (키 미설정)';
+}
+
+async function renderUsageBox(){
+  const box=$('usageBox');if(!box)return;
+  let orInfo='키 미설정';
+  const orKey=aiCfg.openrouter?.key;
+  if(orKey){
+    orInfo=`앱 호출 ${usageCnt.openrouter||0}회 (잔액 조회 중...)`;
+  }
+  box.innerHTML=`
+    <div>• <b>Gemini</b>: ${aiCfg.gemini?.key?'🟢 키 설정됨':'⚪ 미설정'} (이 앱에서 호출: ${usageCnt.gemini||0}회)</div>
+    <div id="orUsageLine">• <b>OpenRouter</b>: ${aiCfg.openrouter?.key?'🟢 키 설정됨':'⚪ 미설정'} (${orInfo})</div>
+    <div>• <b>Groq / OpenAI</b>: ${(usageCnt.groq||0)+(usageCnt.openai||0)}회 호출</div>
+    <div>• <b>Google Maps</b>: ${(ls.get('TRAVEL_GMAP_KEY')||'').trim()?'🟢 키 설정됨':'⚪ 미설정'} (지오코딩 호출: ${usageCnt.gmap||0}회)</div>
+  `;
+  if(orKey){
+    try{
+      const r=await fetchTO('https://openrouter.ai/api/v1/auth/key',{headers:{Authorization:`Bearer ${orKey}`}},5000);
+      if(r.ok){
+        const d=await r.json();
+        const u=d?.data?.usage??0, lim=d?.data?.limit;
+        const el=$('orUsageLine');
+        if(el)el.innerHTML=`• <b>OpenRouter</b>: 🟢 사용량 $${Number(u).toFixed(4)} / 한도 ${lim!=null?'$'+lim:'무제한(무료모델)'} (호출 ${usageCnt.openrouter||0}회)`;
+      }
+    }catch(e){}
+  }
+}
+
+// ==================== AI 호출 엔진 (429 쿼터 초과 자동 우회) ====================
+async function callGeminiSmart(prompt,images=[],allowGrounding=false){
+  const key=(aiCfg.gemini?.key||'').trim();
+  if(!key)throw new Error('키 미설정');
+  const userModel=(aiCfg.gemini?.model||'').trim();
+  const discovered=await geminiModels(key);
+  const models=[...new Set([
+    ...(userModel?[userModel]:[]),
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
+    ...discovered,
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-lite',
+    'gemini-1.5-flash'
+  ])];
+
+  const parts=[{text:prompt}];
+  for(const im of images){
+    if(im&&im.data)parts.push({inline_data:{mime_type:im.mime||'image/jpeg',data:im.data}});
+  }
+
+  let lastErr='';
+  for(const m of models){
+    // Search Grounding은 무료 쿼터 제한(429)이 심하므로 꼭 필요할 때만 1회 시도 후 즉시 일반 호출로 전환
+    const tries=allowGrounding?[true,false]:[false];
+    for(const useGround of tries){
+      const body={contents:[{parts}],generationConfig:{temperature:0.1}};
+      if(useGround)body.tools=[{google_search:{}}];
+      try{
+        const r=await fetchTO(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(key)}`,{
+          method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)
+        },14000);
+        const d=await r.json();
+        if(!r.ok){
+          lastErr=d?.error?.message||`HTTP ${r.status}`;
+          continue;
+        }
+        const txt=d?.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('')||'';
+        if(txt.trim()){
+          bumpCnt('gemini');
+          return txt;
+        }
+      }catch(e){
+        lastErr=e.message||'네트워크 오류';
+      }
+    }
+  }
+  throw new Error(lastErr||'Gemini 쿼터 초과');
+}
+
+async function callOpenAICompat(endpoint,key,models,prompt,images=[],provId='openrouter'){
+  let lastErr='';
+  for(const m of models){
+    try{
+      const content=[{type:'text',text:prompt}];
+      for(const im of images){
+        if(im&&im.data)content.push({type:'image_url',image_url:{url:`data:${im.mime||'image/jpeg'};base64,${im.data}`}});
+      }
+      const r=await fetchTO(endpoint,{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},
+        body:JSON.stringify({model:m,messages:[{role:'user',content:images.length?content:prompt}],temperature:0.1})
+      },14000);
+      const d=await r.json();
+      if(!r.ok){lastErr=d?.error?.message||`HTTP ${r.status}`;continue;}
+      const txt=d?.choices?.[0]?.message?.content||'';
+      if(txt.trim()){bumpCnt(provId);return txt;}
+    }catch(e){lastErr=e.message||'오류';}
+  }
+  throw new Error(lastErr||'호출 실패');
+}
+
+async function askAI(prompt,images=[],allowGrounding=false){
+  const errs=[];
+  if(aiCfg.gemini?.key){
+    try{return await callGeminiSmart(prompt,images,allowGrounding)}
+    catch(e){errs.push(`Google Gemini: ${e.message}`)}
+  }
+  if(aiCfg.openrouter?.key){
+    const custom=aiCfg.openrouter.model;
+    const ms=[...new Set([custom||'openrouter/free','openrouter/free','google/gemini-2.0-flash-exp:free','meta-llama/llama-3.3-70b-instruct:free'])];
+    try{return await callOpenAICompat('https://openrouter.ai/api/v1/chat/completions',aiCfg.openrouter.key,ms,prompt,images,'openrouter')}
+    catch(e){errs.push(`OpenRouter: ${e.message}`)}
+  }
+  if(aiCfg.groq?.key){
+    const custom=aiCfg.groq.model;
+    const ms=images.length?['meta-llama/llama-4-scout-17b-16e-instruct','llama-3.3-70b-versatile']:[custom||'llama-3.3-70b-versatile'];
+    try{return await callOpenAICompat('https://api.groq.com/openai/v1/chat/completions',aiCfg.groq.key,ms,prompt,images,'groq')}
+    catch(e){errs.push(`Groq: ${e.message}`)}
+  }
+  if(aiCfg.openai?.key){
+    const ms=[aiCfg.openai.model||'gpt-4o-mini'];
+    try{return await callOpenAICompat('https://api.openai.com/v1/chat/completions',aiCfg.openai.key,ms,prompt,images,'openai')}
+    catch(e){errs.push(`OpenAI: ${e.message}`)}
+  }
+  throw new Error(errs.join(' · ')||'사용 가능한 AI 제공자 없음');
+}
+
+function extractJsonArray(txt){
+  const s=String(txt||'').trim();
+  const m=s.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const body=m?m[1].trim():s;
+  const a=body.indexOf('['),b=body.lastIndexOf(']');
+  const c=body.indexOf('{'),d=body.lastIndexOf('}');
   try{
-    const r=await fetch('https://places.googleapis.com/v1/places:searchText',{method:'POST',
-      headers:{'Content-Type':'application/json','X-Goog-Api-Key':window._gkey,
-        'X-Goog-FieldMask':'places.displayName,places.formattedAddress,places.location'},
-      body:JSON.stringify({textQuery:String(q).slice(0,200),languageCode:'ko'})});
-    if(!r.ok){if(r.status===403||r.status===400)_noPlaces=true;usageTick('gmap',false,'http '+r.status,(u,f)=>f.places++);return null}
-    const d=await r.json();
-    const p=(d.places||[])[0];
-    if(!p||!p.location||!isFinite(p.location.latitude)){usageTick('gmap',true,'',(u,f)=>f.places++);return null}
-    usageTick('gmap',true,'',(u,f)=>f.places++);
-    return {lat:p.location.latitude,lng:p.location.longitude,address:p.formattedAddress||''};
-  }catch(e){return null}
+    if(a!==-1&&b>a&&(c===-1||a<c))return JSON.parse(body.slice(a,b+1));
+    if(c!==-1&&d>c){const o=JSON.parse(body.slice(c,d+1));return Array.isArray(o)?o:[o];}
+  }catch(e){}
+  return [];
 }
-// 주소 기준 검증 전용 — 이름으로는 뒤집지 않는다(동명이 엉뚱 곳 매칭 방지)
-async function geoCheck(o){
-  const q=String(o&&o.address||'').trim();
-  if(q.length<4)return null;
-  let g=await ggeocode(q);
-  if(!g){const r=await nomi(q);if(r&&r[0])g={lat:r[0].lat,lng:r[0].lng,address:r[0].address||''}}
-  return (g&&isFinite(g.lat)&&isFinite(g.lng))?g:null;
+
+// ==================== 릴스·쇼츠 캡션 추출기 (임베드 HTML 병렬 파싱) ====================
+function decodeHtml(str){
+  const t=document.createElement('textarea');
+  t.innerHTML=str;
+  return t.value;
 }
-// 좌표가 아예 없을 때 채우기: 주소 → 이름
-async function geoFill(o){
-  const nm=String(o&&o.name||'').trim();
-  const hq=CITY_Q[o&&o.h]||hintFrom(o);
-  const qs=[];
-  const ad=String(o&&o.address||'').trim();
-  if(ad)qs.push(ad);
-  const jc=jpCore(ad);
-  if(jc&&jc!==ad)qs.push(jc);
-  qs.push(nm);
-  if(nm){
-    if(hq)qs.push((nm+', '+hq).trim());
-    const toks=nm.replace(/[(),]/g,' ').split(/\s+/).map(t=>t.replace(/(店|食堂|カフェ|ダイニング|バル)$/,'')).filter(t=>t.length>=3).reverse();
-    const seen=new Set();
-    for(const t of toks){if(seen.has(t))continue;seen.add(t);qs.push(hq?(t+', '+hq).trim():t)}
+
+function parseIgEmbedHtml(html){
+  if(!html||typeof html!=='string')return '';
+  // 1. /embed/captioned/ 의 <div class="Caption"> 블록 직접 추출
+  const cm=html.match(/<div class="Caption"[^>]*>([\s\S]*?)<div class="CaptionComments"/i)
+         ||html.match(/<div class="Caption"[^>]*>([\s\S]*?)<\/div>/i);
+  if(cm){
+    let s=cm[1]
+      .replace(/<a class="CaptionUsername"[^>]*>[\s\S]*?<\/a>/i,'')
+      .replace(/<br\s*\/?>/gi,'\n')
+      .replace(/<[^>]+>/g,' ');
+    s=decodeHtml(s).replace(/[ \t]+/g,' ').replace(/\n\s+/g,'\n').trim();
+    if(s.length>=6)return s;
   }
-  let g=null;
-  for(const q of qs.slice(0,7)){
-    if(!q||g)continue;
-    const qc=q.trim();
-    g=await ggeocode(qc);
-    if(!g)g=await gPlaces(qc);
-    if(!g){const r=await nomi(qc);if(r&&r[0])g={lat:r[0].lat,lng:r[0].lng,address:r[0].address||''}}
+  // 2. 내장 JSON의 edge_media_to_caption 추출
+  const jm=html.match(/"edge_media_to_caption"\s*:\s*\{\s*"edges"\s*:\s*\[\s*\{\s*"node"\s*:\s*\{\s*"text"\s*:\s*"((?:[^"\\]|\\.)*)"/i)
+         ||html.match(/\\"edge_media_to_caption\\"\s*:\s*\{\s*\\"edges\\"\s*:\s*\[\s*\{\s*\\"node\\"\s*:\s*\{\s*\\"text\\"\s*:\s*\\"((?:[^"\\]|\\.)*)\\"/i);
+  if(jm){
+    try{
+      const raw=jm[1].replace(/\\"/g,'"').replace(/\\\\/g,'\\');
+      const dec=JSON.parse('"'+raw.replace(/"/g,'\\"')+'"');
+      if(dec&&dec.trim().length>=6)return dec.trim();
+    }catch(e){}
   }
-  if(g&&isFinite(g.lat)&&isFinite(g.lng))return g;
+  // 3. og:description 메타태그 추출
+  const om=html.match(/<meta[^>]+(?:property="og:description"|name="description")[^>]+content="([^"]+)"/i)
+         ||html.match(/<meta[^>]+content="([^"]+)"[^>]+(?:property="og:description"|name="description")/i);
+  if(om){
+    let d=decodeHtml(om[1]);
+    const qm=d.match(/:\s*["“]([\s\S]+)["”]\.?$/);
+    if(qm)d=qm[1];
+    if(d&&!/Create an account or log in/i.test(d)&&d.trim().length>=6)return d.trim();
+  }
+  return '';
+}
+
+async function fetchVideoCaption(vUrl){
+  const meta=parseVideoMeta(vUrl);
+  if(!meta)return '';
+  if(meta.platform==='ig'&&meta.id){
+    const embedUrl=`https://www.instagram.com/p/${meta.id}/embed/captioned/`;
+    const reelEmbedUrl=`https://www.instagram.com/reel/${meta.id}/embed/captioned/`;
+    const postUrl=`https://www.instagram.com/p/${meta.id}/`;
+    const jobs=[
+      ()=>fetchTO(`https://api.allorigins.win/raw?url=${encodeURIComponent(embedUrl)}`,{},6500).then(r=>r.text()),
+      ()=>fetchTO(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(embedUrl)}`,{},6500).then(r=>r.text()),
+      ()=>fetchTO(`https://corsproxy.io/?url=${encodeURIComponent(embedUrl)}`,{},6500).then(r=>r.text()),
+      ()=>fetchTO(`https://r.jina.ai/${embedUrl}`,{},7000).then(r=>r.text()),
+      ()=>fetchTO(`https://api.allorigins.win/get?url=${encodeURIComponent(reelEmbedUrl)}`,{},6500).then(r=>r.json()).then(d=>d.contents||''),
+      ()=>fetchTO(`https://api.allorigins.win/raw?url=${encodeURIComponent(postUrl)}`,{},6500).then(r=>r.text())
+    ];
+    try{
+      return await Promise.any(jobs.map(async fn=>{
+        const txt=await fn();
+        const cap=parseIgEmbedHtml(txt);
+        if(cap&&cap.length>=8)return cap;
+        if(txt&&txt.includes('Markdown Content:')&&!txt.includes('Log in to Instagram')){
+          const md=txt.split('Markdown Content:')[1]||'';
+          const cl=md.replace(/!\[.*?\]\(.*?\)/g,'').replace(/\[([^\]]+)\]\([^)]+\)/g,'$1').trim();
+          if(cl.length>=12)return cl;
+        }
+        throw new Error('no caption');
+      }));
+    }catch(e){return '';}
+  }
+  if(meta.platform==='yt'&&meta.id){
+    const wUrl=`https://www.youtube.com/watch?v=${meta.id}`;
+    let title='',desc='';
+    try{
+      const r=await fetchTO(`https://noembed.com/embed?url=${encodeURIComponent(wUrl)}`,{},4500);
+      if(r.ok){const d=await r.json();title=d.title||'';}
+    }catch(e){}
+    try{
+      desc=await Promise.any([
+        fetchTO(`https://api.allorigins.win/raw?url=${encodeURIComponent(wUrl)}`,{},6000).then(r=>r.text()),
+        fetchTO(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(wUrl)}`,{},6000).then(r=>r.text()),
+        fetchTO(`https://r.jina.ai/${wUrl}`,{},6500).then(r=>r.text())
+      ].map(async p=>{
+        const html=await p;
+        const m=html.match(/"shortDescription"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+        if(m){const s=JSON.parse('"'+m[1]+'"');if(s.length>5)return s;}
+        if(html.includes('Markdown Content:'))return html.split('Markdown Content:')[1].slice(0,1500);
+        throw new Error('empty');
+      }));
+    }catch(e){}
+    return [title,desc].filter(Boolean).join('\n').trim();
+  }
+  if(meta.platform==='tt'){
+    try{
+      const r=await fetchTO(`https://www.tiktok.com/oembed?url=${encodeURIComponent(meta.url)}`,{},5000);
+      if(r.ok){const d=await r.json();return d.title||'';}
+    }catch(e){}
+  }
+  return '';
+}
+
+// ==================== 내장 스마트 캡션 파서 (AI 없이도 이름/주소/가격/시간 분리) ====================
+function parseCaptionLocally(rawText,hint=''){
+  const norm=normalizeOcrAddr(String(rawText||'').replace(/\r/g,''));
+  const lines=String(rawText||'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  let name='',address='',price='',info='',postal='';
+  const addrParts=[];
+
+  const zipM=norm.match(/(?:〒|T|\b)(\d{3}-\d{4})\b/);
+  if(zipM)postal=zipM[1];
+
+  for(const line of lines){
+    if(/^https?:\/\//i.test(line))continue;
+    const cl=line.replace(/^[•·\-\*]\s*/,'').trim();
+
+    if(cl.startsWith('📍')||cl.startsWith('📌')){
+      const v=cl.replace(/^(?:📍|📌)\s*/u,'').trim();
+      if(v&&!name)name=v;
+      continue;
+    }
+    if(cl.startsWith('🇯🇵')||cl.startsWith('🏠')||cl.startsWith('🗺')||cl.startsWith('📮')||/^(?:주소|위치|Address)\s*[:：]/i.test(cl)){
+      let v=cl.replace(/^(?:🇯🇵|🏠|🗺️?|📮)\s*/u,'').replace(/^(?:주소|위치|Address)\s*[:：]\s*/i,'').trim();
+      v=v.replace(/^일본\s+/,'');
+      if(v)addrParts.push(v);
+      continue;
+    }
+    if(cl.startsWith('⏰')||cl.startsWith('🕒')||/(?:영업\s*시간|운영\s*시간|\d{1,2}:\d{2}\s*[~∼\-]\s*\d{1,2}:\d{2})/.test(cl)){
+      const v=cl.replace(/^(?:⏰|🕒)\s*/u,'').trim();
+      if(v&&!info)info=v;
+      continue;
+    }
+    if(cl.startsWith('🥣')||cl.startsWith('🍜')||cl.startsWith('💴')||cl.startsWith('💰')||/\d{1,3}(?:,\d{3})*\s*(?:엔|원|¥|₩)/.test(cl)){
+      const v=cl.replace(/^(?:🥣|🍜|💴|💰)\s*/u,'').trim();
+      if(v&&!price)price=v;
+      continue;
+    }
+    if(/(?:\b\d{3}-\d{4}\b|\bWard\b|\bChuo\b|\bOsaka\b|\bTokyo\b|\bKyoto\b|\bFukuoka\b|丁目|番地?|千日前|[시군구]\s+\S+[동로길]\s*\d+)/i.test(cl)){
+      addrParts.push(cl.replace(/^일본\s+/,''));
+      continue;
+    }
+    const nmM=cl.match(/^(?:상호명?|가게명?|장소|식당|이름)\s*[:：]\s*(.+)$/);
+    if(nmM&&!name){name=nmM[1].trim();continue;}
+  }
+
+  if(addrParts.length)address=normalizeOcrAddr(addrParts.join(', '));
+
+  if(!name){
+    for(const line of lines){
+      if(line.startsWith('#')||/^https?:/i.test(line))continue;
+      const m=line.match(/([가-힣A-Za-z0-9\s]{2,20}(?:본점|지점|점|식당|우동|라멘|스시|야키니쿠|카페|베이커리|치토세|이치란))/);
+      if(m){name=m[1].trim();break;}
+    }
+  }
+  if(!name){
+    const tags=(String(rawText||'').match(/#([^\s#]+)/g)||[]).map(t=>t.slice(1));
+    const sp=tags.find(t=>!/맛집|여행|추천|릴스|오사카|도쿄|교토|일본|투어|가볼만한곳$/.test(t));
+    if(sp)name=sp;
+  }
+
+  let category=cat||'PLACE';
+  if(/편의점|로손|세븐일레븐|패밀리마트|푸딩|산도/.test(norm))category='FOOD';
+  else if(/돈키호테|드럭스토어|쇼핑|기념품/.test(norm))category='SHOP';
+
+  const note=[price,info].filter(Boolean).join(' · ');
+  return {name,address,price,info,note,postal,category};
+}
+
+// ==================== 4단계 정밀 지오코더 (우편번호 + Google + Photon + Nominatim) ====================
+async function geocodePlace(cand,hint=''){
+  const gkey=(ls.get('TRAVEL_GMAP_KEY')||'').trim();
+  const rawAddr=normalizeOcrAddr(cand.address||'');
+  const rawName=isGenericSharedName(cand.name)?'':String(cand.name||'').trim();
+  const localName=String(cand.localName||'').trim();
+
+  // 일본 7자리 우편번호(예: 542-0075)가 있으면 일본 공식 우편번호 API로 정확한 일본어 행정구역 확보
+  const zipM=(rawAddr+' '+(cand.postal||'')).match(/(\d{3})-?(\d{4})/);
+  let jpTown='';
+  if(zipM){
+    try{
+      const zr=await fetchTO(`https://zipcloud.ibsnet.co.jp/api/search?zipcode=${zipM[1]}${zipM[2]}`,{},4000);
+      const zd=await zr.json();
+      if(zd&&zd.results&&zd.results[0]){
+        const x=zd.results[0];
+        jpTown=`${x.address1}${x.address2}${x.address3}`; // 예: 大阪府大阪市中央区難波千日前
+      }
+    }catch(e){}
+  }
+
+  const banchiM=rawAddr.match(/(\d+\s*-\s*\d+(?:\s*-\s*\d+)?)/);
+  const banchi=banchiM?banchiM[1].replace(/\s+/g,''):'';
+
+  const queries=[];
+  if(jpTown&&banchi)queries.push(`${jpTown}${banchi}`);
+  if(localName)queries.push(`${localName} ${jpTown||hint||rawAddr}`.trim());
+  if(rawAddr)queries.push(rawAddr);
+  if(rawAddr){
+    const cleaned=rawAddr.replace(/(?:〒|T)?\d{3}-\d{4}/g,'').replace(/^일본\s*/,'').trim();
+    if(cleaned)queries.push(cleaned);
+  }
+  if(jpTown)queries.push(jpTown);
+  if(rawName)queries.push(`${rawName} ${hint||''}`.trim());
+  if(zipM)queries.push(`${zipM[1]}-${zipM[2]} Japan`);
+
+  const uniq=[...new Set(queries.map(q=>q.trim()).filter(q=>q.length>=2))];
+
+  // 1단계: Google Maps Geocoding API
+  if(gkey){
+    for(const q of uniq.slice(0,4)){
+      try{
+        bumpCnt('gmap');
+        const r=await fetchTO(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(q)}&key=${encodeURIComponent(gkey)}&language=ko`,{},5000);
+        const d=await r.json();
+        if(d.status==='OK'&&d.results&&d.results[0]){
+          const loc=d.results[0].geometry.location;
+          return {lat:Number(loc.lat),lng:Number(loc.lng),formatted:d.results[0].formatted_address};
+        }
+      }catch(e){}
+    }
+  }
+
+  // 2단계: Nominatim + Photon 병렬 검색
+  for(const q of uniq){
+    try{
+      const [nom,pho]=await Promise.allSettled([
+        fetchTO(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1&accept-language=ko,ja,en`,{},5000).then(r=>r.json()),
+        fetchTO(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=1`,{},5000).then(r=>r.json())
+      ]);
+      if(nom.status==='fulfilled'&&Array.isArray(nom.value)&&nom.value[0]){
+        return {lat:Number(nom.value[0].lat),lng:Number(nom.value[0].lon),formatted:nom.value[0].display_name};
+      }
+      if(pho.status==='fulfilled'&&pho.value?.features?.[0]){
+        const c=pho.value.features[0].geometry?.coordinates;
+        if(c&&c.length>=2)return {lat:Number(c[1]),lng:Number(c[0])};
+      }
+    }catch(e){}
+  }
+
+  // 3단계: 우편번호 전용 Nominatim 검색
+  if(zipM){
+    try{
+      const r=await fetchTO(`https://nominatim.openstreetmap.org/search?format=json&postalcode=${zipM[1]}-${zipM[2]}&countrycodes=jp&limit=1`,{},5000);
+      const d=await r.json();
+      if(Array.isArray(d)&&d[0])return {lat:Number(d[0].lat),lng:Number(d[0].lon)};
+    }catch(e){}
+  }
+
+  // 4단계: AI 추론 좌표 폴백
+  if(Number(cand.lat)&&Number(cand.lng)&&Math.abs(Number(cand.lat))<=90&&Math.abs(Number(cand.lng))<=180){
+    return {lat:Number(cand.lat),lng:Number(cand.lng)};
+  }
   return null;
 }
-// 구글 지오코더가 늦게 로드되므로 짧게 대기
-async function waitGoogle(ms){
-  if(mapProvider!=='google'||!(_gkey))return false;
-  const t0=Date.now();
-  while(!(window.google&&google.maps&&google.maps.Geocoder)){
-    if(Date.now()-t0>ms)return false;
-    await sleep(300);
-  }
-  return true;
-}
-// 저장 항목 좌표 총괄 정리: (1) 잘못된 좌표 교정 (2) 좌표 없는 항목 보강
-// AI가 준 좌표는 자주 틀리므로(vfy 미검증 상태) 주소 역검증해서 30km 이상 어긋나면 강제 교정
-async function autoFixCoords(){
-  await waitGoogle(4000);
-  let corrected=0,filled=0,n=0,renamed=0;
-  for(const i of items){
-    // 릴스 코드가 이름인 과거 항목('Dd21bdgSfZp' 등)은 굳이 검색하지 말고 라벨만 정리
-    if(String(i.name||'').match(/^[A-Za-z0-9_-]{10,13}$/)&&i.vid&&i.vid.code===i.name){
-      i.name='공유 '+(i.vid.platform==='youtube'?'쇼츠':i.vid.platform==='tiktok'?'틱톡':'릴스');
-      renamed++;continue;
-    }
-    if(n>=30)break;
-    if(i.vfy===1)continue;
-    n++;
-    i.tryN=(i.tryN||0)+1;
-    if(isFinite(i.lat)&&isFinite(i.lng)&&i.lat&&i.lng){
-      const g=await geoCheck(i);
-      if(g){
-        if(km(i.lat,i.lng,g.lat,g.lng)>30){i.lat=g.lat;i.lng=g.lng;if(!i.address&&g.address)i.address=g.address;corrected++}
-        i.vfy=1;
-      }else if(i.tryN>=3){i.vfy=1} // 3번 시도에도 주소 미매칭이면 포기
+
+// ==================== 분석·추출 통합 함수 ====================
+async function analyzeContent({rawText='',vidUrl='',images=[],hint=''}){
+  let caption=String(rawText||'').replace(/https?:\/\/[^\s]+/g,'').trim();
+  let capStatus='';
+
+  if(vidUrl&&caption.length<8){
+    toast('릴스/쇼츠 캡션 정보를 불러오는 중...');
+    const fetched=await fetchVideoCaption(vidUrl);
+    if(fetched){
+      caption=(caption+'\n'+fetched).trim();
     }else{
-      const g=await geoFill(i);
-      if(g){i.lat=g.lat;i.lng=g.lng;if(!i.address&&g.address)i.address=g.address;i.vfy=1;filled++}
-      else if(i.tryN>=3){i.vfy=1}
+      capStatus='릴스 캡션을 못 가져왔어요(인스타 익명차단)';
     }
   }
-  if(corrected||filled||renamed){
-    save();fit();
-    toast(((corrected?'틀린 위치 '+corrected+'건 바로잡음':'')+(corrected&&filled?' · ':'')+(filled?'위치 없음 '+filled+'건 보강':'')+(renamed?' · 릴스코드 항목 '+renamed+'건 이름 정리':''))||'위치 정리 완료');
+
+  const localParsed=parseCaptionLocally(caption||rawText,hint);
+  let aiCands=[],aiErr='';
+  const hasAi=AI_DEFS.some(d=>aiCfg[d.id]?.key);
+
+  if(hasAi&&(caption.length>=3||images.length>0||!vidUrl)){
+    try{
+      toast('AI로 상호명·주소·좌표를 분석하는 중...');
+      const prompt=`다음 여행 관련 입력(릴스/쇼츠 캡션, 텍스트, 또는 이미지)에서 장소·먹거리·쇼핑 항목을 추출해 JSON 배열로만 출력하세요.
+입력 텍스트:
+"""
+${caption||rawText}
+"""
+지역 힌트: ${hint||'없음'}
+
+반드시 아래 JSON 배열 형식으로만 답하세요:
+[
+  {
+    "name": "장소/가게 이름 (한국어, 예: 오사카 난바 치토세 본점)",
+    "localName": "현지어 공식 상호명 (예: 千とせ 本店)",
+    "address": "우편번호·번지를 포함한 주소 (예: 〒542-0075 大阪府大阪市中央区難波千日前8-1)",
+    "price": "가격·대표메뉴 요약 (예: 고기우동 800엔 계란밥 200엔)",
+    "info": "영업시간·휴무일·특징 요약 (예: 영업시간 10:30~14:30, 화요일 휴무)",
+    "category": "PLACE 또는 FOOD 또는 SHOP",
+    "lat": 34.6653,
+    "lng": 135.5038
   }
-  return corrected+filled;
+]
+중요: 실제 존재하는 유명 장소라면 정확한 위경도(lat, lng)와 현지어 상호명(localName)을 반드시 포함하세요.`;
+      const txt=await askAI(prompt,images,false);
+      aiCands=extractJsonArray(txt);
+    }catch(e){
+      aiErr=e.message;
+    }
+  }
+
+  let cands=[];
+  if(aiCands.length){
+    cands=aiCands.map(c=>({
+      name:c.name||localParsed.name||'',
+      localName:c.localName||'',
+      address:normalizeOcrAddr(c.address||localParsed.address||''),
+      price:c.price||localParsed.price||'',
+      info:c.info||localParsed.info||'',
+      note:[c.price||localParsed.price,c.info||localParsed.info].filter(Boolean).join(' · '),
+      category:CATS[c.category]?c.category:(localParsed.category||cat||'PLACE'),
+      lat:Number(c.lat)||null,
+      lng:Number(c.lng)||null,
+      vid:vidUrl||''
+    }));
+  }else if(localParsed.name||localParsed.address){
+    cands=[{
+      ...localParsed,
+      vid:vidUrl||''
+    }];
+  }
+
+  for(const c of cands){
+    const geo=await geocodePlace(c,hint);
+    if(geo){
+      c.lat=geo.lat;
+      c.lng=geo.lng;
+      if(!c.address&&geo.formatted)c.address=geo.formatted;
+    }
+    if(!c.name&&c.address)c.name=c.address.split(',')[0].trim();
+    if(c.name&&!isGenericSharedName(c.name)){
+      fetchRepPhoto(c.name).then(u=>{if(u){render();draw();}});
+    }
+  }
+
+  return {cands,caption,aiErr,capStatus};
 }
 
-async function find(){
-  const q=$('q').value.trim(),h=$('hint').value.trim(),btn=$('go'),A=aiKeys(),hasAI=aiList(A).length>0;
-  if(!q&&!pend.length)return toast('검색어를 입력하거나 사진을 선택하세요');
-  btn.disabled=true;btn.textContent='인터넷에서 찾는 중...';
-  let list=null,note='';
+// 후보 목록(#rs) 렌더링 (원래 UI와 동일하게 유지 + 사진바꾸기/선택 지원)
+function renderCandidates(headerMsg='맞는 항목을 눌러 저장하세요 · 사진이 다르면 🔄'){
+  if(!res.length){$('rs').innerHTML='';return;}
+  $('rs').innerHTML=`<div class="ds" style="margin:4px 2px">${esc(headerMsg)}</div>`+res.map((r,idx)=>{
+    const dummy={name:r.name,address:r.address,vid:r.vid,img:r.img,useCustomImg:Boolean(r.img),v:r.v||0,category:r.category||cat};
+    return `<div class="item" data-act="pickRes" data-idx="${idx}">
+      ${ph(CATS[dummy.category]?CATS[dummy.category].e:'📍',itemThumb(dummy),'',r.img)}
+      <div class="mid">
+        <div class="nm">${esc(r.name||'장소')}${r.vid?' 🎬':''}${r.lat&&r.lng?' 📍':''}</div>
+        <div class="ds">${esc(r.address||'입력한 그대로 저장')}</div>
+        ${r.price?`<div class="ds" style="color:var(--FOOD);font-weight:700">${esc(r.price)}</div>`:''}
+        ${r.info?`<div class="ds in">${esc(r.info)}</div>`:''}
+        <div style="margin-top:4px"><button class="mb" data-act="resPic" data-idx="${idx}" style="padding:3px 8px;font-size:11px">🔄 다른 사진</button></div>
+      </div>
+      <div class="ok">${r._saved?'✓ 저장됨':'선택'}</div>
+    </div>`;
+  }).join('');
+}
+
+// 릴스/쇼츠/캡션 분석하기 실행 (성공 시 한 번에 자동 저장 + 지도 핀 등록!)
+async function runAnalyzeShare(files=[]){
+  const raw=($('shareBox').value||'').trim();
+  const hint=($('hint').value||'').trim();
+  if(!raw&&!files.length)return toast('릴스/쇼츠 링크나 캡션을 붙여넣거나 스크린샷을 첨부해 주세요');
+
+  const btn=$('analyzeShare');
+  btn.disabled=true;btn.textContent='🔥 분석 중...';
+
   try{
-    if(hasAI){
-      try{
-        const imgs=(await Promise.all(pend.map(f=>shrink(f)))).map(u=>({inlineData:{mimeType:'image/jpeg',data:u.split(',')[1]}}));
-        list=await withTimeout(ask(A,[...imgs,{text:mkPrompt(h,q)}]),45000);
-        if(list===null)note='AI 응답이 45초를 넘었어요 — 다시 시도하거나 검색어로 찾아보세요';
-      }catch(e){note='AI 검색 실패: '+e.message}
-    }else if(pend.length)note='사진 인식은 설정 탭에서 AI 키가 필요해요';
-    if((!list||!list.length)&&cat==='PLACE'&&q){list=await nomi((h+' '+q).trim());if(!list.length&&h)list=await nomi(q)}
-    list=(list||[]).filter(c=>c&&c.name).slice(0,5);
-    const seen=new Set();
-    list=list.filter(c=>{const k=String(c.name).toLowerCase().replace(/\s+/g,'');if(seen.has(k))return false;seen.add(k);return true});
-    if(q&&!list.some(c=>String(c.name).toLowerCase().replace(/\s+/g,'')===String(q).toLowerCase().replace(/\s+/g,'')))list.push({name:q,raw:1});
-    res=list.map(c=>({...c,h,v:0,cat,img:pic(c.name+' '+(h||'')),price:c.price||''}));
-    drawRes();
-    res.forEach(c=>{fetchRepPhoto(c.name+' '+(c.address||h||'')).then(u=>{if(u){c.img=u;drawRes()}})});
-    if(note)toast(note);
-  }catch(e){toast('오류: '+e.message)}
-  finally{btn.disabled=false;btn.textContent='🔎 인터넷에서 찾기'}
-}
-const cc=(c,k)=>`<div class="item" data-act="pick" data-k="${k}">${ph(CATS[c.cat].e,itemThumb(c),'',c.img)}<div class="mid"><div class="nm">${esc(c.name)}${c.vid?' 🎬':''}</div><div class="ds">${c.raw?'입력한 그대로 저장':esc(c.address||'')}</div>${c.info?`<div class="ds in">${esc(c.info)}</div>`:''}<button class="mb" style="margin-top:5px" data-act="sw" data-k="${k}">↻ 다른 사진</button></div><b class="ok">${c.saved?'✓ 저장됨':'선택'}</b></div>`;
-function drawRes(){
-  let head='';
-  if(res.length){
-    head=`<div class="ds" style="margin:2px 2px 8px">맞는 항목을 눌러 저장하세요. 사진이 다르면 ↻</div>`;
-    const unpicked=res.filter(c=>!c.saved);
-    if(res.length>1&&unpicked.length)head+=`<button class="btn" style="margin-bottom:8px" data-act="saveAll">✅ 전체 저장 (${unpicked.length}건 — 지도에 각각 표시)</button>`;
-  }
-  $('rs').innerHTML=head+(res.length?`<div style="display:flex;flex-direction:column;gap:8px">${res.map(cc).join('')}</div>`:'');
-}
-async function pick(k){
-  const c=res[k];if(!c||c.saved)return;
-  c.saved=1;drawRes();
-  let p=null;
-  const ai=(typeof c.lat==='number'&&c.lat&&c.lng)?{lat:c.lat,lng:c.lng}:null;
-  if(ai){
-    try{
-      const g=await geoCheck({address:c.address||'',name:c.name});
-      if(g&&km(ai.lat,ai.lng,g.lat,g.lng)>30){p={lat:g.lat,lng:g.lng};toast('AI 좌표가 부정확해 주소 기준으로 교정했어요')}
-      else p=ai;
-    }catch(e){p=ai}
-  }else{
-    toast('위치 확인 중...');p=await locate(c,c.h);
-    if(p&&p.lat&&c.h){
-      // 지역 힌트(예: '오사카')와 150km 이상 벗어난 결과는 이상 매칭으로 판단 → 좌표 보류
-      try{const hg=await geoCheck({address:c.h});if(hg&&km(p.lat,p.lng,hg.lat,hg.lng)>150)p=null}catch(e){}
-      if(!p)toast('지역 힌트와 안 맞는 좌표라 보류했어요 — 주소 기준으로 나중에 다시 잡아요');
+    const meta=parseVideoMeta(raw);
+    const vidUrl=meta?meta.url:'';
+    const images=[];
+    for(const f of files)images.push(await fileToBase64(f));
+
+    const {cands,aiErr,capStatus}=await analyzeContent({rawText:raw,vidUrl,images,hint});
+
+    if(cands.length&&(cands[0].name||cands[0].address)){
+      // 후보들을 즉시 자동 저장하고 지도에도 핀을 꽂음 (여러 번 누를 필요 없음!)
+      let firstSaved=null;
+      cands.forEach(c=>{
+        const itemObj={
+          id:'id_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+          name:c.name||'저장된 장소',
+          localName:c.localName||'',
+          address:c.address||'',
+          price:c.price||'',
+          info:c.info||'',
+          note:c.note||[c.price,c.info].filter(Boolean).join(' · '),
+          category:CATS[c.category]?c.category:cat,
+          lat:Number(c.lat)||null,
+          lng:Number(c.lng)||null,
+          vid:vidUrl||'',
+          img:images[0]?`data:${images[0].mime};base64,${images[0].data}`:'',
+          useCustomImg:Boolean(images[0]),
+          v:0,
+          done:false
+        };
+        items.unshift(itemObj);
+        c._saved=true;
+        c._itemId=itemObj.id;
+        if(!firstSaved)firstSaved=itemObj;
+      });
+      save();
+      res=cands;
+      renderCandidates('✅ 자동으로 저장되고 지도에 등록되었어요!');
+      $('shareBox').value='';
+      if(firstSaved&&firstSaved.lat&&firstSaved.lng){
+        focusMapOnItem(firstSaved);
+        toast(`✅ '${firstSaved.name}' 자동 저장 및 지도 핀 표시 완료!`);
+      }else if(firstSaved){
+        toast(`'${firstSaved.name}' 저장 완료! (상세창에서 주소를 보완하면 지도에 표시됩니다)`);
+      }
+      return;
     }
-  }
-  const id='i'+Date.now()+Math.random().toString(36).slice(2,5);
-  const vThumb=(c.vid&&c.vid.thumb)||'';
-  items.unshift({id,category:c.cat,name:c.name,address:c.address||(p&&p.address)||'',info:c.info||'',price:c.price||'',lat:p&&p.lat?p.lat:0,lng:p&&p.lng?p.lng:0,img:vThumb||c.img||pic(c.name+' '+c.h,c.v),q:c.name+' '+c.h,v:c.v||0,done:false,vid:c.vid||null,vfy:(p&&p.lat)?1:0,raw:c.raw||0,h:c.h||''});
-  save();fit();toast('저장했어요 · '+CATS[c.cat].n+' 탭에서 볼 수 있어요');
-  // 만약 저장 시점에 릴스 썸네일이 비어 있으면 백그라운드에서 즉시 추출 (지도 핀에 실제 장면 반영)
-  if(c.vid&&c.vid.platform==='instagram'&&c.vid.code&&!c.vid.thumb){
-    fetchReelThumb(c.vid.code,c.vid.fmt).then(u=>{
-      if(u){const it=items.find(x=>x.id===id);if(it&&it.vid){it.vid.thumb=u;if(!it.useCustomImg)it.img=u;save()}}
-    });
-  }else if(!c.raw&&!vThumb){
-    fetchRepPhoto(c.name+' '+(c.address||c.h||'')).then(u=>{if(u){const it=items.find(x=>x.id===id);if(it&&!(it.vid&&it.vid.thumb)){it.img=u;save()}}});
+
+    // 인스타 익명 차단으로 링크에서 캡션을 못 가져왔고 텍스트도 없는 경우
+    const failNote=['자동 인식 실패(인스타 익명차단·AI 한도 등) — 시트에서 [📋 복사한 캡션/주소 붙여넣기]를 누르면 캡션 글자만으로 어떤 장소든 한 번에 저장돼요',aiErr?`AI: ${aiErr}`:'',capStatus].filter(Boolean).join(' · ');
+    const fallbackCand={
+      name:meta?.platform==='yt'?'공유 쇼츠':'공유 릴스',
+      address:'',
+      info:failNote,
+      note:'',
+      category:cat,
+      lat:null,
+      lng:null,
+      vid:vidUrl||raw,
+      v:0
+    };
+    res=[fallbackCand];
+    renderCandidates();
+    toast('링크에서 캡션이 차단되었어요. 아래 카드를 눌러 [📋 릴스캡션]에서 캡션을 복사해 붙여넣으세요.');
+  }finally{
+    btn.disabled=false;btn.textContent='🔥 분석하기';
   }
 }
 
-document.addEventListener('click',async e=>{
-  if(e.target.id==='sheet')return closeSheet();
-  if(e.target.id==='gmapLink'||e.target.id==='gsearchLink'){
-    const it=items.find(x=>x.id===cur);
-    if(it&&!getValidSearchQuery(it)){
-      e.preventDefault();
-      toast('가게 이름이나 주소를 먼저 입력해 주세요');
-      const en=$('editName');if(en)en.focus();
-      return;
-    }
-  }
-  const b=e.target.closest('[data-act]');if(!b)return;
-  const a=b.dataset.act,i=items.find(x=>x.id===(b.dataset.id||cur));
-  if(a==='sw'){res[b.dataset.k].v++;const c=res[b.dataset.k];c.img=pic(c.name+' '+c.h,c.v);drawRes()}
-  else if(a==='pick')pick(+b.dataset.k);
-  else if(a==='vopen'){const it=items.find(x=>x.id===(b.dataset.id||cur));cur=b.dataset.id||cur;view=(it&&it.vid)?'video':'photo';showSheet()}
-  else if(a==='vid'){view='video';showSheet()}
-  else if(a==='open'){const it=items.find(x=>x.id===b.dataset.id);cur=b.dataset.id;view=(it&&it.vid)?'video':'photo';showSheet()}
-  else if(a==='close')closeSheet();
-  else if(a==='rot'&&i){
-    i.v=(i.v||0)+1;
-    i.useCustomImg=1;
-    i.img=pic(i.name,i.v);
-    view='photo';save();showSheet();
-    toast('다른 검색 사진으로 바꿨어요 (릴스 사진으로 돌아가려면 [🎬 릴스사진] 클릭)');
-  }
-  else if(a==='reelThumb'&&i&&i.vid){
-    i.useCustomImg=0;
-    if(i.vid.thumb){
-      i.img=i.vid.thumb;view='photo';save();showSheet();
-      toast('릴스 썸네일 사진을 적용했어요!');
-    }else{
-      toast('릴스 썸네일 사진을 불러오는 중...');
-      const u=await fetchReelThumb(i.vid.code,i.vid.fmt);
-      if(u){
-        i.vid.thumb=u;i.img=u;view='photo';save();showSheet();
-        toast('릴스 썸네일 사진을 적용했어요!');
-      }else{
-        toast('릴스 썸네일을 가져오지 못했어요. [📷 내 사진]으로 스샷을 넣을 수 있어요');
-      }
-    }
-  }
-  else if(a==='photo'){view='photo';showSheet()}
-  else if(a==='view'){view=b.dataset.view;toast('지도: '+view);showSheet()}
-  else if(a==='own'){$('own').click()}
-  else if(a==='sheetShot'){$('sheetShot').click()}
-  else if(a==='sheetPaste'&&i){
-    try{
-      const txt=await navigator.clipboard.readText();
-      if(!txt)throw new Error('empty');
-      await applyTextToSheetItem(i,txt);
-    }catch(err){
-      toast('클립보드 권한이 없어요. 아래 주소 입력칸을 길게 눌러 직접 붙여넣어 주세요');
-      const ea=$('editAddr');if(ea)ea.focus();
-    }
-  }
-  else if(a==='emb'){view=view==='google'?'photo':'google';showSheet()}
-  else if(a==='pin'&&i){closeSheet();tab('map');setTimeout(()=>{if(gmap){gmap.setCenter({lat:i.lat,lng:i.lng});gmap.setZoom(16)}else if(nmap){const np=new naver.maps.LatLng(i.lat,i.lng);nmap.setCenter(np);nmap.setZoom(16)}else if(lm){lm.setView([i.lat,i.lng],16);if(!i.vid&&pins[i.id]&&pins[i.id].openPopup)pins[i.id].openPopup()}},200)}
-  else if(a==='refix'&&i){
-    const en=$('editName'),ea=$('editAddr');
-    if(en&&en.value.trim())i.name=en.value.trim();
-    if(ea)i.address=normalizeOcrAddr(ea.value.trim());
-    if(isGenericSharedName(i.name)&&!i.address){
-      toast('아래 [장소명] 또는 [주소] 입력칸에 가게 이름이나 주소를 먼저 넣어주세요');
-      if(ea)ea.focus();
-      return;
-    }
-    if(isGenericSharedName(i.name)&&i.address){
-      const cm=i.address.match(/\b(Nishishinsaibashi|Shinsaibashi|Dotonbori|Namba|Umeda|Kyoto|Osaka|Tokyo|Fukuoka|Sapporo)\b/i);
-      if(cm)i.name=cm[1]+' (릴스 장소)';
-    }
-    i.lat=0;i.lng=0;i.vfy=0;i.tryN=0;i.raw=0;
-    save();
-    toast('위치를 찾는 중...');
-    const g=await geoFill(i);
-    if(g&&g.lat&&g.lng){
-      i.lat=g.lat;i.lng=g.lng;if(!i.address&&g.address)i.address=g.address;i.vfy=1;
-      if(i.vid&&i.vid.thumb&&!i.useCustomImg){
-        i.img=i.vid.thumb;
-      }else if(!i.img||i.img.includes('공유')){
-        i.img=pic(i.name,0);
-      }
-      save();fit();
-      toast('위치를 찾았어요! 지도 탭과 시트 지도에 반영되었습니다');
-      view='google';
-      showSheet();
-    }else{
-      toast('위치를 못 찾았어요. 가게 이름 옆에 도시명(예: 규카츠 마코 오사카)이나 우편번호를 확인해 주세요');
-      showSheet();
-    }
-  }
-  else if(a==='share'&&i){if(navigator.share){navigator.share({title:i.name,text:i.address||'',url:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(getValidSearchQuery(i)||i.name)}`}).catch(()=>{})}else toast('공유를 지원하지 않는 브라우저예요')}
-  else if(a==='recap'&&i){
-    (async()=>{
-      try{
-        const cap=(await navigator.clipboard.readText()||'').trim();
-        if(!cap){toast('클립보드가 비어요 — 인스타 캡션을 꾹 눌러 복사한 뒤 다시 눌러주세요');return}
-        if(/^https?:\/\//i.test(cap.split('\n')[0])&&!/[가-힣一-龥ぁ-んァ-ヶ]/.test(cap)){toast('복사한 내용이 링크예요 — 캡션 글자를 복사해 주세요');return}
-        const base=($('shareBox').value||'').trim();
-        closeSheet();tab('add');
-        await processShared((base?base+'\n':'')+cap);
-      }catch(e){toast('클립보드 읽기 권한이 없어요 — 입력칸에 캡션을 직접 붙여넣어 주세요')}
-    })();
-  }
-  else if(a==='saveAll'){
-    let n=0;
-    toast('전체 저장 중... (각 장소 위치 검색)');
-    for(let k=0;k<res.length;k++){ if(!res[k].saved){ await pick(k); n++; } }
-    drawRes();
-    if(n){ fit(); tab('map'); toast('📍 장소 '+n+'건을 한 번에 저장했어요 — 지도에 각각 표시돼요'); }
-  }
-  else if(a==='setCat'&&i){const nc=b.dataset.cat;if(CATS[nc]&&i.category!==nc){i.category=nc;save();render();showSheet();toast(CATS[nc].e+' '+CATS[nc].n+'으로 옮겼어요')}}
-  else if(a==='del'&&i){if(b.dataset.sure){items=items.filter(x=>x.id!==i.id);closeSheet();save()}else{b.dataset.sure=1;b.textContent='한 번 더 누르면 삭제'}}
-  else if(a==='toggleEdit'){const c=b.dataset.cat; editMode[c]=!editMode[c]; if(!editMode[c]) selected.clear(); render()}
-  else if(a==='sel'||a==='toggleSel'){const id=b.dataset.id; if(selected.has(id)) selected.delete(id); else selected.add(id); render()}
-  else if(a==='selectAll'){const c=b.dataset.cat; const inCat=items.filter(i=>i.category===c); if(b.checked) inCat.forEach(i=>selected.add(i.id)); else inCat.forEach(i=>selected.delete(i.id)); render()}
-  else if(a==='bulkDelete'){const c=b.dataset.cat; if(!selected.size){toast('선택된 항목이 없어요');return;} if(!confirm('선택한 '+selected.size+'개 항목을 삭제할까요?')) return; items=items.filter(i=>!selected.has(i.id)); selected.clear(); editMode[c]=false; save(); toast('삭제했어요')}
-});
-document.addEventListener('change',e=>{
-  const b=e.target.closest('[data-act="done"]');if(!b)return;
-  const i=items.find(x=>x.id===b.dataset.id);if(i){i.done=b.checked;save()}
-});
-document.addEventListener('input',e=>{
-  const i=items.find(x=>x.id===cur);if(!i)return;
-  if(e.target.id==='memo'){i.note=e.target.value;persist()}
-  else if(e.target.id==='editName'||e.target.id==='editAddr'){
-    const en=$('editName'),ea=$('editAddr');
-    if(en){
-      const nv=en.value.trim();
-      if(nv)i.name=nv;
-    }
-    if(ea){
-      const av=normalizeOcrAddr(ea.value);
-      i.address=av;
-      if(ea.value!==av)ea.value=av;
-    }
-    // 직접 이름/주소를 고치면 raw(임시) 상태 해제
-    if(String(i.name||'').trim()||String(i.address||'').trim())i.raw=0;
-    const st=$('sheetTitle'),sa=$('sheetAddr');
-    if(st)st.textContent=i.name+(i.vid?' 🎬':'');
-    if(sa)sa.textContent=i.address||'주소 미입력';
-    persist();render();
-    const gl=$('gmapLink'),gs=$('gsearchLink');
-    const target=getValidSearchQuery(i);
-    const q=encodeURIComponent(target);
-    if(gl)gl.href=target?('https://www.google.com/maps/search/?api=1&query='+q):'#';
-    if(gs)gs.href=target?('https://www.google.com/search?q='+q):'#';
-  }
-});
-// 주소칸에 캡션 통째로 붙여넣으면 → 자동으로 장소 분석+좌표 검색
-document.addEventListener('paste',e=>{
-  if(e.target&&e.target.id==='editAddr'){
-    const i=items.find(x=>x.id===cur);
-    if(!i)return;
-    const clip=(e.clipboardData||window.clipboardData)?.getData('text')||'';
-    if(clip&&clip.trim().length>=6){
-      e.preventDefault();
-      applyTextToSheetItem(i,clip);
-    }
-  }
-});
+function focusMapOnItem(i){
+  const lat=Number(i?.lat),lng=Number(i?.lng);
+  if(!lat||!lng)return;
+  if(gmap){gmap.panTo({lat,lng});gmap.setZoom(16);}
+  else if(nmap){nmap.setCenter(new naver.maps.LatLng(lat,lng));nmap.setZoom(16);}
+  else if(lm){lm.setView([lat,lng],16);}
+}
 
-// 시트에서 [📋 복사한 캡션/주소 붙여넣기] — 지금 항목에 즉시 반영(이름·주소·정보 추출 후 좌표 검색)
-// 캡션에 장소가 여러 개(①②③·📌 여러 곳)면 나머지는 개별 항목으로 저장해 지도에 핀이 하나씩 생긴다.
-async function applyTextToSheetItem(i,rawText){
-  rawText=String(rawText||'').trim();
-  if(!rawText){toast('붙여넣을 텍스트가 없어요');return}
-  const parsed=parseCaptionPlaces(rawText);
-  let extras=[];
-  if(parsed.length){
-    const p0=parsed[0];
-    if(p0.name&&(isGenericSharedName(i.name)||!i.name))i.name=p0.name;
-    if(p0.address)i.address=normalizeOcrAddr(p0.address);
-    if(p0.info)i.info=p0.info;
-    if(p0.category&&CATS[p0.category])i.category=p0.category;
-    if(p0.h)i.h=p0.h;
-    if(parsed.length>1)extras=parsed.slice(1);
-  }else{
-    const lines=rawText.split(/\r?\n+/).map(s=>s.trim()).filter(Boolean);
-    if(lines.length>=2){
-      if(isGenericSharedName(i.name))i.name=lines[0].replace(/^[^\w가-힣一-龥ぁ-んァ-ヶ]+/,'').trim().slice(0,40);
-      i.address=normalizeOcrAddr(lines.slice(1).join(' '));
-    }else{
-      i.address=normalizeOcrAddr(rawText);
-    }
-  }
-  if(isGenericSharedName(i.name)&&i.address){
-    const cm=i.address.match(/\b(Nishishinsaibashi|Shinsaibashi|Dotonbori|Namba|Umeda|Kyoto|Osaka|Tokyo|Fukuoka|Sapporo)\b/i);
-    if(cm)i.name=cm[1]+' (릴스 장소)';
-  }
-  save();showSheet();
+async function reGeoItem(i){
+  if(!i)return;
   toast('위치를 찾는 중...');
-  const g=await geoFill(i);
-  if(g&&g.lat&&g.lng){
-    i.lat=g.lat;i.lng=g.lng;i.vfy=1;i.raw=0;
-    if(!i.address&&g.address)i.address=g.address;
-    save();fit();
-    view='google';
-    showSheet();
+  const g=await geocodePlace(i,($('hint')?.value||'').trim());
+  if(g){
+    i.lat=g.lat;i.lng=g.lng;
+    if(isGenericSharedName(i.name)&&i.address)i.name=i.address.split(',')[0].trim();
+    save();focusMapOnItem(i);
+    if(cur===i.id)showSheet();
+    toast(`📍 위치 설정 완료! (${g.lat.toFixed(4)}, ${g.lng.toFixed(4)})`);
   }else{
-    toast('텍스트는 반영했지만 좌표를 못 찾았어요. 가게 이름이나 주소를 확인해 주세요');
-  }
-  // 같은 캡션의 나머지 장소 → 개별 항목으로 저장 (지도에 각각 핀)
-  const r=await addExtraPlaces(extras,i);
-  if(r.made){
-    fit();
-    closeSheet();
-    tab('map');
-    toast('📍 장소 '+(r.made+1)+'건을 나눠 저장했어요 — 지도에 각각 표시돼요'+(r.noGeo?' ('+r.noGeo+'건은 좌표를 못 찾았어요)':''));
+    save();if(cur===i.id)showSheet();
+    toast('위치를 찾지 못했어요. 우편번호나 번지를 포함한 주소를 입력해 보세요.');
   }
 }
 
-$('own').onchange=async e=>{
-  const f=e.target.files[0],i=items.find(x=>x.id===cur);e.target.value='';if(!f||!i)return;
-  try{
-    const dataUrl=await shrink(f,480,.75);
-    i.img=dataUrl;
-    if(i.vid)i.vid.thumb=dataUrl;
-    i.useCustomImg=1;
-    view='photo';save();showSheet();
-    toast('사진이 변경되었어요 (지도 핀에도 바로 적용됨)');
-  }catch(err){toast(err.message)}
-};
-
-// 여러 장소 후보(extras)를 개별 항목으로 추가 저장 — 시트 붙여넣기/스크린샷 경로 공용.
-// 각 항목마다 좌표를 독립 검색하고, 영상 링크(vid)는 원본 항목과 복사본으로 공유한다.
-async function addExtraPlaces(extras,srcIt){
-  let made=0,noGeo=0;
-  for(const p of (extras||[])){
-    if(!p||!p.name)continue;
-    const id='i'+Date.now()+Math.random().toString(36).slice(2,5);
-    const nit={id,category:CATS[p.category]?p.category:(srcIt.category||'PLACE'),name:p.name||'',address:normalizeOcrAddr(p.address||''),info:p.info||'',price:p.price||'',lat:0,lng:0,img:vidThumbUrl(srcIt.vid)||((srcIt.vid&&srcIt.vid.thumb)||''),q:(p.name||'')+' '+(p.h||''),v:0,done:false,vid:srcIt.vid?{...srcIt.vid}:null,vfy:0,raw:0,h:p.h||''};
-    items.unshift(nit);
-    const gg=await geoFill(nit);
-    if(gg&&gg.lat&&gg.lng){nit.lat=gg.lat;nit.lng=gg.lng;nit.vfy=1;if(!nit.address&&gg.address)nit.address=gg.address}
-    else noGeo++;
-    made++;
-    save();
+async function applyCaptionToItem(i,rawCap,images=[]){
+  if(!i)return;
+  toast('캡션에서 상호명과 위치를 추출 중...');
+  const hint=($('hint')?.value||'').trim();
+  const {cands}=await analyzeContent({rawText:rawCap,vidUrl:getVidUrlStr(i.vid),images,hint});
+  if(cands.length){
+    const c=cands[0];
+    if(c.name&&!isGenericSharedName(c.name))i.name=c.name;
+    if(c.localName)i.localName=c.localName;
+    if(c.address)i.address=c.address;
+    if(c.price)i.price=c.price;
+    if(c.info)i.info=c.info;
+    if(c.note&&!i.note)i.note=c.note;
+    if(c.lat&&c.lng){i.lat=c.lat;i.lng=c.lng;}
+  }else{
+    const loc=parseCaptionLocally(rawCap,hint);
+    if(loc.name)i.name=loc.name;
+    if(loc.address)i.address=loc.address;
+    else i.address=normalizeOcrAddr(rawCap);
+    if(loc.price)i.price=loc.price;
+    if(loc.info)i.info=loc.info;
+    const g=await geocodePlace(i,hint);
+    if(g){i.lat=g.lat;i.lng=g.lng;}
   }
-  return {made,noGeo};
+  save();
+  if(i.lat&&i.lng){
+    focusMapOnItem(i);
+    view='google';
+    toast(`✅ '${i.name}' 이름·위치 설정 및 지도 등록 완료!`);
+  }else{
+    toast('내용을 반영했지만 좌표를 찾지 못했습니다.');
+  }
+  showSheet();
 }
 
-$('sheetShot').onchange=async e=>{
-  const fs=[...e.target.files].slice(0,3),i=items.find(x=>x.id===cur);e.target.value='';if(!fs.length||!i)return;
-  const A=aiKeys();
-  if(!aiList(A).length){toast('스크린샷 자동 읽기는 설정 탭에서 AI 키(Gemini 또는 OpenRouter)가 필요해요');return}
+// 일반 검색 (이름·가게명·주소로 찾기)
+async function runSearch(){
+  const q=($('q').value||'').trim();
+  const hint=($('hint').value||'').trim();
+  if(!q&&!pend.length)return toast('이름·가게명·주소를 입력하거나 사진을 선택해 주세요');
+  const btn=$('go');btn.disabled=true;btn.textContent='🔎 찾는 중...';
   try{
-    toast('스크린샷에서 장소·주소 읽는 중...');
-    const shots=[];
-    for(const f of fs){ try{const u=await shrink(f);shots.push({inlineData:{mimeType:'image/jpeg',data:u.split(',')[1]}})}catch(err){} }
-    if(!shots.length)throw new Error('사진을 읽을 수 없어요');
-    const pr={kind:'instagram',user:'',caption:'',url:'',screen:1};
-    const list=await withTimeout(ask(A,[...shots,{text:mkReelsPrompt(pr)}]),25000);
-    if(Array.isArray(list)&&list[0]&&list[0].name){
-      const c=list[0];
-      i.name=c.name;
-      if(c.address)i.address=normalizeOcrAddr(c.address);
-      if(c.info)i.info=c.info;
-      if(c.price)i.price=c.price;
-      if(c.category&&CATS[c.category])i.category=c.category;
-      save();showSheet();
-      const g=await geoFill(i);
-      if(g&&g.lat&&g.lng){
-        i.lat=g.lat;i.lng=g.lng;i.vfy=1;
-        if(!i.address&&g.address)i.address=g.address;
-        save();fit();view='google';showSheet();
-        toast('스크린샷에서 장소·좌표를 찾았어요! ('+i.lat.toFixed(4)+', '+i.lng.toFixed(4)+')');
-      }else{
-        toast('장소명을 찾았어요: '+i.name);
-      }
-      // 스크린샷에 장소가 여러 개면 → 나머지도 개별 핀으로
-      if(list.length>1){
-        const r=await addExtraPlaces(list.slice(1),i);
-        if(r.made){fit();closeSheet();tab('map');toast('📸 나머지 장소 '+r.made+'건도 각각 저장했어요 — 지도에 핀으로 표시')}
-      }
+    const {cands}=await analyzeContent({rawText:`${q} ${hint}`.trim(),images:pend,hint});
+    pend=[];$('pc').textContent='📷 사진으로 찾기 (선택)';
+    if(cands.length){
+      res=cands;
+      renderCandidates();
     }else{
-      toast('이 사진엔 상호·주소 글자가 안 보여요. 캡션(설명 글자) 화면이 보이는 스크린샷으로 다시 시도하거나 [📋 캡션 붙여넣기]를 눌러주세요');
+      const g=await geocodePlace({name:q,address:`${q} ${hint}`.trim()},hint);
+      res=[{name:q,address:g?.formatted||hint||q,lat:g?.lat||null,lng:g?.lng||null,category:cat,v:0}];
+      renderCandidates();
     }
-  }catch(err){toast('스크린샷 분석 실패: '+err.message)}
-};
-$('nav').onclick=e=>{const b=e.target.closest('[data-tab]');if(b)tab(b.dataset.tab)};
-$('seg').onclick=e=>{const d=e.target.closest('[data-cat]');if(!d)return;cat=d.dataset.cat;[...$('seg').children].forEach(x=>x.classList.toggle('on',x===d))};
-$('file').onchange=e=>{
-  pend=[...e.target.files];e.target.value='';
-  const txt=pend.length?`📷 사진 ${pend.length}장 선택됨 (다시 누르면 변경)`:'📷 사진으로 찾기 (선택)';
-  $('pc').textContent=txt;
-  if($('pcShare'))$('pcShare').textContent=pend.length?`📷 스크린샷 ${pend.length}장 첨부됨 (🔥 분석하기를 누르세요)`:'📷 캡션/영상 스크린샷 첨부해서 분석 (선택)';
-};
-$('go').onclick=find;
-$('q').onkeydown=e=>{if(e.key==='Enter')find()};
+  }finally{
+    btn.disabled=false;btn.textContent='🔎 인터넷에서 찾기';
+  }
+}
+
+function fileToBase64(file){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>{
+      const s=String(r.result||'');
+      res({mime:file.type||'image/jpeg',data:s.split(',')[1]||''});
+    };
+    r.onerror=rej;
+    r.readAsDataURL(file);
+  });
+}
+
+async function autoFixCoords(){
+  let fixed=0;
+  for(const i of items){
+    if((!Number(i.lat)||!Number(i.lng))&&(i.address||(!isGenericSharedName(i.name)&&i.name))){
+      const g=await geocodePlace(i);
+      if(g){i.lat=g.lat;i.lng=g.lng;fixed++;}
+    }
+  }
+  if(fixed){save();fit();}
+  return fixed>0;
+}
+
+// ==================== 전체 클릭/이벤트 위임 ====================
+document.addEventListener('click',async e=>{
+  const tb=e.target.closest('.tab-btn');
+  if(tb)return tab(tb.dataset.tab);
+
+  const sg=e.target.closest('#seg div');
+  if(sg){
+    cat=sg.dataset.cat;
+    document.querySelectorAll('#seg div').forEach(d=>d.classList.toggle('on',d===sg));
+    return;
+  }
+
+  const actEl=e.target.closest('[data-act]');
+  if(!actEl)return;
+  const act=actEl.dataset.act,id=actEl.dataset.id,c=actEl.dataset.cat;
+
+  if(act==='done'){
+    e.stopPropagation();
+    const it=items.find(x=>x.id===id);
+    if(it){it.done=actEl.checked;save();}
+    return;
+  }
+  if(act==='open'){
+    cur=id;
+    const it=items.find(x=>x.id===id);
+    view=it&&it.vid?'video':'photo';
+    if(it&&it.lat&&it.lng)focusMapOnItem(it);
+    showSheet();
+    return;
+  }
+  if(act==='resPic'){
+    e.stopPropagation();
+    const idx=Number(actEl.dataset.idx);
+    if(res[idx]){res[idx].v=(res[idx].v||0)+1;renderCandidates();}
+    return;
+  }
+  if(act==='pickRes'){
+    const idx=Number(actEl.dataset.idx);
+    const r=res[idx];
+    if(!r)return;
+    if(r._saved&&r._itemId){
+      cur=r._itemId;
+      const existing=items.find(x=>x.id===cur);
+      if(existing){
+        view=existing.vid?'video':'photo';
+        showSheet();
+        return;
+      }
+    }
+    const ni={
+      id:'id_'+Date.now(),
+      name:r.name||'장소',
+      localName:r.localName||'',
+      address:r.address||'',
+      price:r.price||'',
+      info:r.info||'',
+      note:r.note||'',
+      category:CATS[r.category]?r.category:cat,
+      lat:Number(r.lat)||null,
+      lng:Number(r.lng)||null,
+      vid:r.vid||'',
+      v:r.v||0,
+      done:false
+    };
+    items.unshift(ni);
+    r._saved=true;r._itemId=ni.id;
+    save();renderCandidates();
+    if(ni.lat&&ni.lng)focusMapOnItem(ni);
+    toast(`저장했어요 · ${CATS[ni.category].n} 탭에서 볼 수 있어요`);
+    return;
+  }
+
+  // 일괄 편집 액션
+  if(act==='toggleEdit'){editMode[c]=!editMode[c];selected.clear();render();return;}
+  if(act==='toggleSel'||act==='sel'){
+    e.stopPropagation();
+    if(selected.has(id))selected.delete(id);else selected.add(id);
+    render();return;
+  }
+  if(act==='selectAll'){
+    const ids=items.filter(x=>x.category===c).map(x=>x.id);
+    if(actEl.checked)ids.forEach(x=>selected.add(x));else selected.clear();
+    render();return;
+  }
+  if(act==='bulkDelete'){
+    if(!selected.size)return toast('선택한 항목이 없어요');
+    items=items.filter(x=>!selected.has(x.id));
+    selected.clear();editMode[c]=false;save();toast('선택 항목을 삭제했어요');
+    return;
+  }
+
+  // 시트 내부 액션
+  const curItem=items.find(x=>x.id===cur);
+  if(act==='close')return closeSheet();
+  if(!curItem)return;
+
+  if(act==='vvideo'){view='video';showSheet();return;}
+  if(act==='vcap'){view='caption';showSheet();return;}
+  if(act==='vphoto'){view='photo';showSheet();return;}
+  if(act==='vmap'){view='google';showSheet();return;}
+  if(act==='vmymap'){view='mymaps';showSheet();return;}
+  if(act==='chgpic'){curItem.v=(curItem.v||0)+1;curItem.useCustomImg=false;save();showSheet();return;}
+  if(act==='chcat'){curItem.category=c;save();showSheet();toast(`${CATS[c].n} 탭으로 이동했어요`);return;}
+  if(act==='del'){items=items.filter(x=>x.id!==curItem.id);save();closeSheet();toast('삭제했어요');return;}
+  if(act==='share'){
+    const shareTxt=`${curItem.name}\n${curItem.address||''}\n${getVidUrlStr(curItem.vid)}`.trim();
+    if(navigator.share){try{await navigator.share({title:curItem.name,text:shareTxt,url:getVidUrlStr(curItem.vid)||location.href});return;}catch(_){}}
+    try{await navigator.clipboard.writeText(shareTxt);toast('장소 정보를 클립보드에 복사했어요');}catch(_){}
+    return;
+  }
+  if(act==='regeo'){
+    const nm=($('sh-name')?.value||'').trim();
+    const ad=normalizeOcrAddr(($('sh-addr')?.value||'').trim());
+    if(nm)curItem.name=nm;
+    if(ad)curItem.address=ad;
+    await reGeoItem(curItem);
+    return;
+  }
+  if(act==='recap'){
+    const src=[curItem.name,curItem.address,curItem.note,curItem.info].filter(Boolean).join('\n');
+    await applyCaptionToItem(curItem,src);
+    return;
+  }
+  if(act==='pastecap'){
+    try{
+      const clip=await navigator.clipboard.readText();
+      if(clip&&clip.trim()){await applyCaptionToItem(curItem,clip.trim());return;}
+    }catch(_){}
+    const m=prompt('복사한 릴스 캡션이나 주소를 붙여넣으세요:');
+    if(m&&m.trim())await applyCaptionToItem(curItem,m.trim());
+    return;
+  }
+});
+
+// 기본 버튼 바인딩
 $('themeBtn').onclick=()=>setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
 $('settingsBtn').onclick=()=>tab('set');
-function renderAI(){
-  const K=aiKeys();
-  $('aiProv').innerHTML=AIS.map(([id,label,ph,dflt])=>{
-    const v=K[id]||{};
-    return '<div class="card" style="margin:6px 0;padding:10px">'
-      +'<b style="font-size:12px">'+esc(label)+'</b>'+(v.key?' <span style="color:#4ade80;font-size:11px">● 설정됨</span>':'')
-      +'<input type="password" id="ai_'+id+'" placeholder="'+esc(ph)+'">'
-      +(id==='custom'?'<input type="text" id="aibase_'+id+'" placeholder="Base URL (예: https://api.groq.com/openai/v1)">' : '')
-      +'<input type="text" id="aimodel_'+id+'" placeholder="모델명 (기본: '+(v.key&&v.model?esc(v.model):(dflt||'자동'))+')">'
-      +'<div style="display:flex;gap:6px;margin-top:4px"><button class="mb" data-aiaction="save" data-ai="'+id+'">💾 저장</button>'+(v.key?'<button class="mb" data-aiaction="del" data-ai="'+id+'">🗑️ 삭제</button>':'')
-      +(id==='custom'&&!v.key?'<span class="ds" style="font-size:10px;align-self:center">Base URL+모델 필수</span>':'')+'</div>'
-      +'</div>';
-  }).join('');
-  const chain=aiList(K).map(p=>aiProviderName(p.id)).join(' → ')||'설정된 AI 없음 (캡션 파서로만 분석)';
-  const el=document.getElementById('aiChain');if(el)el.textContent=chain;
-  const ub=document.getElementById('usageBox');if(ub)ub.innerHTML=usageHtml();
-}
-document.addEventListener('click',e=>{
-  const b=e.target.closest('[data-aiaction]');if(!b)return;
-  const id=b.dataset.ai,K=aiKeys();
-  if(b.dataset.aiaction==='orkey'){
-    const key=(K.openrouter||{}).key,res=$('orRes');
-    if(!key){toast('OpenRouter 키가 없어요');return}
-    if(res){res.textContent=' 조회 중...';res.style.color='var(--pr)'}
-    fetchTO('https://openrouter.ai/api/v1/key',{headers:{'Authorization':'Bearer '+key}},8000)
-      .then(r=>r.json())
-      .then(d=>{
-        const k=(d&&d.data)||{};
-        if(!d||!k.label&&!k.usage&&!k.limit){throw new Error('조회 실패')}
-        const usage='$'+(+k.usage||0).toFixed(3);
-        const limit=k.limit===null||k.limit===undefined?'한도 없음(충전제)':'$'+(+k.limit).toFixed(2);
-        const remain=k.limit!==null&&k.limit!==undefined?' / 남은 $'+(Math.max(0,(+k.limit)-(+k.usage||0))).toFixed(2):'';
-        const tier=k.is_free_tier?' <span style="color:var(--pr);font-weight:700">무료티어</span>':'';
-        const rl=k.rate_limit?(' · 분당제한 '+k.rate_limit.requests+'회/'+(k.rate_limit.interval||'10s')):'';
-        if(res){res.innerHTML='<b style="color:var(--tx)">'+usage+' 사용'+remain+tier+'</b><br>'+limit+rl}
-      })
-      .catch(e=>{
-        if(res){res.textContent=' 조회 실패: '+String(e.message||e).slice(0,60);res.style.color='var(--dg)'}
-        toast('OpenRouter 잔액 조회 실패 — 키가 유효한지 확인하세요 (진단에서 ⊙/× 표시만 나올 수 있어요)');
-      });
-    return;
+$('sheet').onclick=e=>{if(e.target===$('sheet'))closeSheet()};
+
+$('pasteShare').onclick=async()=>{
+  try{
+    const t=await navigator.clipboard.readText();
+    if(t){$('shareBox').value=t;toast('붙여넣기 완료! 바로 분석합니다.');runAnalyzeShare();}
+    else toast('클립보드가 비어 있어요');
+  }catch(e){
+    $('shareBox').focus();
+    toast('입력창을 길게 눌러 붙여넣어 주세요');
   }
-  if(b.dataset.aiaction==='del'){
-    delete K[id];
-    if(id==='gemini')ls.set('TRAVEL_GEMINI_KEY','');
-    ls.set('TRIP_AI_KEYS',JSON.stringify(K));
-    renderAI();toast(aiProviderName(id)+' 키를 삭제했어요');
-    return;
-  }
-  if(b.dataset.aiaction!=='save')return;
-  const key=$('ai_'+id).value.trim(),model=$('aimodel_'+id).value.trim();
-  if(!key){toast('키를 입력하세요');return}
-  const entry={key,model};
-  if(id==='custom'){const base=($('aibase_'+id)||{}).value||'';if(!base){toast('Base URL을 입력하세요');return}entry.base=base.trim()}
-  K[id]=entry;
-  if(id==='gemini')ls.set('TRAVEL_GEMINI_KEY',key); // 구버전 호환 유지
-  ls.set('TRIP_AI_KEYS',JSON.stringify(K));
-  renderAI();toast(aiProviderName(id)+' 키가 저장되었습니다 · 분석 시 자동으로 사용돼요');
-});
-$('aiSaveAll').onclick=()=>{
-  const K=aiKeys();let saved=0,warn='';
-  for(const [id] of AIS){
-    const ki=$('ai_'+id);if(!ki)continue;
-    const key=ki.value.trim(),model=($('aimodel_'+id)||{value:''}).value.trim()||'';
-    if(key){
-      const entry={key,model};
-      if(id==='custom'){const base=($('aibase_'+id)||{value:''}).value.trim();if(!base){warn=aiProviderName(id)+'는 Base URL 필수';continue}entry.base=base}
-      K[id]=entry;saved++;
-      if(id==='gemini')ls.set('TRAVEL_GEMINI_KEY',key);
-    }
-  }
-  ls.set('TRIP_AI_KEYS',JSON.stringify(K));
-  renderAI();
-  toast((saved?saved+'개 키 저장 완료':'저장된 키 없음')+(warn?' · '+warn:''));
 };
+$('analyzeShare').onclick=()=>runAnalyzeShare();
+$('pcShare').onclick=()=>$('shareFile').click();
+$('shareFile').onchange=async e=>{
+  const fs=[...(e.target.files||[])];e.target.value='';
+  if(fs.length)await runAnalyzeShare(fs);
+};
+
+$('file').onchange=async e=>{
+  const fs=[...(e.target.files||[])];e.target.value='';
+  if(!fs.length)return;
+  pend=[];
+  for(const f of fs)pend.push(await fileToBase64(f));
+  $('pc').textContent=`📷 사진 ${pend.length}장 선택됨`;
+  toast(`사진 ${pend.length}장이 첨부되었어요. [🔎 인터넷에서 찾기]를 누르세요.`);
+};
+$('go').onclick=runSearch;
+$('q').onkeydown=e=>{if(e.key==='Enter')runSearch()};
+
+$('own').onchange=async e=>{
+  const f=e.target.files?.[0];e.target.value='';
+  if(!f||!cur)return;
+  const b64=await fileToBase64(f);
+  const i=items.find(x=>x.id===cur);
+  if(i){i.img=`data:${b64.mime};base64,${b64.data}`;i.useCustomImg=true;view='photo';save();showSheet();}
+};
+$('sheetShot').onchange=async e=>{
+  const f=e.target.files?.[0];e.target.value='';
+  if(!f||!cur)return;
+  const b64=await fileToBase64(f);
+  const i=items.find(x=>x.id===cur);
+  if(i)await applyCaptionToItem(i,'',[b64]);
+};
+
+// 설정 탭 이벤트
+$('aiSaveAll').onclick=()=>{saveAiProvFromUI();renderUsageBox();toast('AI 키 설정을 저장했어요')};
 $('aiClearAll').onclick=()=>{
-  ls.set('TRIP_AI_KEYS','{}');ls.set('TRAVEL_GEMINI_KEY','');
-  renderAI();toast('모든 AI 키를 지웠어요');
+  AI_DEFS.forEach(d=>aiCfg[d.id]={key:'',model:d.defModel});
+  ls.set('TRIP_AI_CFG',JSON.stringify(aiCfg));
+  buildAiProvUI();
+  toast('모든 AI 키를 지웠어요');
 };
-// 환경 진단: 폰에서하는 모든 외부 연결(AI·지오코딩·Places·인스타)을 실제로 때려보고 결과를 텍스트로 복사
-let diagBusy=false;
-async function runDiag(){
-  if(diagBusy)return;diagBusy=true;
-  const L=[],add=(k,v)=>L.push(k+'='+v);
-  const KB=s=>s?s.slice(0,4)+'…'+s.slice(-3):'(없음)';
-  toast('진단 시작 (약 20초)...');
+$('diagBtn').onclick=async()=>{
+  saveAiProvFromUI();
+  toast('환경 진단 중...');
   try{
-    const K=aiKeys();const provs=aiList(K);
-    add('sw_cache',(navigator.serviceWorker&&navigator.serviceWorker.controller)?navigator.serviceWorker.controller.scriptURL.split('/').pop():'none');
-    add('mapProvider',ls.get('TRIP_MAP_PROVIDER')||'(기본:osm)');
-    add('gmap_key',KB(ls.get('TRAVEL_GMAP_KEY')));
-    add('date',new Date().toISOString().slice(0,16));
-    add('ua',(navigator.userAgent||'').replace(/.*Version\/([\d.]+).*/,'iOS-Safari/$1')||navigator.userAgent);
-    add('itemCount',items.length);
-    const ai0=provs.map(p=>p.id+(p.key?':'+KB(p.key):':키없음')+(p.model?'@'+p.model:'')).join(',')||'none';
-    add('ai_providers',ai0);
-    for(const p of provs){
-      const pnm=aiProviderName(p.id);
-      if(p.id==='gemini'){
-        try{
-          const mdl=p.model||((await geminiModels(p.key))[0]);
-          const r=await fetchTO('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(mdl)+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':p.key},body:JSON.stringify({contents:[{parts:[{text:'PING — 숫자 1만 출력'}]}]})},16000);
-          const d=await r.json();
-          const parts=(d.candidates&&d.candidates[0]&&d.candidates[0].content&&d.candidates[0].content.parts)||[];
-          const hasText=r.ok&&parts.some(x=>x.text);
-          const reason=r.ok?(hasText?'OK':'빈응답'):''+(((d.error||{}).status)||r.status)+':'+String(((d.error||{}).message)||'').slice(0,70);
-          add('test_gemini',mdl+' → '+reason);
-        }catch(e){add('test_gemini','통신실패 '+String(e.message||e).slice(0,50))}
-      }else if(p.id==='openrouter'){
-        try{
-          const pool=await openrouterFreePool();
-          const mdl=p.model&&p.model!=='openrouter/free'?p.model:(pool[0]||'openrouter/free');
-          const r=await fetchTO('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+p.key},body:JSON.stringify({model:mdl,messages:[{role:'user',content:'PING — 숫자 1만 출력'}],max_tokens:8})},16000);
-          const d=await r.json();
-          const txt=r.ok&&d.choices&&d.choices[0]&&d.choices[0].message&&d.choices[0].message.content;
-          add('test_openrouter',mdl+' → '+(r.ok?(txt?'OK('+String(txt).slice(0,12)+')':'빈응답'):'실패 '+r.status+':'+String(((d.error||{}).message)||'').slice(0,70)));
-        }catch(e){add('test_openrouter','통신실패 '+String(e.message||e).slice(0,50))}
-      }
-    }
-    if(!provs.length)add('test_ai','키 미설정 — 분석은 캡션 파서로만 작동');
-    // 지오코딩 (주소→좌표의 핵심)
-    try{
-      const t0=Date.now();
-      const n=await nomi('26 Sagatenryuji Setogawacho, Ukyo Ward, Kyoto, 616-8376');
-      add('test_nominatim',n&&n[0]?'OK @'+n[0].lat.toFixed(3)+' ('+(Date.now()-t0)+'ms)':'실패/빈결과 ('+(Date.now()-t0)+'ms)');
-    }catch(e){add('test_nominatim','통신실패 '+String(e.message||e).slice(0,40))}
-    // Places 상호검색 (폰의 실제 키로)
-    if(ls.get('TRAVEL_GMAP_KEY')){
-      window._gkey=ls.get('TRAVEL_GMAP_KEY');
-      _noPlaces=false;
-      const gp=await gPlaces('규카츠 마요 신사이바시 오사카');
-      add('test_places',gp?'OK @'+gp.lat.toFixed(3)+','+gp.lng.toFixed(3):(_noPlaces?'미개설/거부(403·400) — Google Cloud 콘솔에서 "Places API (New)" 활성화 필요':'빈결과'));
-    }else add('test_places','Google키 없음 — 스킵');
-    // 인스타 익명 차단 상태 확인
-    try{
-      const r=await fetchTO('https://r.jina.ai/https://www.instagram.com/reel/DcYWVOlypa0f/',{headers:{'Accept':'text/plain'}},9000);
-      add('test_ig_crawl',r.ok?'jina OK (드믈 확보)':'jina '+r.status+' (익명차단 — 캡션 붙여넣기/스크린샷 필요)');
-    }catch(e){add('test_ig_crawl','통신실패 '+String(e.message||e).slice(0,40))}
-    // 인스타 릴스 장면 썸네일(지도 핀 사진) 로드 실측 — <img>는 CORS 제약이 없으므로 Image로 검증
-    add('test_ig_media',await new Promise(res=>{
-      const im=new Image();const t0=Date.now();let done=false;
-      im.referrerPolicy='no-referrer';
-      im.onload=()=>{done=true;res('OK '+im.naturalWidth+'x'+im.naturalHeight+' ('+(Date.now()-t0)+'ms) — 핀 실제장면 표시 정상')};
-      im.onerror=()=>{done=true;res('실패 ('+(Date.now()-t0)+'ms) — 이 네트워크는 막힘, 핀은 폴백 사진 사용')};
-      im.src='https://www.instagram.com/p/DdWJ1ngSjFN/media/?size=l';
-      setTimeout(()=>{if(!done)res('시간초과 ('+(Date.now()-t0)+'ms)')},9000);
-    }));
-    const out='TripSync 진단 '+L.length+'항목\n'+L.join('\n');
-    $('bk').value=out;
-    try{await navigator.clipboard.writeText(out);toast('진단 완료 — 결과가 클립보드에 복사됐어요 → 채팅에 붙여넣기')}catch(e){toast('진단 완료 — 상단 백업칸의 결과를 직접 복사하세요')}
-  }catch(e){toast('진단 오류: '+e.message)}
-  diagBusy=false;
-}
-$('diagBtn').onclick=runDiag;
-$('savegmap').onclick=()=>{const v=$('gmapkey').value.trim(); ls.set('TRAVEL_GMAP_KEY',v);toast(v?'Google 키가 저장되었습니다.':'Google 키가 비워졌어요.')};
-$('savenaver').onclick=()=>{const v=$('naverkey').value.trim(); if(!v){toast('Naver 키를 입력하세요');return;} ls.set('TRAVEL_NAVER_KEY',v);toast('Naver 키가 저장되었습니다.')};
-$('mapProvider').onchange=()=>{ls.set('TRIP_MAP_PROVIDER',$('mapProvider').value);toast('지도 제공자가 변경되었습니다. 페이지를 새로고침하세요.')};
-$('bkOut').onclick=()=>{const t=JSON.stringify(items);$('bk').value=t;$('bk').select();try{navigator.clipboard.writeText(t).then(()=>toast('백업을 복사했어요. 메모 앱 등에 붙여넣어 보관하세요')).catch(()=>toast('위 내용을 직접 복사해 보관하세요'))}catch(e){toast('위 내용을 직접 복사해 보관하세요')}};
-$('bkIn').onclick=()=>{try{const d=JSON.parse($('bk').value);if(!Array.isArray(d))throw 0;items=d;save();fit();toast(d.length+'개 항목을 복원했어요')}catch(e){toast('백업 내용이 올바르지 않아요')}};
-$('saveMyMaps').onclick=()=>{let v=$('mymapsUrl').value.trim(); const m=v.match(/src=["']([^"']+)["']/); if(m) v=m[1]; ls.set('TRIP_MYMMaps_URL',v); $('mymapsUrl').value=v; const midMatch=v.match(/mid=([^&]+)/); if(midMatch){const embedUrl='https://www.google.com/maps/d/u/0/embed?mid='+midMatch[1]+'&ehbc=2E312F'; ls.set('TRIP_MYMMaps_EMBED',embedUrl); $('mymapsEmbed').value=embedUrl; toast('내 지도 URL + 임베드 URL이 자동 저장되었어요');} else toast(v?'내 지도 URL이 저장되었어요':'URL이 비워졌어요');};
-$('saveMyMapsEmbed').onclick=()=>{let v=$('mymapsEmbed').value.trim(); const m=v.match(/src=["']([^"']+)["']/); if(m) v=m[1]; ls.set('TRIP_MYMMaps_EMBED',v); $('mymapsEmbed').value=v; toast(v?'임베드 URL이 저장되었어요':'URL이 비워졌어요');};
-$('openMyMapsBtn').onclick=()=>{
-  let url=(ls.get('TRIP_MYMMaps_URL')||'').trim();
-  const m=url.match(/src=["']([^"']+)["']/); if(m) url=m[1];
-  if(url){
-    if(!url.includes('maps/d') && !url.includes('mid=')){ toast('Google My Maps 공유 링크(mid= 포함)를 넣어주세요'); return; }
-    // 모바일/PWA에서 window.open 대신 a 태그 클릭 방식 사용 (백그라운드 앱 문제 해결)
-    const a=document.createElement('a');
-    a.href=url;
-    a.target='_blank';
-    a.rel='noopener noreferrer';
-    document.body.appendChild(a); a.click(); a.remove();
-    toast('내 지도를 열었어요');
-  } else {
-    const a=document.createElement('a');
-    a.href='https://www.google.com/maps/d/';
-    a.target='_blank';
-    a.rel='noopener noreferrer';
-    document.body.appendChild(a); a.click(); a.remove();
-    toast('Google My Maps에서 지도를 만들고 공유 링크를 복사해 넣어주세요');
+    const r=await askAI('OK 라고만 답하세요',[],false);
+    toast('✅ AI 응답 정상: '+r.trim().slice(0,25));
+  }catch(e){
+    toast('⚠️ AI 진단 결과: '+e.message);
   }
 };
-$('exportKmzBtn').onclick=async()=>{
-  if(!items.length){toast('내보낼 항목이 없어요');return;}
-  try{
-    const kml=`<?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://www.opengis.net/kml/2.2">
-<Document>
-  <name>TripSync Master</name>
-  <description>여행 장소·먹거리·쇼핑</description>
-  ${items.filter(i=>i.lat&&i.lng).map(i=>`<Placemark>
-    <name>${esc(i.name)}</name>
-    <description>${esc((i.address||'')+' '+(i.info||'')+' '+(i.note||''))}</description>
-    <Point><coordinates>${i.lng},${i.lat},0</coordinates></Point>
-  </Placemark>`).join('\n')}
-</Document>
-</kml>`;
-    const zip=new JSZip();
-    zip.file('doc.kml', kml);
-    const blob=await zip.generateAsync({type:'blob'});
-    const a=document.createElement('a');
-    a.href=URL.createObjectURL(blob);
-    a.download='tripsync.kmz';
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(()=>URL.revokeObjectURL(a.href),1000);
-    toast('KMZ 파일을 다운로드했어요');
-  }catch(e){toast('KMZ 내보내기 실패: '+e.message)}
+
+$('mapProvider').onchange=e=>{ls.set('TRIP_MAP_PROVIDER',e.target.value);location.reload()};
+$('savegmap').onclick=()=>{ls.set('TRAVEL_GMAP_KEY',$('gmapkey').value.trim());toast('Google Maps 키 저장됨');location.reload()};
+$('savenaver').onclick=()=>{ls.set('TRAVEL_NAVER_KEY',$('naverkey').value.trim());toast('Naver Maps 키 저장됨');location.reload()};
+$('saveMyMaps').onclick=()=>{ls.set('TRIP_MYMAPS_URL',$('mymapsUrl').value.trim());toast('내 지도 URL 저장됨')};
+$('openMyMapsBtn').onclick=()=>{const u=ls.get('TRIP_MYMAPS_URL');if(u)window.open(u,'_blank');else toast('내 지도 URL을 먼저 저장하세요')};
+$('saveMyMapsEmbed').onclick=()=>{ls.set('TRIP_MYMMaps_EMBED',$('mymapsEmbed').value.trim());toast('임베드 URL 저장됨')};
+$('myMapsBtn').onclick=()=>{
+  const u=ls.get('TRIP_MYMMaps_EMBED')||ls.get('TRIP_MYMAPS_URL');
+  if(!u)return toast('설정 탭에서 Google My Maps URL을 먼저 등록하세요');
+  $('myMapsFrame').src=u;
+  $('myMapsOverlay').classList.add('show');
 };
-function splitCSV(line){const res=[];let cur='';let inQ=false;for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"'){inQ=!inQ;}else if(ch===','&&!inQ){res.push(cur);cur='';}else cur+=ch;}res.push(cur);return res.map(s=>s.trim().replace(/^"|"$/g,''));}
-function parseCSV(text){const lines=text.trim().split(/\r?\n/);if(!lines.length)return[];const first=lines[0].toLowerCase();const hasHeader=first.includes('name')||first.includes('이름')||first.includes('주소')||first.includes('address');const header=hasHeader?lines[0].split(',').map(h=>h.trim().toLowerCase()):null;const rows=hasHeader?lines.slice(1):lines;return rows.filter(r=>r.trim()).map(row=>{const cols=splitCSV(row);if(header){const obj={};header.forEach((h,i)=>{obj[h]=cols[i]||'';});return obj;}return{name:cols[0],address:cols[1],lat:cols[2],lng:cols[3]};});}
-$('importBtn').onclick=()=>$('importFile').click();
-$('importFile').onchange=async e=>{
-  const f=e.target.files[0];e.target.value='';if(!f)return;
-  try{
-    const text=await f.text();
-    const rows=parseCSV(text);
-    let count=0;
-    rows.forEach(r=>{
-      const name=r.name||r.이름||r.title||r.장소; if(!name) return;
-      const catRaw=(r.category||r.카테고리||r.type||'PLACE').toString().toUpperCase();
-      const cat=CATS[catRaw]?catRaw:'PLACE';
-      const lat=parseFloat(r.lat||r.위도||r.latitude||0)||0;
-      const lng=parseFloat(r.lng||r.경도||r.longitude||0)||0;
-      items.unshift({id:'i'+Date.now()+Math.random().toString(36).slice(2,5),category:cat,name,address:r.address||r.주소||'',info:r.info||r.정보||r.note||'',lat,lng,img:pic(name,0),q:name,v:0,done:false});
-      count++;
-    });
-    save();fit();toast(count+'개 항목을 가져왔어요');
-  }catch(err){toast('CSV 가져오기 실패: '+err.message)}
+$('myMapsClose').onclick=()=>$('myMapsOverlay').classList.remove('show');
+
+$('locBtn').onclick=()=>{
+  if(!navigator.geolocation)return toast('위치 기능이 지원되지 않아요');
+  navigator.geolocation.getCurrentPosition(p=>{
+    const {latitude:lat,longitude:lng}=p.coords;
+    if(gmap){gmap.panTo({lat,lng});gmap.setZoom(15);}
+    else if(nmap){nmap.setCenter(new naver.maps.LatLng(lat,lng));nmap.setZoom(15);}
+    else if(lm){lm.setView([lat,lng],15);L.circleMarker([lat,lng],{radius:8,color:'#2563eb',fillOpacity:0.9}).addTo(lm);}
+  },()=>toast('위치 권한을 허용해 주세요'));
+};
+
+$('copyShareUrl').onclick=async()=>{
+  const u=location.origin+location.pathname+'?share=';
+  try{await navigator.clipboard.writeText(u);toast('단축어용 주소가 복사되었어요');}
+  catch(e){prompt('아래 주소를 복사하세요:',u);}
+};
+
+// KMZ 내보내기 & 가져오기 (원래 기능 복원)
+$('exportKmzBtn').onclick=async()=>{
+  const kml=`<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>TripSync Master</name>${items.filter(i=>Number(i.lat)&&Number(i.lng)).map(i=>`<Placemark><name>${esc(i.name)}</name><description>${esc([i.address,i.price,i.info,i.note].filter(Boolean).join(' / '))}</description><Point><coordinates>${Number(i.lng)},${Number(i.lat)},0</coordinates></Point></Placemark>`).join('')}</Document></kml>`;
+  const zip=new JSZip();zip.file('doc.kml',kml);
+  const blob=await zip.generateAsync({type:'blob'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='tripsync.kmz';a.click();
 };
 $('importKmzBtn').onclick=()=>$('importKmzFile').click();
 $('importKmzFile').onchange=async e=>{
-  const f=e.target.files[0];e.target.value='';if(!f)return;
+  const f=e.target.files?.[0];e.target.value='';if(!f)return;
   try{
-    const zip=await JSZip.loadAsync(await f.arrayBuffer());
-    const kmlFile=zip.file(/\.kml$/i)[0];
-    if(!kmlFile) throw new Error('KMZ 안에 KML이 없어요');
-    const text=await kmlFile.async('text');
-    const xml=new DOMParser().parseFromString(text,'application/xml');
-    const placemarks=xml.getElementsByTagName('Placemark');
-    let count=0;
-    for(const pm of placemarks){
-      const name=pm.getElementsByTagName('name')[0]?.textContent?.trim();
-      if(!name) continue;
-      const desc=pm.getElementsByTagName('description')[0]?.textContent?.trim()||'';
-      const coordNode=pm.querySelector('Point coordinates') || pm.getElementsByTagName('coordinates')[0];
-      const coordText=coordNode?.textContent?.trim();
-      if(!coordText) continue;
-      const parts=coordText.split(/[\s,]+/).filter(Boolean);
-      const lng=parseFloat(parts[0]); const lat=parseFloat(parts[1]);
-      if(isNaN(lat)||isNaN(lng)) continue;
-      const folder=pm.closest?.('Folder')?.getElementsByTagName('name')[0]?.textContent?.trim()||'';
-      const cat= /food|먹|restaurant/i.test(folder+name+desc)?'FOOD':/shop|구매|buy/i.test(folder+name+desc)?'SHOP':'PLACE';
-      items.unshift({id:'i'+Date.now()+Math.random().toString(36).slice(2,5),category:cat,name,address:desc,lat,lng,img:pic(name,0),q:name,v:0,done:false,info:desc});
-      count++;
-    }
-    save();fit();toast(count+'개 장소를 KMZ에서 가져왔어요');
-  }catch(err){toast('KMZ 가져오기 실패: '+err.message)}
-};
-addEventListener('resize',()=>lm&&lm.invalidateSize());
-
-setTheme(ls.get('TRIP_THEME')||'dark');
-// API 키는 형식 검증 없이 그대로 사용 (Google AI Studio 키 등 다양한 형식 지원)
-renderAI();
-$('gmapkey').value=ls.get('TRAVEL_GMAP_KEY')||'';
-$('naverkey').value=ls.get('TRAVEL_NAVER_KEY')||'';
-$('mymapsUrl').value=ls.get('TRIP_MYMMaps_URL')||'';
-$('mymapsEmbed').value=ls.get('TRIP_MYMMaps_EMBED')||'';
-if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{})}
-if(!ls.get('TRIP_ONBOARD')){setTimeout(()=>toast('찾기 탭에서 장소를 추가해 보세요. 사진·이름으로 검색할 수 있어요.'),800);ls.set('TRIP_ONBOARD','1')}
-const _gkey=(ls.get('TRAVEL_GMAP_KEY')||'').trim();
-try{window._gkey=_gkey||''}catch(e){}
-const _nkey=ls.get('TRAVEL_NAVER_KEY')||'';
-mapProvider=ls.get('TRIP_MAP_PROVIDER')||'osm';
-$('mapProvider').value=mapProvider;
-let locating=false;
-function requestLocation(){
-  if(locating) return;
-  if(!navigator.geolocation){ toast('이 브라우저는 위치 정보를 지원하지 않아요'); return; }
-  if(location.protocol!=='https:'&&location.hostname!=='localhost'){ toast('위치 기능은 HTTPS에서만 동작해요 (GitHub Pages는 HTTPS)'); return; }
-  locating=true; toast('현재 위치 확인 중...');
-  navigator.geolocation.getCurrentPosition(pos=>{
-    locating=false;
-    const lat=pos.coords.latitude,lng=pos.coords.longitude;
-    if(gmap){
-      if(glocMarker) glocMarker.setMap(null);
-      glocMarker=new google.maps.Marker({position:{lat,lng},map:gmap,title:'내 위치',icon:{path:google.maps.SymbolPath.CIRCLE,scale:8,fillColor:'#2563eb',fillOpacity:1,strokeColor:'#fff',strokeWeight:2}});
-      gmap.setCenter({lat,lng}); gmap.setZoom(15);
-    } else if(nmap){
-      if(nlocMarker) nlocMarker.setMap(null);
-      nlocMarker=new naver.maps.Marker({position:new naver.maps.LatLng(lat,lng),map:nmap,title:'내 위치'});
-      nmap.setCenter(new naver.maps.LatLng(lat,lng)); nmap.setZoom(15);
-    } else if(lm){
-      if(glocMarker&&lm.hasLayer&&lm.hasLayer(glocMarker)) lm.removeLayer(glocMarker);
-      glocMarker=L.circleMarker([lat,lng],{radius:8,color:'#fff',fillColor:'#2563eb',fillOpacity:1}).addTo(lm);
-      lm.setView([lat,lng],15);
-    }
-    toast('현재 위치로 이동했어요');
-  },err=>{
-    locating=false;
-    if(err.code===1) toast('위치 권한이 거부되었어요. 브라우저/휴대폰 설정에서 허용해 주세요');
-    else if(err.code===2) toast('위치를 확인할 수 없어요. GPS/네트워크를 확인해 주세요');
-    else toast('위치 확인 시간이 초과되었어요');
-  },{enableHighAccuracy:true,timeout:10000,maximumAge:60000});
-}
-$('locBtn').onclick=requestLocation;
-
-if(mapProvider==='google' && _gkey){
-  window.gm_authFailure = function(){ toast('Google Maps 인증 실패: API 키/도메인/결제 설정을 확인하세요 (F12 콘솔 참고)'); fallbackToOsm(); };
-  let gLoaded=false;
-  const s=document.createElement('script');
-  s.src='https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(_gkey)+'&loading=async';
-  s.async=true;s.defer=true;
-  s.onload=()=>{ setTimeout(()=>{ try{ if(!window.google||!google.maps) throw new Error('google.maps 없음'); gmap=new google.maps.Map($('map'),{center:{lat:36.5,lng:128},zoom:6}); GPinClass=makeGPinClass(); gLoaded=true; draw(); fit(); console.log('Google Map initialized'); }catch(e){ console.error('Google init error:',e); fallbackToOsm() } },100); };
-  s.onerror=(e)=>{ console.error('Google script error:',e); fallbackToOsm() };
-  const gTimer=setTimeout(()=>{ if(!gLoaded) fallbackToOsm() },8000);
-  document.head.appendChild(s);
-} else if(mapProvider==='naver' && _nkey){
-  const s=document.createElement('script');
-  s.src='https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId='+encodeURIComponent(_nkey);
-  s.async=true;
-  s.onload=()=>{ try{ if(!window.naver||!naver.maps) throw new Error('naver.maps 없음'); nmap=new naver.maps.Map('map',{center:new naver.maps.LatLng(36.5,128),zoom:10}); draw(); fit(); }catch(e){ toast('Naver 지도 초기화 실패: '+e.message); if(window.L){ lm=L.map('map').setView([36.5,128],6); layer=L.featureGroup().addTo(lm); rebuildTiles(); render(); draw(); fit(); } else $('mapmsg').style.display='block' } };
-  s.onerror=()=>{ toast('Naver Maps 스크립트 로드 실패. 키/도메인 설정을 확인하세요.'); if(window.L){ lm=L.map('map').setView([36.5,128],6); layer=L.featureGroup().addTo(lm); rebuildTiles(); render(); draw(); fit(); } else $('mapmsg').style.display='block' };
-  document.head.appendChild(s);
-} else if(window.L){
-  lm=L.map('map').setView([36.5,128],6);
-  layer=L.featureGroup().addTo(lm);
-  rebuildTiles();
-} else $('mapmsg').style.display='block';
-// ===== 릴스/쇼츠 공유 → 장소 찾기 =====
-function withTimeout(p,ms){return Promise.race([p,new Promise(r=>setTimeout(()=>r(null),ms))])}
-function parseShare(raw){
-  const t=String(raw||'').trim();
-  const urls=(t.match(/https?:\/\/[^\s"'<>]+/g)||[]).map(u=>u.replace(/[).,;]+$/,''));
-  let clean=t;urls.forEach(u=>{clean=clean.split(u).join(' ')});
-  clean=clean.replace(/Instagram에서[^\s]*님[^:]*:\s*/g,'').replace(/Instagram from .*?:\s*/gi,'').replace(/^.*?님이 공유함:\s*/,'').replace(/^"?\s*동영상 보기\s*:?\s*/i,'').replace(/\s*동영상 보기:?\s*$/i,'').replace(/\s*Instagram\s*$/i,'').trim();
-  let kind='text',code='',fmt='';const u=urls[0]||'';
-  if(/instagram\.com\//i.test(u)){kind='instagram';const m=u.match(/\/(?:reel|reels|p|tv)\/([A-Za-z0-9_-]+)/);if(m)code=m[1];if(/\/(?:p|tv)\//.test(u))fmt='post';}
-  else if(/youtube\.com|youtu\.be/i.test(u)){kind='youtube';const m=u.match(/shorts\/([A-Za-z0-9_-]+)/)||u.match(/[?&]v=([A-Za-z0-9_-]+)/)||u.match(/youtu\.be\/([A-Za-z0-9_-]+)/);if(m)code=m[1];}
-  else if(/tiktok\.com/i.test(u)){kind='tiktok';const m=u.match(/\/video\/(\d+)/);if(m)code=m[1];}
-  return {raw:t,url:u,kind,code,fmt,clean:clean.replace(/[ \t]+/g,' ').trim().slice(0,2500)};
-}
-function mkReelsPrompt(d){
-  return `아래는 SNS 영상(인스타 릴스/유튜브 쇼츠/틱톡)을 공유한 내용입니다.
-${d.screen?'중요: 첨부된 사진은 영상 화면의 스크린샷입니다. 이미지 속 글자(캡션·주소·가게명·영업시간·해시태그)를 그대로 읽어 그 텍스트를 기준으로 장소를 찾으세요. 링크/공유 텍스트보다 이미지 글자가 우선입니다.\n':''}영상이 소개하는 실제 장소(식당·카페·숙소·명소·관광지) 또는 구매 상품 후보를 가능성 높은 순서로 최대 4개 찾고, JSON 배열만 출력하세요. 장소를 특정할 수 없는 영상이면 []만 출력하세요.
-중요: 영상이 여러 장소를 소개하면(예: 오사카 카페 명소 5선) 각각을 개별 후보로 분리하고, 각자 정확한 현지어 주소(지방/도시/구까지)를 적으세요.
-중요: 캡션에 ①②③·📌·📍으로 구분된 장소가 여러 개면 하나도 빠뜨리지 말고 각각 별도 후보로 만드세요. 각 장소의 상호명과 주소는 짝이 어긋나지 않게 캡션 순서대로 정리하세요.
-좌표(lat/lng)는 확신할 때만 넣고 불확실하면 null로 남기세요. 주소가 정확한 것이 좌표보다 우선입니다.
-형식: {"name":"한국어 또는 현지어 장소명","address":"현지어 주소 또는 빈 문자열","lat":숫자 또는 null,"lng":숫자 또는 null,"category":"PLACE(장소/명소)·FOOD(식당/음식)·SHOP(쇼핑/상품) 중 하나","price":"가격(통화 기호 포함, 없으면 '')","info":"한 줄 정보(영업시간·특징 등)"}
-플랫폼: ${d.kind}${d.code?` (코드 ${d.code})`:''}
-계정: ${d.user||'모름'}
-링크: ${d.url||'없음'}
-공유 텍스트: ${d.caption||'(텍스트 없음 — 링크 정보로 최대한 찾아보세요)'}`;
-}
-// 링크만 공유된 경우(캡션 회수 실패) — Google 색인에는 릴스 페이지가 잡혀있므로(실측: 검색 결과에 상호·주소가 노출됨)
-// 구글 검색 도구를 붙인 Gemini에게 직접 웹조사를 시킨다. 근거 없는 장소 생성을 강하게 금지.
-function mkSearchPrompt(d){
-  return `아래는 SNS 영상 링크만 공유되어 본문이 없는 상태입니다. google_search 도구로 직접 웹검색해서 이 영상이 소개하는 장소를 조사하세요.
-지침:
-- 영상 코드·계정명·지역 등 조합으로 2~4회 검색하세요 (예: ${d.kind} ${d.code||''} 릴스 후기).
-- 검색 결과(제목·스니펫)에 실제로 나온 상호명·주소·영업시간을 근거로 하는 것만 후보로 쓰세요.
-- 근거 없는 장소는 절대 지어내지 마세요. 못 찾았으면 반드시 []만 출력하세요.
-출력 맴: {"name":"상호명(현지어)","address":"현지어 주소","lat":숫자 또는 null,"lng":숫자 또는 null,"category":"PLACE/FOOD/SHOP","price":"없으면 ''","info":"근거가 된 검색 발견 한 줄"}
-플랫폼: ${d.kind}${d.code?` (코드 ${d.code})`:''}
-계정: ${d.user||'모름'}
-링크: ${d.url||'없음'}
-참고 텍스트: ${d.caption||'(없음)'}
-JSON 배열만 출력하세요.`;
-}
-async function jinaRead(url){
-  // jina는 실패결과를 캐시하므로 캐시버스트로 새 키를 만들어 만성 403캐시를 피한다.
-  try{const r=await fetchTO('https://r.jina.ai/'+url+(url.includes('?')?'&':'?')+'__cb='+(Date.now()%1e7),{headers:{'Accept':'text/plain'}},7000);if(!r.ok)return '';return await r.text();}catch(e){return ''}
-}
-// CORS 프록시 사슬: 오늘 실측(allorigins 522·codetabs 522·cors.lol 429·corsproxy.io 유료화) 같은 단일 장애에 굳지 않게
-// 여러 프록시를 순회하고, 실패캐시를 피하려 캐시버스트로 새 키로 친다. allorigins /get은 json(contents 필드)을 풀어준다.
-function pxChain(){
-  return [
-    u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u)+'&_='+Date.now(),
-    u=>'https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(u)+'&_='+Date.now(),
-    u=>'https://api.allorigins.win/get?url='+encodeURIComponent(u)+'&_='+Date.now(),
-    u=>'https://api.cors.lol/?url='+encodeURIComponent(u)
-  ];
-}
-async function pxText(px,url,ms){
-  const r=await fetchTO(px(url),{},ms);
-  if(!r.ok)return '';
-  const t=await r.text();
-  if(/allorigins\.win\/get/.test(px(''))){try{const j=JSON.parse(t);return (j&&j.contents)||''}catch(e){return ''}}
-  return t;
-}
-// IG 임베드(/embed/captioned/)는 로그인 없이 캡션을 달아주는 페이지 — 단, 요청 IP에 따라 EmbedBrokenMedia로 대체됨(실측).
-// 프록시별로 값싸게 시도하고 막히면 조용히 포기한다(재시도 무익).
-async function igEmbedMeta(url,left){
-  const m=String(url).match(/instagram\.com\/(?:[^\/]+\/)?(reel|reels|p)\/([A-Za-z0-9_-]+)/);
-  if(!m)return null;
-  const ep='https://www.instagram.com/'+(m[1]==='p'?'p':'reel')+'/'+m[2]+'/embed/captioned/';
-  for(const px of pxChain()){
-    const ms=Math.min(7000,left());if(ms<3000)return null;
-    try{
-      const h=await pxText(px,ep,ms);
-      if(!h)continue;
-      if(/EmbedBrokenMedia|Login\s*•|id="facebook"|class="no_js"/.test(h.slice(0,4000)))continue;
-      const doc=new DOMParser().parseFromString(h,'text/html');
-      const tx=((doc.querySelector('div.CommentText')||{}).textContent||(h.match(/CommentText">\s*([^<]{10,2000})</)||[])[1]||'');
-      const us=((doc.querySelector('div.UsernameText')||{}).textContent||(h.match(/UsernameText">\s*([^<]{1,60})</)||[])[1]||'');
-      if(tx&&tx.trim().length>10)return {user:us.trim().replace(/^@/,''),caption:tx.replace(/&quot;/g,'"').replace(/#(\S+)/g,' #$1').trim(),thumb:''};
-    }catch(e){}
-  }
-  return null;
-}
-// 릴스/틱톡 메타: 전체 예산 ~16초 — jina(1회) → 임베드 캡션(로그인 불필요 페이지) → og메타(allorigins→codetabs)
-async function fetchIGMeta(url){
-  const t0=Date.now(),budget=16000,left=()=>budget-(Date.now()-t0);
-  const t=await jinaRead(url);
-  if(t&&t.length>60&&!/rate\s*limit|too many|429/i.test(t.slice(0,200)))return {text:t};
-  if(left()>3500){
-    const em=await igEmbedMeta(url,left);
-    if(em)return em;
-  }
-  if(left()>3500){
-    for(const px of pxChain()){
-      const ms=Math.min(7000,left());if(ms<3000)break;
-      try{
-        const h=await pxText(px,url,ms);
-        if(!h)continue;
-        if(/id="facebook"|class="no_js"/.test(h.slice(0,2000)))continue; // 인스타의 로그인벽 셸
-        const doc=new DOMParser().parseFromString(h,'text/html');
-        const q=s=>{const el=doc.querySelector('meta[property="'+s+'"]');return el?(el.getAttribute('content')||''):''};
-        const t=q('og:title'),d=q('og:description'),img=q('og:image');
-        if(t||d){
-          let user='',cap='';
-          const dm=d.match(/[\d.,]+\s*(?:likes|좋아요)[^-]*-\s*(.+?)\s+on\s+[^:]*:\s*([\s\S]+)$/);
-          if(dm){user=dm[1].trim();cap=dm[2].trim()}
-          if(!cap&&t){const tm=t.match(/^(.*?)on (?:Instagram|TikTok)\s*:\s*([\s\S]*)$/);if(tm){user=user||tm[1].trim();cap=tm[2].trim()}}
-          if(cap||user)return {user,caption:cap.replace(/&quot;/g,'"').replace(/&amp;/g,'&').trim(),thumb:img};
-        }
-      }catch(e){}
-    }
-  }
-  return null;
-}
-function thumbFromJina(txt){
-  if(!txt)return '';
-  const urls=[...txt.matchAll(/\((https:\/\/[^)\s]+)\)/g)].map(m=>m[1]);
-  const ok=urls.filter(u=>/(scontent|cdninstagram|fbcdn\.net|tiktokcdn|muscdn)/.test(u)&&!/2885-19\/|s150x150|p150x150|s100x100/.test(u));
-  return ok[0]||'';
-}
-function vidEmbedUrl(v){
-  if(!v)return '';
-  if(v.platform==='youtube'&&v.code)return 'https://www.youtube.com/embed/'+v.code+'?rel=0&playsinline=1';
-  if(v.platform==='tiktok'&&v.code)return 'https://www.tiktok.com/embed/v2/'+v.code;
-  if(v.platform==='instagram'&&v.code)return 'https://www.instagram.com/'+(v.fmt==='post'?'p':'reel')+'/'+v.code+'/embed/captioned/';
-  return '';
-}
-function vidUrlFromItem(it){
-  const v=it&&it.vid||{};
-  if(v.platform==='youtube') return 'https://www.youtube.com/shorts/'+v.code;
-  if(v.platform==='instagram') return 'https://www.instagram.com/'+(v.fmt==='post'?'p':'reel')+'/'+v.code+'/';
-  if(v.platform==='tiktok') return 'https://www.tiktok.com/video/'+v.code;
-  return '';
-}
-// 영상 실제 장면 썸네일 — 저장하지 않고 렌더 때마다 새로 만드므로 만료 걱정 없음.
-// 인스타는 /p/{코드}/media/ (reel 코드여도 이 경로로 정상 응답 — 실측 200, 404면 차단/만료이므로 폴백 사진이 뜸)
-function vidThumbUrl(v){
-  if(!v)return '';
-  if(v.platform==='youtube'&&v.code)return 'https://i.ytimg.com/vi/'+v.code+'/hqdefault.jpg';
-  if(v.platform==='instagram'&&v.code)return 'https://www.instagram.com/p/'+v.code+'/media/?size=l';
-  return v.thumb||'';
-}
-// 핀카드/리스트/시트 공용 대표이미지: 영상 장면 > 틱톡 썸네일 > 저장된 사진
-function itemThumb(i){
-  if(!i)return '';
-  if(i.useCustomImg&&i.img)return i.img; // 사용자가 직접 넣은 사진이 최우선
-  if(i.vid){const t=vidThumbUrl(i.vid)||i.vid.thumb||'';if(t)return t}
-  return i.img||'';
-}
-function metaFromJina(txt){
-  if(!txt)return null;
-  const line=((txt.match(/^Title:\s*(.+)$/m)||[])[1]||'');
-  const body=txt.replace(/^[\s\S]*?Markdown Content:\s*/i,'').trim();
-  if(line){
-    const s=line.trim().replace(/^["“]|["”]$/g,'');
-    const m=s.match(/^(.*?)on Instagram\s*:\s*([\s\S]*)$/);
-    if(m)return {user:m[1].trim(),caption:((m[2]||'').replace(/^[""]|[""]$/g,'').trim())};
-  }
-  // Title 줄이 없어도 본문이 캡션일 수 있다 (로그인 벽·리믹스 안내 제외)
-  if(body&&body.length>15&&!/Log in to Instagram|리믹스 활용 예시/i.test(body))return {user:'',caption:body.slice(0,1500)};
-  return null;
-}
-async function ytMeta(code){
-  try{
-    const r=await fetch('https://www.youtube.com/oembed?url='+encodeURIComponent('https://www.youtube.com/watch?v='+code)+'&format=json');
-    if(!r.ok)return null;
-    const d=await r.json();
-    return {author:d.author_name||'',title:d.title||''};
-  }catch(e){return null}
-}
-async function askShared(K,parts){
-  let e1=null;
-  try{return await ask(K,parts)}catch(e){e1=e}
-  // 1차 실패 시에만 구글 검색 도구로 Gemini 재시도 (검색 결합은 응답이 느려 1차에서는 끔)
-  const g=aiList(K).find(p=>p.id==='gemini');
-  if(!g)throw e1;
-  return await ask({gemini:{key:g.key,model:g.model}},parts,[{google_search:{}}]);
-}
-// AI 없이 캡션에서 장소 후보를 직접 추출 (주소가 맨 앞에 오는 구조도 지원: 영문 도시 힌트 + ✨불릿 이름 + ¥메뉴 정보)
-const CITY_EN={osaka:'오사카',kyoto:'교토',tokyo:'도쿄',nagoya:'나고야',sapporo:'삿포로',fukuoka:'후쿠오카',okinawa:'오키나와',kobe:'고베',hiroshima:'히로시마',kanazawa:'가나자와',seoul:'서울',busan:'부산',daegu:'대구',jeju:'제주',gangneung:'강릉',jeonju:'전주',bangkok:'방콕',singapore:'싱가포르',rome:'로마',milan:'밀라노',london:'런던',paris:'파리',berlin:'베를린'};
-// 지역 힌트의 지오코딩용 쿼리형 (한글 힌트 뒤에 현지어 이름 붙으면 Nominatim이 못 읽어서 영문형 별도 사용)
-const CITY_Q={'오사카':'Osaka, Japan','교토':'Kyoto, Japan','도쿄':'Tokyo, Japan','나고야':'Nagoya, Japan','삿포로':'Sapporo, Japan','후쿠오카':'Fukuoka, Japan','오키나와':'Okinawa, Japan','고베':'Kobe, Japan','히로시마':'Hiroshima, Japan','가나자와':'Kanazawa, Japan','방콕':'Bangkok, Thailand','싱가포르':'Singapore','로마':'Rome, Italy','밀라노':'Milan, Italy','파리':'Paris, France','런던':'London, UK','베를린':'Berlin, Germany','제주':'Jeju, South Korea','서울':'Seoul, South Korea','부산':'Busan, South Korea'};
-// 주소/이름에 일본 한자 도시명이 있으면 지오코딩용 영문 힌트로 변환 (AI 후보는 h 힌트가 비어 도시 인식 실패 → 이 헬퍼가 보완)
-const CITY_JP_Q={大阪:'Osaka, Japan',京都:'Kyoto, Japan',東京:'Tokyo, Japan',名古屋:'Nagoya, Japan',札幌:'Sapporo, Japan',福岡:'Fukuoka, Japan',神戸:'Kobe, Japan',横浜:'Yokohama, Japan',奈良:'Nara, Japan',和歌山:'Wakayama, Japan',仙台:'Sendai, Japan',広島:'Hiroshima, Japan',那覇:'Naha, Japan',金沢:'Kanazawa, Japan'};
-function hintFrom(o){
-  const s=(String((o&&o.address)||'')+' '+String((o&&o.name)||'')).trim();
-  if(!s)return '';
-  for(const k in CITY_JP_Q)if(s.indexOf(k)>=0)return CITY_JP_Q[k];
-  const lm=s.match(new RegExp('\\b('+Object.keys(CITY_EN).join('|')+')\\b','i'));
-  if(lm){const ko=CITY_EN[lm[1].toLowerCase()];if(CITY_Q[ko])return CITY_Q[ko]}
-  for(const k of ['서울','부산','대구','인천','제주','강릉','전주','여수'])if(s.indexOf(k)>=0)return k;
-  return '';
-}
-// 일본 주소에서 '市+区+지번블록' 코어만 추출 (전체 주소는 지오코더 실패, 블록 코어는 OSM 히트)
-function jpCore(a){
-  a=String(a||'').replace(/〒\d{3}-?\d{0,4}/g,' ').trim();
-  if(!/[一-龥]/.test(a))return '';
-  const m=a.match(/([一-龥]{2,5}市[一-龥]{1,6}(?:区|區)[一-龥]{2,8})/);
-  if(m)return m[1];
-  const w=a.match(/([一-龥]{2,8}(?:町|区|區)[一-龥]{2,8})/);
-  if(w)return w[1];
-  return '';
-}
-function parseCaptionPlaces(cap){
-  if(!cap)return [];
-  const txt=String(cap);
-  // 줄 단위로 정규화(T542-0086 → 〒542-0086). 통째로 하면 개행이 공백으로 뭉개져 구조가 깨진다.
-  const lines=txt.split(/\r?\n+/).map(s=>normalizeOcrAddr(s)).filter(Boolean);
-  const tags=(txt.match(/#[^\s#\n]+/g)||[]).map(t=>t.slice(1));
-  // 지역 힌트: 1) 본문(주소 포함)의 영문 도시명 2) 해시태그·본문 한글
-  let hint='';
-  const cm=txt.match(new RegExp('\\b('+Object.keys(CITY_EN).join('|')+')\\b','i'));
-  if(cm)hint=CITY_EN[cm[1].toLowerCase()]||cm[1];
-  if(!hint){
-    const RK=[...new Set(Object.values(CITY_EN)),'속초','여수','포항','호치민','다낭','발리','시드니'];
-    for(const ko of RK){ if(tags.some(t=>t.includes(ko))||txt.includes(ko)){hint=ko;break} }
-  }
-  // 주소형 줄 판정: 이모지 시작 분기 없이 내용으로만 판정한다 (📍상호줄이 주소로 오인되는 것을 막기 위해 — 상호줄은 pinName/별도 패스가 처리)
-  const isAddr=l=>/\b\d{2,3}-\d{3,4}\b/.test(l)||/\b\w+\s+(?:Ward|Building|City|Prefecture|Road|Street|Dong|Gu|si)\b/.test(l)||/\b\d+\s*Chome\b/i.test(l)||/[都道府県][\u4E00-\u9FFF]{1,4}(?:市|区|町|村)/.test(l);
-  // 📌 핀 이모지만 있고 주소 형태(우편번호/구·Ward 등)가 없는 줄 = 가게명 줄 (📍 규카츠 마요 같은 표준 릴스 포맷)
-  const pinName=l=>/^[\u{1F4CD}\u{1F4CC}\u{1F5FA}\s]/u.test(l)&&!/\b\d{2,3}-\d{3,4}\b/.test(l)&&!/\b\w+\s+(?:Ward|Building|City|Prefecture|Road|Street|Dong|Gu|si)\b/.test(l);
-  const isHours=l=>/^[\u23F0\u23F1\u23F2\u{1F550}-\u{1F567}]/u.test(l)||/\d{1,2}:\d{2}\s*[~–-]/.test(l);
-  const isPrice=l=>/[¥$₩]\s?\d/.test(l);
-  const clean=s=>String(s||'').replace(/^[^\w가-힣一-龥ぁ-んァ-ヶ]{1,3}\s*/,'').trim();
-  const out=[];
-  for(let i=0;i<lines.length;i++){
-    const L=lines[i];
-    if(!isAddr(L)||pinName(L))continue; // 📌상호줄은 주소로 취급하지 않음(별도 패스에서 상호+주소 짝으로 처리)
-    const addr=L.replace(/^\s*(?:[\u{1F4CD}\u{1F4CC}\u{1F5FA}][\s·]*)+/u,'').trim(); // 핀 이모지만 제거 — 〒 우편기호는 지오코딩에 유리해서 보존
-    if(addr.length<8)continue;
-    let nm='',info='',menu=[];
-    for(let j=i-1;j>=Math.max(0,i-4);j--){ // 주소 바로 위에서 가까운 순으로: 이름·영업시간 (핀+상호 줄은 주소가 아니어도 이름으로 인정)
-      const P=lines[j];
-      if(isHours(P)&&!info){info=clean(P).slice(0,60);continue}
-      if(isAddr(P)&&!pinName(P))continue;
-      if(/#/.test(P)||isPrice(P))continue;
-      const c=clean(P);
-      if(c&&c.length<=44){nm=c;break}
-    }
-    if(!nm){ // 주소 뒤 불릿에서 '맛집/식당' 등 포함 줄 찾기 (주소가 맨 앞에 오는 캡션 대응)
-      for(let j=i+1;j<=Math.min(lines.length-1,i+8);j++){
-        const P=lines[j];
-        if(isPrice(P))continue;
-        const c=clean(P);
-        if(c&&c.length<=60&&/맛집|식당|카페|스시|라멘|규카츠|돈카츠|레스토랑|restaurant|cafe|food|market/i.test(c)){nm=c;break}
-      }
-    }
-    for(let j=i+1;j<=Math.min(lines.length-1,i+10);j++){ // 메뉴 가격(¥/$/₩) 줄 → 정보
-      const P=lines[j];
-      if(isAddr(P))break;
-      if(isPrice(P)&&P.length<=48){menu.push(clean(P));if(menu.length>=4)break}
-      else if(isHours(P)&&!info)info=clean(P).slice(0,60);
-    }
-    if(!nm){ // 한 줄로 합쳐진 캡션(og:description 등)의 ✨'맛집/식당' 이름 패턴
-      const b=txt.match(/✨\s*([^✨#\n]{3,44}?)\s*(?:맛집|식당)/);
-      if(b)nm=b[1].trim();
-    }
-    if(!nm)nm=addr.slice(0,28);
-    nm=nm.replace(/\s*맛집\s*$/,'');
-    nm=nm.replace(/\s*(@[^\s]+)\s*$/,'').trim(); // @계정태그는 이름에서 제외
-    let cc='PLACE';
-    const blob=(tags.join(' ')+' '+txt);
-    if(/맛집|먹는|음식|카페|식당|규카츠|돈카츠|sushi|ramen|cafe|food|食堂|ラーメン|먹방/i.test(blob))cc='FOOD';
-    else if(/쇼핑|shop|market|mall|스토어|백화점/i.test(blob))cc='SHOP';
-    const infoAll=[info,...menu].filter(Boolean).slice(0,5).join(' · ');
-    out.push({name:nm,address:addr,info:(infoAll?infoAll+' · ':'')+'캡션에서 직접 추출',category:cc,h:hint});
-    if(out.length>=4)break;
-  }
-  // 📌상호줄(핀만 있고 주소형 아님) 바로 다음 줄에 실제 주소가 오는 표준 릴스 포맷 별도 패스
-  if(out.length<4){
-    for(let i=0;i<lines.length-1;i++){
-      const A=lines[i],B=lines[i+1];
-      if(!pinName(A))continue;
-      if(clean(A).length<3||clean(A).length>44)continue;
-      if(!isAddr(B)||pinName(B))continue;
-      const nm2=clean(A).replace(/\s*맛집\s*$/,'').replace(/\s*(@[^\s]+)\s*$/,'').trim();
-      if(!nm2||out.some(o=>o.name===nm2))continue;
-      const addr2=B.replace(/^\s*(?:[\u{1F4CD}\u{1F4CC}\u{1F5FA}][\s·]*)+/u,'').trim();
-      let cc='PLACE';
-      const blob=(tags.join(' ')+' '+txt);
-      if(/맛집|먹는|음식|카페|식당|규카츠|돈카츠|sushi|ramen|cafe|food|食堂|ラーメン|먹방/i.test(blob))cc='FOOD';
-      else if(/쇼핑|shop|market|mall|스토어|백화점/i.test(blob))cc='SHOP';
-      const hInfo=lines.slice(i+2,i+6).filter(isHours).map(s=>clean(s)).slice(0,2).join(' · ');
-      out.push({name:nm2,address:addr2,info:(hInfo?hInfo+' · ':'')+'캡션 📍상호+주소 포맷에서 추출',category:cc,h:hint});
-      if(out.length>=4)break;
-    }
-  }
-  if(!out.length){ // 주소 라인이 전혀 없는 산문형 캡션: 일본식 상호명(店/食堂/カフェ…) + 랜드마크로 후보 생성
-    const runs=(txt.replace(/[#＃][^\s#＃]*/g,' ').match(/[一-龥ぁ-んァ-ヶ][一-龥ぁ-んァ-ヶー・A-Za-z0-9＆′']+/g)||[]);
-    let jp='';
-    for(let r2=0;r2<runs.length;r2++){
-      const R=runs[r2];
-      if(/(店|食堂|ダイニング|カフェ|バル|キッチン|ラーメン|ランチ)$/.test(R)){
-        const prev=runs[r2-1];
-        const joined=(prev&&prev.length<=16&&!/(입니다|です|ます|まで|을|를|이|가)$/.test(prev)&&(prev+' '+R).length<=44)?prev+' '+R:R;
-        jp=joined;break;
-      }
-    }
-    if(jp||/난바워크|なんばウォーク|Namba Walk/i.test(txt)){
-      const LM=(txt.match(/(난바워크|なんばウォーク|Namba Walk|지하\s?\d+\s?층|[A-Z]\d+\s?[-–~]\s?[A-Z]?\d+|스시카라[비ビ]|スシカラビ|바로\s?옆)/gi)||[]).slice(0,4);
-      if(!jp)jp=((txt.match(/난바워크|なんばウォーク|Namba Walk/i)||[''])[0]||'').trim();
-      if(jp){
-        jp=jp.replace(/^[「『"'’・,.]+/,'');
-        let cc='PLACE';
-        const blob=(tags.join(' ')+' '+txt);
-        if(/맛집|먹는|음식|카페|식당|규카츠|돈카츠|トンテキ|丼|寿司|ラーメン|定食|sushi|ramen|cafe|food|食堂|먹방/i.test(blob))cc='FOOD';
-        else if(/쇼핑|shop|market|mall|스토어|백화점/i.test(blob))cc='SHOP';
-        out.push({name:jp,address:'',info:(LM.length?LM.join(' · ')+' · ':'')+'캡션 산문에서 추출 — 이름+지역으로 위치 검색',category:cc,h:hint});
-      }
-    }
-  }
-  return out;
-}
-let shareBusy=false;
-async function processShared(raw){
-  raw=String(raw||'').trim();
-  if(shareBusy)return;
-  if(!raw){toast('공유 링크나 캡션을 먼저 넣어주세요');return}
-  shareBusy=true;
-  const btn=$('analyzeShare'),old=btn.textContent;
-  btn.textContent='⏳ 분석 중...';btn.disabled=true;
-  try{
-    const sd=parseShare(raw);
-    if(!sd.url&&!sd.clean){toast('분석할 내용이 없어요');return}
-    let user='',caption=sd.clean,vThumb='',metaFail=false;
-    if((sd.kind==='instagram'||sd.kind==='tiktok')&&sd.url){
-      toast((sd.kind==='tiktok'?'틱톡':'릴스')+' 정보 불러오는 중...');
-      window._lastIGtry=Date.now(); // 시트 자동 재시도와의 중복 방지 표식
-      const meta=await withTimeout(fetchIGMeta(sd.url),18000);
-      if(meta){
-        let u2='',c2='',t2='';
-        if(meta.text){const m=metaFromJina(meta.text);if(m){u2=m.user;c2=m.caption||''}t2=thumbFromJina(meta.text)||''}
-        else{u2=meta.user||'';c2=meta.caption||'';t2=meta.thumb||''}
-        if(c2&&(!caption||caption.length<20))caption=c2; // 유저가 직접 붙여넣은 긴 캡션이 있으면 보존
-        if(u2)user=u2;
-        if(t2)vThumb=t2;
-      }
-      metaFail=!caption||caption.length<20; // 캡션을 못 받아오면(인스타 익명 차단) 안내 문구
-    }else if(sd.kind==='youtube'&&sd.code){
-      const y=await withTimeout(ytMeta(sd.code),7000);
-      if(y&&y.title){user=y.author;caption=y.title}
-      vThumb='https://i.ytimg.com/vi/'+sd.code+'/hqdefault.jpg';
-    }else if(sd.kind==='tiktok'&&sd.code){
-      // 틱톡 oembed는 CORS 개방(실측 ACAO:*)이라 폰에서 직접 제목·썸네일 회수 가능
-      const turl=((sd.raw.match(/https?:\/\/[^\s"'<>]*tiktok\.com[^\s"'<>]*/i)||['https://www.tiktok.com/@t/video/'+sd.code])[0]).split('?')[0];
-      try{
-        const r=await withTimeout(fetchTO('https://www.tiktok.com/oembed?url='+encodeURIComponent(turl),{},6000),7000);
-        if(r.ok){const d=await r.json();
-          if(d&&d.title)caption=d.title;
-          if(d&&(d.author_unique_id||d.author_name))user=String(d.author_unique_id||d.author_name).replace(/^@/,'');
-          if(d&&d.thumbnail_url)vThumb=d.thumbnail_url;
-        }
-      }catch(e){}
-    }
-    const vmeta=(sd.kind!=='text'&&sd.code)?{platform:sd.kind,code:sd.code,fmt:sd.fmt||'',thumb:vThumb}:null;
-    let list=null,errNote='';
-    const AC=aiKeys();
-    const provs=aiList(AC);
-    if(provs.length){
-      // 선택된 사진(스크린샷)이 있으면 AI에게 같이 첨부 — 비전으로 캡션 화면의 글자를 직접 읽음(인스타 차단 우회)
-      let shots=[];
-      if(pend.length){
-        toast('선택한 사진 파일 변환 중...');
-        try{shots=(await Promise.all(pend.map(f=>shrink(f)))).map(u=>({inlineData:{mimeType:'image/jpeg',data:u.split(',')[1]}}))}catch(e){}
-      }
-      // 캡션이 사실상 없으면(=링크만 공유 → 인스타 익명차단으로 본문 데이터 없음)
-      // 1차 블라인드 분석은 근거 없는 답만 나오므로 건너뛰고, 구글 검색 도구 결합으로 바로 웹조사.
-      const capT=(caption||'').trim();
-      const capThin=capT.length<25||!/[\uAC00-\uD7A3\u3040-\u30FF\u4E00-\u9FFF]{3}/.test(capT);
-      const useSearch=capThin&&!shots.length;
-      const pr={kind:sd.kind,code:sd.code,user,caption:capT,url:sd.url};
-      if(shots.length)pr.screen=1;
-      let aiEmptyNote='';
-      try{
-        if(useSearch){
-          const g=provs.find(p=>p.id==='gemini');
-          if(!g){
-            errNote='링크만 공유한 경우 웹검색 AI(Gemini)가 필요해요 — 설정 탭에서 키 입력, 또는 스크린샷 첨부';
-          }else{
-            window.aiProg=()=>{toast('AI가 웹검색으로 장소를 찾는 중... (최대 45초)')};
-            const ares=await withTimeout(ask({gemini:{key:g.key,model:g.model}},[{text:mkSearchPrompt(pr)}],[{google_search:{}}]),45000);
-            if(ares===null)aiEmptyNote='AI 웹검색 지연(45초 초과)';
-            else{list=ares;if(Array.isArray(list)&&!list.length)aiEmptyNote='웹검색에서도 장소를 못 찾았어요 — 스크린샷 첨부가 가장 확실해요'}
-          }
-        }else{
-          window.aiProg=n=>{toast(n+(shots.length?' · 사진 첨부 분석 중...':' · 분석 중...'))};
-          const ares=await withTimeout(askShared(AC,[...shots,{text:mkReelsPrompt(pr)}]),48000);
-          if(ares===null)aiEmptyNote='AI 응답 지연(48초 초과) — 사진 넣고 재시도 권장';
-          else{list=ares;if(Array.isArray(list)&&!list.length)aiEmptyNote='AI가 장소 특정 불가 판정'+(metaFail?' — 인스타 화면의 캡션을 스크린샷으로 저장해 사진으로 찾기(선택)에 넣고 다시 분석하면 확실해요':' — 캡션 복사 후 다시 분석 권장')}
-        }
-      }catch(e){
-        if(useSearch){errNote='AI 웹검색 실패: '+String(e.message).slice(0,80)}
-        else{
-          errNote=/quota|rate|exceeded/i.test(e.message)?'AI 무료 한도 초과 — 캡션에서 직접 추출':'AI 실패: '+String(e.message).slice(0,90);
-          if(/quota/i.test(e.message)&&provs.length===1&&provs[0].id==='gemini')errNote+=' (OpenRouter 키를 설정 탭에 넣으면 자동 대체)';
-        }
-      }finally{window.aiProg=null}
-      if(aiEmptyNote)errNote=(errNote?errNote+' · ':'')+aiEmptyNote;
-    }else{
-      errNote='AI 키 없음 — 캡션에서 직접 추출';
-    }
-    list=(list||[]).filter(c=>c&&c.name);
-    if(metaFail)errNote=(errNote?errNote+' · ':'')+'릴스 캡션을 못 가져왔어요(인스타 익명차단) — 화면을 스크린샷으로 찍어 사진으로 찾기(선택)에 넣고 다시 분석하면 AI가 읽어요';
-    if(!list.length){
-      const parsed=parseCaptionPlaces(caption);
-      if(parsed.length)list=parsed;
-      else{
-        try{const g=await nomi((caption||'').replace(/#[^\s#]+/g,'').trim().slice(0,90));if(g.length)list=g.slice(0,4).map(c=>({name:c.name,address:c.address,lat:c.lat,lng:c.lng,category:'PLACE',info:'공유 텍스트 기반 추정'}))}catch(e){}
-        if(!list||!list.length){
-          const kindKo={instagram:'릴스',youtube:'쇼츠',tiktok:'틱톡'}[sd.kind]||'링크';
-          const tag=errNote?' · '+errNote.slice(0,110):'';
-          list=[{name:'공유 '+kindKo+(user?' · '+user:''),address:'',category:'PLACE',info:'자동 인식 실패(인스타 익명차단·AI 한도 등) — 시트에서 [📋 복사한 캡션/주소 붙여넣기]를 누르면 캡션 글자만으로 여러 장소가 한 번에 저장돼요'+tag,raw:1}]
-        }
-      }
-    }
-    const seen=new Set();
-    list=list.filter(c=>{const k=String(c.name).toLowerCase().replace(/\s+/g,'');if(seen.has(k))return false;seen.add(k);return true}).slice(0,5);
-    res=list.map(c=>{
-      const cc=String(c.category||'').toUpperCase();
-      return {name:c.name,address:c.address||'',info:c.info||'',price:c.price||'',raw:c.raw||0,
-        lat:(typeof c.lat==='number'?c.lat:(c.lat?+c.lat:0))||0,lng:(typeof c.lng==='number'?c.lng:(c.lng?+c.lng:0))||0,
-        cat:CATS[cc]?cc:'PLACE',h:c.h||'',v:0,img:vThumb||(c.raw?'':pic(c.name+' '+(c.address||''))),vid:vmeta};
+    const zip=await JSZip.loadAsync(f);
+    const kmlFile=Object.values(zip.files).find(x=>/\.kml$/i.test(x.name));
+    if(!kmlFile)return toast('KMZ 안에서 KML 파일을 찾지 못했어요');
+    const xmlTxt=await kmlFile.async('string');
+    const dom=new DOMParser().parseFromString(xmlTxt,'text/xml');
+    const pms=[...dom.querySelectorAll('Placemark')];
+    let cnt=0;
+    pms.forEach(pm=>{
+      const nm=pm.querySelector('name')?.textContent?.trim()||'장소';
+      const desc=pm.querySelector('description')?.textContent?.trim()||'';
+      const coordTxt=pm.querySelector('coordinates')?.textContent?.trim()||'';
+      const parts=coordTxt.split(/[\s,]+/).map(Number);
+      const lng=parts[0]||null,lat=parts[1]||null;
+      items.unshift({id:'id_'+Date.now()+'_'+(cnt++),name:nm,address:desc,category:'PLACE',lat,lng,done:false});
     });
-    drawRes();tab('add');
-    toast('공유 영상에서 후보 '+res.length+'건을 찾았어요. 눌러서 저장하세요'+(errNote?' · '+errNote.slice(0,120):''));
-  }catch(e){
-    toast('공유 처리 오류: '+e.message);
-  }finally{
-    shareBusy=false;btn.textContent=old;btn.disabled=false;
+    save();fit();toast(`KMZ에서 ${cnt}개 장소를 가져왔어요!`);
+  }catch(err){toast('KMZ 가져오기 실패: '+err.message);}
+};
+
+// CSV 가져오기 (원래 기능 복원)
+$('importBtn').onclick=()=>$('importFile').click();
+$('importFile').onchange=async e=>{
+  const f=e.target.files?.[0];e.target.value='';if(!f)return;
+  const txt=await f.text();
+  const rows=txt.split(/\r?\n/).map(r=>r.split(',').map(c=>c.replace(/^"|"$/g,'').trim())).filter(r=>r.some(Boolean));
+  if(rows.length<2)return toast('CSV 데이터가 비어 있어요');
+  const hdr=rows[0].map(h=>h.toLowerCase());
+  const iName=hdr.findIndex(h=>/name|title|이름|제목|장소/.test(h));
+  const iAddr=hdr.findIndex(h=>/address|desc|note|주소|설명|메모/.test(h));
+  const iLat=hdr.findIndex(h=>/^lat|위도/.test(h));
+  const iLng=hdr.findIndex(h=>/^lng|^lon|경도/.test(h));
+  let cnt=0;
+  for(let r=1;r<rows.length;r++){
+    const row=rows[r];
+    const nm=row[iName>=0?iName:0];if(!nm)continue;
+    const ad=iAddr>=0?(row[iAddr]||''):'';
+    const lat=iLat>=0?Number(row[iLat])||null:null;
+    const lng=iLng>=0?Number(row[iLng])||null:null;
+    items.unshift({id:'id_'+Date.now()+'_'+(cnt++),name:nm,address:ad,category:'PLACE',lat,lng,done:false});
   }
-}
-$('pasteShare').onclick=async()=>{
-  try{
-    const txt=await navigator.clipboard.readText();
-    if(!txt)throw new Error('empty');
-    $('shareBox').value=txt.slice(0,2500);
-    processShared(txt.slice(0,2500));
-  }catch(e){toast('붙여넣기 권한이 없어요. 입력칸을 길게 눌러 직접 붙여넣어 주세요')}
+  save();autoFixCoords();toast(`CSV에서 ${cnt}개 장소를 가져왔어요!`);
 };
-$('analyzeShare').onclick=()=>processShared($('shareBox').value);
-$('copyShareUrl').onclick=async()=>{
-  const base=location.origin+location.pathname.replace(/[^/]*$/,'')+'?share=';
-  try{await navigator.clipboard.writeText(base);toast('복사했어요 → '+base)}catch(e){$('bk').value=base;$('bk').select();toast('백업칸에 넣었어요. 직접 복사하세요')}
+
+// 백업 / 복원
+$('bkOut').onclick=async()=>{
+  const s=JSON.stringify(items);
+  $('bk').value=s;
+  try{await navigator.clipboard.writeText(s);toast('백업이 클립보드에 복사되었어요');}catch(e){toast('아래 텍스트를 복사하세요');}
 };
-(function(){
+$('bkIn').onclick=()=>{
   try{
-    const p=new URLSearchParams(location.search);
-    const s=[p.get('share'),p.get('text'),p.get('url')].filter(Boolean).join('\n').trim();
-    if(!s)return;
-    try{history.replaceState(null,'',location.pathname)}catch(_){}
-    tab('add');
-    $('shareBox').value=s.slice(0,2500);
-    setTimeout(()=>processShared(s),700);
-  }catch(e){}
+    const arr=JSON.parse($('bk').value.trim());
+    if(Array.isArray(arr)){items=arr;save();fit();toast(`${arr.length}개 항목을 복원했어요`);}
+  }catch(e){toast('유효한 백업 데이터가 아니에요');}
+};
+
+// 당겨서 새로고침 (#ptr, 영상 00:40 동작 복원)
+(function initPullToRefresh(){
+  let startY=0,pulling=false;
+  window.addEventListener('touchstart',e=>{
+    const sc=e.target.closest('.tab-content,.sh');
+    if((sc&&sc.scrollTop>0)||$('sheet').classList.contains('on'))return;
+    startY=e.touches[0].clientY;pulling=true;
+  },{passive:true});
+  window.addEventListener('touchmove',e=>{
+    if(!pulling)return;
+    const dy=e.touches[0].clientY-startY;
+    if(dy>65)$('ptr').classList.add('show');
+    else $('ptr').classList.remove('show');
+  },{passive:true});
+  window.addEventListener('touchend',()=>{
+    if(pulling&&$('ptr').classList.contains('show')){
+      $('ptr').classList.remove('show');
+      location.reload();
+    }
+    pulling=false;
+  },{passive:true});
 })();
-// ===== iOS 제스처 (PWA/사파리 공통) =====
-// 1) 세로 풀다운 = 새로고침 (지도 탭·시트·오버레이에서는 작동 안 함)
-// 2) 화면 왼쪽 가장자리 → 오른쪽 스와이프 = 뒤로가기 (시트 닫기 → 이전 탭)
-// 3) 화면 오른쪽 가장자리 → 왼쪽 스와이프 = 새로고침
-let ptrStartY=0, ptrDy=0, ptrActive=false;
-function overlayBlockGesture(){
-  const ov=$('myMapsOverlay');
-  return ($('sheet').classList.contains('on'))||(ov&&ov.classList.contains('show'));
-}
-document.addEventListener('touchstart',e=>{
-  if(e.touches.length!==1)return;
-  const tc=document.querySelector('.tab-content.active');
-  const top=(tc?tc.scrollTop:0);
-  if(!document.body.classList.contains('show-map')&&(window.scrollY||0)===0&&top<=4){
-    ptrStartY=e.touches[0].clientY;ptrDy=0;ptrActive=true;
-  }else{ptrActive=false}
-}, {passive:true});
-document.addEventListener('touchmove',e=>{
-  if(ptrActive&&e.touches.length===1){
-    ptrDy=e.touches[0].clientY-ptrStartY;
-    if(ptrDy>0){
-      const p=Math.min(ptrDy,90);
-      const el=$('ptr');
-      el.classList.add('show');
-      el.style.transform=`translate(-50%, ${p-90}px)`;
-    }
-  }
-}, {passive:true});
-document.addEventListener('touchend',()=>{
-  if(ptrActive){
-    ptrActive=false;
-    const el=$('ptr');
-    el.classList.remove('show');
-    el.style.transform='translate(-50%,-100%)';
-    if(ptrDy>80){ toast('새로고침...'); setTimeout(()=>location.reload(),250); }
-  }
-});
-// 엣지 스와이프 (뒤로가기 / 새로고침)
-let swX=0,swY=0,swEdge=null,swOK=false,lastNav=0;
-function navBack(){
-  if($('sheet').classList.contains('on')){closeSheet();return}
-  const ov=$('myMapsOverlay');
-  if(ov&&ov.classList.contains('show')){ov.classList.remove('show');$('myMapsFrame').src='';return}
-  if(document.body.classList.contains('show-map')){tab(prevTab||'add');return}
-  const curTab=(document.querySelector('.tab-btn.active')||{}).dataset||{};
-  if(curTab.tab&&curTab.tab!=='add'){tab('add');return}
-  toast('뒤로 갈 화면이 없어요');
-}
-document.addEventListener('touchstart',e=>{
-  if(e.touches.length!==1){swEdge=null;return}
-  const t=e.touches[0];
-  swEdge=t.clientX<40?'l':(t.clientX>innerWidth-40?'r':null);
-  if(swEdge){swX=t.clientX;swY=t.clientY;swOK=true}
-},{passive:true});
-document.addEventListener('touchmove',e=>{
-  if(!swEdge||e.touches.length!==1)return;
-  const t=e.touches[0];
-  const dx=t.clientX-swX,dy=t.clientY-swY;
-  if(Math.abs(dy)>Math.abs(dx))swOK=false; // 세로 동작 우선 (스크롤 방해 금지)
-},{passive:true});
-document.addEventListener('touchend',e=>{
-  if(!swEdge)return;
-  const lt=e.changedTouches[0];
-  if(!lt){swEdge=null;return}
-  const dx=lt.clientX-swX,dy=lt.clientY-swY;
-  if(swOK&&Math.abs(dx)>70&&Math.abs(dy)<60&&Date.now()-lastNav>600){
-    lastNav=Date.now();
-    if(swEdge==='l'&&dx>0)navBack();
-    else if(swEdge==='r'&&dx<0){toast('새로고침...');setTimeout(()=>location.reload(),250)}
-  }
-  swEdge=null;swOK=false;
-});
-// 배경에서 대표 사진 보강 (Bing 썸네일 → Wikipedia/Commons)
-setTimeout(async()=>{
-  let changed=false;
-  for(const it of items){
-    if(it.raw)continue;
-    if(it.img && it.img.includes('tse1.mm.bing.net')){
-      const u=await fetchRepPhoto(it.name+' '+(it.address||''));
-      if(u){ it.img=u; changed=true; }
-      await new Promise(r=>setTimeout(r,300));
-    }
-  }
-  if(changed){ save(); }
-},2000);
-// 릴스 썸네일 추출기 — 코드만 있으면 임베드 HTML의 이미지 DOM·og:image·contextJSON에서 장면 사진을 찾는다.
-// 프록시 3종(allorigins/codetabs/jina)을 동시에 던지고 가장 먼저 성공한 것을 쓴다(Promise.any).
-function extractIGThumbFromHtml(html){
-  if(!html||html.length<80)return '';
-  const doc=new DOMParser().parseFromString(html,'text/html');
-  const imgEl=doc.querySelector('img.EmbeddedMediaImage, .EmbedVideo img, .EmbeddedMedia img');
-  if(imgEl){
-    const s=imgEl.getAttribute('src')||'';
-    if(s&&!/2885-19|s150x150/.test(s))return s.replace(/&amp;/g,'&');
-  }
-  const og=doc.querySelector('meta[property="og:image"]');
-  if(og&&og.getAttribute('content'))return og.getAttribute('content').replace(/&amp;/g,'&');
-  const un=html.replace(/\\"/g,'"').replace(/\\\\\//g,'/').replace(/\\\//g,'/').replace(/\\u0026/g,'&').replace(/&amp;/g,'&');
-  for(const k of ['thumbnail_src','display_url','display_src']){
-    const m=un.match(new RegExp('"'+k+'"\\s*:\\s*"(https://[^"]+)"'));
-    if(m&&m[1]&&!/2885-19|s150x150|p150x150/.test(m[1]))return m[1];
-  }
-  const all=[...un.matchAll(/(https:\/\/scontent[^"'\s)\\]+(?:cdninstagram\.com|fbcdn\.net)[^"'\s)\\]+)/g)].map(m=>m[1]);
-  const good=all.filter(u=>!/2885-19|s150x150|p150x150|s100x100/.test(u));
-  return good[0]||'';
-}
-async function fetchReelThumb(code,fmt){
-  if(!code)return '';
-  const eu=`https://www.instagram.com/${fmt==='post'?'p':'reel'}/${code}/embed/captioned/`;
-  const url=`https://www.instagram.com/${fmt==='post'?'p':'reel'}/${code}/`;
-  const tasks=[
-    (async()=>{
-      const r=await fetchTO(`https://api.allorigins.win/raw?url=${encodeURIComponent(eu)}`,{},5000);
-      if(!r.ok)throw 0;
-      const u=extractIGThumbFromHtml(await r.text());
-      if(!u)throw 0;
-      return u;
-    })(),
-    (async()=>{
-      const r=await fetchTO(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(eu)}`,{},5000);
-      if(!r.ok)throw 0;
-      const u=extractIGThumbFromHtml(await r.text());
-      if(!u)throw 0;
-      return u;
-    })(),
-    (async()=>{
-      const jt=await jinaRead(eu,8000);
-      const u=thumbFromJina(jt);
-      if(!u)throw 0;
-      return u;
-    })(),
-    (async()=>{
-      const jt=await jinaRead(url,8000);
-      const u=thumbFromJina(jt);
-      if(!u)throw 0;
-      return u;
-    })()
-  ];
-  try{return await Promise.any(tasks)}catch(e){return ''}
-}
-// 이미 저장된 항목(예: 규카츠 마코 🎬) 중 릴스 썸네일이 비어 있는 항목을 부팅 직후 자동으로 채운다.
-// 핀 표시 우선순위는 인스타 /p/media/ 실시간 URL(매 요청 새 서명)이고, 이 루프는 그 URL이 막히는 환경을 대비한 보험층.
-async function autoFetchReelThumbs(){
-  let updated=0;
-  for(const it of items){
-    if(it.vid && it.vid.platform==='instagram' && it.vid.code && !it.vid.thumb){
-      const u=await fetchReelThumb(it.vid.code,it.vid.fmt);
-      if(u){
-        it.vid.thumb=u;
-        if(!it.useCustomImg)it.img=u;
-        updated++;
-        save();
-      }
-      await sleep(500);
-    }
-  }
-  if(updated)toast(`🎬 저장된 항목 ${updated}건에 릴스 실제 장면 썸네일을 적용했어요!`);
-}
-setTimeout(autoFetchReelThumbs,600);
-// My Maps (main map bottom-left button) — '임베드'는 범례가 구조적으로 숨겨지므로 viewer(전체 지도+범례)를 새 탭으로 엶
-$('myMapsBtn').onclick=()=>{
-  const saved=(ls.get('TRIP_MYMMaps_EMBED')||ls.get('TRIP_MYMMaps_URL')||'').trim();
-  const m=saved.match(/src=["']([^"']+)["']/);
-  const u=(m?m[1]:saved);
-  const mid=(u.match(/mid=([^&]+)/)||[])[1];
-  if(!mid){
-    toast('설정 탭에서 내 지도 URL을 먼저 저장하세요');
-    const d=document.createElement('a');d.href='https://www.google.com/maps/d/';d.target='_blank';d.rel='noopener noreferrer';document.body.appendChild(d);d.click();d.remove();
+
+// 지도 초기화
+function initMap(){
+  mapProvider=ls.get('TRIP_MAP_PROVIDER')||'osm';
+  $('mapProvider').value=mapProvider;
+  const gkey=(ls.get('TRAVEL_GMAP_KEY')||'').trim();
+  const nkey=(ls.get('TRAVEL_NAVER_KEY')||'').trim();
+  $('gmapkey').value=gkey;
+  $('naverkey').value=nkey;
+  $('mymapsUrl').value=ls.get('TRIP_MYMAPS_URL')||'';
+  $('mymapsEmbed').value=ls.get('TRIP_MYMMaps_EMBED')||'';
+
+  if(mapProvider==='google'&&gkey){
+    window.gm_authFailure=()=>fallbackToOsm('Google Auth Failure');
+    const s=document.createElement('script');
+    s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(gkey)}`;
+    s.async=true;
+    s.onload=()=>{
+      try{
+        gmap=new google.maps.Map($('map'),{center:{lat:34.668,lng:135.501},zoom:12});
+        GPinClass=makeGPinClass();
+        draw();fit();
+      }catch(e){fallbackToOsm(e.message)}
+    };
+    s.onerror=()=>fallbackToOsm('Google Script Error');
+    document.head.appendChild(s);
     return;
   }
-  const a=document.createElement('a');
-  a.href='https://www.google.com/maps/d/viewer?mid='+encodeURIComponent(mid)+'&hl=ko';
-  a.target='_blank';a.rel='noopener noreferrer';
-  document.body.appendChild(a);a.click();a.remove();
-  toast('내 지도(범례 포함)를 열었어요');
-};
-$('myMapsClose').onclick=()=>{ $('myMapsOverlay').classList.remove('show'); $('myMapsFrame').src=''; };
-render();draw();fit();
-autoFixCoords();
+  if(mapProvider==='naver'&&nkey){
+    const s=document.createElement('script');
+    s.src=`https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${encodeURIComponent(nkey)}`;
+    s.async=true;
+    s.onload=()=>{
+      try{
+        nmap=new naver.maps.Map('map',{center:new naver.maps.LatLng(37.5665,126.9780),zoom:11});
+        draw();fit();
+      }catch(e){fallbackToOsm(e.message)}
+    };
+    s.onerror=()=>fallbackToOsm('Naver Script Error');
+    document.head.appendChild(s);
+    return;
+  }
+  fallbackToOsm('default osm');
+}
+
+// 초기 구동
+setTheme(ls.get('TRIP_THEME')||'dark');
+buildAiProvUI();
+render();
+initMap();
+setTimeout(()=>autoFixCoords(),500);
+
+// 단축어(?share=)로 진입 시 자동 분석 실행
+(function checkShareParam(){
+  const p=new URLSearchParams(location.search);
+  const s=p.get('share')||p.get('text')||p.get('url');
+  if(s&&s.trim()){
+    $('shareBox').value=s.trim();
+    history.replaceState({},'',location.pathname);
+    setTimeout(()=>runAnalyzeShare(),350);
+  }
+})();
 </script>
 </body>
 </html>
