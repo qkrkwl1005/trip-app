@@ -492,32 +492,41 @@ async function ask(K,parts,tools){
 }
 async function nomi(q){
   const w=1100-(Date.now()-lastGeo);if(w>0)await sleep(w);lastGeo=Date.now();
-  try{const d=await(await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&accept-language=ko&q='+encodeURIComponent(q))).json();return d.map(x=>({name:x.name||x.display_name.split(',')[0],address:x.display_name,lat:+x.lat,lng:+x.lon}))}catch(e){return[]}
+  const call=async()=>{
+    try{const d=await(await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&accept-language=ko&q='+encodeURIComponent(q))).json();
+      return (d&&d.length!==undefined)?d.map(x=>({name:x.name||x.display_name.split(',')[0],address:x.display_name,lat:+x.lat,lng:+x.lon})):null;
+    }catch(e){return null}
+  };
+  let r=await call();
+  if(r===null){ // 일시 차단(분당 제한)이 잦아 한 번 재시도
+    await sleep(2500);lastGeo=Date.now();r=await call();
+  }
+  return r||[];
 }
 const km=(a,b,c,d)=>{const r=Math.PI/180,x=Math.sin((c-a)*r/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin((d-b)*r/2)**2;return 12742*Math.asin(Math.sqrt(x))};
 async function locate(o,h){
   const ai=(typeof o.lat==='number'&&typeof o.lng==='number'&&o.lat&&o.lng)?{lat:o.lat,lng:o.lng}:null;
-  const hq=CITY_Q[h]||h||'';
   const nm=String(o.name||'').trim();
+  let hq=CITY_Q[h]||hintFrom(o);
+  if(!hq&&h)hq=h;
   const qs=[];
-  if(o.address&&String(o.address).trim())qs.push(String(o.address).trim());
+  const ad=String(o.address||'').trim();
+  if(ad)qs.push(ad);
+  const jc=jpCore(ad);
+  if(jc&&jc!==ad)qs.push(jc);
   if(nm){
-    if(h&&hq)qs.push((h+' '+nm).trim());
-    if(hq)qs.push((nm+', '+hq).trim());
-    // 토큰 폴백: 상호(店 접미 제거) 토큰 단위 재시도 — 몰/랜드마크 명이 OSM에 있는 경우 대응
-    // (마지막 토큰이 'なんばウォーク店' 같은 POI인 경우가 많아 뒤 토큰 우선)
-    if(hq){
-      const toks=nm.replace(/[(),]/g,' ').split(/\s+/).map(t=>t.replace(/(店|食堂|カフェ|ダイニング|バル)$/,'')).filter(t=>t.length>=3).reverse();
-      const seen=new Set();
-      for(const t of toks){if(seen.has(t))continue;seen.add(t);qs.push((t+', '+hq).trim())}
-    }
+    if(h)qs.push((h+' '+nm).trim());
+    if(hq&&hq!==h)qs.push((nm+', '+hq).trim());
+    // 토큰 폴백: 상호(店 접미 제거) 토큰 단위 재시도 — 몰/랜드마크 명인 경우 통과, 힌트 없으면 단독 쿼리
+    const toks=nm.replace(/[(),]/g,' ').split(/\s+/).map(t=>t.replace(/(店|食堂|カフェ|ダイニング|バル)$/,'')).filter(t=>t.length>=3).reverse();
+    const seen=new Set();
+    for(const t of toks){if(seen.has(t))continue;seen.add(t);qs.push(hq?(t+', '+hq).trim():t)}
   }
   let g=null;
-  for(const q of qs.slice(0,6)){
-    if(q&&!g){
-      g=await ggeocode(q.trim());
-      if(!g){const r=await nomi(q.trim());if(r&&r[0])g={lat:r[0].lat,lng:r[0].lng,address:r[0].address||''}}
-    }
+  for(const q of qs.slice(0,7)){
+    if(!q||g)continue;
+    g=await ggeocode(q.trim());
+    if(!g){const r=await nomi(q.trim());if(r&&r[0])g={lat:r[0].lat,lng:r[0].lng,address:r[0].address||''}}
   }
   if(g&&ai&&km(g.lat,g.lng,ai.lat,ai.lng)>50)g=null;
   return g?{lat:g.lat,lng:g.lng}:ai;
@@ -539,12 +548,27 @@ async function geoCheck(o){
 }
 // 좌표가 아예 없을 때 채우기: 주소 → 이름
 async function geoFill(o){
-  for(const q of [String(o&&o.address||'').trim(),String(o&&o.name||'').trim(),(CITY_Q[o&&o.h]&&o.name?(o.name+', '+CITY_Q[o.h]):'').trim()]){
-    if(!q)continue;
-    let g=await ggeocode(q);
-    if(!g){const r=await nomi(q);if(r&&r[0])g={lat:r[0].lat,lng:r[0].lng,address:r[0].address||''}}
-    if(g&&isFinite(g.lat)&&isFinite(g.lng))return g;
+  const nm=String(o&&o.name||'').trim();
+  const hq=CITY_Q[o&&o.h]||hintFrom(o);
+  const qs=[];
+  const ad=String(o&&o.address||'').trim();
+  if(ad)qs.push(ad);
+  const jc=jpCore(ad);
+  if(jc&&jc!==ad)qs.push(jc);
+  qs.push(nm);
+  if(nm){
+    if(hq)qs.push((nm+', '+hq).trim());
+    const toks=nm.replace(/[(),]/g,' ').split(/\s+/).map(t=>t.replace(/(店|食堂|カフェ|ダイニング|バル)$/,'')).filter(t=>t.length>=3).reverse();
+    const seen=new Set();
+    for(const t of toks){if(seen.has(t))continue;seen.add(t);qs.push(hq?(t+', '+hq).trim():t)}
   }
+  let g=null;
+  for(const q of qs.slice(0,7)){
+    if(!q||g)continue;
+    g=await ggeocode(q.trim());
+    if(!g){const r=await nomi(q.trim());if(r&&r[0])g={lat:r[0].lat,lng:r[0].lng,address:r[0].address||''}}
+  }
+  if(g&&isFinite(g.lat)&&isFinite(g.lng))return g;
   return null;
 }
 // 구글 지오코더가 늦게 로드되므로 짧게 대기
@@ -1009,6 +1033,27 @@ async function askShared(key,parts){
 const CITY_EN={osaka:'오사카',kyoto:'교토',tokyo:'도쿄',nagoya:'나고야',sapporo:'삿포로',fukuoka:'후쿠오카',okinawa:'오키나와',kobe:'고베',hiroshima:'히로시마',kanazawa:'가나자와',seoul:'서울',busan:'부산',daegu:'대구',jeju:'제주',gangneung:'강릉',jeonju:'전주',bangkok:'방콕',singapore:'싱가포르',rome:'로마',milan:'밀라노',london:'런던',paris:'파리',berlin:'베를린'};
 // 지역 힌트의 지오코딩용 쿼리형 (한글 힌트 뒤에 현지어 이름 붙으면 Nominatim이 못 읽어서 영문형 별도 사용)
 const CITY_Q={'오사카':'Osaka, Japan','교토':'Kyoto, Japan','도쿄':'Tokyo, Japan','나고야':'Nagoya, Japan','삿포로':'Sapporo, Japan','후쿠오카':'Fukuoka, Japan','오키나와':'Okinawa, Japan','고베':'Kobe, Japan','히로시마':'Hiroshima, Japan','가나자와':'Kanazawa, Japan','방콕':'Bangkok, Thailand','싱가포르':'Singapore','로마':'Rome, Italy','밀라노':'Milan, Italy','파리':'Paris, France','런던':'London, UK','베를린':'Berlin, Germany','제주':'Jeju, South Korea','서울':'Seoul, South Korea','부산':'Busan, South Korea'};
+// 주소/이름에 일본 한자 도시명이 있으면 지오코딩용 영문 힌트로 변환 (AI 후보는 h 힌트가 비어 도시 인식 실패 → 이 헬퍼가 보완)
+const CITY_JP_Q={大阪:'Osaka, Japan',京都:'Kyoto, Japan',東京:'Tokyo, Japan',名古屋:'Nagoya, Japan',札幌:'Sapporo, Japan',福岡:'Fukuoka, Japan',神戸:'Kobe, Japan',横浜:'Yokohama, Japan',奈良:'Nara, Japan',和歌山:'Wakayama, Japan',仙台:'Sendai, Japan',広島:'Hiroshima, Japan',那覇:'Naha, Japan',金沢:'Kanazawa, Japan'};
+function hintFrom(o){
+  const s=(String((o&&o.address)||'')+' '+String((o&&o.name)||'')).trim();
+  if(!s)return '';
+  for(const k in CITY_JP_Q)if(s.indexOf(k)>=0)return CITY_JP_Q[k];
+  const lm=s.match(new RegExp('\\b('+Object.keys(CITY_EN).join('|')+')\\b','i'));
+  if(lm){const ko=CITY_EN[lm[1].toLowerCase()];if(CITY_Q[ko])return CITY_Q[ko]}
+  for(const k of ['서울','부산','대구','인천','제주','강릉','전주','여수'])if(s.indexOf(k)>=0)return k;
+  return '';
+}
+// 일본 주소에서 '市+区+지번블록' 코어만 추출 (전체 주소는 지오코더 실패, 블록 코어는 OSM 히트)
+function jpCore(a){
+  a=String(a||'').replace(/〒\d{3}-?\d{0,4}/g,' ').trim();
+  if(!/[一-龥]/.test(a))return '';
+  const m=a.match(/([一-龥]{2,5}市[一-龥]{1,6}(?:区|區)[一-龥]{2,8})/);
+  if(m)return m[1];
+  const w=a.match(/([一-龥]{2,8}(?:町|区|區)[一-龥]{2,8})/);
+  if(w)return w[1];
+  return '';
+}
 function parseCaptionPlaces(cap){
   if(!cap)return [];
   const txt=String(cap);
