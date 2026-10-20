@@ -92,6 +92,7 @@ input[type=text],input[type=password],textarea{font-size:16px}
         <button class="btn" id="analyzeShare" style="flex:1">🔥 분석하기</button>
       </div>
       <small style="display:block;margin-top:6px;color:var(--sub);font-size:11px">인스타 공유 → TripSync 선택이면 자동 열림 (설정 탭에 단축어 방법 있음)</small>
+      <small style="display:block;margin-top:6px;color:var(--sub);font-size:11px">💡 인스타가 캡션을 못 찾으면 → 릴스 화면을 <b>스크린샷</b>으로 찍어 <b>사진으로 찾기(선택)</b>에 넣고 다시 분석하면 AI가 사진 속 캡션 글자를 직접 읽어요</small>
     </div>
     <div class="card">
       <div class="seg" id="seg"><div data-cat="PLACE" class="on">📍 장소/식당</div><div data-cat="FOOD">🍙 편의점/음식</div><div data-cat="SHOP">🛍️ 구매 물건</div></div>
@@ -110,7 +111,7 @@ input[type=text],input[type=password],textarea{font-size:16px}
     <label>AI 제공자 키 (선택 — 여러 개 가능, 위부터 순서대로 시도하고 실패하면 자동으로 다음 제공자)</label>
     <div id="aiProv"></div>
     <small style="display:block;margin-top:6px;color:var(--sub);font-size:11px">시도 순서: <span id="aiChain">-</span></small>
-    <div style="display:flex;gap:6px"><button id="aiSaveAll" class="mb">💾 지금 화면의 키 저장</button><button id="aiClearAll" class="mb">🧹 모두 지우기</button></div>
+    <div style="display:flex;gap:6px"><button id="aiSaveAll" class="mb">💾 지금 화면의 키 저장</button><button id="aiClearAll" class="mb">🧹 모두 지우기</button><button id="diagBtn" class="mb">🔍 환경 진단</button></div>
     <small style="display:block;margin-top:6px;color:var(--sub);font-size:11px">OpenRouter 키는 무료 모델도 사용 가능 — 모델칸을 비우면 무료 라우터(openrouter/free)를 씁니다. Gemini는 무료 쿼터(분당 횟수 제한)라 순서는 Gemini → OpenRouter로 돌아요.</small>
     <label style="margin-top:14px">지도 제공자</label>
     <select id="mapProvider" class="btn g" style="margin-bottom:10px">
@@ -439,25 +440,36 @@ function toClaudeMessages(parts){
   }
   return {role:'user',content};
 }
+// AI 요청에 기한을 강제(무한로딩 방지) — 초과 시 즉시 중단하고 다음 제공자로 넘어감
+function fetchTO(url,opts,ms){
+  const c=new AbortController();const t=setTimeout(()=>{try{c.abort()}catch(_){}},ms||15000);
+  return fetch(url,{...opts,signal:c.signal}).finally(()=>clearTimeout(t));
+}
 async function callProvider(p,parts,tools){
+  if(window.aiProg)window.aiProg(aiProviderName(p.id));
   if(p.id==='gemini'){
     const models=p.model?[p.model]:MODELS;
     let last='';
+    // 제공자당 총예산제(모델 N개여도 예산 소진 시 즉시 포기)
+    const budget=(tools&&tools[0]&&tools[0].google_search)?32000:16000;
+    const gstart=Date.now();
     for(const m of models){
+      const left=budget-(Date.now()-gstart);
+      if(left<4000)break;
       try{
         const tls=tools||[{google_search:{}}];
-        const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':p.key},body:JSON.stringify({contents:[{parts}],tools:tls})});
+        const r=await fetchTO(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':p.key},body:JSON.stringify({contents:[{parts}],tools:tls})},left);
         const d=await r.json();
         if(!r.ok)throw new Error((d.error&&d.error.message)||('HTTP '+r.status));
         const t=((d.candidates&&d.candidates[0]&&d.candidates[0].content&&d.candidates[0].content.parts)||[]).map(x=>x.text||'').join('');
         if(!t)throw new Error('빈 응답');
         return t;
-      }catch(e){last=e.message}
+      }catch(e){last=(e&&e.name==='AbortError')?'응답 지연(시간초과)':e.message}
     }
     throw new Error('Gemini: '+last);
   }
   if(p.id==='anthropic'){
-    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':p.key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:p.model||'claude-sonnet-4-5',max_tokens:1600,messages:[toClaudeMessages(parts)]})});
+    const r=await fetchTO('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':p.key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:p.model||'claude-sonnet-4-5',max_tokens:1600,messages:[toClaudeMessages(parts)]})},16000);
     const d=await r.json();
     if(!r.ok)throw new Error((d.error&&d.error.message)||('HTTP '+r.status));
     return (d.content||[]).map(c=>c.text||'').join('');
@@ -467,7 +479,7 @@ async function callProvider(p,parts,tools){
   if(!base)throw new Error('Base URL이 필요해요');
   const hdr={'Content-Type':'application/json','Authorization':'Bearer '+p.key};
   const body={model:p.model||({openrouter:'openrouter/free'})[p.id]||'gpt-4o-mini',messages:toOpenAIMessages(parts)};
-  const r=await fetch(base+'/chat/completions',{method:'POST',headers:hdr,body:JSON.stringify(body)});
+  const r=await fetchTO(base+'/chat/completions',{method:'POST',headers:hdr,body:JSON.stringify(body)},16000);
   const d=await r.json();
   if(!r.ok)throw new Error((d.error&&d.error.message)||('HTTP '+r.status));
   return ((d.choices&&d.choices[0]&&d.choices[0].message&&d.choices[0].message.content)||'')+'';
@@ -644,7 +656,8 @@ async function find(){
     if(hasAI){
       try{
         const imgs=(await Promise.all(pend.map(f=>shrink(f)))).map(u=>({inlineData:{mimeType:'image/jpeg',data:u.split(',')[1]}}));
-        list=await ask(A,[...imgs,{text:mkPrompt(h,q)}]);
+        list=await withTimeout(ask(A,[...imgs,{text:mkPrompt(h,q)}]),45000);
+        if(list===null)note='AI 응답이 45초를 넘었어요 — 다시 시도하거나 검색어로 찾아보세요';
       }catch(e){note='AI 검색 실패: '+e.message}
     }else if(pend.length)note='사진 인식은 설정 탭에서 AI 키가 필요해요';
     if((!list||!list.length)&&cat==='PLACE'&&q){list=await nomi((h+' '+q).trim());if(!list.length&&h)list=await nomi(q)}
@@ -782,6 +795,71 @@ $('aiClearAll').onclick=()=>{
   ls.set('TRIP_AI_KEYS','{}');ls.set('TRAVEL_GEMINI_KEY','');
   renderAI();toast('모든 AI 키를 지웠어요');
 };
+// 환경 진단: 폰에서하는 모든 외부 연결(AI·지오코딩·Places·인스타)을 실제로 때려보고 결과를 텍스트로 복사
+let diagBusy=false;
+async function runDiag(){
+  if(diagBusy)return;diagBusy=true;
+  const L=[],add=(k,v)=>L.push(k+'='+v);
+  const KB=s=>s?s.slice(0,4)+'…'+s.slice(-3):'(없음)';
+  toast('진단 시작 (약 20초)...');
+  try{
+    const K=aiKeys();const provs=aiList(K);
+    add('sw_cache',(navigator.serviceWorker&&navigator.serviceWorker.controller)?navigator.serviceWorker.controller.scriptURL.split('/').pop():'none');
+    add('mapProvider',ls.get('TRIP_MAP_PROVIDER')||'(기본:osm)');
+    add('gmap_key',KB(ls.get('TRAVEL_GMAP_KEY')));
+    add('date',new Date().toISOString().slice(0,16));
+    add('ua',(navigator.userAgent||'').replace(/.*Version\/([\d.]+).*/,'iOS-Safari/$1')||navigator.userAgent);
+    add('itemCount',items.length);
+    const ai0=provs.map(p=>p.id+(p.key?':'+KB(p.key):':키없음')+(p.model?'@'+p.model:'')).join(',')||'none';
+    add('ai_providers',ai0);
+    for(const p of provs){
+      const pnm=aiProviderName(p.id);
+      if(p.id==='gemini'){
+        try{
+          const mdl=p.model||MODELS[0];
+          const r=await fetchTO('https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(mdl)+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':p.key},body:JSON.stringify({contents:[{parts:[{text:'PING — 숫자 1만 출력'}]}]})},16000);
+          const d=await r.json();
+          const parts=(d.candidates&&d.candidates[0]&&d.candidates[0].content&&d.candidates[0].content.parts)||[];
+          const hasText=r.ok&&parts.some(x=>x.text);
+          const reason=r.ok?(hasText?'OK':'빈응답'):''+(((d.error||{}).status)||r.status)+':'+String(((d.error||{}).message)||'').slice(0,70);
+          add('test_gemini',mdl+' → '+reason);
+        }catch(e){add('test_gemini','통신실패 '+String(e.message||e).slice(0,50))}
+      }else if(p.id==='openrouter'){
+        try{
+          const mdl=p.model||'openrouter/free';
+          const r=await fetchTO('https://openrouter.ai/api/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+p.key},body:JSON.stringify({model:mdl,messages:[{role:'user',content:'PING — 숫자 1만 출력'}],max_tokens:8})},16000);
+          const d=await r.json();
+          const txt=r.ok&&d.choices&&d.choices[0]&&d.choices[0].message&&d.choices[0].message.content;
+          add('test_openrouter',mdl+' → '+(r.ok?(txt?'OK('+String(txt).slice(0,12)+')':'빈응답'):'실패 '+r.status+':'+String(((d.error||{}).message)||'').slice(0,70)));
+        }catch(e){add('test_openrouter','통신실패 '+String(e.message||e).slice(0,50))}
+      }
+    }
+    if(!provs.length)add('test_ai','키 미설정 — 분석은 캡션 파서로만 작동');
+    // 지오코딩 (주소→좌표의 핵심)
+    try{
+      const t0=Date.now();
+      const n=await nomi('26 Sagatenryuji Setogawacho, Ukyo Ward, Kyoto, 616-8376');
+      add('test_nominatim',n&&n[0]?'OK @'+n[0].lat.toFixed(3)+' ('+(Date.now()-t0)+'ms)':'실패/빈결과 ('+(Date.now()-t0)+'ms)');
+    }catch(e){add('test_nominatim','통신실패 '+String(e.message||e).slice(0,40))}
+    // Places 상호검색 (폰의 실제 키로)
+    if(ls.get('TRAVEL_GMAP_KEY')){
+      window._gkey=ls.get('TRAVEL_GMAP_KEY');
+      _noPlaces=false;
+      const gp=await gPlaces('규카츠 마요 신사이바시 오사카');
+      add('test_places',gp?'OK @'+gp.lat.toFixed(3)+','+gp.lng.toFixed(3):(_noPlaces?'미개설/거부(403·400) — Google Cloud 콘솔에서 "Places API (New)" 활성화 필요':'빈결과'));
+    }else add('test_places','Google키 없음 — 스킵');
+    // 인스타 익명 차단 상태 확인
+    try{
+      const r=await fetchTO('https://r.jina.ai/https://www.instagram.com/reel/DcYWVOlypa0f/',{headers:{'Accept':'text/plain'}},9000);
+      add('test_ig_crawl',r.ok?'jina OK (드믈 확보)':'jina '+r.status+' (익명차단 — 캡션 붙여넣기/스크린샷 필요)');
+    }catch(e){add('test_ig_crawl','통신실패 '+String(e.message||e).slice(0,40))}
+    const out='TripSync 진단 '+L.length+'항목\n'+L.join('\n');
+    $('bk').value=out;
+    try{await navigator.clipboard.writeText(out);toast('진단 완료 — 결과가 클립보드에 복사됐어요 → 채팅에 붙여넣기')}catch(e){toast('진단 완료 — 상단 백업칸의 결과를 직접 복사하세요')}
+  }catch(e){toast('진단 오류: '+e.message)}
+  diagBusy=false;
+}
+$('diagBtn').onclick=runDiag;
 $('savegmap').onclick=()=>{const v=$('gmapkey').value.trim(); ls.set('TRAVEL_GMAP_KEY',v);toast(v?'Google 키가 저장되었습니다.':'Google 키가 비워졌어요.')};
 $('savenaver').onclick=()=>{const v=$('naverkey').value.trim(); if(!v){toast('Naver 키를 입력하세요');return;} ls.set('TRAVEL_NAVER_KEY',v);toast('Naver 키가 저장되었습니다.')};
 $('mapProvider').onchange=()=>{ls.set('TRIP_MAP_PROVIDER',$('mapProvider').value);toast('지도 제공자가 변경되었습니다. 페이지를 새로고침하세요.')};
@@ -972,7 +1050,7 @@ function parseShare(raw){
 }
 function mkReelsPrompt(d){
   return `아래는 SNS 영상(인스타 릴스/유튜브 쇼츠/틱톡)을 공유한 내용입니다.
-영상이 소개하는 실제 장소(식당·카페·숙소·명소·관광지) 또는 구매 상품 후보를 구글 검색으로 확인해 가능성 높은 순서로 최대 4개 찾고, JSON 배열만 출력하세요. 장소를 특정할 수 없는 영상이면 []만 출력하세요.
+${d.screen?'중요: 첨부된 사진은 영상 화면의 스크린샷입니다. 이미지 속 글자(캡션·주소·가게명·영업시간·해시태그)를 그대로 읽어 그 텍스트를 기준으로 장소를 찾으세요. 링크/공유 텍스트보다 이미지 글자가 우선입니다.\n':''}영상이 소개하는 실제 장소(식당·카페·숙소·명소·관광지) 또는 구매 상품 후보를 가능성 높은 순서로 최대 4개 찾고, JSON 배열만 출력하세요. 장소를 특정할 수 없는 영상이면 []만 출력하세요.
 중요: 영상이 여러 장소를 소개하면(예: 오사카 카페 명소 5선) 각각을 개별 후보로 분리하고, 각자 정확한 현지어 주소(지방/도시/구까지)를 적으세요.
 좌표(lat/lng)는 확신할 때만 넣고 불확실하면 null로 남기세요. 주소가 정확한 것이 좌표보다 우선입니다.
 형식: {"name":"한국어 또는 현지어 장소명","address":"현지어 주소 또는 빈 문자열","lat":숫자 또는 null,"lng":숫자 또는 null,"category":"PLACE(장소/명소)·FOOD(식당/음식)·SHOP(쇼핑/상품) 중 하나","price":"가격(통화 기호 포함, 없으면 '')","info":"한 줄 정보(영업시간·특징 등)"}
@@ -1046,9 +1124,13 @@ async function ytMeta(code){
     return {author:d.author_name||'',title:d.title||''};
   }catch(e){return null}
 }
-async function askShared(key,parts){
-  try{return await ask(key,parts,[{google_search:{}},{url_context:{}}])}
-  catch(e){return await ask(key,parts)}
+async function askShared(K,parts){
+  let e1=null;
+  try{return await ask(K,parts)}catch(e){e1=e}
+  // 1차 실패 시에만 구글 검색 도구로 Gemini 재시도 (검색 결합은 응답이 느려 1차에서는 끔)
+  const g=aiList(K).find(p=>p.id==='gemini');
+  if(!g)throw e1;
+  return await ask({gemini:{key:g.key,model:g.model}},parts,[{google_search:{}}]);
 }
 // AI 없이 캡션에서 장소 후보를 직접 추출 (주소가 맨 앞에 오는 구조도 지원: 영문 도시 힌트 + ✨불릿 이름 + ¥메뉴 정보)
 const CITY_EN={osaka:'오사카',kyoto:'교토',tokyo:'도쿄',nagoya:'나고야',sapporo:'삿포로',fukuoka:'후쿠오카',okinawa:'오키나와',kobe:'고베',hiroshima:'히로시마',kanazawa:'가나자와',seoul:'서울',busan:'부산',daegu:'대구',jeju:'제주',gangneung:'강릉',jeonju:'전주',bangkok:'방콕',singapore:'싱가포르',rome:'로마',milan:'밀라노',london:'런던',paris:'파리',berlin:'베를린'};
@@ -1174,7 +1256,7 @@ async function processShared(raw){
     let user='',caption=sd.clean,vThumb='',metaFail=false;
     if((sd.kind==='instagram'||sd.kind==='tiktok')&&sd.url){
       toast((sd.kind==='tiktok'?'틱톡':'릴스')+' 정보 불러오는 중...');
-      const meta=await withTimeout(fetchIGMeta(sd.url),15000);
+      const meta=await withTimeout(fetchIGMeta(sd.url),9000);
       if(meta){
         let u2='',c2='',t2='';
         if(meta.text){const m=metaFromJina(meta.text);if(m){u2=m.user;c2=m.caption||''}t2=thumbFromJina(meta.text)||''}
@@ -1190,25 +1272,34 @@ async function processShared(raw){
       vThumb='https://i.ytimg.com/vi/'+sd.code+'/hqdefault.jpg';
     }
     const vmeta=(sd.kind!=='text'&&sd.code)?{platform:sd.kind,code:sd.code,fmt:sd.fmt||'',thumb:vThumb}:null;
-    toast('AI가 영상 속 장소를 찾는 중...');
     let list=null,errNote='';
     const AC=aiKeys();
     const provs=aiList(AC);
     if(provs.length){
+      // 선택된 사진(스크린샷)이 있으면 AI에게 같이 첨부 — 비전으로 캡션 화면의 글자를 직접 읽음(인스타 차단 우회)
+      let shots=[];
+      if(pend.length){
+        toast('선택한 사진 파일 변환 중...');
+        try{shots=(await Promise.all(pend.map(f=>shrink(f)))).map(u=>({inlineData:{mimeType:'image/jpeg',data:u.split(',')[1]}}))}catch(e){}
+      }
+      const pr={kind:sd.kind,user,caption,url:sd.url};
+      if(shots.length)pr.screen=1;
       let aiEmptyNote='';
       try{
-        list=await askShared(AC,[{text:mkReelsPrompt({kind:sd.kind,user,caption,url:sd.url})}]);
-        if(Array.isArray(list)&&!list.length)aiEmptyNote='AI가 이 영상은 장소 특정 불가 판정 — 캡션 복사 후 다시 분석 권장';
+        window.aiProg=n=>{toast(n+(shots.length?' · 사진 첨부 분석 중...':' · 분석 중...'))};
+        const ares=await withTimeout(askShared(AC,[...shots,{text:mkReelsPrompt(pr)}]),48000);
+        if(ares===null)aiEmptyNote='AI 응답 지연(48초 초과) — 사진 넣고 재시도 권장';
+        else{list=ares;if(Array.isArray(list)&&!list.length)aiEmptyNote='AI가 장소 특정 불가 판정'+(metaFail?' — 인스타 화면의 캡션을 스크린샷으로 저장해 사진으로 찾기(선택)에 넣고 다시 분석하면 확실해요':' — 캡션 복사 후 다시 분석 권장')}
       }catch(e){
         errNote=/quota|rate|exceeded/i.test(e.message)?'AI 무료 한도 초과 — 캡션에서 직접 추출':'AI 실패: '+String(e.message).slice(0,90);
         if(/quota/i.test(e.message)&&provs.length===1&&provs[0].id==='gemini')errNote+=' (OpenRouter 키를 설정 탭에 넣으면 자동 대체)';
-      }
+      }finally{window.aiProg=null}
       if(aiEmptyNote)errNote=(errNote?errNote+' · ':'')+aiEmptyNote;
     }else{
       errNote='AI 키 없음 — 캡션에서 직접 추출';
     }
     list=(list||[]).filter(c=>c&&c.name);
-    if(metaFail)errNote=(errNote?errNote+' · ':'')+'릴스 캡션을 못 가져왔어요(인스타 익명차단) — 시트의 영상 아래 캡션을 꾹 눌러 복사해 입력칸에 같이 붙여넣고 다시 분석하세요';
+    if(metaFail)errNote=(errNote?errNote+' · ':'')+'릴스 캡션을 못 가져왔어요(인스타 익명차단) — 화면을 스크린샷으로 찍어 사진으로 찾기(선택)에 넣고 다시 분석하면 AI가 읽어요';
     if(!list.length){
       const parsed=parseCaptionPlaces(caption);
       if(parsed.length)list=parsed;
