@@ -52,7 +52,7 @@ input:focus,textarea:focus{border-color:var(--pr)}textarea{min-height:76px;resiz
 #myMapsOverlay iframe{flex:1;border:0}
 #myMapsClose{position:absolute;top:12px;right:12px;padding:8px 14px;border:0;border-radius:10px;background:var(--s);color:var(--tx);font-weight:700;cursor:pointer;z-index:201}
 .pin{width:20px;height:20px;border-radius:50%;border:3px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.5);background:var(--PLACE)}.pin.FOOD{background:var(--FOOD)}.pin.SHOP{background:var(--SHOP)}
-.pinCard{width:46px;height:58px;border-radius:10px;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.5);overflow:hidden;background:var(--s2);position:relative}
+.pinCard{width:52px;height:66px;border-radius:10px;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.5);overflow:hidden;background:var(--s2);position:relative}
 .pinCard img{width:100%;height:100%;object-fit:cover;display:block}
 .pinCard b{position:absolute;right:2px;bottom:2px;background:rgba(0,0,0,.65);border-radius:6px;font-size:10px;padding:1px 4px;pointer-events:none}
 .lnk{color:#2563eb;font-weight:700;cursor:pointer}
@@ -177,7 +177,7 @@ const SUF=['',' photo',' review',' menu',' exterior'];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const pic=(q,v=0)=>'https://tse1.mm.bing.net/th?w=480&h=360&c=7&rs=1&p=0&q='+encodeURIComponent(String(q||'').trim()+SUF[v%5]);
-let items=[],cat='PLACE',pend=[],res=[],lm=null,tl=null,layer=null,pins={},lastGeo=0,tt,cur=null,view='photo',tileIndex=1,tileFails=0,gmap=null,gmarkers=[],glocMarker=null,nmap=null,nmarkers=[],nlocMarker=null,mapProvider='osm',editMode={},selected=new Set();
+let items=[],cat='PLACE',pend=[],res=[],lm=null,tl=null,layer=null,pins={},lastGeo=0,tt,cur=null,view='photo',tileIndex=1,tileFails=0,gmap=null,gmarkers=[],glocMarker=null,nmap=null,nmarkers=[],nlocMarker=null,mapProvider='osm',editMode={},selected=new Set(),prevTab='add';
 try{items=JSON.parse(ls.get('TRIP_MASTER_ITEMS')||'[]')}catch(e){items=[]}
 let photoCache={};try{photoCache=JSON.parse(ls.get('TRIP_PHOTO_CACHE')||'{}')}catch(e){photoCache={}}
 function savePhotoCache(){ls.set('TRIP_PHOTO_CACHE',JSON.stringify(photoCache))}
@@ -250,6 +250,8 @@ async function fetchRepPhoto(q){
 
 function tab(k){
   if(k==='map'&&innerWidth>820)return;
+  const act=(document.querySelector('.tab-btn.active')||{}).dataset||{};
+  if(k!=='map'&&act.tab&&act.tab!==k)prevTab=act.tab;
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===k));
   document.querySelectorAll('.tab-content').forEach(c=>c.classList.toggle('active',c.id==='tab-'+k));
   document.body.classList.toggle('show-map',k==='map');
@@ -278,7 +280,7 @@ function draw(){
     gmarkers.forEach(m=>m.setMap(null));gmarkers=[];
     items.filter(i=>i.lat&&i.lng).forEach(i=>{
       const m=new google.maps.Marker({position:{lat:i.lat,lng:i.lng},map:gmap,title:i.name});
-      m.addListener('click',()=>{emb=false;cur=i.id;showSheet()});
+      m.addListener('click',()=>{cur=i.id;view=i.vid?'video':'photo';showSheet()});
       gmarkers.push(m);
     });
     return;
@@ -287,17 +289,19 @@ function draw(){
     nmarkers.forEach(m=>m.setMap(null));nmarkers=[];
     items.filter(i=>i.lat&&i.lng).forEach(i=>{
       const m=new naver.maps.Marker({position:new naver.maps.LatLng(i.lat,i.lng),map:nmap,title:i.name});
-      naver.maps.Event.addListener(m,'click',()=>{emb=false;cur=i.id;showSheet()});
+      naver.maps.Event.addListener(m,'click',()=>{cur=i.id;view=i.vid?'video':'photo';showSheet()});
       nmarkers.push(m);
     });
     return;
   }
   if(!lm||!layer)return;layer.clearLayers();pins={};
   items.filter(i=>i.lat&&i.lng).forEach(i=>{
-    const thumb=(i.vid&&i.vid.thumb)||(i.img||'');
+    const thumb=(i.vid&&i.vid.thumb)||i.img||'';
     const pinHtml=thumb?`<div class="pinCard"><img loading="lazy" referrerpolicy="no-referrer" src="${esc(thumb)}" onerror="this.onerror=null;this.remove()"><b>${i.vid?'🎬':translateCAT(i.category)}</b></div>`:`<div class="pin ${i.category}"></div>`;
-    pins[i.id]=L.marker([i.lat,i.lng],{icon:L.divIcon({className:'',html:pinHtml,iconSize:thumb?[46,58]:[20,20],iconAnchor:thumb?[23,58]:[10,10]})})
-      .bindPopup(`<b>${esc(i.name)}</b>${i.vid?' 🎬':''}<br>${esc(i.address||'')}<br>${i.vid?`<span class="lnk" data-act="vopen" data-id="${i.id}">🎬 영상 보기 ›</span><br>`:''}<span class="lnk" data-act="open" data-id="${i.id}">사진·상세 보기 ›</span>`).addTo(layer);
+    const m=L.marker([i.lat,i.lng],{icon:L.divIcon({className:'',html:pinHtml,iconSize:thumb?[52,66]:[20,20],iconAnchor:thumb?[26,66]:[10,10]})});
+    if(i.vid){m.on('click',()=>{cur=i.id;view='video';showSheet()});}
+    else{m.bindPopup(`<b>${esc(i.name)}</b><br>${esc(i.address||'')}<br><span class="lnk" data-act="open" data-id="${i.id}">사진·상세 보기 ›</span>`);}
+    m.addTo(layer);pins[i.id]=m;
   });
 }
 function translateCAT(c){return c==='FOOD'?'food':c==='SHOP'?'shop':'place'}
@@ -441,7 +445,7 @@ document.addEventListener('click',e=>{
   else if(a==='view'){view=b.dataset.view;toast('지도: '+view);showSheet()}
   else if(a==='own'){$('own').click()}
   else if(a==='emb'){view=view==='photo'?'google':'photo';toast('지도: '+view);showSheet()}
-  else if(a==='pin'&&i){closeSheet();tab('map');setTimeout(()=>{if(lm){lm.setView([i.lat,i.lng],16);pins[i.id]&&pins[i.id].openPopup()}},200)}
+  else if(a==='pin'&&i){closeSheet();tab('map');setTimeout(()=>{if(lm){lm.setView([i.lat,i.lng],16);if(!i.vid&&pins[i.id]&&pins[i.id].openPopup)pins[i.id].openPopup()}},200)}
   else if(a==='share'&&i){if(navigator.share){navigator.share({title:i.name,text:i.address||'',url:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(i.name+' '+(i.address||''))}`}).catch(()=>{})}else toast('공유를 지원하지 않는 브라우저예요')}
   else if(a==='del'&&i){if(b.dataset.sure){items=items.filter(x=>x.id!==i.id);closeSheet();save()}else{b.dataset.sure=1;b.textContent='한 번 더 누르면 삭제'}}
   else if(a==='toggleEdit'){const c=b.dataset.cat; editMode[c]=!editMode[c]; if(!editMode[c]) selected.clear(); render()}
@@ -788,28 +792,77 @@ $('copyShareUrl').onclick=async()=>{
     setTimeout(()=>processShared(s),700);
   }catch(e){}
 })();
-// Pull-to-refresh (iOS PWA)
+// ===== iOS 제스처 (PWA/사파리 공통) =====
+// 1) 세로 풀다운 = 새로고침 (지도 탭·시트·오버레이에서는 작동 안 함)
+// 2) 화면 왼쪽 가장자리 → 오른쪽 스와이프 = 뒤로가기 (시트 닫기 → 이전 탭)
+// 3) 화면 오른쪽 가장자리 → 왼쪽 스와이프 = 새로고침
 let ptrStartY=0, ptrDy=0, ptrActive=false;
+function overlayBlockGesture(){
+  const ov=$('myMapsOverlay');
+  return ($('sheet').classList.contains('on'))||(ov&&ov.classList.contains('show'));
+}
 document.addEventListener('touchstart',e=>{
-  if(window.scrollY===0 && e.touches.length===1){ ptrStartY=e.touches[0].clientY; ptrDy=0; ptrActive=true; }
+  if(e.touches.length!==1)return;
+  const tc=document.querySelector('.tab-content.active');
+  const top=(tc?tc.scrollTop:0);
+  if(!document.body.classList.contains('show-map')&&(window.scrollY||0)===0&&top<=4){
+    ptrStartY=e.touches[0].clientY;ptrDy=0;ptrActive=true;
+  }else{ptrActive=false}
 }, {passive:true});
 document.addEventListener('touchmove',e=>{
-  if(!ptrActive) return;
-  ptrDy=e.touches[0].clientY-ptrStartY;
-  if(ptrDy>0){
-    const p=Math.min(ptrDy,90);
-    const el=$('ptr');
-    el.classList.add('show');
-    el.style.transform=`translate(-50%, ${p-90}px)`;
+  if(ptrActive&&e.touches.length===1){
+    ptrDy=e.touches[0].clientY-ptrStartY;
+    if(ptrDy>0){
+      const p=Math.min(ptrDy,90);
+      const el=$('ptr');
+      el.classList.add('show');
+      el.style.transform=`translate(-50%, ${p-90}px)`;
+    }
   }
 }, {passive:true});
 document.addEventListener('touchend',()=>{
-  if(!ptrActive) return;
-  ptrActive=false;
-  const el=$('ptr');
-  el.classList.remove('show');
-  el.style.transform='translate(-50%,-100%)';
-  if(ptrDy>80){ location.reload(); }
+  if(ptrActive){
+    ptrActive=false;
+    const el=$('ptr');
+    el.classList.remove('show');
+    el.style.transform='translate(-50%,-100%)';
+    if(ptrDy>80){ toast('새로고침...'); setTimeout(()=>location.reload(),250); }
+  }
+});
+// 엣지 스와이프 (뒤로가기 / 새로고침)
+let swX=0,swY=0,swEdge=null,swOK=false,lastNav=0;
+function navBack(){
+  if($('sheet').classList.contains('on')){closeSheet();return}
+  const ov=$('myMapsOverlay');
+  if(ov&&ov.classList.contains('show')){ov.classList.remove('show');$('myMapsFrame').src='';return}
+  if(document.body.classList.contains('show-map')){tab(prevTab||'add');return}
+  const curTab=(document.querySelector('.tab-btn.active')||{}).dataset||{};
+  if(curTab.tab&&curTab.tab!=='add'){tab('add');return}
+  toast('뒤로 갈 화면이 없어요');
+}
+document.addEventListener('touchstart',e=>{
+  if(e.touches.length!==1){swEdge=null;return}
+  const t=e.touches[0];
+  swEdge=t.clientX<40?'l':(t.clientX>innerWidth-40?'r':null);
+  if(swEdge){swX=t.clientX;swY=t.clientY;swOK=true}
+},{passive:true});
+document.addEventListener('touchmove',e=>{
+  if(!swEdge||e.touches.length!==1)return;
+  const t=e.touches[0];
+  const dx=t.clientX-swX,dy=t.clientY-swY;
+  if(Math.abs(dy)>Math.abs(dx))swOK=false; // 세로 동작 우선 (스크롤 방해 금지)
+},{passive:true});
+document.addEventListener('touchend',e=>{
+  if(!swEdge)return;
+  const lt=e.changedTouches[0];
+  if(!lt){swEdge=null;return}
+  const dx=lt.clientX-swX,dy=lt.clientY-swY;
+  if(swOK&&Math.abs(dx)>70&&Math.abs(dy)<60&&Date.now()-lastNav>600){
+    lastNav=Date.now();
+    if(swEdge==='l'&&dx>0)navBack();
+    else if(swEdge==='r'&&dx<0){toast('새로고침...');setTimeout(()=>location.reload(),250)}
+  }
+  swEdge=null;swOK=false;
 });
 // 배경에서 대표 사진 보강 (Bing 썸네일 → Wikipedia/Commons)
 setTimeout(async()=>{
@@ -835,12 +888,22 @@ setTimeout(async()=>{
     }
   }
 },4000);
-// My Maps overlay (main map bottom-left button)
+// My Maps (main map bottom-left button) — '임베드'는 범례가 구조적으로 숨겨지므로 viewer(전체 지도+범례)를 새 탭으로 엶
 $('myMapsBtn').onclick=()=>{
-  const url=(ls.get('TRIP_MYMMaps_EMBED')||'').trim();
-  if(!url){ toast('설정 탭에서 Google My Maps 임베드 URL을 먼저 저장하세요'); return; }
-  $('myMapsFrame').src=url;
-  $('myMapsOverlay').classList.add('show');
+  const saved=(ls.get('TRIP_MYMMaps_EMBED')||ls.get('TRIP_MYMMaps_URL')||'').trim();
+  const m=saved.match(/src=["']([^"']+)["']/);
+  const u=(m?m[1]:saved);
+  const mid=(u.match(/mid=([^&]+)/)||[])[1];
+  if(!mid){
+    toast('설정 탭에서 내 지도 URL을 먼저 저장하세요');
+    const d=document.createElement('a');d.href='https://www.google.com/maps/d/';d.target='_blank';d.rel='noopener noreferrer';document.body.appendChild(d);d.click();d.remove();
+    return;
+  }
+  const a=document.createElement('a');
+  a.href='https://www.google.com/maps/d/viewer?mid='+encodeURIComponent(mid)+'&hl=ko';
+  a.target='_blank';a.rel='noopener noreferrer';
+  document.body.appendChild(a);a.click();a.remove();
+  toast('내 지도(범례 포함)를 열었어요');
 };
 $('myMapsClose').onclick=()=>{ $('myMapsOverlay').classList.remove('show'); $('myMapsFrame').src=''; };
 render();draw();fit();
