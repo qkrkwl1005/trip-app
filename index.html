@@ -257,7 +257,7 @@ function tab(k){
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===k));
   document.querySelectorAll('.tab-content').forEach(c=>c.classList.toggle('active',c.id==='tab-'+k));
   document.body.classList.toggle('show-map',k==='map');
-  if(k==='map')setTimeout(()=>{if(gmap){google.maps.event.trigger(gmap,'resize');fit()}else if(nmap){naver.maps.Event.trigger(nmap,'resize');fit()}else if(lm){lm.invalidateSize();fit()}const cnt=items.filter(i=>i.lat&&i.lng).length;if(!cnt&&items.length){toast('저장한 장소의 위치를 자동으로 찾고 있어요...');backfillCoords().then(ok=>{if(!ok)toast('위치를 못 찾았어요. 찾기 탭에서 검색 후 저장하면 좌표가 붙어요')})}else if(!cnt&&!items.length)toast('아직 저장한 장소가 없어요. 찾기 탭에서 저장하세요')},80);
+  if(k==='map')setTimeout(()=>{if(gmap){google.maps.event.trigger(gmap,'resize');fit()}else if(nmap){naver.maps.Event.trigger(nmap,'resize');fit()}else if(lm){lm.invalidateSize();fit()}const cnt=items.filter(i=>i.lat&&i.lng).length;if(!cnt&&items.length){toast('저장한 장소의 위치를 자동으로 찾고 있어요...');autoFixCoords().then(ok=>{if(!ok)toast('위치를 못 찾았어요. 찾기 탭에서 검색 후 저장하면 좌표가 붙어요')})}else if(!cnt&&!items.length)toast('아직 저장한 장소가 없어요. 찾기 탭에서 저장하세요')},80);
 }
 
 function fit(){
@@ -382,7 +382,7 @@ function showSheet(){
   const vLink=vUrl?`<a class="mb" target="_blank" rel="noopener" href="${esc(vUrl)}">원본 ↗</a>`:'';
   $('sbody').innerHTML=media
   +`<div class="nm" style="font-size:19px">${esc(i.name)}${v?' 🎬':''}</div><div class="ds" style="-webkit-line-clamp:4">${esc(i.address||'')}</div>${i.price?`<div class="ds" style="color:var(--FOOD);font-weight:700;font-size:16px">${esc(i.price)}</div>`:''}${i.info?`<div class="ds in">${esc(i.info)}</div>`:''}
-  <div class="act">${vButs}<button class="mb${!vEmbed?' pr':''}" data-act="photo">📷 사진</button><button class="mb" data-act="rot">↻ 사진바꾸기</button><button class="mb" data-act="emb">🗺️ 지도</button><button class="mb" data-act="own">📷 내 사진</button>${i.lat?'<button class="mb" data-act="pin">📍 지도 탭</button>':''}<button class="mb" data-act="share">↗ 공유</button>${vLink}</div>
+  <div class="act">${vButs}<button class="mb${!vEmbed?' pr':''}" data-act="photo">📷 사진</button><button class="mb" data-act="rot">↻ 사진바꾸기</button><button class="mb" data-act="emb">🗺️ 지도</button><button class="mb" data-act="own">📷 내 사진</button>${i.lat?'<button class="mb" data-act="pin">📍 지도 탭</button>':''}<button class="mb" data-act="refix">📍 위치 다시 찾기</button><button class="mb" data-act="share">↗ 공유</button>${vLink}</div>
   <textarea id="memo" placeholder="메모 (가격, 영업시간, 같이 갈 사람...)">${esc(i.note||'')}</textarea>
   <div class="act"><a class="mb pr" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${q}">구글지도 ↗</a><a class="mb" target="_blank" rel="noopener" href="https://www.google.com/search?q=${encodeURIComponent(i.name)}">검색 ↗</a><button class="mb dg" data-act="del">삭제</button><button class="mb" data-act="close" style="margin-left:auto">닫기</button></div>`;
   $('sheet').classList.add('on');
@@ -424,38 +424,79 @@ async function nomi(q){
 }
 const km=(a,b,c,d)=>{const r=Math.PI/180,x=Math.sin((c-a)*r/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin((d-b)*r/2)**2;return 12742*Math.asin(Math.sqrt(x))};
 async function locate(o,h){
-  const ai=typeof o.lat==='number'&&typeof o.lng==='number'?{lat:o.lat,lng:o.lng}:null;
+  const ai=(typeof o.lat==='number'&&typeof o.lng==='number'&&o.lat&&o.lng)?{lat:o.lat,lng:o.lng}:null;
   let g=null;
-  for(const q of [o.address,(h+' '+o.name).trim()]){if(q&&q.trim()&&!g){const r=await nomi(q.trim());if(r[0])g=r[0]}}
+  for(const q of [o.address,(h+' '+o.name).trim()]){
+    if(q&&q.trim()&&!g){
+      g=await ggeocode(q.trim());
+      if(!g){const r=await nomi(q.trim());if(r&&r[0])g={lat:r[0].lat,lng:r[0].lng,address:r[0].address||''}}
+    }
+  }
   if(g&&ai&&km(g.lat,g.lng,ai.lat,ai.lng)>50)g=null;
   return g?{lat:g.lat,lng:g.lng}:ai;
 }
-// 기존 저장 항목 중 좌표가 없는 것들 자동 보강 (구버전 저장분/좌표 실패분 복구)
-let bbTried=new Set();
+// 구글 지오코더 (API 키 있을 때 최우선, 실패 시 Nominatim 대기)
 function ggeocode(addr){
   return new Promise(res=>{
     if(!window.google||!google.maps||!google.maps.Geocoder)return res(null);
     try{new google.maps.Geocoder().geocode({address:addr},(rs,st)=>{if(st==='OK'&&rs&&rs[0]){res({lat:rs[0].geometry.location.lat(),lng:rs[0].geometry.location.lng(),address:rs[0].formatted_address||''})}else res(null)})}catch(e){res(null)}
   });
 }
-async function backfillCoords(){
-  const miss=items.filter(i=>!(i.lat&&i.lng)&&!bbTried.has(i.id));
-  if(!miss.length)return 0;
-  miss.forEach(i=>bbTried.add(i.id));
-  let ok=0;
-  for(const i of miss){
-    try{
-      let g=null;
-      for(const q of [String(i.address||'').trim(),String(i.name||'').trim(),(String(i.address||'').trim()+' 대한민국')]){
-        if(!q||g)continue;
-        g=await ggeocode(q);
-        if(!g){const r=await nomi(q);if(r&&r[0]&&r[0].lat&&r[0].lng)g=r[0]}
-      }
-      if(g&&g.lat&&g.lng){i.lat=g.lat;i.lng=g.lng;if(!i.address&&g.address)i.address=g.address;ok++}
-    }catch(e){}
+// 주소 기준 검증 전용 — 이름으로는 뒤집지 않는다(동명이 엉뚱 곳 매칭 방지)
+async function geoCheck(o){
+  const q=String(o&&o.address||'').trim();
+  if(q.length<4)return null;
+  let g=await ggeocode(q);
+  if(!g){const r=await nomi(q);if(r&&r[0])g={lat:r[0].lat,lng:r[0].lng,address:r[0].address||''}}
+  return (g&&isFinite(g.lat)&&isFinite(g.lng))?g:null;
+}
+// 좌표가 아예 없을 때 채우기: 주소 → 이름
+async function geoFill(o){
+  for(const q of [String(o&&o.address||'').trim(),String(o&&o.name||'').trim()]){
+    if(!q)continue;
+    let g=await ggeocode(q);
+    if(!g){const r=await nomi(q);if(r&&r[0])g={lat:r[0].lat,lng:r[0].lng,address:r[0].address||''}}
+    if(g&&isFinite(g.lat)&&isFinite(g.lng))return g;
   }
-  if(ok){toast('좌표 '+ok+'개를 자동으로 잡았어요');save();fit()}
-  return ok;
+  return null;
+}
+// 구글 지오코더가 늦게 로드되므로 짧게 대기
+async function waitGoogle(ms){
+  if(mapProvider!=='google'||!(_gkey))return false;
+  const t0=Date.now();
+  while(!(window.google&&google.maps&&google.maps.Geocoder)){
+    if(Date.now()-t0>ms)return false;
+    await sleep(300);
+  }
+  return true;
+}
+// 저장 항목 좌표 총괄 정리: (1) 잘못된 좌표 교정 (2) 좌표 없는 항목 보강
+// AI가 준 좌표는 자주 틀리므로(vfy 미검증 상태) 주소 역검증해서 30km 이상 어긋나면 강제 교정
+async function autoFixCoords(){
+  await waitGoogle(4000);
+  let corrected=0,filled=0,n=0;
+  for(const i of items){
+    if(n>=30)break;
+    if(i.vfy===1)continue;
+    n++;
+    i.tryN=(i.tryN||0)+1;
+    if(isFinite(i.lat)&&isFinite(i.lng)&&i.lat&&i.lng){
+      const g=await geoCheck(i);
+      if(g){
+        if(km(i.lat,i.lng,g.lat,g.lng)>30){i.lat=g.lat;i.lng=g.lng;if(!i.address&&g.address)i.address=g.address;corrected++}
+        i.vfy=1;
+      }else if(i.tryN>=3){i.vfy=1} // 3번 시도에도 주소 미매칭이면 포기
+    }else{
+      const g=await geoFill(i);
+      if(g){i.lat=g.lat;i.lng=g.lng;if(!i.address&&g.address)i.address=g.address;i.vfy=1;filled++}
+      else if(i.tryN>=3){i.vfy=1}
+    }
+  }
+  if(corrected||filled){
+    save();fit();
+    toast(((corrected?'틀린 위치 '+corrected+'건 바로잡음':'')+(corrected&&filled?' · ':'')+(filled?'위치 없음 '+filled+'건 보강':''))||'위치 정리 완료');
+  }
+  return corrected+filled;
 }
 
 async function find(){
@@ -487,10 +528,19 @@ function drawRes(){$('rs').innerHTML=res.length?`<div class="ds" style="margin:2
 async function pick(k){
   const c=res[k];if(!c||c.saved)return;
   c.saved=1;drawRes();
-  let p=c.lat&&c.lng?{lat:c.lat,lng:c.lng}:null;
-  if(c.cat==='PLACE'&&!p){toast('위치 확인 중...');p=await locate(c,c.h)}
+  let p=null;
+  const ai=(typeof c.lat==='number'&&c.lat&&c.lng)?{lat:c.lat,lng:c.lng}:null;
+  if(ai){
+    try{
+      const g=await geoCheck({address:c.address||'',name:c.name});
+      if(g&&km(ai.lat,ai.lng,g.lat,g.lng)>30){p={lat:g.lat,lng:g.lng};toast('AI 좌표가 부정확해 주소 기준으로 교정했어요')}
+      else p=ai;
+    }catch(e){p=ai}
+  }else{
+    toast('위치 확인 중...');p=await locate(c,c.h);
+  }
   const id='i'+Date.now()+Math.random().toString(36).slice(2,5);
-  items.unshift({id,category:c.cat,name:c.name,address:c.address||'',info:c.info||'',price:c.price||'',lat:p?p.lat:0,lng:p?p.lng:0,img:c.img||pic(c.name+' '+c.h,c.v),q:c.name+' '+c.h,v:c.v||0,done:false,vid:c.vid||null});
+  items.unshift({id,category:c.cat,name:c.name,address:c.address||'',info:c.info||'',price:c.price||'',lat:p&&p.lat?p.lat:0,lng:p&&p.lng?p.lng:0,img:c.img||pic(c.name+' '+c.h,c.v),q:c.name+' '+c.h,v:c.v||0,done:false,vid:c.vid||null,vfy:(p&&p.lat)?1:0});
   save();fit();toast('저장했어요 · '+CATS[c.cat].n+' 탭에서 볼 수 있어요');
   fetchRepPhoto(c.name+' '+(c.address||c.h||'')).then(u=>{if(u){const it=items.find(x=>x.id===id);if(it){it.img=u;save();}}});
 }
@@ -511,6 +561,7 @@ document.addEventListener('click',e=>{
   else if(a==='own'){$('own').click()}
   else if(a==='emb'){view=view==='photo'?'google':'photo';toast('지도: '+view);showSheet()}
   else if(a==='pin'&&i){closeSheet();tab('map');setTimeout(()=>{if(gmap){gmap.setCenter({lat:i.lat,lng:i.lng});gmap.setZoom(16)}else if(nmap){const np=new naver.maps.LatLng(i.lat,i.lng);nmap.setCenter(np);nmap.setZoom(16)}else if(lm){lm.setView([i.lat,i.lng],16);if(!i.vid&&pins[i.id]&&pins[i.id].openPopup)pins[i.id].openPopup()}},200)}
+  else if(a==='refix'&&i){i.lat=0;i.lng=0;i.vfy=0;i.tryN=0;save();toast('위치를 다시 찾는 중...');autoFixCoords().then(ok=>{if(ok){view='photo';showSheet();tab('map');setTimeout(()=>{if(gmap){gmap.setCenter({lat:i.lat,lng:i.lng});gmap.setZoom(16)}else if(nmap){const np=new naver.maps.LatLng(i.lat,i.lng);nmap.setCenter(np);nmap.setZoom(16)}else if(lm)lm.setView([i.lat,i.lng],16)},400)}else{toast('위치를 못 찾았어요. 주소를 고친 뒤 다시 눌러주세요');showSheet()}})}
   else if(a==='share'&&i){if(navigator.share){navigator.share({title:i.name,text:i.address||'',url:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(i.name+' '+(i.address||''))}`}).catch(()=>{})}else toast('공유를 지원하지 않는 브라우저예요')}
   else if(a==='del'&&i){if(b.dataset.sure){items=items.filter(x=>x.id!==i.id);closeSheet();save()}else{b.dataset.sure=1;b.textContent='한 번 더 누르면 삭제'}}
   else if(a==='toggleEdit'){const c=b.dataset.cat; editMode[c]=!editMode[c]; if(!editMode[c]) selected.clear(); render()}
@@ -725,6 +776,8 @@ function parseShare(raw){
 function mkReelsPrompt(d){
   return `아래는 SNS 영상(인스타 릴스/유튜브 쇼츠/틱톡)을 공유한 내용입니다.
 영상이 소개하는 실제 장소(식당·카페·숙소·명소·관광지) 또는 구매 상품 후보를 구글 검색으로 확인해 가능성 높은 순서로 최대 4개 찾고, JSON 배열만 출력하세요. 장소를 특정할 수 없는 영상이면 []만 출력하세요.
+중요: 영상이 여러 장소를 소개하면(예: 오사카 카페 명소 5선) 각각을 개별 후보로 분리하고, 각자 정확한 현지어 주소(지방/도시/구까지)를 적으세요.
+좌표(lat/lng)는 확신할 때만 넣고 불확실하면 null로 남기세요. 주소가 정확한 것이 좌표보다 우선입니다.
 형식: {"name":"한국어 또는 현지어 장소명","address":"현지어 주소 또는 빈 문자열","lat":숫자 또는 null,"lng":숫자 또는 null,"category":"PLACE(장소/명소)·FOOD(식당/음식)·SHOP(쇼핑/상품) 중 하나","price":"가격(통화 기호 포함, 없으면 '')","info":"한 줄 정보(영업시간·특징 등)"}
 플랫폼: ${d.kind}${d.code?` (코드 ${d.code})`:''}
 계정: ${d.user||'모름'}
@@ -971,7 +1024,7 @@ $('myMapsBtn').onclick=()=>{
 };
 $('myMapsClose').onclick=()=>{ $('myMapsOverlay').classList.remove('show'); $('myMapsFrame').src=''; };
 render();draw();fit();
-backfillCoords();
+autoFixCoords();
 </script>
 </body>
 </html>
