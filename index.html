@@ -828,7 +828,6 @@ addEventListener('resize',()=>lm&&lm.invalidateSize());
 setTheme(ls.get('TRIP_THEME')||'dark');
 // API 키는 형식 검증 없이 그대로 사용 (Google AI Studio 키 등 다양한 형식 지원)
 renderAI();
-</script>
 $('gmapkey').value=ls.get('TRAVEL_GMAP_KEY')||'';
 $('naverkey').value=ls.get('TRAVEL_NAVER_KEY')||'';
 $('mymapsUrl').value=ls.get('TRIP_MYMMaps_URL')||'';
