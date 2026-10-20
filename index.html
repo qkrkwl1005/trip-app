@@ -9,6 +9,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%231e3a8a'/%3E%3Cpath d='M256 96 L416 224 L256 208 L96 224 Z' fill='white'/%3E%3Cpath d='M256 208 L256 384 L224 416 L288 416 L256 384' fill='white'/%3E%3Cpath d='M256 208 L320 320 L288 320 L256 288 L224 320 L192 320 Z' fill='white'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%232563eb'/%3E%3Cstop offset='100%25' stop-color='%237c3aed'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='128' height='128' rx='28' fill='url(%23g)'/%3E%3Cpolygon points='64,24 96,96 64,76 32,96' fill='white'/%3E%3C/svg%3E">
 <title>TripSync Master</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
@@ -78,6 +79,16 @@ input[type=text],input[type=password],textarea{font-size:16px}
 
   <section id="tab-add" class="tab-content active">
     <div class="card">
+      <label style="margin-bottom:3px">🔗 릴스·쇼츠 공유로 찾기</label>
+      <div class="ds">인스타 릴스 / 유튜브 쇼츠를 복사하거나 공유하면 영상 속 장소를 AI가 찾아 저장할 수 있어요</div>
+      <input type="text" id="shareBox" enterkeyhint="search" placeholder="공유 링크 또는 캡션을 붙여넣으세요" style="margin-top:8px">
+      <div style="display:flex;gap:8px">
+        <button class="btn g" id="pasteShare" style="flex:1;margin-bottom:0">📋 붙여넣기</button>
+        <button class="btn" id="analyzeShare" style="flex:1">🔥 분석하기</button>
+      </div>
+      <small style="display:block;margin-top:6px;color:var(--sub);font-size:11px">인스타 공유 → TripSync 선택이면 자동 열림 (설정 탭에 단축어 방법 있음)</small>
+    </div>
+    <div class="card">
       <div class="seg" id="seg"><div data-cat="PLACE" class="on">📍 장소/식당</div><div data-cat="FOOD">🍙 편의점/음식</div><div data-cat="SHOP">🛍️ 구매 물건</div></div>
       <label>지역 힌트 (선택)</label>
       <input type="text" id="hint" placeholder="예: 일본 오사카 / 강릉 / 시드니">
@@ -115,6 +126,20 @@ input[type=text],input[type=password],textarea{font-size:16px}
     <label style="margin-top:14px">Google My Maps 임베드 URL (선택)</label>
     <input type="text" id="mymapsEmbed" placeholder="https://www.google.com/maps/d/u/0/embed?mid=...">
     <button id="saveMyMapsEmbed" class="btn g">임베드 URL 저장</button>
+    <label style="margin-top:14px">📱 공유 연결 (릴스/쇼츠 → 앱)</label>
+    <button id="copyShareUrl" class="btn g">🔗 단축어용 주소 복사</button>
+    <details style="margin:2px 0 10px"><summary style="cursor:pointer;font-size:12px;color:var(--sub)">iPhone 단축어 만드는 방법 (약 2분)</summary>
+      <div class="ds" style="margin-top:6px;line-height:1.6">
+        1. 단축어 앱 → +로 새 단축어<br>
+        2. ⓘ(정보) → "시트에서 받기" 켜기 → 텍스트·URL 허용<br>
+        3. 작업 추가: "텍스트" → 위에서 복사한 주소 붙여넣기<br>
+        4. 그 줄 끝에서 변수 삽입 → "받은 입력"(시트 입력) 연결<br>
+        5. 작업 추가: "URL 열기" → 입력을 앞의 텍스트 결과로 지정<br>
+        6. 이름 "TripSync 저장"으로 저장<br><br>
+        이후 인스타/유튜브에서 공유 → TripSync 저장 선택하면 앱이 열려 장소를 바로 찾아요.<br>
+        <b style="color:var(--pr)">Android</b>: 단축어 불필요 — Chrome에서 앱 설치하면 공유시트에 TripSync가 바로 나와요.
+      </div>
+    </details>
     <label style="margin-top:14px">KMZ 내보내기 (Google Earth/Maps)</label>
     <button id="exportKmzBtn" class="btn g">📤 KMZ 파일 다운로드</button>
     <label style="margin-top:14px">KMZ 가져오기 (Google My Maps)</label>
@@ -320,11 +345,12 @@ ${cat==='PLACE'?'주소와 위도·경도를 꼭 찾으세요.':'제품명, 대�
 지역: ${h||'없음'}
 입력: ${q||'(사진만)'}`;
 
-async function ask(key,parts){
+async function ask(key,parts,tools){
   let err=new Error('AI 호출 실패');
+  const tls=tools||[{google_search:{}}];
   for(const m of MODELS){
     try{
-      const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{parts}],tools:[{google_search:{}}]})});
+      const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{parts}],tools:tls})});
       const d=await r.json();
       if(!r.ok)throw new Error((d.error&&d.error.message)||('HTTP '+r.status));
       const t=((d.candidates&&d.candidates[0]&&d.candidates[0].content&&d.candidates[0].content.parts)||[]).map(p=>p.text||'').join(''),a=t.indexOf('['),b=t.lastIndexOf(']');
@@ -431,7 +457,6 @@ $('bkOut').onclick=()=>{const t=JSON.stringify(items);$('bk').value=t;$('bk').se
 $('bkIn').onclick=()=>{try{const d=JSON.parse($('bk').value);if(!Array.isArray(d))throw 0;items=d;save();fit();toast(d.length+'개 항목을 복원했어요')}catch(e){toast('백업 내용이 올바르지 않아요')}};
 $('saveMyMaps').onclick=()=>{let v=$('mymapsUrl').value.trim(); const m=v.match(/src=["']([^"']+)["']/); if(m) v=m[1]; ls.set('TRIP_MYMMaps_URL',v); $('mymapsUrl').value=v; const midMatch=v.match(/mid=([^&]+)/); if(midMatch){const embedUrl='https://www.google.com/maps/d/u/0/embed?mid='+midMatch[1]+'&ehbc=2E312F'; ls.set('TRIP_MYMMaps_EMBED',embedUrl); $('mymapsEmbed').value=embedUrl; toast('내 지도 URL + 임베드 URL이 자동 저장되었어요');} else toast(v?'내 지도 URL이 저장되었어요':'URL이 비워졌어요');};
 $('saveMyMapsEmbed').onclick=()=>{let v=$('mymapsEmbed').value.trim(); const m=v.match(/src=["']([^"']+)["']/); if(m) v=m[1]; ls.set('TRIP_MYMMaps_EMBED',v); $('mymapsEmbed').value=v; toast(v?'임베드 URL이 저장되었어요':'URL이 비워졌어요');};
-$('saveMyMapsEmbed').onclick=()=>{const v=$('mymapsEmbed').value.trim(); ls.set('TRIP_MYMMaps_EMBED',v); toast(v?'임베드 URL이 저장되었어요':'URL이 비워졌어요');};
 $('openMyMapsBtn').onclick=()=>{
   let url=(ls.get('TRIP_MYMMaps_URL')||'').trim();
   const m=url.match(/src=["']([^"']+)["']/); if(m) url=m[1];
@@ -582,7 +607,6 @@ if(mapProvider==='google' && _gkey){
   s.async=true;s.defer=true;
   s.onload=()=>{ setTimeout(()=>{ try{ if(!window.google||!google.maps) throw new Error('google.maps 없음'); gmap=new google.maps.Map($('map'),{center:{lat:36.5,lng:128},zoom:6}); gLoaded=true; draw(); fit(); console.log('Google Map initialized'); }catch(e){ console.error('Google init error:',e); fallbackToOsm() } },100); };
   s.onerror=(e)=>{ console.error('Google script error:',e); fallbackToOsm() };
-  s.onerror=()=>{ fallbackToOsm() };
   const gTimer=setTimeout(()=>{ if(!gLoaded) fallbackToOsm() },8000);
   document.head.appendChild(s);
 } else if(mapProvider==='naver' && _nkey){
@@ -597,6 +621,131 @@ if(mapProvider==='google' && _gkey){
   layer=L.featureGroup().addTo(lm);
   rebuildTiles();
 } else $('mapmsg').style.display='block';
+// ===== 릴스/쇼츠 공유 → 장소 찾기 =====
+function withTimeout(p,ms){return Promise.race([p,new Promise(r=>setTimeout(()=>r(null),ms))])}
+function parseShare(raw){
+  const t=String(raw||'').trim();
+  const urls=(t.match(/https?:\/\/[^\s"'<>]+/g)||[]).map(u=>u.replace(/[).,;]+$/,''));
+  let clean=t;urls.forEach(u=>{clean=clean.split(u).join(' ')});
+  clean=clean.replace(/Instagram에서[^\s]*님[^:]*:\s*/g,'').replace(/Instagram from .*?:\s*/gi,'').replace(/^.*?님이 공유함:\s*/,'').replace(/^"?\s*동영상 보기\s*:?\s*/i,'').replace(/\s*동영상 보기:?\s*$/i,'').replace(/\s*Instagram\s*$/i,'').trim();
+  let kind='text',code='';const u=urls[0]||'';
+  if(/instagram\.com\//i.test(u)){kind='instagram';const m=u.match(/\/(?:reel|reels|p|tv)\/([A-Za-z0-9_-]+)/);if(m)code=m[1];}
+  else if(/youtube\.com|youtu\.be/i.test(u)){kind='youtube';const m=u.match(/shorts\/([A-Za-z0-9_-]+)/)||u.match(/[?&]v=([A-Za-z0-9_-]+)/)||u.match(/youtu\.be\/([A-Za-z0-9_-]+)/);if(m)code=m[1];}
+  else if(/tiktok\.com/i.test(u)){kind='tiktok'}
+  return {raw:t,url:u,kind,code,clean:clean.replace(/\s+/g,' ').trim().slice(0,500)};
+}
+function mkReelsPrompt(d){
+  return `아래는 SNS 영상(인스타 릴스/유튜브 쇼츠/틱톡)을 공유한 내용입니다.
+영상이 소개하는 실제 장소(식당·카페·숙소·명소·관광지) 또는 구매 상품 후보를 구글 검색으로 확인해 가능성 높은 순서로 최대 4개 찾고, JSON 배열만 출력하세요. 장소를 특정할 수 없는 영상이면 []만 출력하세요.
+형식: {"name":"한국어 또는 현지어 장소명","address":"현지어 주소 또는 빈 문자열","lat":숫자 또는 null,"lng":숫자 또는 null,"category":"PLACE(장소/명소)·FOOD(식당/음식)·SHOP(쇼핑/상품) 중 하나","price":"가격(통화 기호 포함, 없으면 '')","info":"한 줄 정보(영업시간·특징 등)"}
+플랫폼: ${d.kind}${d.code?` (코드 ${d.code})`:''}
+계정: ${d.user||'모름'}
+링크: ${d.url||'없음'}
+공유 텍스트: ${d.caption||'(텍스트 없음 — 링크 정보로 최대한 찾아보세요)'}`;
+}
+async function jinaRead(url){
+  try{const r=await fetch('https://r.jina.ai/'+url,{headers:{'Accept':'text/plain'}});if(!r.ok)return '';return await r.text();}catch(e){return ''}
+}
+function metaFromJina(txt){
+  if(!txt)return null;
+  const line=((txt.match(/^Title:\s*(.+)$/m)||[])[1]||'');
+  if(!line)return null;
+  const s=line.trim().replace(/^["“]|["”]$/g,'');
+  const m=s.match(/^(.*?)on Instagram\s*:\s*(.*)$/);
+  if(m)return {user:m[1].trim(),caption:(m[2]||'').replace(/^[""]|[""]$/g,'').trim()};
+  return {user:'',caption:s};
+}
+async function ytMeta(code){
+  try{
+    const r=await fetch('https://www.youtube.com/oembed?url='+encodeURIComponent('https://www.youtube.com/watch?v='+code)+'&format=json');
+    if(!r.ok)return null;
+    const d=await r.json();
+    return {author:d.author_name||'',title:d.title||''};
+  }catch(e){return null}
+}
+async function askShared(key,parts){
+  try{return await ask(key,parts,[{google_search:{}},{url_context:{}}])}
+  catch(e){return await ask(key,parts)}
+}
+let shareBusy=false;
+async function processShared(raw){
+  raw=String(raw||'').trim();
+  if(shareBusy)return;
+  if(!raw){toast('공유 링크나 캡션을 먼저 넣어주세요');return}
+  shareBusy=true;
+  const btn=$('analyzeShare'),old=btn.textContent;
+  btn.textContent='⏳ 분석 중...';btn.disabled=true;
+  try{
+    const sd=parseShare(raw);
+    if(!sd.url&&!sd.clean){toast('분석할 내용이 없어요');return}
+    let user='',caption=sd.clean;
+    if(sd.kind==='instagram'&&sd.code){
+      toast('릴스 정보 불러오는 중...');
+      const j=await withTimeout(jinaRead(sd.url),9000);
+      if(j){const m=metaFromJina(j);if(m&&m.caption){user=m.user;caption=m.caption}}
+    }else if(sd.kind==='youtube'&&sd.code){
+      const y=await withTimeout(ytMeta(sd.code),7000);
+      if(y&&y.title){user=y.author;caption=y.title}
+    }else if(sd.kind==='tiktok'){
+      toast('틱톡 정보 불러오는 중...');
+      const j=await withTimeout(jinaRead(sd.url),9000);
+      if(j){const m=metaFromJina(j);if(m&&m.caption){user=m.user;caption=m.caption}}
+    }
+    toast('AI가 영상 속 장소를 찾는 중...');
+    let list=null,errNote='';
+    const key=ls.get('TRAVEL_GEMINI_KEY')||'';
+    if(key){
+      try{list=await askShared(key,[{text:mkReelsPrompt({kind:sd.kind,user,caption,url:sd.url})}])}
+      catch(e){errNote='AI 분석 실패: '+e.message}
+    }else{
+      errNote='Gemini 키가 없어 자동 분석이 제한돼요 (설정 탭에서 키 입력)';
+    }
+    list=(list||[]).filter(c=>c&&c.name);
+    if(!list.length){
+      try{const g=await nomi((caption||'').replace(/#[^\s#]+/g,'').trim().slice(0,90));if(g.length)list=g.slice(0,4).map(c=>({name:c.name,address:c.address,lat:c.lat,lng:c.lng,category:'PLACE',info:'공유 텍스트 기반 추정'}))}catch(e){}
+      if(!list||!list.length)list=[{name:(caption||sd.code||'공유 항목').slice(0,60)||'공유 항목',category:'PLACE',info:'자동 분석 실패 — 직접 확인 후 메모 남기세요',raw:1}];
+    }
+    const seen=new Set();
+    list=list.filter(c=>{const k=String(c.name).toLowerCase().replace(/\s+/g,'');if(seen.has(k))return false;seen.add(k);return true}).slice(0,5);
+    res=list.map(c=>{
+      const cc=String(c.category||'').toUpperCase();
+      return {name:c.name,address:c.address||'',info:c.info||'',price:c.price||'',
+        lat:(typeof c.lat==='number'?c.lat:(c.lat?+c.lat:0))||0,lng:(typeof c.lng==='number'?c.lng:(c.lng?+c.lng:0))||0,
+        cat:CATS[cc]?cc:'PLACE',h:'',v:0,img:pic(c.name+' '+(c.address||''))};
+    });
+    drawRes();tab('add');
+    toast('공유 영상에서 후보 '+res.length+'건을 찾았어요. 눌러서 저장하세요'+(errNote?' · '+errNote:''));
+  }catch(e){
+    toast('공유 처리 오류: '+e.message);
+  }finally{
+    shareBusy=false;btn.textContent=old;btn.disabled=false;
+  }
+}
+$('pasteShare').onclick=async()=>{
+  try{
+    const txt=await navigator.clipboard.readText();
+    if(!txt)throw new Error('empty');
+    $('shareBox').value=txt.slice(0,600);
+    processShared(txt.slice(0,600));
+  }catch(e){toast('붙여넣기 권한이 없어요. 입력칸에 직접 붙여넣어 주세요')}
+};
+$('analyzeShare').onclick=()=>processShared($('shareBox').value);
+$('shareBox').onkeydown=e=>{if(e.key==='Enter')processShared($('shareBox').value)};
+$('copyShareUrl').onclick=async()=>{
+  const base=location.origin+location.pathname.replace(/[^/]*$/,'')+'?share=';
+  try{await navigator.clipboard.writeText(base);toast('복사했어요 → '+base)}catch(e){$('bk').value=base;$('bk').select();toast('백업칸에 넣었어요. 직접 복사하세요')}
+};
+(function(){
+  try{
+    const p=new URLSearchParams(location.search);
+    const s=[p.get('share'),p.get('text'),p.get('url')].filter(Boolean).join('\n').trim();
+    if(!s)return;
+    try{history.replaceState(null,'',location.pathname)}catch(_){}
+    tab('add');
+    $('shareBox').value=s.slice(0,600);
+    setTimeout(()=>processShared(s),700);
+  }catch(e){}
+})();
 // Pull-to-refresh (iOS PWA)
 let ptrStartY=0, ptrDy=0, ptrActive=false;
 document.addEventListener('touchstart',e=>{
