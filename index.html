@@ -52,8 +52,10 @@ input:focus,textarea:focus{border-color:var(--pr)}textarea{min-height:76px;resiz
 #myMapsOverlay iframe{flex:1;border:0}
 #myMapsClose{position:absolute;top:12px;right:12px;padding:8px 14px;border:0;border-radius:10px;background:var(--s);color:var(--tx);font-weight:700;cursor:pointer;z-index:201}
 .pin{width:20px;height:20px;border-radius:50%;border:3px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.5);background:var(--PLACE)}.pin.FOOD{background:var(--FOOD)}.pin.SHOP{background:var(--SHOP)}
-.pinCard{width:52px;height:66px;border-radius:10px;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.5);overflow:hidden;background:var(--s2);position:relative}
-.pinCard img{width:100%;height:100%;object-fit:cover;display:block}
+.pinCard{width:52px;height:66px;border-radius:10px;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.5);overflow:hidden;background:var(--s2);position:relative;display:grid;place-items:center}
+.pinCard i{font-style:normal;font-size:22px;line-height:1}
+.pinCard.c-PLACE{background:rgba(37,99,235,.92)}.pinCard.c-FOOD{background:rgba(217,119,6,.92)}.pinCard.c-SHOP{background:rgba(124,58,237,.92)}
+.pinCard img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .pinCard b{position:absolute;right:2px;bottom:2px;background:rgba(0,0,0,.65);border-radius:6px;font-size:10px;padding:1px 4px;pointer-events:none}
 .lnk{color:#2563eb;font-weight:700;cursor:pointer}
 #sheet{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center}#sheet.on{display:flex}
@@ -177,7 +179,7 @@ const SUF=['',' photo',' review',' menu',' exterior'];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const pic=(q,v=0)=>'https://tse1.mm.bing.net/th?w=480&h=360&c=7&rs=1&p=0&q='+encodeURIComponent(String(q||'').trim()+SUF[v%5]);
-let items=[],cat='PLACE',pend=[],res=[],lm=null,tl=null,layer=null,pins={},lastGeo=0,tt,cur=null,view='photo',tileIndex=1,tileFails=0,gmap=null,gmarkers=[],glocMarker=null,nmap=null,nmarkers=[],nlocMarker=null,mapProvider='osm',editMode={},selected=new Set(),prevTab='add';
+let items=[],cat='PLACE',pend=[],res=[],lm=null,tl=null,layer=null,pins={},lastGeo=0,tt,cur=null,view='photo',tileIndex=1,tileFails=0,gmap=null,gmarkers=[],glocMarker=null,nmap=null,nmarkers=[],nlocMarker=null,mapProvider='osm',editMode={},selected=new Set(),prevTab='add',gpins=[],gposPts=[],GPinClass=null;
 try{items=JSON.parse(ls.get('TRIP_MASTER_ITEMS')||'[]')}catch(e){items=[]}
 let photoCache={};try{photoCache=JSON.parse(ls.get('TRIP_PHOTO_CACHE')||'{}')}catch(e){photoCache={}}
 function savePhotoCache(){ls.set('TRIP_PHOTO_CACHE',JSON.stringify(photoCache))}
@@ -255,14 +257,14 @@ function tab(k){
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===k));
   document.querySelectorAll('.tab-content').forEach(c=>c.classList.toggle('active',c.id==='tab-'+k));
   document.body.classList.toggle('show-map',k==='map');
-  if(k==='map')setTimeout(()=>{if(gmap){google.maps.event.trigger(gmap,'resize');fit()}else if(nmap){naver.maps.Event.trigger(nmap,'resize');fit()}else if(lm){lm.invalidateSize();fit()}},80);
+  if(k==='map')setTimeout(()=>{if(gmap){google.maps.event.trigger(gmap,'resize');fit()}else if(nmap){naver.maps.Event.trigger(nmap,'resize');fit()}else if(lm){lm.invalidateSize();fit()}if(!Object.keys(pins).length)toast('지도에 띄울 좌표가 없어요. 찾기 탭에서 다시 저장하면 위치가 잡혀요')},80);
 }
 
 function fit(){
   if(gmap){
-    if(!gmarkers.length)return;
+    if(!gposPts.length)return;
     const bounds=new google.maps.LatLngBounds();
-    gmarkers.forEach(m=>bounds.extend(m.getPosition()));
+    gposPts.forEach(p=>bounds.extend(p));
     gmap.fitBounds(bounds);
     return;
   }
@@ -275,20 +277,59 @@ function fit(){
   }
   if(!lm||!layer)return;const b=layer.getBounds();if(b.isValid())lm.fitBounds(b,{padding:[40,40],maxZoom:15})
 }
+function pinCardHtml(i){
+  const thumb=(i.vid&&i.vid.thumb)||i.img||'';
+  const ic=CATS[i.category]?CATS[i.category].e:'📍';
+  return `<div class="pinCard c-${CATS[i.category]?i.category:'PLACE'}"><i>${ic}</i>${thumb?`<img loading="lazy" referrerpolicy="no-referrer" src="${esc(thumb)}" onerror="this.remove()">`:''}${i.vid?'<b>🎬</b>':''}</div>`;
+}
+// 구글맵 위에 HTML 핀카드를 그리는 커스텀 오버레이 (기본 빨간 핀 대체)
+function makeGPinClass(){
+  if(!window.google||!google.maps||!google.maps.OverlayView)return null;
+  class GPin extends google.maps.OverlayView{
+    constructor(map,item,onOpen){super();this.item=item;this.onOpen=onOpen;this.div=null;this.setMap(map)}
+    onAdd(){
+      this.div=document.createElement('div');
+      this.div.style.cssText='position:absolute;width:52px;height:66px;cursor:pointer;pointer-events:auto';
+      this.div.innerHTML=pinCardHtml(this.item);
+      google.maps.event.addDomListener(this.div,'click',()=>{if(this.onOpen)this.onOpen()});
+      this.getPanes().overlayMouseTarget.appendChild(this.div);
+    }
+    draw(){
+      if(!this.div)return;
+      const p=this.getProjection().fromLatLngToDivPixel(new google.maps.LatLng(this.item.lat,this.item.lng));
+      if(!p)return;
+      this.div.style.left=(p.x-26)+'px';
+      this.div.style.top=(p.y-66)+'px';
+    }
+    onRemove(){if(this.div){this.div.remove();this.div=null}}
+  }
+  return GPin;
+}
 function draw(){
   if(gmap){
+    gpins.forEach(o=>o.setMap(null));gpins=[];
     gmarkers.forEach(m=>m.setMap(null));gmarkers=[];
-    items.filter(i=>i.lat&&i.lng).forEach(i=>{
-      const m=new google.maps.Marker({position:{lat:i.lat,lng:i.lng},map:gmap,title:i.name});
-      m.addListener('click',()=>{cur=i.id;view=i.vid?'video':'photo';showSheet()});
-      gmarkers.push(m);
-    });
+    gposPts=[];
+    items.filter(i=>i.lat&&i.lng).forEach(i=>gposPts.push(new google.maps.LatLng(i.lat,i.lng)));
+    if(GPinClass){
+      items.filter(i=>i.lat&&i.lng).forEach(i=>{
+        const o=new GPinClass(gmap,i,()=>{cur=i.id;view=i.vid?'video':'photo';showSheet()});
+        gpins.push(o);
+      });
+    }else{
+      items.filter(i=>i.lat&&i.lng).forEach(i=>{
+        const m=new google.maps.Marker({position:{lat:i.lat,lng:i.lng},map:gmap,title:i.name});
+        m.addListener('click',()=>{cur=i.id;view=i.vid?'video':'photo';showSheet()});
+        gmarkers.push(m);
+      });
+    }
     return;
   }
   if(nmap){
     nmarkers.forEach(m=>m.setMap(null));nmarkers=[];
     items.filter(i=>i.lat&&i.lng).forEach(i=>{
-      const m=new naver.maps.Marker({position:new naver.maps.LatLng(i.lat,i.lng),map:nmap,title:i.name});
+      const m=new naver.maps.Marker({position:new naver.maps.LatLng(i.lat,i.lng),map:nmap,
+        icon:{content:pinCardHtml(i),anchor:new naver.maps.Point(26,66)}});
       naver.maps.Event.addListener(m,'click',()=>{cur=i.id;view=i.vid?'video':'photo';showSheet()});
       nmarkers.push(m);
     });
@@ -296,15 +337,12 @@ function draw(){
   }
   if(!lm||!layer)return;layer.clearLayers();pins={};
   items.filter(i=>i.lat&&i.lng).forEach(i=>{
-    const thumb=(i.vid&&i.vid.thumb)||i.img||'';
-    const pinHtml=thumb?`<div class="pinCard"><img loading="lazy" referrerpolicy="no-referrer" src="${esc(thumb)}" onerror="this.onerror=null;this.remove()"><b>${i.vid?'🎬':translateCAT(i.category)}</b></div>`:`<div class="pin ${i.category}"></div>`;
-    const m=L.marker([i.lat,i.lng],{icon:L.divIcon({className:'',html:pinHtml,iconSize:thumb?[52,66]:[20,20],iconAnchor:thumb?[26,66]:[10,10]})});
+    const m=L.marker([i.lat,i.lng],{icon:L.divIcon({className:'',html:pinCardHtml(i),iconSize:[52,66],iconAnchor:[26,66]})});
     if(i.vid){m.on('click',()=>{cur=i.id;view='video';showSheet()});}
     else{m.bindPopup(`<b>${esc(i.name)}</b><br>${esc(i.address||'')}<br><span class="lnk" data-act="open" data-id="${i.id}">사진·상세 보기 ›</span>`);}
     m.addTo(layer);pins[i.id]=m;
   });
 }
-function translateCAT(c){return c==='FOOD'?'food':c==='SHOP'?'shop':'place'}
 
 const card=i=>`<div class="item${i.done?' done':''}${selected.has(i.id)?' selected':''}" data-act="${editMode[i.category]?'toggleSel':'open'}" data-id="${i.id}" style="${selected.has(i.id)?'outline:2px solid var(--pr)':''}">${editMode[i.category]?`<input type="checkbox" data-act="sel" data-id="${i.id}"${selected.has(i.id)?' checked':''} style="width:18px;height:18px;margin-right:8px">`:''}${ph(CATS[i.category].e,i.img)}<div class="mid"><div class="nm">${esc(i.name)}${i.vid?' 🎬':''}</div><div class="ds">${esc(i.address||i.note||'')}</div>${i.price?`<div class="ds" style="color:var(--FOOD);font-weight:700">${esc(i.price)}</div>`:''}${i.info?`<div class="ds in">${esc(i.info)}</div>`:''}</div><input type="checkbox" data-act="done" data-id="${i.id}"${i.done?' checked':''}></div>`;
 function ph(e,src,c=''){return `<div class="pic ${c}">${e}${src?`<img loading="lazy" referrerpolicy="no-referrer" src="${esc(src)}" onerror="this.remove()">`:''}</div>`}
@@ -628,9 +666,8 @@ if(mapProvider==='google' && _gkey){
   const s=document.createElement('script');
   s.src='https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(_gkey)+'&loading=async';
   s.async=true;s.defer=true;
-  s.onload=()=>{ setTimeout(()=>{ try{ if(!window.google||!google.maps) throw new Error('google.maps 없음'); gmap=new google.maps.Map($('map'),{center:{lat:36.5,lng:128},zoom:6}); gLoaded=true; draw(); fit(); console.log('Google Map initialized'); }catch(e){ console.error('Google init error:',e); fallbackToOsm() } },100); };
+  s.onload=()=>{ setTimeout(()=>{ try{ if(!window.google||!google.maps) throw new Error('google.maps 없음'); gmap=new google.maps.Map($('map'),{center:{lat:36.5,lng:128},zoom:6}); GPinClass=makeGPinClass(); gLoaded=true; draw(); fit(); console.log('Google Map initialized'); }catch(e){ console.error('Google init error:',e); fallbackToOsm() } },100); };
   s.onerror=(e)=>{ console.error('Google script error:',e); fallbackToOsm() };
-  s.onerror=()=>{ fallbackToOsm() };
   const gTimer=setTimeout(()=>{ if(!gLoaded) fallbackToOsm() },8000);
   document.head.appendChild(s);
 } else if(mapProvider==='naver' && _nkey){
