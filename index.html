@@ -538,6 +538,11 @@ async function pick(k){
     }catch(e){p=ai}
   }else{
     toast('위치 확인 중...');p=await locate(c,c.h);
+    if(p&&p.lat&&c.h){
+      // 지역 힌트(예: '오사카')와 150km 이상 벗어난 결과는 이상 매칭으로 판단 → 좌표 보류
+      try{const hg=await geoCheck({address:c.h});if(hg&&km(p.lat,p.lng,hg.lat,hg.lng)>150)p=null}catch(e){}
+      if(!p)toast('지역 힌트와 안 맞는 좌표라 보류했어요 — 주소 기준으로 나중에 다시 잡아요');
+    }
   }
   const id='i'+Date.now()+Math.random().toString(36).slice(2,5);
   items.unshift({id,category:c.cat,name:c.name,address:c.address||'',info:c.info||'',price:c.price||'',lat:p&&p.lat?p.lat:0,lng:p&&p.lng?p.lng:0,img:c.img||pic(c.name+' '+c.h,c.v),q:c.name+' '+c.h,v:c.v||0,done:false,vid:c.vid||null,vfy:(p&&p.lat)?1:0});
@@ -828,6 +833,41 @@ async function askShared(key,parts){
   try{return await ask(key,parts,[{google_search:{}},{url_context:{}}])}
   catch(e){return await ask(key,parts)}
 }
+// AI 없이 캡션에서 장소 후보를 직접 추출 (🍴이름 → 📍주소 → ⏰시간 구조, 해시태그로 지역/카테고리 추정)
+function parseCaptionPlaces(cap){
+  if(!cap)return [];
+  const txt=String(cap);
+  const lines=txt.split(/\n+/).map(s=>s.trim()).filter(Boolean);
+  const tags=(txt.match(/#[^\s#\n]+/g)||[]).map(t=>t.slice(1));
+  const RK=['오사카','도쿄','교토','후쿠오카','나고야','삿포로','오키나와','서울','부산','대구','제주','강릉','전주','속초','경주','여수','포항','방콕','싱가포르','발리','호치민','다낭','로마','밀라노','런던','파리','베를린','시드니'];
+  let hint='';
+  for(const ko of RK){ if(tags.some(t=>t.includes(ko))||txt.includes(ko)){hint=ko;break} }
+  const isAddr=l=>/^[📍📌🗺]/.test(l)||/\b\d{2,3}-\d{3,4}\b/.test(l)||/\b\w+\s+(?:Ward|Building|City|Prefecture|Road|Street|Dong|Gu|si)/.test(l);
+  const isHours=l=>/^[⏰🕐⏱]/.test(l)||/\d{1,2}:\d{2}\s*[~–-]/.test(l);
+  const out=[];
+  for(let i=0;i<lines.length;i++){
+    const L=lines[i];
+    if(!isAddr(L))continue;
+    const addr=L.replace(/^[^A-Za-z0-9가-힣]{0,3}\s*/,'').trim();
+    if(addr.length<8)continue;
+    let nm='',info='';
+    for(let j=i-1;j>=Math.max(0,i-4);j--){
+      const P=lines[j];
+      if(isHours(P)&&!info){info=P.replace(/^[^A-Za-z가-힣]{1,2}\s*/,'').slice(0,60);continue}
+      if(isAddr(P))continue;
+      const cleaned=P.replace(/^[^\w가-힣一-龥ぁ-んァ-ヶ]{1,3}\s*/,'').trim();
+      if(cleaned&&cleaned.length<=44){nm=cleaned;break}
+    }
+    if(!nm)nm=addr.slice(0,28);
+    let cc='PLACE';
+    const blob=(tags.join(' ')+' '+txt);
+    if(/맛집|먹는|음식|카페|식당|food|cafe|restaurant|食堂|ラーメン|먹방/i.test(blob))cc='FOOD';
+    else if(/쇼핑|shop|market|mall|스토어|백화점/i.test(blob))cc='SHOP';
+    out.push({name:nm,address:addr,info:(info?info+' · ':'')+'캡션에서 직접 추출',category:cc,h:hint});
+    if(out.length>=3)break;
+  }
+  return out;
+}
 let shareBusy=false;
 async function processShared(raw){
   raw=String(raw||'').trim();
@@ -859,14 +899,18 @@ async function processShared(raw){
     const key=ls.get('TRAVEL_GEMINI_KEY')||'';
     if(key){
       try{list=await askShared(key,[{text:mkReelsPrompt({kind:sd.kind,user,caption,url:sd.url})}])}
-      catch(e){errNote='AI 분석 실패: '+e.message}
+      catch(e){errNote=/quota|rate|exceeded/i.test(e.message)?'AI 무료 한도 초과 — 캡션에서 직접 추출':'AI 분석 실패: '+String(e.message).slice(0,70)}
     }else{
-      errNote='Gemini 키가 없어 자동 분석이 제한돼요 (설정 탭에서 키 입력)';
+      errNote='Gemini 키 없음 — 캡션에서 직접 추출';
     }
     list=(list||[]).filter(c=>c&&c.name);
     if(!list.length){
-      try{const g=await nomi((caption||'').replace(/#[^\s#]+/g,'').trim().slice(0,90));if(g.length)list=g.slice(0,4).map(c=>({name:c.name,address:c.address,lat:c.lat,lng:c.lng,category:'PLACE',info:'공유 텍스트 기반 추정'}))}catch(e){}
-      if(!list||!list.length)list=[{name:(caption||sd.code||'공유 항목').slice(0,60)||'공유 항목',category:'PLACE',info:'자동 분석 실패 — 직접 확인 후 메모 남기세요',raw:1}];
+      const parsed=parseCaptionPlaces(caption);
+      if(parsed.length)list=parsed;
+      else{
+        try{const g=await nomi((caption||'').replace(/#[^\s#]+/g,'').trim().slice(0,90));if(g.length)list=g.slice(0,4).map(c=>({name:c.name,address:c.address,lat:c.lat,lng:c.lng,category:'PLACE',info:'공유 텍스트 기반 추정'}))}catch(e){}
+        if(!list||!list.length)list=[{name:(caption||sd.code||'공유 항목').slice(0,60)||'공유 항목',category:'PLACE',info:'자동 분석 실패 — 직접 확인 후 메모 남기세요',raw:1}];
+      }
     }
     const seen=new Set();
     list=list.filter(c=>{const k=String(c.name).toLowerCase().replace(/\s+/g,'');if(seen.has(k))return false;seen.add(k);return true}).slice(0,5);
@@ -874,7 +918,7 @@ async function processShared(raw){
       const cc=String(c.category||'').toUpperCase();
       return {name:c.name,address:c.address||'',info:c.info||'',price:c.price||'',
         lat:(typeof c.lat==='number'?c.lat:(c.lat?+c.lat:0))||0,lng:(typeof c.lng==='number'?c.lng:(c.lng?+c.lng:0))||0,
-        cat:CATS[cc]?cc:'PLACE',h:'',v:0,img:pic(c.name+' '+(c.address||'')),vid:vmeta};
+        cat:CATS[cc]?cc:'PLACE',h:c.h||'',v:0,img:pic(c.name+' '+(c.address||'')),vid:vmeta};
     });
     drawRes();tab('add');
     toast('공유 영상에서 후보 '+res.length+'건을 찾았어요. 눌러서 저장하세요'+(errNote?' · '+errNote:''));
