@@ -257,7 +257,7 @@ function tab(k){
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===k));
   document.querySelectorAll('.tab-content').forEach(c=>c.classList.toggle('active',c.id==='tab-'+k));
   document.body.classList.toggle('show-map',k==='map');
-  if(k==='map')setTimeout(()=>{if(gmap){google.maps.event.trigger(gmap,'resize');fit()}else if(nmap){naver.maps.Event.trigger(nmap,'resize');fit()}else if(lm){lm.invalidateSize();fit()}if(!Object.keys(pins).length)toast('지도에 띄울 좌표가 없어요. 찾기 탭에서 다시 저장하면 위치가 잡혀요')},80);
+  if(k==='map')setTimeout(()=>{if(gmap){google.maps.event.trigger(gmap,'resize');fit()}else if(nmap){naver.maps.Event.trigger(nmap,'resize');fit()}else if(lm){lm.invalidateSize();fit()}const cnt=items.filter(i=>i.lat&&i.lng).length;if(!cnt&&items.length){toast('저장한 장소의 위치를 자동으로 찾고 있어요...');backfillCoords().then(ok=>{if(!ok)toast('위치를 못 찾았어요. 찾기 탭에서 검색 후 저장하면 좌표가 붙어요')})}else if(!cnt&&!items.length)toast('아직 저장한 장소가 없어요. 찾기 탭에서 저장하세요')},80);
 }
 
 function fit(){
@@ -430,6 +430,33 @@ async function locate(o,h){
   if(g&&ai&&km(g.lat,g.lng,ai.lat,ai.lng)>50)g=null;
   return g?{lat:g.lat,lng:g.lng}:ai;
 }
+// 기존 저장 항목 중 좌표가 없는 것들 자동 보강 (구버전 저장분/좌표 실패분 복구)
+let bbTried=new Set();
+function ggeocode(addr){
+  return new Promise(res=>{
+    if(!window.google||!google.maps||!google.maps.Geocoder)return res(null);
+    try{new google.maps.Geocoder().geocode({address:addr},(rs,st)=>{if(st==='OK'&&rs&&rs[0]){res({lat:rs[0].geometry.location.lat(),lng:rs[0].geometry.location.lng(),address:rs[0].formatted_address||''})}else res(null)})}catch(e){res(null)}
+  });
+}
+async function backfillCoords(){
+  const miss=items.filter(i=>!(i.lat&&i.lng)&&!bbTried.has(i.id));
+  if(!miss.length)return 0;
+  miss.forEach(i=>bbTried.add(i.id));
+  let ok=0;
+  for(const i of miss){
+    try{
+      let g=null;
+      for(const q of [String(i.address||'').trim(),String(i.name||'').trim(),(String(i.address||'').trim()+' 대한민국')]){
+        if(!q||g)continue;
+        g=await ggeocode(q);
+        if(!g){const r=await nomi(q);if(r&&r[0]&&r[0].lat&&r[0].lng)g=r[0]}
+      }
+      if(g&&g.lat&&g.lng){i.lat=g.lat;i.lng=g.lng;if(!i.address&&g.address)i.address=g.address;ok++}
+    }catch(e){}
+  }
+  if(ok){toast('좌표 '+ok+'개를 자동으로 잡았어요');save();fit()}
+  return ok;
+}
 
 async function find(){
   const q=$('q').value.trim(),h=$('hint').value.trim(),key=ls.get('TRAVEL_GEMINI_KEY')||'',btn=$('go');
@@ -483,7 +510,7 @@ document.addEventListener('click',e=>{
   else if(a==='view'){view=b.dataset.view;toast('지도: '+view);showSheet()}
   else if(a==='own'){$('own').click()}
   else if(a==='emb'){view=view==='photo'?'google':'photo';toast('지도: '+view);showSheet()}
-  else if(a==='pin'&&i){closeSheet();tab('map');setTimeout(()=>{if(lm){lm.setView([i.lat,i.lng],16);if(!i.vid&&pins[i.id]&&pins[i.id].openPopup)pins[i.id].openPopup()}},200)}
+  else if(a==='pin'&&i){closeSheet();tab('map');setTimeout(()=>{if(gmap){gmap.setCenter({lat:i.lat,lng:i.lng});gmap.setZoom(16)}else if(nmap){const np=new naver.maps.LatLng(i.lat,i.lng);nmap.setCenter(np);nmap.setZoom(16)}else if(lm){lm.setView([i.lat,i.lng],16);if(!i.vid&&pins[i.id]&&pins[i.id].openPopup)pins[i.id].openPopup()}},200)}
   else if(a==='share'&&i){if(navigator.share){navigator.share({title:i.name,text:i.address||'',url:`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(i.name+' '+(i.address||''))}`}).catch(()=>{})}else toast('공유를 지원하지 않는 브라우저예요')}
   else if(a==='del'&&i){if(b.dataset.sure){items=items.filter(x=>x.id!==i.id);closeSheet();save()}else{b.dataset.sure=1;b.textContent='한 번 더 누르면 삭제'}}
   else if(a==='toggleEdit'){const c=b.dataset.cat; editMode[c]=!editMode[c]; if(!editMode[c]) selected.clear(); render()}
@@ -944,6 +971,7 @@ $('myMapsBtn').onclick=()=>{
 };
 $('myMapsClose').onclick=()=>{ $('myMapsOverlay').classList.remove('show'); $('myMapsFrame').src=''; };
 render();draw();fit();
+backfillCoords();
 </script>
 </body>
 </html>
