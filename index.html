@@ -61,7 +61,7 @@ input:focus,textarea:focus{border-color:var(--pr)}textarea{min-height:76px;resiz
 #sheet{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center}#sheet.on{display:flex}
 .sh{background:var(--s);width:100%;max-width:520px;max-height:92dvh;overflow-y:auto;border-radius:22px 22px 0 0;padding:16px 16px calc(18px + env(safe-area-inset-bottom))}
 #toast{position:fixed;left:50%;bottom:20px;transform:translate(-50%,150%);max-width:90vw;z-index:9999;background:var(--s);color:var(--tx);border:1px solid var(--bd);border-left:4px solid var(--pr);padding:12px 16px;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,.4);font-size:13px;font-weight:600;opacity:0;transition:.25s}#toast.show{transform:translate(-50%,0);opacity:1}
-#ptr{position:fixed;top:0;left:50%;transform:translate(-50%,-100%);z-index:100000;padding:10px 18px;background:var(--s);color:var(--tx);border:radius:0 0 14px 14px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;font-weight:700;transition:transform .2s,opacity .2s;opacity:0}
+#ptr{position:fixed;top:0;left:50%;transform:translate(-50%,-100%);z-index:100000;padding:10px 18px;background:var(--s);color:var(--tx);border-radius:0 0 14px 14px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;font-weight:700;transition:transform .2s,opacity .2s;opacity:0}
 #ptr.show{transform:translate(-50%,0);opacity:1}
 @media(max-width:820px){
 #side{width:100%;min-width:0;border:0}
@@ -186,6 +186,24 @@ try{items=JSON.parse(ls.get('TRIP_MASTER_ITEMS')||'[]')}catch(e){items=[]}
 let photoCache={};try{photoCache=JSON.parse(ls.get('TRIP_PHOTO_CACHE')||'{}')}catch(e){photoCache={}}
 function savePhotoCache(){ls.set('TRIP_PHOTO_CACHE',JSON.stringify(photoCache))}
 
+// 인스타그램 CDN 이미지가 사파리 CORP 정책이나 캐시 문제로 막힐 때 wsrv.nl 프록시로 자동 우회
+window.imgErr=function(el){
+  if(!el)return;
+  const s=el.getAttribute('src')||'';
+  if(s&&!el.dataset.wsrv&&/(cdninstagram\.com|fbcdn\.net|scontent|tiktokcdn)/.test(s)){
+    el.dataset.wsrv='1';
+    el.src='https://wsrv.nl/?url='+encodeURIComponent(s)+'&w=480&output=jpg';
+    return;
+  }
+  el.remove();
+};
+
+function itemThumb(i){
+  if(!i)return '';
+  if(i.useCustomImg&&i.img)return i.img;
+  return (i.vid&&i.vid.thumb)||i.img||'';
+}
+
 function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),4500)}
 window.addEventListener('error',e=>{try{toast('오류: '+(e.message||'알 수 없는 오류'))}catch(_){}});
 function currentTileUrl(){return tileIndex===0?`https://{s}.basemaps.cartocdn.com/${document.documentElement.dataset.theme==='dark'?'dark':'light'}_all/{z}/{x}/{y}{r}.png`:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'}
@@ -280,9 +298,9 @@ function fit(){
   if(!lm||!layer)return;const b=layer.getBounds();if(b.isValid())lm.fitBounds(b,{padding:[40,40],maxZoom:15})
 }
 function pinCardHtml(i){
-  const thumb=(i.vid&&i.vid.thumb)||i.img||'';
+  const thumb=itemThumb(i);
   const ic=CATS[i.category]?CATS[i.category].e:'📍';
-  return `<div class="pinCard c-${CATS[i.category]?i.category:'PLACE'}"><i>${ic}</i>${thumb?`<img loading="lazy" referrerpolicy="no-referrer" src="${esc(thumb)}" onerror="this.remove()">`:''}${i.vid?'<b>🎬</b>':''}</div>`;
+  return `<div class="pinCard c-${CATS[i.category]?i.category:'PLACE'}"><i>${ic}</i>${thumb?`<img loading="lazy" referrerpolicy="no-referrer" src="${esc(thumb)}" onerror="imgErr(this)">`:''}${i.vid?'<b>🎬</b>':''}</div>`;
 }
 function makeGPinClass(){
   if(!window.google||!google.maps||!google.maps.OverlayView)return null;
@@ -345,8 +363,9 @@ function draw(){
   });
 }
 
-const card=i=>`<div class="item${i.done?' done':''}${selected.has(i.id)?' selected':''}" data-act="${editMode[i.category]?'toggleSel':'open'}" data-id="${i.id}" style="${selected.has(i.id)?'outline:2px solid var(--pr)':''}">${editMode[i.category]?`<input type="checkbox" data-act="sel" data-id="${i.id}"${selected.has(i.id)?' checked':''} style="width:18px;height:18px;margin-right:8px">`:''}${ph(CATS[i.category].e,i.img)}<div class="mid"><div class="nm">${esc(i.name)}${i.vid?' 🎬':''}</div><div class="ds">${esc(i.address||i.note||'')}</div>${i.price?`<div class="ds" style="color:var(--FOOD);font-weight:700">${esc(i.price)}</div>`:''}${i.info?`<div class="ds in">${esc(i.info)}</div>`:''}</div><input type="checkbox" data-act="done" data-id="${i.id}"${i.done?' checked':''}></div>`;
-function ph(e,src,c=''){return `<div class="pic ${c}">${e}${src?`<img loading="lazy" referrerpolicy="no-referrer" src="${esc(src)}" onerror="this.remove()">`:''}</div>`}
+// 목록 카드에서도 지도 핀과 동일하게 릴스 썸네일(itemThumb)을 우선 표시
+const card=i=>`<div class="item${i.done?' done':''}${selected.has(i.id)?' selected':''}" data-act="${editMode[i.category]?'toggleSel':'open'}" data-id="${i.id}" style="${selected.has(i.id)?'outline:2px solid var(--pr)':''}">${editMode[i.category]?`<input type="checkbox" data-act="sel" data-id="${i.id}"${selected.has(i.id)?' checked':''} style="width:18px;height:18px;margin-right:8px">`:''}${ph(CATS[i.category].e,itemThumb(i))}<div class="mid"><div class="nm">${esc(i.name)}${i.vid?' 🎬':''}</div><div class="ds">${esc(i.address||i.note||'')}</div>${i.price?`<div class="ds" style="color:var(--FOOD);font-weight:700">${esc(i.price)}</div>`:''}${i.info?`<div class="ds in">${esc(i.info)}</div>`:''}</div><input type="checkbox" data-act="done" data-id="${i.id}"${i.done?' checked':''}></div>`;
+function ph(e,src,c=''){return `<div class="pic ${c}">${e}${src?`<img loading="lazy" referrerpolicy="no-referrer" src="${esc(src)}" onerror="imgErr(this)">`:''}</div>`}
 function render(){
   for(const c in CATS){
     const kw=($('q-'+c).value||'').trim().toLowerCase(),all=items.filter(i=>i.category===c);
@@ -364,7 +383,6 @@ function isGenericSharedName(nm){
   return /^공유\s*(릴스|쇼츠|틱톡|링크)/.test(String(nm||'').trim());
 }
 
-// iOS Live Text OCR 오타 보정: 'T542-0086' -> '〒542-0086', 'cocolo1 2F' 정제 등
 function normalizeOcrAddr(s){
   return String(s||'')
     .replace(/(^|[\s,])T(\d{3}-\d{4})\b/g,'$1〒$2')
@@ -372,7 +390,6 @@ function normalizeOcrAddr(s){
     .trim();
 }
 
-// 검색어 생성 시 '공유 릴스'가 절대 들어가지 않도록 차단
 function getValidSearchQuery(i){
   const nm=isGenericSharedName(i.name)?'':String(i.name||'').trim();
   const ad=normalizeOcrAddr(i.address||'');
@@ -397,9 +414,9 @@ function showSheet(){
     else if(i.lat&&i.lng) media=`<iframe class="big" src="https://www.openstreetmap.org/export/embed.html?bbox=${i.lng-0.005},${i.lat-0.005},${i.lng+0.005},${i.lat+0.005}&layer=mapnik&marker=${i.lat},${i.lng}" style="min-height:300px"></iframe>`;
     else media=`<div class="empty" style="padding:28px 12px"><i>🗺️</i>장소명이나 주소가 아직 없어요.<br>아래 <b>[📋 복사한 캡션/주소 붙여넣기]</b>를 누르거나 가게명·주소를 입력해 주세요.</div>`;
   }else{
-    media=ph(CATS[i.category].e,(v&&v.thumb)||i.img,'big');
+    media=ph(CATS[i.category].e,itemThumb(i),'big');
   }
-  const vButs=v?`<button class="mb${vEmbed?' pr':''}" data-act="vid">🎬 영상</button>`:'';
+  const vButs=v?`<button class="mb${vEmbed?' pr':''}" data-act="vid">🎬 영상</button><button class="mb" data-act="reelThumb">🎬 릴스사진</button>`:'';
   const vUrl=v?vidUrlFromItem(i):'';
   const vLink=vUrl?`<a class="mb" target="_blank" rel="noopener" href="${esc(vUrl)}">원본 ↗</a>`:'';
   const coordBadge=(i.lat&&i.lng)?`<span style="font-size:11px;color:#4ade80;font-weight:700">● 지도 좌표 설정됨 (${i.lat.toFixed(4)}, ${i.lng.toFixed(4)})</span>`:`<span style="font-size:11px;color:var(--FOOD);font-weight:700">● 좌표 미설정 — 아래에 이름/주소 입력 후 [📍 위치 다시 찾기] 클릭</span>`;
@@ -536,7 +553,7 @@ async function ask(K,parts,tools){
   throw new Error('모든 AI 제공자 실패 — '+errs.join(' / '));
 }
 
-// ===== 다중 지오코딩 엔진 (Google REST + Google JS + Places + Photon + Nominatim + 단계별 주소 정제) =====
+// ===== 다중 지오코딩 엔진 =====
 async function nomi(q){
   const w=600-(Date.now()-lastGeo);if(w>0)await sleep(w);lastGeo=Date.now();
   try{
@@ -547,7 +564,6 @@ async function nomi(q){
   }catch(e){return []}
 }
 
-// Photon (Komoot OpenStreetMap) — 무료, 속도 제한 없음, 부분 주소 매칭 우수
 async function photonGeo(q){
   try{
     const r=await fetchTO('https://photon.komoot.io/api/?q='+encodeURIComponent(q)+'&limit=3',{},3500);
@@ -563,7 +579,6 @@ async function photonGeo(q){
   }catch(e){return null}
 }
 
-// Google Geocoding REST API (지도 제공자가 OSM이어도 Google 키만 있으면 작동)
 async function ggeocodeRest(addr){
   const key=(window._gkey||ls.get('TRAVEL_GMAP_KEY')||'').trim();
   if(!key)return null;
@@ -627,22 +642,18 @@ function jpCore(a){
   return '';
 }
 
-// OCR 오타(T542-0086) 및 건물/층수(cocolo1 2F, cocoloビル 2F)가 포함된 주소를 단계별 검색 쿼리로 분해
 function buildAddrQueries(rawAddr){
   const raw=normalizeOcrAddr(rawAddr);
   if(!raw)return [];
   const out=[];
   const add=q=>{q=String(q||'').replace(/\s+/g,' ').replace(/^[,\s]+|[,\s]+$/g,'');if(q&&q.length>=3&&!out.includes(q))out.push(q)};
 
-  // 우편번호 추출 (〒542-0086 또는 T542-0086 또는 542-0086)
   const pm=raw.match(/(?:^|[\s,〒T])(\d{3}-\d{4})\b/);
   const zip=pm?pm[1]:'';
 
-  // 도시 추출
   const cm=raw.match(/\b(Osaka|Kyoto|Tokyo|Nagoya|Sapporo|Fukuoka|Okinawa|Kobe|Hiroshima|Yokohama|Nara)\b/i);
   const cityEn=cm?cm[1]:'';
 
-  // 1) 우편번호·국가명·층수·빌딩명 제거한 도로/초메 주소
   let clean=raw
     .replace(/^(?:일본|日本|대한민국|한국)\s*/g,'')
     .replace(/(?:^|[\s,])[〒T]?\s*\d{3}-\d{4}\b/g,' ')
@@ -654,14 +665,13 @@ function buildAddrQueries(rawAddr){
   add(clean);
   add(raw);
 
-  // 2) 영문 일본 주소 패턴: "Osaka, Chuo Ward, Nishishinsaibashi, 2 Chome-1-18..."
   const chomeMatch=clean.match(/^(.*?),\s*(\d+)\s*Chome(?:[-ー−–](\d+))?(?:[-ー−–](\d+))?/i);
   if(chomeMatch){
-    const prefix=chomeMatch[1].trim(); // "Osaka, Chuo Ward, Nishishinsaibashi"
+    const prefix=chomeMatch[1].trim();
     const chomeNum=chomeMatch[2];
     const parts=prefix.split(',').map(s=>s.trim()).filter(Boolean);
     if(parts.length>=2){
-      const rev=[...parts].reverse(); // ["Nishishinsaibashi", "Chuo Ward", "Osaka"]
+      const rev=[...parts].reverse();
       add(`${rev[0]} ${chomeNum}-chome, ${rev.slice(1).join(', ')}, Japan`);
       add(`${rev.join(', ')}, Japan`);
       add(rev.join(', '));
@@ -671,7 +681,6 @@ function buildAddrQueries(rawAddr){
   }else if(clean.includes(',')){
     const parts=clean.split(',').map(s=>s.trim()).filter(Boolean);
     if(parts.length>=2){
-      // 마지막 파트가 번지/건물명이면 제외한 상위 행정구역 쿼리 추가
       if(/\d/.test(parts[parts.length-1])){
         const areaParts=parts.slice(0,-1);
         add(areaParts.join(', '));
@@ -681,11 +690,9 @@ function buildAddrQueries(rawAddr){
     }
   }
 
-  // 3) 한자 코어 주소
   const jc=jpCore(raw);
   if(jc)add(jc+(cityEn?', '+cityEn:''));
 
-  // 4) 우편번호 기반 폴백 (OSM/Google에서 542-0086은 신사이바시 2초메 정중앙을 정확히 반환)
   if(zip){
     if(cityEn)add(`${zip}, ${cityEn}, Japan`);
     add(`${zip}, Japan`);
@@ -860,12 +867,19 @@ async function pick(k){
     toast('위치 확인 중...');p=await locate(c,c.h);
   }
   const id='i'+Date.now()+Math.random().toString(36).slice(2,5);
-  items.unshift({id,category:c.cat,name:c.name,address:c.address||(p&&p.address)||'',info:c.info||'',price:c.price||'',lat:p&&p.lat?p.lat:0,lng:p&&p.lng?p.lng:0,img:c.img||pic(c.name+' '+c.h,c.v),q:c.name+' '+c.h,v:c.v||0,done:false,vid:c.vid||null,vfy:(p&&p.lat)?1:0,raw:c.raw||0,h:c.h||''});
+  const vThumb=(c.vid&&c.vid.thumb)||'';
+  items.unshift({id,category:c.cat,name:c.name,address:c.address||(p&&p.address)||'',info:c.info||'',price:c.price||'',lat:p&&p.lat?p.lat:0,lng:p&&p.lng?p.lng:0,img:vThumb||c.img||pic(c.name+' '+c.h,c.v),q:c.name+' '+c.h,v:c.v||0,done:false,vid:c.vid||null,vfy:(p&&p.lat)?1:0,raw:c.raw||0,h:c.h||''});
   save();fit();toast('저장했어요 · '+CATS[c.cat].n+' 탭에서 볼 수 있어요');
-  if(!c.raw)fetchRepPhoto(c.name+' '+(c.address||c.h||'')).then(u=>{if(u){const it=items.find(x=>x.id===id);if(it){it.img=u;save();}}});
+  // 만약 저장 시점에 릴스 썸네일이 비어 있으면 백그라운드에서 즉시 추출
+  if(c.vid&&c.vid.platform==='instagram'&&c.vid.code&&!c.vid.thumb){
+    fetchReelThumb(c.vid.code,c.vid.fmt).then(u=>{
+      if(u){const it=items.find(x=>x.id===id);if(it&&it.vid){it.vid.thumb=u;if(!it.useCustomImg)it.img=u;save()}}
+    });
+  }else if(!c.raw&&!vThumb){
+    fetchRepPhoto(c.name+' '+(c.address||c.h||'')).then(u=>{if(u){const it=items.find(x=>x.id===id);if(it&&!(it.vid&&it.vid.thumb)){it.img=u;save()}}});
+  }
 }
 
-// 상세 시트에서 캡션/주소 텍스트를 붙여넣었을 때 자동으로 이름·주소 분리 및 좌표 검색
 async function applyTextToSheetItem(i,rawText){
   rawText=String(rawText||'').trim();
   if(!rawText){toast('붙여넣을 텍스트가 없어요');return}
@@ -924,7 +938,29 @@ document.addEventListener('click',async e=>{
   else if(a==='vid'){view='video';showSheet()}
   else if(a==='open'){const it=items.find(x=>x.id===b.dataset.id);cur=b.dataset.id;view=(it&&it.vid)?'video':'photo';showSheet()}
   else if(a==='close')closeSheet();
-  else if(a==='rot'&&i){i.v=(i.v||0)+1;i.img=pic(i.q||i.name,i.v);save();showSheet()}
+  else if(a==='rot'&&i){
+    i.v=(i.v||0)+1;
+    i.useCustomImg=1;
+    i.img=pic(i.name,i.v);
+    view='photo';save();showSheet();
+    toast('다른 검색 사진으로 바꿨어요 (릴스 사진으로 돌아가려면 [🎬 릴스사진] 클릭)');
+  }
+  else if(a==='reelThumb'&&i&&i.vid){
+    i.useCustomImg=0;
+    if(i.vid.thumb){
+      i.img=i.vid.thumb;view='photo';save();showSheet();
+      toast('릴스 썸네일 사진을 적용했어요!');
+    }else{
+      toast('릴스 썸네일 사진을 불러오는 중...');
+      const u=await fetchReelThumb(i.vid.code,i.vid.fmt);
+      if(u){
+        i.vid.thumb=u;i.img=u;view='photo';save();showSheet();
+        toast('릴스 썸네일 사진을 적용했어요!');
+      }else{
+        toast('릴스 썸네일을 가져오지 못했어요. [📷 내 사진]으로 스샷을 넣을 수 있어요');
+      }
+    }
+  }
   else if(a==='photo'){view='photo';showSheet()}
   else if(a==='view'){view=b.dataset.view;toast('지도: '+view);showSheet()}
   else if(a==='own'){$('own').click()}
@@ -960,7 +996,11 @@ document.addEventListener('click',async e=>{
     const g=await geoFill(i);
     if(g&&g.lat&&g.lng){
       i.lat=g.lat;i.lng=g.lng;if(!i.address&&g.address)i.address=g.address;i.vfy=1;
-      if(!i.img||i.img.includes('공유'))i.img=pic(i.name+' '+(i.address||''),0);
+      if(i.vid&&i.vid.thumb&&!i.useCustomImg){
+        i.img=i.vid.thumb;
+      }else if(!i.img||i.img.includes('공유')){
+        i.img=pic(i.name,0);
+      }
       save();fit();
       toast('위치를 찾았어요! 지도 탭과 시트 지도에 반영되었습니다');
       view='google';
@@ -983,7 +1023,6 @@ document.addEventListener('change',e=>{
   const i=items.find(x=>x.id===b.dataset.id);if(i){i.done=b.checked;save()}
 });
 
-// 상세 시트의 이름·주소 입력 시 실시간 반영 및 붙여넣기 자동 지오코딩
 document.addEventListener('input',e=>{
   const i=items.find(x=>x.id===cur);if(!i)return;
   if(e.target.id==='memo'){i.note=e.target.value;persist()}
@@ -1010,7 +1049,6 @@ document.addEventListener('input',e=>{
   }
 });
 
-// 주소 입력칸에 붙여넣기(paste)할 때 캡션 전체나 주소가 들어오면 자동으로 위치까지 검색
 document.addEventListener('paste',e=>{
   if(e.target&&e.target.id==='editAddr'){
     const i=items.find(x=>x.id===cur);
@@ -1025,10 +1063,16 @@ document.addEventListener('paste',e=>{
 
 $('own').onchange=async e=>{
   const f=e.target.files[0],i=items.find(x=>x.id===cur);e.target.value='';if(!f||!i)return;
-  try{i.img=await shrink(f,480,.72);view='photo';save();showSheet()}catch(err){toast(err.message)}
+  try{
+    const dataUrl=await shrink(f,480,.75);
+    i.img=dataUrl;
+    if(i.vid)i.vid.thumb=dataUrl;
+    i.useCustomImg=1;
+    view='photo';save();showSheet();
+    toast('사진이 변경되었어요 (지도 핀에도 바로 적용됨)');
+  }catch(err){toast(err.message)}
 };
 
-// 상세 시트에서 캡션 스크린샷 선택 시 AI로 읽어서 현재 항목에 즉시 반영
 $('sheetShot').onchange=async e=>{
   const f=e.target.files[0],i=items.find(x=>x.id===cur);e.target.value='';if(!f||!i)return;
   const A=aiKeys();
@@ -1347,7 +1391,7 @@ if(mapProvider==='google' && _gkey){
   rebuildTiles();
 } else $('mapmsg').style.display='block';
 
-// ===== 릴스/쇼츠 공유 → 장소 찾기 =====
+// ===== 릴스/쇼츠 공유 & 릴스 썸네일 추출 =====
 function withTimeout(p,ms){return Promise.race([p,new Promise(r=>setTimeout(()=>r(null),ms))])}
 function parseShare(raw){
   const t=String(raw||'').trim();
@@ -1371,15 +1415,42 @@ ${d.screen?'중요: 첨부된 사진은 영상/캡션 화면의 스크린샷입�
 공유 텍스트: ${d.caption||'(텍스트 없음)'}`;
 }
 
-async function jinaRead(url,ms=4000){
+async function jinaRead(url,ms=7500){
   try{const r=await fetchTO('https://r.jina.ai/'+url,{headers:{'Accept':'text/plain'}},ms);if(!r.ok)return '';return await r.text();}catch(e){return ''}
 }
 
-// 인스타그램 임베드 HTML(`/embed/captioned/`)에서 이중 이스케이프된 contextJSON 및 DOM 파싱
+function thumbFromJina(txt){
+  if(!txt)return '';
+  const urls=[...txt.matchAll(/\((https:\/\/[^)\s]+)\)/g)].map(m=>m[1]);
+  const ok=urls.filter(u=>/(scontent|cdninstagram|fbcdn\.net|tiktokcdn|muscdn)/.test(u)&&!/2885-19\/|s150x150|p150x150|s100x100/.test(u));
+  return ok[0]||'';
+}
+
+// 인스타그램 임베드 HTML 내부의 DOM 및 이중 이스케이프된 contextJSON에서 릴스 썸네일 추출
+function extractIGThumbFromHtml(html){
+  if(!html||html.length<80)return '';
+  const doc=new DOMParser().parseFromString(html,'text/html');
+  const imgEl=doc.querySelector('img.EmbeddedMediaImage, .EmbedVideo img, .EmbeddedMedia img');
+  if(imgEl){
+    const s=imgEl.getAttribute('src')||'';
+    if(s&&!/2885-19|s150x150/.test(s))return s.replace(/&amp;/g,'&');
+  }
+  const og=doc.querySelector('meta[property="og:image"]');
+  if(og&&og.getAttribute('content'))return og.getAttribute('content').replace(/&amp;/g,'&');
+  const un=html.replace(/\\"/g,'"').replace(/\\\\\//g,'/').replace(/\\\//g,'/').replace(/\\u0026/g,'&').replace(/&amp;/g,'&');
+  for(const k of ['thumbnail_src','display_url','display_src']){
+    const m=un.match(new RegExp('"'+k+'"\\s*:\\s*"(https://[^"]+)"'));
+    if(m&&m[1]&&!/2885-19|s150x150|p150x150/.test(m[1]))return m[1];
+  }
+  const all=[...un.matchAll(/(https:\/\/scontent[^"'\s)\\]+(?:cdninstagram\.com|fbcdn\.net)[^"'\s)\\]+)/g)].map(m=>m[1]);
+  const good=all.filter(u=>!/2885-19|s150x150|p150x150|s100x100/.test(u));
+  return good[0]||'';
+}
+
 function parseIGEmbedHtml(html){
   if(!html||html.length<100)return null;
   const doc=new DOMParser().parseFromString(html,'text/html');
-  let user='',caption='',thumb='';
+  let user='',caption='',thumb=extractIGThumbFromHtml(html);
   const uEl=doc.querySelector('.HeaderText .UsernameText, a.Username, .EmbedFrame .UsernameText');
   if(uEl)user=uEl.textContent.trim();
   const cEl=doc.querySelector('.Caption');
@@ -1389,77 +1460,124 @@ function parseIGEmbedHtml(html){
     clone.querySelectorAll('br').forEach(br=>br.replaceWith('\n'));
     caption=clone.textContent.trim();
   }
-  const imgEl=doc.querySelector('img.EmbeddedMediaImage');
-  if(imgEl)thumb=imgEl.getAttribute('src')||'';
-
-  // contextJSON 이중 이스케이프 해제 후 캡션 탐색
+  const unescaped=html.replace(/\\"/g,'"').replace(/\\\\n/g,'\\n');
   if(!caption){
-    const unescaped=html.replace(/\\"/g,'"').replace(/\\\\n/g,'\\n');
     const m=unescaped.match(/"edge_media_to_caption"\s*:\s*\{\s*"edges"\s*:\s*\[\s*\{\s*"node"\s*:\s*\{\s*"text"\s*:\s*"((?:\\.|[^"\\])*)"/)
       ||unescaped.match(/"caption"\s*:\s*\{\s*[^}]*"text"\s*:\s*"((?:\\.|[^"\\])*)"/);
     if(m){
       try{caption=JSON.parse('"'+m[1]+'"')}catch(e){caption=m[1].replace(/\\n/g,'\n')}
     }
-    if(!user){
-      const um=unescaped.match(/"owner"\s*:\s*\{[^}]*"username"\s*:\s*"([^"]+)"/)||unescaped.match(/"username"\s*:\s*"([^"]+)"/);
-      if(um&&um[1]!=='instagram')user=um[1];
-    }
+  }
+  if(!user){
+    const um=unescaped.match(/"owner"\s*:\s*\{[^}]*"username"\s*:\s*"([^"]+)"/)||unescaped.match(/"username"\s*:\s*"([^"]+)"/);
+    if(um&&um[1]!=='instagram')user=um[1];
   }
   if(!caption){
     const q=s=>{const el=doc.querySelector('meta[property="'+s+'"]');return el?(el.getAttribute('content')||''):''};
-    const t=q('og:title'),d=q('og:description'),im=q('og:image');
-    if(im&&!thumb)thumb=im;
+    const t=q('og:title'),d=q('og:description');
     const dm=d.match(/[\d.,]+\s*(?:likes|좋아요)[^-]*-\s*(.+?)\s+on\s+[^:]*:\s*([\s\S]+)$/);
     if(dm){user=user||dm[1].trim();caption=dm[2].trim()}
     if(!caption&&t){const tm=t.match(/^(.*?)on (?:Instagram|TikTok)\s*:\s*([\s\S]*)$/);if(tm){user=user||tm[1].trim();caption=tm[2].trim()}}
   }
-  if(caption||user)return {user,caption:caption.replace(/&quot;/g,'"').replace(/&amp;/g,'&').trim(),thumb};
+  if(caption||user||thumb)return {user,caption:caption.replace(/&quot;/g,'"').replace(/&amp;/g,'&').trim(),thumb};
   return null;
 }
 
-// 병렬 요청으로 대기 시간을 4초 이내로 단축
+// 릴스 코드만으로 썸네일 사진을 가져오는 전용 함수 (신규 및 기존 저장 항목 공용)
+async function fetchReelThumb(code,fmt){
+  if(!code)return '';
+  const eu=`https://www.instagram.com/${fmt==='post'?'p':'reel'}/${code}/embed/captioned/`;
+  const url=`https://www.instagram.com/${fmt==='post'?'p':'reel'}/${code}/`;
+  const tasks=[
+    (async()=>{
+      const r=await fetchTO(`https://api.allorigins.win/raw?url=${encodeURIComponent(eu)}`,{},5000);
+      if(!r.ok)throw 0;
+      const u=extractIGThumbFromHtml(await r.text());
+      if(!u)throw 0;
+      return u;
+    })(),
+    (async()=>{
+      const r=await fetchTO(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(eu)}`,{},5000);
+      if(!r.ok)throw 0;
+      const u=extractIGThumbFromHtml(await r.text());
+      if(!u)throw 0;
+      return u;
+    })(),
+    (async()=>{
+      const jt=await jinaRead(eu,8000);
+      const u=thumbFromJina(jt);
+      if(!u)throw 0;
+      return u;
+    })(),
+    (async()=>{
+      const jt=await jinaRead(url,8000);
+      const u=thumbFromJina(jt);
+      if(!u)throw 0;
+      return u;
+    })()
+  ];
+  try{return await Promise.any(tasks)}catch(e){return ''}
+}
+
+// 캡션이 비어 있어도 썸네일(thumb)과 작성자(user)를 절대 버리지 않도록 수정
 async function fetchIGMeta(url,code){
   const cleanUrl=String(url||'').split('?')[0].replace(/\/+$/,'')+'/';
   const eu=code?`https://www.instagram.com/reel/${code}/embed/captioned/`:cleanUrl;
+  let best={user:'',caption:'',thumb:''};
+  const merge=p=>{
+    if(!p)return;
+    if(p.user&&!best.user)best.user=p.user;
+    if(p.thumb&&!best.thumb)best.thumb=p.thumb;
+    if(p.caption&&p.caption.length>(best.caption||'').length)best.caption=p.caption;
+  };
   const tasks=[
     (async()=>{
-      const r=await fetchTO(`https://api.allorigins.win/raw?url=${encodeURIComponent(eu)}`,{},4200);
+      const r=await fetchTO(`https://api.allorigins.win/raw?url=${encodeURIComponent(eu)}`,{},4500);
       if(!r.ok)throw 0;
       const p=parseIGEmbedHtml(await r.text());
-      if(!p||!p.caption||p.caption.length<8)throw 0;
+      merge(p);
+      if(!p||(!p.caption&&!p.thumb))throw 0;
       return p;
     })(),
     (async()=>{
-      const r=await fetchTO(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(eu)}`,{},4200);
+      const r=await fetchTO(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(eu)}`,{},4500);
       if(!r.ok)throw 0;
       const p=parseIGEmbedHtml(await r.text());
-      if(!p||!p.caption||p.caption.length<8)throw 0;
+      merge(p);
+      if(!p||(!p.caption&&!p.thumb))throw 0;
       return p;
     })(),
     (async()=>{
-      const jt=await jinaRead(eu,4200);
-      if(!jt||jt.length<80||/rate\s*limit|too many|429|Log in to Instagram/i.test(jt.slice(0,300)))throw 0;
+      const jt=await jinaRead(eu,6500);
+      if(!jt||jt.length<60)throw 0;
       const m=metaFromJina(jt);
-      if(!m||!m.caption||m.caption.length<8)throw 0;
-      return {user:m.user,caption:m.caption,thumb:thumbFromJina(jt)};
+      const th=thumbFromJina(jt);
+      const p={user:(m&&m.user)||'',caption:(m&&m.caption)||'',thumb:th};
+      merge(p);
+      if(!p.caption&&!p.thumb)throw 0;
+      return p;
     })(),
     (async()=>{
-      const jt=await jinaRead(cleanUrl,4200);
-      if(!jt||jt.length<80||/rate\s*limit|too many|429|Log in to Instagram/i.test(jt.slice(0,300)))throw 0;
+      const jt=await jinaRead(cleanUrl,6500);
+      if(!jt||jt.length<60)throw 0;
       const m=metaFromJina(jt);
-      if(!m||!m.caption||m.caption.length<8)throw 0;
-      return {user:m.user,caption:m.caption,thumb:thumbFromJina(jt)};
+      const th=thumbFromJina(jt);
+      const p={user:(m&&m.user)||'',caption:(m&&m.caption)||'',thumb:th};
+      merge(p);
+      if(!p.caption&&!p.thumb)throw 0;
+      return p;
     })()
   ];
-  try{return await Promise.any(tasks)}catch(e){return null}
+  await Promise.race([
+    Promise.allSettled(tasks),
+    new Promise(res=>{
+      const iv=setInterval(()=>{if(best.thumb&&best.caption){clearInterval(iv);res()}},200);
+      setTimeout(()=>{clearInterval(iv);res()},5000);
+    })
+  ]);
+  return (best.user||best.caption||best.thumb)?best:null;
 }
 
-function thumbFromJina(txt){
-  if(!txt)return '';
-  const urls=[...txt.matchAll(/\((https:[^)\s]+)\)/g)].map(m=>m[1]);
-  const ok=urls.filter(u=>/(scontent|cdninstagram|tiktokcdn|muscdn)/.test(u)&&!/2885-19\//.test(u));
-  return ok[0]||'';
-}
 function vidEmbedUrl(v){
   if(!v)return '';
   if(v.platform==='youtube'&&v.code)return 'https://www.youtube.com/embed/'+v.code+'?rel=0&playsinline=1';
@@ -1481,10 +1599,10 @@ function metaFromJina(txt){
   if(line){
     const s=line.trim().replace(/^["“]|["”]$/g,'');
     const m=s.match(/^(.*?)on Instagram\s*:\s*([\s\S]*)$/);
-    if(m)return {user:m[1].trim(),caption:((m[2]||'').replace(/^[""]|[""]$/g,'').trim()||body)};
+    if(m)return {user:m[1].trim(),caption:((m[2]||'').replace(/^[""]|[""]$/g,'').trim())};
   }
-  if(body&&body.length>15&&!/Log in to Instagram/i.test(body))return {user:'',caption:body.slice(0,1500)};
-  return line?{user:'',caption:line.trim()}:null;
+  if(body&&body.length>15&&!/Log in to Instagram|리믹스 활용 예시/i.test(body))return {user:'',caption:body.slice(0,1500)};
+  return null;
 }
 async function ytMeta(code){
   try{
@@ -1495,7 +1613,6 @@ async function ytMeta(code){
   }catch(e){return null}
 }
 
-// iOS Live Text OCR 복사본(이모지 누락, 'T542-0086' 오타 포함)까지 완벽히 파싱하는 캡션 파서
 function parseCaptionPlaces(cap){
   if(!cap)return [];
   const txt=normalizeOcrAddr(cap);
@@ -1516,7 +1633,6 @@ function parseCaptionPlaces(cap){
   const out=[];
   for(let i=0;i<lines.length;i++){
     const L=lines[i];
-    // 케이스 1: '📍 가게명' 다음 줄에 실제 주소가 오는 경우
     if(hasPin(L)&&!isRealAddr(L)){
       const pinName=clean(L);
       const nextL=lines[i+1]||'';
@@ -1540,7 +1656,6 @@ function parseCaptionPlaces(cap){
         continue;
       }
     }
-    // 케이스 2: 줄 자체가 실제 주소인 경우 (윗줄에서 가게명 탐색 — 이모지가 없는 OCR 텍스트도 대응)
     if(!isRealAddr(L)&&!(hasPin(L)&&clean(L).length>=10))continue;
     const addr=clean(L);
     if(addr.length<8)continue;
@@ -1590,11 +1705,11 @@ async function processShared(raw){
   try{
     const sd=parseShare(raw);
     let user='',caption=sd.clean,vThumb='',metaFail=false;
-    if((sd.kind==='instagram'||sd.kind==='tiktok')&&sd.url&&(!caption||caption.length<20)){
-      toast((sd.kind==='tiktok'?'틱톡':'릴스')+' 캡션 확인 중 (최대 4초)...');
+    if((sd.kind==='instagram'||sd.kind==='tiktok')&&sd.url){
+      toast((sd.kind==='tiktok'?'틱톡':'릴스')+' 썸네일·정보 확인 중...');
       const meta=await fetchIGMeta(sd.url,sd.code);
       if(meta){
-        if(meta.caption)caption=meta.caption;
+        if(meta.caption&&(!caption||caption.length<20))caption=meta.caption;
         if(meta.user)user=meta.user;
         if(meta.thumb)vThumb=meta.thumb;
       }
@@ -1606,13 +1721,11 @@ async function processShared(raw){
     }
     const vmeta=(sd.kind!=='text'&&sd.code)?{platform:sd.kind,code:sd.code,fmt:sd.fmt||'',thumb:vThumb}:null;
 
-    // 1) 캡션/주소가 확보되었으면 로컬 파서로 즉시 추출
     const directParsed=caption?parseCaptionPlaces(caption):[];
     let list=null,errNote='';
     const AC=aiKeys();
     const provs=aiList(AC);
 
-    // 2) 스크린샷이 첨부되었거나, 로컬 파서가 못 찾은 텍스트가 있을 때 AI 호출
     if(provs.length&&(pend.length||(caption&&!directParsed.length))){
       let shots=[];
       if(pend.length){
@@ -1652,7 +1765,7 @@ async function processShared(raw){
       const cc=String(c.category||'').toUpperCase();
       return {name:c.name,address:normalizeOcrAddr(c.address||''),info:c.info||'',price:c.price||'',raw:c.raw||0,
         lat:(typeof c.lat==='number'?c.lat:(c.lat?+c.lat:0))||0,lng:(typeof c.lng==='number'?c.lng:(c.lng?+c.lng:0))||0,
-        cat:CATS[cc]?cc:'PLACE',h:c.h||'',v:0,img:c.raw?'':pic(c.name+' '+(c.address||'')),vid:vmeta};
+        cat:CATS[cc]?cc:'PLACE',h:c.h||'',v:0,img:vThumb||(c.raw?'':pic(c.name,0)),vid:vmeta};
     });
     drawRes();tab('add');
     toast((res[0]&&res[0].raw?'릴스 영상이 연결되었어요. 눌러서 저장 후 주소를 붙여넣으세요':('후보 '+res.length+'건을 찾았어요! 눌러서 저장하세요'))+(errNote?' · '+errNote.slice(0,110):''));
@@ -1752,10 +1865,31 @@ document.addEventListener('touchend',e=>{
   }
   swEdge=null;swOK=false;
 });
+
+// 이미 저장된 항목(예: 규카츠 마코 🎬) 중 릴스 썸네일이 비어 있는 항목을 자동으로 채워 지도 핀·목록에 즉시 반영
+async function autoFetchReelThumbs(){
+  let updated=0;
+  for(const it of items){
+    if(it.vid && it.vid.platform==='instagram' && it.vid.code && !it.vid.thumb){
+      const u=await fetchReelThumb(it.vid.code,it.vid.fmt);
+      if(u){
+        it.vid.thumb=u;
+        if(!it.useCustomImg)it.img=u;
+        updated++;
+        save();
+      }
+      await sleep(500);
+    }
+  }
+  if(updated)toast(`🎬 저장된 항목 ${updated}건의 릴스 썸네일 사진을 적용했어요!`);
+}
+setTimeout(autoFetchReelThumbs,600);
+
+// 릴스가 아닌 일반 항목의 대표 사진 보강
 setTimeout(async()=>{
   let changed=false;
   for(const it of items){
-    if(it.raw)continue;
+    if(it.raw||(it.vid&&it.vid.thumb))continue;
     if(it.img && it.img.includes('tse1.mm.bing.net')){
       const u=await fetchRepPhoto(it.name+' '+(it.address||''));
       if(u){ it.img=u; changed=true; }
@@ -1763,7 +1897,8 @@ setTimeout(async()=>{
     }
   }
   if(changed){ save(); }
-},2000);
+},3000);
+
 $('myMapsBtn').onclick=()=>{
   const saved=(ls.get('TRIP_MYMMaps_EMBED')||ls.get('TRIP_MYMMaps_URL')||'').trim();
   const m=saved.match(/src=["']([^"']+)["']/);
