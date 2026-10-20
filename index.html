@@ -525,8 +525,10 @@ async function locate(o,h){
   let g=null;
   for(const q of qs.slice(0,7)){
     if(!q||g)continue;
-    g=await ggeocode(q.trim());
-    if(!g){const r=await nomi(q.trim());if(r&&r[0])g={lat:r[0].lat,lng:r[0].lng,address:r[0].address||''}}
+    const qc=q.trim();
+    g=await ggeocode(qc);
+    if(!g)g=await gPlaces(qc);
+    if(!g){const r=await nomi(qc);if(r&&r[0])g={lat:r[0].lat,lng:r[0].lng,address:r[0].address||''}}
   }
   if(g&&ai&&km(g.lat,g.lng,ai.lat,ai.lng)>50)g=null;
   return g?{lat:g.lat,lng:g.lng}:ai;
@@ -537,6 +539,22 @@ function ggeocode(addr){
     if(!window.google||!google.maps||!google.maps.Geocoder)return res(null);
     try{new google.maps.Geocoder().geocode({address:addr},(rs,st)=>{if(st==='OK'&&rs&&rs[0]){res({lat:rs[0].geometry.location.lat(),lng:rs[0].geometry.location.lng(),address:rs[0].formatted_address||''})}else res(null)})}catch(e){res(null)}
   });
+}
+// Places(신규) 텍스트 검색 폴백 — Geocoder가 못 찾는 상호/POI명(규카츠 마요, 난바워크 등) 해결
+let _noPlaces=false;
+async function gPlaces(q){
+  if(_noPlaces||!window._gkey)return null;
+  try{
+    const r=await fetch('https://places.googleapis.com/v1/places:searchText',{method:'POST',
+      headers:{'Content-Type':'application/json','X-Goog-Api-Key':window._gkey,
+        'X-Goog-FieldMask':'places.displayName,places.formattedAddress,places.location'},
+      body:JSON.stringify({textQuery:String(q).slice(0,200),languageCode:'ko'})});
+    if(!r.ok){if(r.status===403||r.status===400)_noPlaces=true;return null}
+    const d=await r.json();
+    const p=(d.places||[])[0];
+    if(!p||!p.location||!isFinite(p.location.latitude))return null;
+    return {lat:p.location.latitude,lng:p.location.longitude,address:p.formattedAddress||''};
+  }catch(e){return null}
 }
 // 주소 기준 검증 전용 — 이름으로는 뒤집지 않는다(동명이 엉뚱 곳 매칭 방지)
 async function geoCheck(o){
@@ -565,8 +583,10 @@ async function geoFill(o){
   let g=null;
   for(const q of qs.slice(0,7)){
     if(!q||g)continue;
-    g=await ggeocode(q.trim());
-    if(!g){const r=await nomi(q.trim());if(r&&r[0])g={lat:r[0].lat,lng:r[0].lng,address:r[0].address||''}}
+    const qc=q.trim();
+    g=await ggeocode(qc);
+    if(!g)g=await gPlaces(qc);
+    if(!g){const r=await nomi(qc);if(r&&r[0])g={lat:r[0].lat,lng:r[0].lng,address:r[0].address||''}}
   }
   if(g&&isFinite(g.lat)&&isFinite(g.lng))return g;
   return null;
@@ -879,6 +899,7 @@ $('mymapsEmbed').value=ls.get('TRIP_MYMMaps_EMBED')||'';
 if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{})}
 if(!ls.get('TRIP_ONBOARD')){setTimeout(()=>toast('찾기 탭에서 장소를 추가해 보세요. 사진·이름으로 검색할 수 있어요.'),800);ls.set('TRIP_ONBOARD','1')}
 const _gkey=(ls.get('TRAVEL_GMAP_KEY')||'').trim();
+try{window._gkey=_gkey||''}catch(e){}
 const _nkey=ls.get('TRAVEL_NAVER_KEY')||'';
 mapProvider=ls.get('TRIP_MAP_PROVIDER')||'osm';
 $('mapProvider').value=mapProvider;
@@ -1172,14 +1193,22 @@ async function processShared(raw){
     toast('AI가 영상 속 장소를 찾는 중...');
     let list=null,errNote='';
     const AC=aiKeys();
-    if(aiList(AC).length){
-      try{list=await askShared(AC,[{text:mkReelsPrompt({kind:sd.kind,user,caption,url:sd.url})}])}
-      catch(e){errNote=/quota|rate|exceeded/i.test(e.message)?'AI 무료 한도 초과 — 캡션에서 직접 추출':'AI 실패: '+String(e.message).slice(0,90)}
+    const provs=aiList(AC);
+    if(provs.length){
+      let aiEmptyNote='';
+      try{
+        list=await askShared(AC,[{text:mkReelsPrompt({kind:sd.kind,user,caption,url:sd.url})}]);
+        if(Array.isArray(list)&&!list.length)aiEmptyNote='AI가 이 영상은 장소 특정 불가 판정 — 캡션 복사 후 다시 분석 권장';
+      }catch(e){
+        errNote=/quota|rate|exceeded/i.test(e.message)?'AI 무료 한도 초과 — 캡션에서 직접 추출':'AI 실패: '+String(e.message).slice(0,90);
+        if(/quota/i.test(e.message)&&provs.length===1&&provs[0].id==='gemini')errNote+=' (OpenRouter 키를 설정 탭에 넣으면 자동 대체)';
+      }
+      if(aiEmptyNote)errNote=(errNote?errNote+' · ':'')+aiEmptyNote;
     }else{
       errNote='AI 키 없음 — 캡션에서 직접 추출';
     }
     list=(list||[]).filter(c=>c&&c.name);
-    if(metaFail)errNote=(errNote?errNote+' · ':'')+'릴스 캡션을 못 가져왔어요(인스타 익명차단) — 캡션을 복사해 같이 붙여넣고 다시 분석하면 확실히 찾아요';
+    if(metaFail)errNote=(errNote?errNote+' · ':'')+'릴스 캡션을 못 가져왔어요(인스타 익명차단) — 시트의 영상 아래 캡션을 꾹 눌러 복사해 입력칸에 같이 붙여넣고 다시 분석하세요';
     if(!list.length){
       const parsed=parseCaptionPlaces(caption);
       if(parsed.length)list=parsed;
