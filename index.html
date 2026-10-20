@@ -452,6 +452,10 @@ function showSheet(){
       <button class="mb pr" data-act="sheetPaste" style="flex:1">📋 복사한 캡션/주소 붙여넣기</button>
       <button class="mb" data-act="sheetShot" style="flex:1">📷 캡션 스샷 자동 추출</button>
     </div>
+    <label>카테고리 이동</label>
+    <div style="display:flex;gap:6px;margin:4px 0 12px">
+      ${['PLACE','FOOD','SHOP'].map(k=>`<button class="mb${i.category===k?' pr':''}" data-act="setCat" data-cat="${k}" style="flex:1;font-size:13px;padding:9px 2px">${CATS[k].e} ${CATS[k].n}${i.category===k?' ✓':''}</button>`).join('')}
+    </div>
     <label>장소명 / 가게 이름</label>
     <input type="text" id="editName" value="${esc(isGenericSharedName(i.name)?'':i.name)}" placeholder="예: 규카츠 마코 (비워둬도 주소로 위치 찾음)" style="margin-bottom:8px">
     <label>주소 / 지역 (붙여넣으면 자동으로 위치까지 찾아요)</label>
@@ -1008,6 +1012,7 @@ document.addEventListener('click',async e=>{
     drawRes();
     if(n){ fit(); tab('map'); toast('📍 장소 '+n+'건을 한 번에 저장했어요 — 지도에 각각 표시돼요'); }
   }
+  else if(a==='setCat'&&i){const nc=b.dataset.cat;if(CATS[nc]&&i.category!==nc){i.category=nc;save();render();showSheet();toast(CATS[nc].e+' '+CATS[nc].n+'으로 옮겼어요')}}
   else if(a==='del'&&i){if(b.dataset.sure){items=items.filter(x=>x.id!==i.id);closeSheet();save()}else{b.dataset.sure=1;b.textContent='한 번 더 누르면 삭제'}}
   else if(a==='toggleEdit'){const c=b.dataset.cat; editMode[c]=!editMode[c]; if(!editMode[c]) selected.clear(); render()}
   else if(a==='sel'||a==='toggleSel'){const id=b.dataset.id; if(selected.has(id)) selected.delete(id); else selected.add(id); render()}
@@ -1557,7 +1562,25 @@ function mkSearchPrompt(d){
 JSON 배열만 출력하세요.`;
 }
 async function jinaRead(url){
-  try{const r=await fetchTO('https://r.jina.ai/'+url,{headers:{'Accept':'text/plain'}},7000);if(!r.ok)return '';return await r.text();}catch(e){return ''}
+  // jina는 실패결과를 캐시하므로 캐시버스트로 새 키를 만들어 만성 403캐시를 피한다.
+  try{const r=await fetchTO('https://r.jina.ai/'+url+(url.includes('?')?'&':'?')+'__cb='+(Date.now()%1e7),{headers:{'Accept':'text/plain'}},7000);if(!r.ok)return '';return await r.text();}catch(e){return ''}
+}
+// CORS 프록시 사슬: 오늘 실측(allorigins 522·codetabs 522·cors.lol 429·corsproxy.io 유료화) 같은 단일 장애에 굳지 않게
+// 여러 프록시를 순회하고, 실패캐시를 피하려 캐시버스트로 새 키로 친다. allorigins /get은 json(contents 필드)을 풀어준다.
+function pxChain(){
+  return [
+    u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u)+'&_='+Date.now(),
+    u=>'https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(u)+'&_='+Date.now(),
+    u=>'https://api.allorigins.win/get?url='+encodeURIComponent(u)+'&_='+Date.now(),
+    u=>'https://api.cors.lol/?url='+encodeURIComponent(u)
+  ];
+}
+async function pxText(px,url,ms){
+  const r=await fetchTO(px(url),{},ms);
+  if(!r.ok)return '';
+  const t=await r.text();
+  if(/allorigins\.win\/get/.test(px(''))){try{const j=JSON.parse(t);return (j&&j.contents)||''}catch(e){return ''}}
+  return t;
 }
 // IG 임베드(/embed/captioned/)는 로그인 없이 캡션을 달아주는 페이지 — 단, 요청 IP에 따라 EmbedBrokenMedia로 대체됨(실측).
 // 프록시별로 값싸게 시도하고 막히면 조용히 포기한다(재시도 무익).
@@ -1565,13 +1588,12 @@ async function igEmbedMeta(url,left){
   const m=String(url).match(/instagram\.com\/(?:[^\/]+\/)?(reel|reels|p)\/([A-Za-z0-9_-]+)/);
   if(!m)return null;
   const ep='https://www.instagram.com/'+(m[1]==='p'?'p':'reel')+'/'+m[2]+'/embed/captioned/';
-  for(const px of [u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u),u=>'https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(u)]){
-    const ms=Math.min(8000,left());if(ms<3000)return null;
+  for(const px of pxChain()){
+    const ms=Math.min(7000,left());if(ms<3000)return null;
     try{
-      const r=await fetchTO(px(ep),{headers:{'Accept':'text/html'}},ms);
-      if(!r.ok)continue;
-      const h=await r.text();
-      if(/EmbedBrokenMedia|죄송합니다|Login\s*•/.test(h))return null;
+      const h=await pxText(px,ep,ms);
+      if(!h)continue;
+      if(/EmbedBrokenMedia|Login\s*•|id="facebook"|class="no_js"/.test(h.slice(0,4000)))continue;
       const doc=new DOMParser().parseFromString(h,'text/html');
       const tx=((doc.querySelector('div.CommentText')||{}).textContent||(h.match(/CommentText">\s*([^<]{10,2000})</)||[])[1]||'');
       const us=((doc.querySelector('div.UsernameText')||{}).textContent||(h.match(/UsernameText">\s*([^<]{1,60})</)||[])[1]||'');
@@ -1590,12 +1612,12 @@ async function fetchIGMeta(url){
     if(em)return em;
   }
   if(left()>3500){
-    for(const px of [u=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u),u=>'https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(u)]){
-      const ms=Math.min(9000,left());if(ms<3000)break;
+    for(const px of pxChain()){
+      const ms=Math.min(7000,left());if(ms<3000)break;
       try{
-        const r=await fetchTO(px(url),{},ms);
-        if(!r.ok)continue;
-        const h=await r.text();
+        const h=await pxText(px,url,ms);
+        if(!h)continue;
+        if(/id="facebook"|class="no_js"/.test(h.slice(0,2000)))continue; // 인스타의 로그인벽 셸
         const doc=new DOMParser().parseFromString(h,'text/html');
         const q=s=>{const el=doc.querySelector('meta[property="'+s+'"]');return el?(el.getAttribute('content')||''):''};
         const t=q('og:title'),d=q('og:description'),img=q('og:image');
@@ -1907,8 +1929,8 @@ async function processShared(raw){
         try{const g=await nomi((caption||'').replace(/#[^\s#]+/g,'').trim().slice(0,90));if(g.length)list=g.slice(0,4).map(c=>({name:c.name,address:c.address,lat:c.lat,lng:c.lng,category:'PLACE',info:'공유 텍스트 기반 추정'}))}catch(e){}
         if(!list||!list.length){
           const kindKo={instagram:'릴스',youtube:'쇼츠',tiktok:'틱톡'}[sd.kind]||'링크';
-          const tag=errNote?' — '+errNote.slice(0,140):'';
-          list=[{name:'공유 '+kindKo+(user?' · '+user:''),address:'',category:'PLACE',info:'장소 자동 인식 실패'+(tag||' — 시트의 영상/원본 보고 직접 확인하세요')+' ⚙️ 설정 탭 환경진단 결과를 확인하세요',raw:1}]
+          const tag=errNote?' · '+errNote.slice(0,110):'';
+          list=[{name:'공유 '+kindKo+(user?' · '+user:''),address:'',category:'PLACE',info:'자동 인식 실패(인스타 익명차단·AI 한도 등) — 시트에서 [📋 복사한 캡션/주소 붙여넣기]를 누르면 캡션 글자만으로 여러 장소가 한 번에 저장돼요'+tag,raw:1}]
         }
       }
     }
