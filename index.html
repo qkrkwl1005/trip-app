@@ -107,9 +107,11 @@ input[type=text],input[type=password],textarea{font-size:16px}
   </section>
 
   <section id="tab-set" class="tab-content"><div class="card">
-    <label>Gemini API 키 (사진 인식 + AI 검색, 선택)</label>
-    <input type="password" id="gkey" placeholder="AIzaSy...">
-    <button id="savek" class="btn g">키 저장</button>
+    <label>AI 제공자 키 (선택 — 여러 개 가능, 위부터 순서대로 시도하고 실패하면 자동으로 다음 제공자)</label>
+    <div id="aiProv"></div>
+    <small style="display:block;margin-top:6px;color:var(--sub);font-size:11px">시도 순서: <span id="aiChain">-</span></small>
+    <div style="display:flex;gap:6px"><button id="aiSaveAll" class="mb">💾 지금 화면의 키 저장</button><button id="aiClearAll" class="mb">🧹 모두 지우기</button></div>
+    <small style="display:block;margin-top:6px;color:var(--sub);font-size:11px">OpenRouter 키는 무료 모델도 사용 가능 — 모델칸을 비우면 무료 라우터(openrouter/free)를 씁니다. Gemini는 무료 쿼터(분당 횟수 제한)라 순서는 Gemini → OpenRouter로 돌아요.</small>
     <label style="margin-top:14px">지도 제공자</label>
     <select id="mapProvider" class="btn g" style="margin-bottom:10px">
       <option value="osm">OpenStreetMap (키 불필요)</option>
@@ -401,22 +403,92 @@ ${cat==='PLACE'?'주소와 위도·경도를 꼭 찾으세요.':'제품명, 대�
 지역: ${h||'없음'}
 입력: ${q||'(사진만)'}`;
 
-async function ask(key,parts,tools){
-  let err=new Error('AI 호출 실패');
-  const tls=tools||[{google_search:{}}];
-  for(const m of MODELS){
+// ===== AI 제공자 체인 (여러 키 지원: 위부터 순서대로 시도, 실패 시 다음 제공자) =====
+const AIS=[
+  ['gemini','Google Gemini (무료 쿼터 있음)','AIzaSy...','gemini-2.0-flash'],
+  ['openrouter','OpenRouter (키 하나로 모든 모델)','sk-or-...','openrouter/free']
+];
+function aiKeys(){
+  const s=ls.get('TRIP_AI_KEYS');
+  if(s){try{const d=JSON.parse(s);if(d&&typeof d==='object')return d}catch(e){}}
+  const g=(ls.get('TRAVEL_GEMINI_KEY')||'').trim(); // 구버전 저장 키 마이그레이션
+  return g?{gemini:{key:g,model:''}}:{};
+}
+function aiList(K){
+  if(!K)return [];
+  if(typeof K==='string')return K?[{id:'gemini',key:K,model:''}]:[];
+  if(Array.isArray(K))return K;
+  const out=[];
+  for(const [id] of AIS){const v=K[id];if(v&&typeof v==='object'&&v.key)out.push({id,key:v.key,model:v.model||'',base:v.base||''})}
+  return out;
+}
+function aiProviderName(id){const row=AIS.find(a=>a[0]===id);return row?row[1]:id}
+function toOpenAIMessages(parts){
+  const content=[];
+  for(const p of parts||[]){
+    if(p.text)content.push({type:'text',text:p.text});
+    else if(p.inlineData)content.push({type:'image_url',image_url:{url:'data:'+(p.inlineData.mimeType||'image/jpeg')+';base64,'+p.inlineData.data}});
+  }
+  return [{role:'user',content}];
+}
+function toClaudeMessages(parts){
+  const content=[];
+  for(const p of parts||[]){
+    if(p.text)content.push({type:'text',text:p.text});
+    else if(p.inlineData)content.push({type:'image',source:{type:'base64',media_type:p.inlineData.mimeType||'image/jpeg',data:p.inlineData.data}});
+  }
+  return {role:'user',content};
+}
+async function callProvider(p,parts,tools){
+  if(p.id==='gemini'){
+    const models=p.model?[p.model]:MODELS;
+    let last='';
+    for(const m of models){
+      try{
+        const tls=tools||[{google_search:{}}];
+        const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':p.key},body:JSON.stringify({contents:[{parts}],tools:tls})});
+        const d=await r.json();
+        if(!r.ok)throw new Error((d.error&&d.error.message)||('HTTP '+r.status));
+        const t=((d.candidates&&d.candidates[0]&&d.candidates[0].content&&d.candidates[0].content.parts)||[]).map(x=>x.text||'').join('');
+        if(!t)throw new Error('빈 응답');
+        return t;
+      }catch(e){last=e.message}
+    }
+    throw new Error('Gemini: '+last);
+  }
+  if(p.id==='anthropic'){
+    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':p.key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:p.model||'claude-sonnet-4-5',max_tokens:1600,messages:[toClaudeMessages(parts)]})});
+    const d=await r.json();
+    if(!r.ok)throw new Error((d.error&&d.error.message)||('HTTP '+r.status));
+    return (d.content||[]).map(c=>c.text||'').join('');
+  }
+  // openai / openrouter / custom — OpenAI 호환
+  const base=p.id==='openai'?'https://api.openai.com/v1':(p.id==='openrouter'?'https://openrouter.ai/api/v1':(p.base||'').trim().replace(/\/+$/,''));
+  if(!base)throw new Error('Base URL이 필요해요');
+  const hdr={'Content-Type':'application/json','Authorization':'Bearer '+p.key};
+  const body={model:p.model||({openrouter:'openrouter/free'})[p.id]||'gpt-4o-mini',messages:toOpenAIMessages(parts)};
+  const r=await fetch(base+'/chat/completions',{method:'POST',headers:hdr,body:JSON.stringify(body)});
+  const d=await r.json();
+  if(!r.ok)throw new Error((d.error&&d.error.message)||('HTTP '+r.status));
+  return ((d.choices&&d.choices[0]&&d.choices[0].message&&d.choices[0].message.content)||'')+'';
+}
+let lastAIP='';
+async function ask(K,parts,tools){
+  const provs=aiList(K);
+  if(!provs.length)throw new Error('AI 키가 없어요 (설정 탭에서 입력)');
+  const errs=[];
+  for(const p of provs){
     try{
-      const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{parts}],tools:tls})});
-      const d=await r.json();
-      if(!r.ok)throw new Error((d.error&&d.error.message)||('HTTP '+r.status));
-      const t=((d.candidates&&d.candidates[0]&&d.candidates[0].content&&d.candidates[0].content.parts)||[]).map(p=>p.text||'').join(''),a=t.indexOf('['),b=t.lastIndexOf(']');
+      const t=await callProvider(p,parts,tools);
+      const a=t.indexOf('['),b=t.lastIndexOf(']');
       if(a<0||b<a)throw new Error('AI 응답을 해석하지 못했어요');
       const j=JSON.parse(t.slice(a,b+1));
       if(!Array.isArray(j))throw new Error('AI 응답 형식 오류');
+      lastAIP=aiProviderName(p.id);
       return j;
-    }catch(e){err=e}
+    }catch(e){errs.push(aiProviderName(p.id)+': '+e.message)}
   }
-  throw err;
+  throw new Error('모든 AI 제공자 실패 — '+errs.join(' / '));
 }
 async function nomi(q){
   const w=1100-(Date.now()-lastGeo);if(w>0)await sleep(w);lastGeo=Date.now();
@@ -500,17 +572,17 @@ async function autoFixCoords(){
 }
 
 async function find(){
-  const q=$('q').value.trim(),h=$('hint').value.trim(),key=ls.get('TRAVEL_GEMINI_KEY')||'',btn=$('go');
+  const q=$('q').value.trim(),h=$('hint').value.trim(),btn=$('go'),A=aiKeys(),hasAI=aiList(A).length>0;
   if(!q&&!pend.length)return toast('검색어를 입력하거나 사진을 선택하세요');
   btn.disabled=true;btn.textContent='인터넷에서 찾는 중...';
   let list=null,note='';
   try{
-    if(key){
+    if(hasAI){
       try{
         const imgs=(await Promise.all(pend.map(f=>shrink(f)))).map(u=>({inlineData:{mimeType:'image/jpeg',data:u.split(',')[1]}}));
-        list=await ask(key,[...imgs,{text:mkPrompt(h,q)}]);
+        list=await ask(A,[...imgs,{text:mkPrompt(h,q)}]);
       }catch(e){note='AI 검색 실패: '+e.message}
-    }else if(pend.length)note='사진 인식은 설정 탭에서 Gemini 키가 필요해요';
+    }else if(pend.length)note='사진 인식은 설정 탭에서 AI 키가 필요해요';
     if((!list||!list.length)&&cat==='PLACE'&&q){list=await nomi((h+' '+q).trim());if(!list.length&&h)list=await nomi(q)}
     list=(list||[]).filter(c=>c&&c.name).slice(0,5);
     const seen=new Set();
@@ -590,7 +662,62 @@ $('go').onclick=find;
 $('q').onkeydown=e=>{if(e.key==='Enter')find()};
 $('themeBtn').onclick=()=>setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
 $('settingsBtn').onclick=()=>tab('set');
-$('savek').onclick=()=>{const v=$('gkey').value.trim(); ls.set('TRAVEL_GEMINI_KEY',v);toast(v?'API 키가 저장되었습니다.':'API 키가 비워졌어요.')};
+function renderAI(){
+  const K=aiKeys();
+  $('aiProv').innerHTML=AIS.map(([id,label,ph,dflt])=>{
+    const v=K[id]||{};
+    return '<div class="card" style="margin:6px 0;padding:10px">'
+      +'<b style="font-size:12px">'+esc(label)+'</b>'+(v.key?' <span style="color:#4ade80;font-size:11px">● 설정됨</span>':'')
+      +'<input type="password" id="ai_'+id+'" placeholder="'+esc(ph)+'">'
+      +(id==='custom'?'<input type="text" id="aibase_'+id+'" placeholder="Base URL (예: https://api.groq.com/openai/v1)">' : '')
+      +'<input type="text" id="aimodel_'+id+'" placeholder="모델명 (기본: '+(v.key&&v.model?esc(v.model):(dflt||'자동'))+')">'
+      +'<div style="display:flex;gap:6px;margin-top:4px"><button class="mb" data-aiaction="save" data-ai="'+id+'">💾 저장</button>'+(v.key?'<button class="mb" data-aiaction="del" data-ai="'+id+'">🗑️ 삭제</button>':'')
+      +(id==='custom'&&!v.key?'<span class="ds" style="font-size:10px;align-self:center">Base URL+모델 필수</span>':'')+'</div>'
+      +'</div>';
+  }).join('');
+  const chain=aiList(K).map(p=>aiProviderName(p.id)).join(' → ')||'설정된 AI 없음 (캡션 파서로만 분석)';
+  const el=document.getElementById('aiChain');if(el)el.textContent=chain;
+}
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-aiaction]');if(!b)return;
+  const id=b.dataset.ai,K=aiKeys();
+  if(b.dataset.aiaction==='del'){
+    delete K[id];
+    if(id==='gemini')ls.set('TRAVEL_GEMINI_KEY','');
+    ls.set('TRIP_AI_KEYS',JSON.stringify(K));
+    renderAI();toast(aiProviderName(id)+' 키를 삭제했어요');
+    return;
+  }
+  if(b.dataset.aiaction!=='save')return;
+  const key=$('ai_'+id).value.trim(),model=$('aimodel_'+id).value.trim();
+  if(!key){toast('키를 입력하세요');return}
+  const entry={key,model};
+  if(id==='custom'){const base=($('aibase_'+id)||{}).value||'';if(!base){toast('Base URL을 입력하세요');return}entry.base=base.trim()}
+  K[id]=entry;
+  if(id==='gemini')ls.set('TRAVEL_GEMINI_KEY',key); // 구버전 호환 유지
+  ls.set('TRIP_AI_KEYS',JSON.stringify(K));
+  renderAI();toast(aiProviderName(id)+' 키가 저장되었습니다 · 분석 시 자동으로 사용돼요');
+});
+$('aiSaveAll').onclick=()=>{
+  const K=aiKeys();let saved=0,warn='';
+  for(const [id] of AIS){
+    const ki=$('ai_'+id);if(!ki)continue;
+    const key=ki.value.trim(),model=($('aimodel_'+id)||{value:''}).value.trim()||'';
+    if(key){
+      const entry={key,model};
+      if(id==='custom'){const base=($('aibase_'+id)||{value:''}).value.trim();if(!base){warn=aiProviderName(id)+'는 Base URL 필수';continue}entry.base=base}
+      K[id]=entry;saved++;
+      if(id==='gemini')ls.set('TRAVEL_GEMINI_KEY',key);
+    }
+  }
+  ls.set('TRIP_AI_KEYS',JSON.stringify(K));
+  renderAI();
+  toast((saved?saved+'개 키 저장 완료':'저장된 키 없음')+(warn?' · '+warn:''));
+};
+$('aiClearAll').onclick=()=>{
+  ls.set('TRIP_AI_KEYS','{}');ls.set('TRAVEL_GEMINI_KEY','');
+  renderAI();toast('모든 AI 키를 지웠어요');
+};
 $('savegmap').onclick=()=>{const v=$('gmapkey').value.trim(); ls.set('TRAVEL_GMAP_KEY',v);toast(v?'Google 키가 저장되었습니다.':'Google 키가 비워졌어요.')};
 $('savenaver').onclick=()=>{const v=$('naverkey').value.trim(); if(!v){toast('Naver 키를 입력하세요');return;} ls.set('TRAVEL_NAVER_KEY',v);toast('Naver 키가 저장되었습니다.')};
 $('mapProvider').onchange=()=>{ls.set('TRIP_MAP_PROVIDER',$('mapProvider').value);toast('지도 제공자가 변경되었습니다. 페이지를 새로고침하세요.')};
@@ -700,7 +827,8 @@ addEventListener('resize',()=>lm&&lm.invalidateSize());
 
 setTheme(ls.get('TRIP_THEME')||'dark');
 // API 키는 형식 검증 없이 그대로 사용 (Google AI Studio 키 등 다양한 형식 지원)
-$('gkey').value=ls.get('TRAVEL_GEMINI_KEY')||'';
+renderAI();
+</script>
 $('gmapkey').value=ls.get('TRAVEL_GMAP_KEY')||'';
 $('naverkey').value=ls.get('TRAVEL_NAVER_KEY')||'';
 $('mymapsUrl').value=ls.get('TRIP_MYMMaps_URL')||'';
@@ -833,7 +961,7 @@ async function askShared(key,parts){
   try{return await ask(key,parts,[{google_search:{}},{url_context:{}}])}
   catch(e){return await ask(key,parts)}
 }
-// AI 없이 캡션에서 장소 후보를 직접 추출 (🍴이름 → 📍주소 → ⏰시간 구조, 해시태그로 지역/카테고리 추정)
+// AI 없이 캡션에서 장소 후보를 직접 추출 (🍴이름 → 📍주소 → ⏰시간 구조, 해시태그로 지역/카테고리 추정) (🍴이름 → 📍주소 → ⏰시간 구조, 해시태그로 지역/카테고리 추정)
 function parseCaptionPlaces(cap){
   if(!cap)return [];
   const txt=String(cap);
@@ -896,12 +1024,12 @@ async function processShared(raw){
     const vmeta=(sd.kind!=='text'&&sd.code)?{platform:sd.kind,code:sd.code,fmt:sd.fmt||'',thumb:vThumb}:null;
     toast('AI가 영상 속 장소를 찾는 중...');
     let list=null,errNote='';
-    const key=ls.get('TRAVEL_GEMINI_KEY')||'';
-    if(key){
-      try{list=await askShared(key,[{text:mkReelsPrompt({kind:sd.kind,user,caption,url:sd.url})}])}
-      catch(e){errNote=/quota|rate|exceeded/i.test(e.message)?'AI 무료 한도 초과 — 캡션에서 직접 추출':'AI 분석 실패: '+String(e.message).slice(0,70)}
+    const AC=aiKeys();
+    if(aiList(AC).length){
+      try{list=await askShared(AC,[{text:mkReelsPrompt({kind:sd.kind,user,caption,url:sd.url})}])}
+      catch(e){errNote=/quota|rate|exceeded/i.test(e.message)?'AI 무료 한도 초과 — 캡션에서 직접 추출':'AI 실패: '+String(e.message).slice(0,90)}
     }else{
-      errNote='Gemini 키 없음 — 캡션에서 직접 추출';
+      errNote='AI 키 없음 — 캡션에서 직접 추출';
     }
     list=(list||[]).filter(c=>c&&c.name);
     if(!list.length){
