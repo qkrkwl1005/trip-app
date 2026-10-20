@@ -1099,22 +1099,12 @@ async function applyTextToSheetItem(i,rawText){
     toast('텍스트는 반영했지만 좌표를 못 찾았어요. 가게 이름이나 주소를 확인해 주세요');
   }
   // 같은 캡션의 나머지 장소 → 개별 항목으로 저장 (지도에 각각 핀)
-  let made=0,noGeo=0;
-  for(const p of extras){
-    const id='i'+Date.now()+Math.random().toString(36).slice(2,5);
-    const nit={id,category:CATS[p.category]?p.category:(i.category||'PLACE'),name:p.name||'',address:normalizeOcrAddr(p.address||''),info:p.info||'',price:p.price||'',lat:0,lng:0,img:vidThumbUrl(i.vid)||((i.vid&&i.vid.thumb)||''),q:(p.name||'')+' '+(p.h||''),v:0,done:false,vid:i.vid?{...i.vid}:null,vfy:0,raw:0,h:p.h||''};
-    items.unshift(nit);
-    const gg=await geoFill(nit);
-    if(gg&&gg.lat&&gg.lng){nit.lat=gg.lat;nit.lng=gg.lng;nit.vfy=1;if(!nit.address&&gg.address)nit.address=gg.address}
-    else noGeo++;
-    made++;
-    save();
-  }
-  if(made){
+  const r=await addExtraPlaces(extras,i);
+  if(r.made){
     fit();
     closeSheet();
     tab('map');
-    toast('📍 장소 '+(made+1)+'건을 나눠 저장했어요 — 지도에 각각 표시돼요'+(noGeo?' ('+noGeo+'건은 좌표를 못 찾았어요)':''));
+    toast('📍 장소 '+(r.made+1)+'건을 나눠 저장했어요 — 지도에 각각 표시돼요'+(r.noGeo?' ('+r.noGeo+'건은 좌표를 못 찾았어요)':''));
   }
 }
 
@@ -1130,16 +1120,35 @@ $('own').onchange=async e=>{
   }catch(err){toast(err.message)}
 };
 
+// 여러 장소 후보(extras)를 개별 항목으로 추가 저장 — 시트 붙여넣기/스크린샷 경로 공용.
+// 각 항목마다 좌표를 독립 검색하고, 영상 링크(vid)는 원본 항목과 복사본으로 공유한다.
+async function addExtraPlaces(extras,srcIt){
+  let made=0,noGeo=0;
+  for(const p of (extras||[])){
+    if(!p||!p.name)continue;
+    const id='i'+Date.now()+Math.random().toString(36).slice(2,5);
+    const nit={id,category:CATS[p.category]?p.category:(srcIt.category||'PLACE'),name:p.name||'',address:normalizeOcrAddr(p.address||''),info:p.info||'',price:p.price||'',lat:0,lng:0,img:vidThumbUrl(srcIt.vid)||((srcIt.vid&&srcIt.vid.thumb)||''),q:(p.name||'')+' '+(p.h||''),v:0,done:false,vid:srcIt.vid?{...srcIt.vid}:null,vfy:0,raw:0,h:p.h||''};
+    items.unshift(nit);
+    const gg=await geoFill(nit);
+    if(gg&&gg.lat&&gg.lng){nit.lat=gg.lat;nit.lng=gg.lng;nit.vfy=1;if(!nit.address&&gg.address)nit.address=gg.address}
+    else noGeo++;
+    made++;
+    save();
+  }
+  return {made,noGeo};
+}
+
 $('sheetShot').onchange=async e=>{
-  const f=e.target.files[0],i=items.find(x=>x.id===cur);e.target.value='';if(!f||!i)return;
+  const fs=[...e.target.files].slice(0,3),i=items.find(x=>x.id===cur);e.target.value='';if(!fs.length||!i)return;
   const A=aiKeys();
   if(!aiList(A).length){toast('스크린샷 자동 읽기는 설정 탭에서 AI 키(Gemini 또는 OpenRouter)가 필요해요');return}
   try{
     toast('스크린샷에서 장소·주소 읽는 중...');
-    const u=await shrink(f);
-    const shot={inlineData:{mimeType:'image/jpeg',data:u.split(',')[1]}};
+    const shots=[];
+    for(const f of fs){ try{const u=await shrink(f);shots.push({inlineData:{mimeType:'image/jpeg',data:u.split(',')[1]}})}catch(err){} }
+    if(!shots.length)throw new Error('사진을 읽을 수 없어요');
     const pr={kind:'instagram',user:'',caption:'',url:'',screen:1};
-    const list=await withTimeout(ask(A,[shot,{text:mkReelsPrompt(pr)}]),25000);
+    const list=await withTimeout(ask(A,[...shots,{text:mkReelsPrompt(pr)}]),25000);
     if(Array.isArray(list)&&list[0]&&list[0].name){
       const c=list[0];
       i.name=c.name;
@@ -1149,10 +1158,21 @@ $('sheetShot').onchange=async e=>{
       if(c.category&&CATS[c.category])i.category=c.category;
       save();showSheet();
       const g=await geoFill(i);
-      if(g&&g.lat&&g.lng){i.lat=g.lat;i.lng=g.lng;i.vfy=1;save();fit();view='google';showSheet();toast('스크린샷에서 장소와 위치 좌표를 모두 찾았어요!')}
-      else toast('장소명을 찾았어요: '+i.name);
+      if(g&&g.lat&&g.lng){
+        i.lat=g.lat;i.lng=g.lng;i.vfy=1;
+        if(!i.address&&g.address)i.address=g.address;
+        save();fit();view='google';showSheet();
+        toast('스크린샷에서 장소·좌표를 찾았어요! ('+i.lat.toFixed(4)+', '+i.lng.toFixed(4)+')');
+      }else{
+        toast('장소명을 찾았어요: '+i.name);
+      }
+      // 스크린샷에 장소가 여러 개면 → 나머지도 개별 핀으로
+      if(list.length>1){
+        const r=await addExtraPlaces(list.slice(1),i);
+        if(r.made){fit();closeSheet();tab('map');toast('📸 나머지 장소 '+r.made+'건도 각각 저장했어요 — 지도에 핀으로 표시')}
+      }
     }else{
-      toast('스크린샷에서 장소를 특정하지 못했어요');
+      toast('이 사진엔 상호·주소 글자가 안 보여요. 캡션(설명 글자) 화면이 보이는 스크린샷으로 다시 시도하거나 [📋 캡션 붙여넣기]를 눌러주세요');
     }
   }catch(err){toast('스크린샷 분석 실패: '+err.message)}
 };
