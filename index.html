@@ -115,7 +115,12 @@ input[type=text],input[type=password],textarea{font-size:16px}
     <div id="aiProv"></div>
     <small style="display:block;margin-top:6px;color:var(--sub);font-size:11px">시도 순서: <span id="aiChain">-</span></small>
     <div id="usageBox" style="margin-top:10px;padding:10px;border:1px solid var(--bd);border-radius:12px;background:var(--s2);font-size:12px;line-height:1.8"></div>
-    <div style="display:flex;gap:6px;margin-top:8px"><button id="aiSaveAll" class="mb">💾 지금 화면의 키 저장</button><button id="aiClearAll" class="mb">🧹 모두 지우기</button><button id="diagBtn" class="mb">🔍 환경 진단</button></div>
+    <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+      <button id="aiSaveAll" class="mb">💾 지금 화면의 키 저장</button>
+      <button id="aiClearAll" class="mb">🧹 모두 지우기</button>
+      <button id="diagBtn" class="mb">🔍 환경 진단</button>
+      <button id="slimBtn" class="mb pr">⚡ 저장공간 즉시 정리</button>
+    </div>
     <small style="display:block;margin-top:6px;color:var(--sub);font-size:11px">📊 사용량 안내: OpenRouter는 잔액·한도를 실시간으로 서버에서 조회 가능 / Gemini·Google Maps는 서버 잔량 조회가 구조적으로 없어(no key-only API) 앱이 직접 세어 표시합니다 — 숫자는 이 앱에서 호출한 횟수일 뿐입니다.</small>
     <small style="display:block;margin-top:6px;color:var(--sub);font-size:11px">OpenRouter 키는 무료 모델도 사용 가능 — 모델칸을 비우면 무료 라우터(openrouter/free)를 씁니다. Gemini는 무료 쿼터(분당 횟수 제한)라 순서는 Gemini → OpenRouter로 돌아요.</small>
     <label style="margin-top:14px">지도 제공자</label>
@@ -179,7 +184,25 @@ input[type=text],input[type=password],textarea{font-size:16px}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
 const $=id=>document.getElementById(id);
-const ls={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v);return 1}catch(e){return 0}}};
+
+// iOS Safari WebKit 덮어쓰기 QuotaExceededError 방지: 실패 시 기존 키를 먼저 removeItem 한 뒤 재기록
+const ls={
+  get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},
+  set:(k,v)=>{
+    try{
+      localStorage.setItem(k,v);
+      return 1;
+    }catch(e){
+      try{
+        localStorage.removeItem('TRIP_PHOTO_CACHE');
+        localStorage.removeItem(k);
+        localStorage.setItem(k,v);
+        return 1;
+      }catch(e2){return 0}
+    }
+  }
+};
+
 const CATS={PLACE:{n:'장소',e:'📍',b:'여행 장소/식당'},FOOD:{n:'먹거리',e:'🍙',b:'편의점 음식/먹거리'},SHOP:{n:'쇼핑',e:'🛍️',b:'구매 물건'}};
 
 function fetchTO(url,opt={},ms=9000){
@@ -188,7 +211,6 @@ function fetchTO(url,opt={},ms=9000){
   return fetch(url,{...opt,signal:ctrl.signal}).finally(()=>clearTimeout(tid));
 }
 
-// Gemini 모델 목록: flash-lite를 포함해 쿼터 초과(429) 시 다중 모델로 즉시 폴백되도록 개선
 let _gmodels=null,_gmodelsAt=0;
 async function geminiModels(key){
   const now=Date.now();
@@ -216,11 +238,86 @@ const pic=(q,v=0)=>'https://tse1.mm.bing.net/th?w=480&h=360&c=7&rs=1&p=0&q='+enc
 
 let items=[],cat='PLACE',pend=[],res=[],lm=null,tl=null,layer=null,pins={},lastGeo=0,tt,cur=null,view='photo',tileIndex=1,tileFails=0,gmap=null,gmarkers=[],glocMarker=null,nmap=null,nmarkers=[],nlocMarker=null,mapProvider='osm',editMode={},selected=new Set(),prevTab='add',gpins=[],gposPts=[],GPinClass=null;
 try{items=JSON.parse(ls.get('TRIP_MASTER_ITEMS')||'[]')}catch(e){items=[]}
-// 기존 아이템 좌표 숫자형 정규화
-items.forEach(i=>{if(i.lat!=null)i.lat=Number(i.lat)||null;if(i.lng!=null)i.lng=Number(i.lng)||null;if(!CATS[i.category])i.category='PLACE';});
+
+// 앱 시작 즉시 용량 초과 주범인 대용량 Base64 이미지(60KB 초과)를 동기적으로 정리하여 5MB 꽉 찬 상태를 즉시 해소
+(function immediateQuotaRescue(){
+  let changed=false;
+  try{localStorage.removeItem('TRIP_PHOTO_CACHE');}catch(e){}
+  items.forEach(i=>{
+    if(i.lat!=null)i.lat=Number(i.lat)||null;
+    if(i.lng!=null)i.lng=Number(i.lng)||null;
+    if(!CATS[i.category])i.category='PLACE';
+    if(i.img&&String(i.img).startsWith('data:image')&&i.img.length>60000){
+      i.img='';
+      i.useCustomImg=false;
+      changed=true;
+    }
+  });
+  if(changed)ls.set('TRIP_MASTER_ITEMS',JSON.stringify(items));
+})();
 
 let photoCache={};try{photoCache=JSON.parse(ls.get('TRIP_PHOTO_CACHE')||'{}')}catch(e){photoCache={}}
-function savePhotoCache(){ls.set('TRIP_PHOTO_CACHE',JSON.stringify(photoCache))}
+function savePhotoCache(){
+  const keys=Object.keys(photoCache);
+  if(keys.length>100){keys.slice(0,keys.length-100).forEach(k=>delete photoCache[k]);}
+  ls.set('TRIP_PHOTO_CACHE',JSON.stringify(photoCache));
+}
+
+function compressDataUrl(dataUrl,maxW=320,quality=0.55){
+  return new Promise(resolve=>{
+    if(!dataUrl||!String(dataUrl).startsWith('data:image'))return resolve(dataUrl||'');
+    const img=new Image();
+    img.onload=()=>{
+      let w=img.width||320,h=img.height||320;
+      if(w>maxW){h=Math.round(h*(maxW/w));w=maxW;}
+      const cv=document.createElement('canvas');
+      cv.width=w;cv.height=h;
+      const ctx=cv.getContext('2d');
+      ctx.drawImage(img,0,0,w,h);
+      resolve(cv.toDataURL('image/jpeg',quality));
+    };
+    img.onerror=()=>resolve('');
+    img.src=dataUrl;
+  });
+}
+
+function fileToBase64(file,maxW=860,quality=0.72){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=async()=>{
+      const raw=String(r.result||'');
+      const comp=await compressDataUrl(raw,maxW,quality);
+      const target=comp||raw;
+      const mime=(target.match(/^data:([^;]+);/)||[])[1]||'image/jpeg';
+      res({mime,data:target.split(',')[1]||''});
+    };
+    r.onerror=rej;
+    r.readAsDataURL(file);
+  });
+}
+
+async function slimStorage(showMsg=false){
+  let freed=0;
+  try{localStorage.removeItem('TRIP_PHOTO_CACHE');photoCache={};}catch(e){}
+  for(const i of items){
+    if(i.img&&String(i.img).startsWith('data:image')){
+      const before=i.img.length;
+      if(!i.useCustomImg||before>35000){
+        const comp=i.useCustomImg?await compressDataUrl(i.img,280,0.5):'';
+        if(comp&&comp.length<30000){
+          i.img=comp;
+          freed+=(before-comp.length);
+        }else{
+          i.img='';i.useCustomImg=false;
+          freed+=before;
+        }
+      }
+    }
+  }
+  ls.set('TRIP_MASTER_ITEMS',JSON.stringify(items));
+  render();draw();
+  if(showMsg)toast(`⚡ 저장 공간 정리 완료! (${Math.round(freed/1024)}KB 확보됨)`);
+}
 
 window.imgErr=function(el){
   if(!el)return;
@@ -237,7 +334,6 @@ window.imgErr=function(el){
 function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),4500)}
 window.addEventListener('error',e=>{try{if(e.message)toast('오류: '+e.message)}catch(_){}});
 
-// 영상 URL 파싱 및 썸네일/임베드 헬퍼 (문자열/객체 모두 100% 호환)
 function getVidUrlStr(v){
   if(!v)return '';
   if(typeof v==='string')return v;
@@ -295,7 +391,6 @@ function setTheme(t){document.documentElement.dataset.theme=t;ls.set('TRIP_THEME
 function fallbackToOsm(reason){
   if(lm) return;
   gmap=null;nmap=null;
-  console.warn('fallbackToOsm:',reason||'unknown');
   if(window.L){
     $('map').innerHTML='';
     lm=L.map('map').setView([36.5,128],6);
@@ -458,7 +553,19 @@ function render(){
     const sc=$('selCount-'+c); if(sc) sc.textContent=editMode[c]?`선택 ${selected.size}개`:'';
   }
 }
-function persist(){if(!ls.set('TRIP_MASTER_ITEMS',JSON.stringify(items)))toast('저장 공간이 부족해요. 설정에서 백업 후 정리하세요')}
+
+function persist(){
+  if(ls.set('TRIP_MASTER_ITEMS',JSON.stringify(items)))return true;
+  // 만약 실패하면 즉시 무거운 Base64 이미지들을 비우고 재저장
+  items.forEach(i=>{
+    if(i.img&&String(i.img).startsWith('data:image')&&i.img.length>25000){
+      i.img='';i.useCustomImg=false;
+    }
+  });
+  if(ls.set('TRIP_MASTER_ITEMS',JSON.stringify(items)))return true;
+  items.forEach(i=>{if(i.img&&String(i.img).startsWith('data:')){i.img='';i.useCustomImg=false;}});
+  return ls.set('TRIP_MASTER_ITEMS',JSON.stringify(items));
+}
 function save(){persist();render();draw()}
 
 function normalizeOcrAddr(s){
@@ -478,7 +585,6 @@ function getValidSearchQuery(i){
 
 function closeSheet(){$('sheet').classList.remove('on');cur=null}
 
-// 상세 시트 (영상 00:39~00:49의 원래 UI 및 자동 저장 구조 100% 복원)
 function showSheet(){
   const i=items.find(x=>x.id===cur);if(!i)return closeSheet();
   const searchTarget=getValidSearchQuery(i);
@@ -549,7 +655,6 @@ function showSheet(){
   `;
   $('sheet').classList.add('on');
 
-  // 입력 필드 실시간 자동 저장 & 주소 붙여넣기 시 자동 지오코딩 연결
   const nmEl=$('sh-name'), adEl=$('sh-addr'), ntEl=$('sh-note');
   if(nmEl){
     nmEl.oninput=()=>{if(nmEl.value.trim())i.name=nmEl.value.trim();save();};
@@ -586,7 +691,6 @@ function showSheet(){
   }
 }
 
-// ==================== AI 제공자 설정 및 기존 저장 키 자동 복원 ====================
 const AI_DEFS=[
   {id:'gemini',name:'Google Gemini (무료 쿼터 있음)',ph:'AIzaSy...',defModel:''},
   {id:'openrouter',name:'OpenRouter (무료 라우터 가능)',ph:'sk-or-v1-...',defModel:'openrouter/free'},
@@ -598,7 +702,6 @@ let aiCfg={},usageCnt={gemini:0,openrouter:0,groq:0,openai:0,gmap:0};
 try{aiCfg=JSON.parse(ls.get('TRIP_AI_CFG')||ls.get('TRIP_AI_KEYS')||'{}')}catch(e){aiCfg={}}
 try{usageCnt={...usageCnt,...JSON.parse(ls.get('TRIP_USAGE_CNT')||'{}')}}catch(e){}
 
-// 브라우저 localStorage 전체를 스캔해 이전 버전에서 저장했던 API 키를 100% 자동 복구
 (function recoverExistingKeys(){
   const gmapKey=(ls.get('TRAVEL_GMAP_KEY')||'').trim();
   try{
@@ -606,7 +709,6 @@ try{usageCnt={...usageCnt,...JSON.parse(ls.get('TRIP_USAGE_CNT')||'{}')}}catch(e
       const k=localStorage.key(idx);
       if(!k||k==='TRIP_MASTER_ITEMS'||k==='TRIP_PHOTO_CACHE')continue;
       const raw=localStorage.getItem(k)||'';
-      // Gemini 키 패턴 (AIzaSy...)
       const gm=raw.match(/AIzaSy[A-Za-z0-9_-]{30,40}/g);
       if(gm){
         for(const cand of gm){
@@ -615,15 +717,12 @@ try{usageCnt={...usageCnt,...JSON.parse(ls.get('TRIP_USAGE_CNT')||'{}')}}catch(e
           }
         }
       }
-      // OpenRouter 키 패턴 (sk-or-v1-...)
       const orm=raw.match(/sk-or-v1-[A-Za-z0-9]{40,80}/);
       if(orm&&!aiCfg.openrouter?.key)aiCfg.openrouter={...(aiCfg.openrouter||{}),key:orm[0]};
-      // Groq 키 패턴 (gsk_...)
       const grq=raw.match(/gsk_[A-Za-z0-9]{30,70}/);
       if(grq&&!aiCfg.groq?.key)aiCfg.groq={...(aiCfg.groq||{}),key:grq[0]};
     }
   }catch(e){}
-  // 문자열 형태로 저장된 경우 객체 형태로 정규화
   AI_DEFS.forEach(d=>{
     if(typeof aiCfg[d.id]==='string')aiCfg[d.id]={key:aiCfg[d.id],model:d.defModel};
     else if(!aiCfg[d.id])aiCfg[d.id]={key:'',model:d.defModel};
@@ -666,14 +765,20 @@ function updateAiChainText(){
   $('aiChain').textContent=act.length?act.join(' → ')+' → 내장 캡션 파서':'내장 캡션 파서 (키 미설정)';
 }
 
+function getStorageUsedKB(){
+  let total=0;
+  try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);total+=(localStorage.getItem(k)||'').length*2;}}catch(e){}
+  return Math.round(total/1024);
+}
+
 async function renderUsageBox(){
   const box=$('usageBox');if(!box)return;
   let orInfo='키 미설정';
   const orKey=aiCfg.openrouter?.key;
-  if(orKey){
-    orInfo=`앱 호출 ${usageCnt.openrouter||0}회 (잔액 조회 중...)`;
-  }
+  if(orKey)orInfo=`앱 호출 ${usageCnt.openrouter||0}회 (잔액 조회 중...)`;
+  const usedKB=getStorageUsedKB();
   box.innerHTML=`
+    <div>• <b>브라우저 저장소 사용량</b>: 약 ${usedKB.toLocaleString()} KB / 5,000 KB</div>
     <div>• <b>Gemini</b>: ${aiCfg.gemini?.key?'🟢 키 설정됨':'⚪ 미설정'} (이 앱에서 호출: ${usageCnt.gemini||0}회)</div>
     <div id="orUsageLine">• <b>OpenRouter</b>: ${aiCfg.openrouter?.key?'🟢 키 설정됨':'⚪ 미설정'} (${orInfo})</div>
     <div>• <b>Groq / OpenAI</b>: ${(usageCnt.groq||0)+(usageCnt.openai||0)}회 호출</div>
@@ -692,7 +797,6 @@ async function renderUsageBox(){
   }
 }
 
-// ==================== AI 호출 엔진 (429 쿼터 초과 자동 우회) ====================
 async function callGeminiSmart(prompt,images=[],allowGrounding=false){
   const key=(aiCfg.gemini?.key||'').trim();
   if(!key)throw new Error('키 미설정');
@@ -715,7 +819,6 @@ async function callGeminiSmart(prompt,images=[],allowGrounding=false){
 
   let lastErr='';
   for(const m of models){
-    // Search Grounding은 무료 쿼터 제한(429)이 심하므로 꼭 필요할 때만 1회 시도 후 즉시 일반 호출로 전환
     const tries=allowGrounding?[true,false]:[false];
     for(const useGround of tries){
       const body={contents:[{parts}],generationConfig:{temperature:0.1}};
@@ -803,7 +906,6 @@ function extractJsonArray(txt){
   return [];
 }
 
-// ==================== 릴스·쇼츠 캡션 추출기 (임베드 HTML 병렬 파싱) ====================
 function decodeHtml(str){
   const t=document.createElement('textarea');
   t.innerHTML=str;
@@ -812,7 +914,6 @@ function decodeHtml(str){
 
 function parseIgEmbedHtml(html){
   if(!html||typeof html!=='string')return '';
-  // 1. /embed/captioned/ 의 <div class="Caption"> 블록 직접 추출
   const cm=html.match(/<div class="Caption"[^>]*>([\s\S]*?)<div class="CaptionComments"/i)
          ||html.match(/<div class="Caption"[^>]*>([\s\S]*?)<\/div>/i);
   if(cm){
@@ -823,7 +924,6 @@ function parseIgEmbedHtml(html){
     s=decodeHtml(s).replace(/[ \t]+/g,' ').replace(/\n\s+/g,'\n').trim();
     if(s.length>=6)return s;
   }
-  // 2. 내장 JSON의 edge_media_to_caption 추출
   const jm=html.match(/"edge_media_to_caption"\s*:\s*\{\s*"edges"\s*:\s*\[\s*\{\s*"node"\s*:\s*\{\s*"text"\s*:\s*"((?:[^"\\]|\\.)*)"/i)
          ||html.match(/\\"edge_media_to_caption\\"\s*:\s*\{\s*\\"edges\\"\s*:\s*\[\s*\{\s*\\"node\\"\s*:\s*\{\s*\\"text\\"\s*:\s*\\"((?:[^"\\]|\\.)*)\\"/i);
   if(jm){
@@ -833,7 +933,6 @@ function parseIgEmbedHtml(html){
       if(dec&&dec.trim().length>=6)return dec.trim();
     }catch(e){}
   }
-  // 3. og:description 메타태그 추출
   const om=html.match(/<meta[^>]+(?:property="og:description"|name="description")[^>]+content="([^"]+)"/i)
          ||html.match(/<meta[^>]+content="([^"]+)"[^>]+(?:property="og:description"|name="description")/i);
   if(om){
@@ -905,7 +1004,6 @@ async function fetchVideoCaption(vUrl){
   return '';
 }
 
-// ==================== 내장 스마트 캡션 파서 (AI 없이도 이름/주소/가격/시간 분리) ====================
 function parseCaptionLocally(rawText,hint=''){
   const norm=normalizeOcrAddr(String(rawText||'').replace(/\r/g,''));
   const lines=String(rawText||'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
@@ -971,14 +1069,12 @@ function parseCaptionLocally(rawText,hint=''){
   return {name,address,price,info,note,postal,category};
 }
 
-// ==================== 4단계 정밀 지오코더 (우편번호 + Google + Photon + Nominatim) ====================
 async function geocodePlace(cand,hint=''){
   const gkey=(ls.get('TRAVEL_GMAP_KEY')||'').trim();
   const rawAddr=normalizeOcrAddr(cand.address||'');
   const rawName=isGenericSharedName(cand.name)?'':String(cand.name||'').trim();
   const localName=String(cand.localName||'').trim();
 
-  // 일본 7자리 우편번호(예: 542-0075)가 있으면 일본 공식 우편번호 API로 정확한 일본어 행정구역 확보
   const zipM=(rawAddr+' '+(cand.postal||'')).match(/(\d{3})-?(\d{4})/);
   let jpTown='';
   if(zipM){
@@ -987,7 +1083,7 @@ async function geocodePlace(cand,hint=''){
       const zd=await zr.json();
       if(zd&&zd.results&&zd.results[0]){
         const x=zd.results[0];
-        jpTown=`${x.address1}${x.address2}${x.address3}`; // 예: 大阪府大阪市中央区難波千日前
+        jpTown=`${x.address1}${x.address2}${x.address3}`;
       }
     }catch(e){}
   }
@@ -1009,7 +1105,6 @@ async function geocodePlace(cand,hint=''){
 
   const uniq=[...new Set(queries.map(q=>q.trim()).filter(q=>q.length>=2))];
 
-  // 1단계: Google Maps Geocoding API
   if(gkey){
     for(const q of uniq.slice(0,4)){
       try{
@@ -1024,7 +1119,6 @@ async function geocodePlace(cand,hint=''){
     }
   }
 
-  // 2단계: Nominatim + Photon 병렬 검색
   for(const q of uniq){
     try{
       const [nom,pho]=await Promise.allSettled([
@@ -1041,7 +1135,6 @@ async function geocodePlace(cand,hint=''){
     }catch(e){}
   }
 
-  // 3단계: 우편번호 전용 Nominatim 검색
   if(zipM){
     try{
       const r=await fetchTO(`https://nominatim.openstreetmap.org/search?format=json&postalcode=${zipM[1]}-${zipM[2]}&countrycodes=jp&limit=1`,{},5000);
@@ -1050,14 +1143,12 @@ async function geocodePlace(cand,hint=''){
     }catch(e){}
   }
 
-  // 4단계: AI 추론 좌표 폴백
   if(Number(cand.lat)&&Number(cand.lng)&&Math.abs(Number(cand.lat))<=90&&Math.abs(Number(cand.lng))<=180){
     return {lat:Number(cand.lat),lng:Number(cand.lng)};
   }
   return null;
 }
 
-// ==================== 분석·추출 통합 함수 ====================
 async function analyzeContent({rawText='',vidUrl='',images=[],hint=''}){
   let caption=String(rawText||'').replace(/https?:\/\/[^\s]+/g,'').trim();
   let capStatus='';
@@ -1144,7 +1235,6 @@ ${caption||rawText}
   return {cands,caption,aiErr,capStatus};
 }
 
-// 후보 목록(#rs) 렌더링 (원래 UI와 동일하게 유지 + 사진바꾸기/선택 지원)
 function renderCandidates(headerMsg='맞는 항목을 눌러 저장하세요 · 사진이 다르면 🔄'){
   if(!res.length){$('rs').innerHTML='';return;}
   $('rs').innerHTML=`<div class="ds" style="margin:4px 2px">${esc(headerMsg)}</div>`+res.map((r,idx)=>{
@@ -1163,7 +1253,6 @@ function renderCandidates(headerMsg='맞는 항목을 눌러 저장하세요 · 
   }).join('');
 }
 
-// 릴스/쇼츠/캡션 분석하기 실행 (성공 시 한 번에 자동 저장 + 지도 핀 등록!)
 async function runAnalyzeShare(files=[]){
   const raw=($('shareBox').value||'').trim();
   const hint=($('hint').value||'').trim();
@@ -1176,12 +1265,11 @@ async function runAnalyzeShare(files=[]){
     const meta=parseVideoMeta(raw);
     const vidUrl=meta?meta.url:'';
     const images=[];
-    for(const f of files)images.push(await fileToBase64(f));
+    for(const f of files)images.push(await fileToBase64(f,860,0.72));
 
     const {cands,aiErr,capStatus}=await analyzeContent({rawText:raw,vidUrl,images,hint});
 
     if(cands.length&&(cands[0].name||cands[0].address)){
-      // 후보들을 즉시 자동 저장하고 지도에도 핀을 꽂음 (여러 번 누를 필요 없음!)
       let firstSaved=null;
       cands.forEach(c=>{
         const itemObj={
@@ -1196,8 +1284,8 @@ async function runAnalyzeShare(files=[]){
           lat:Number(c.lat)||null,
           lng:Number(c.lng)||null,
           vid:vidUrl||'',
-          img:images[0]?`data:${images[0].mime};base64,${images[0].data}`:'',
-          useCustomImg:Boolean(images[0]),
+          img:'',
+          useCustomImg:false,
           v:0,
           done:false
         };
@@ -1219,7 +1307,6 @@ async function runAnalyzeShare(files=[]){
       return;
     }
 
-    // 인스타 익명 차단으로 링크에서 캡션을 못 가져왔고 텍스트도 없는 경우
     const failNote=['자동 인식 실패(인스타 익명차단·AI 한도 등) — 시트에서 [📋 복사한 캡션/주소 붙여넣기]를 누르면 캡션 글자만으로 어떤 장소든 한 번에 저장돼요',aiErr?`AI: ${aiErr}`:'',capStatus].filter(Boolean).join(' · ');
     const fallbackCand={
       name:meta?.platform==='yt'?'공유 쇼츠':'공유 릴스',
@@ -1288,6 +1375,10 @@ async function applyCaptionToItem(i,rawCap,images=[]){
     const g=await geocodePlace(i,hint);
     if(g){i.lat=g.lat;i.lng=g.lng;}
   }
+  // 캡션 스샷 추출 시 기존에 들어가 있던 대용량 스크린샷 이미지를 제거해 저장 실패 방지
+  if(i.img&&String(i.img).startsWith('data:image')&&i.img.length>30000){
+    i.img='';i.useCustomImg=false;
+  }
   save();
   if(i.lat&&i.lng){
     focusMapOnItem(i);
@@ -1299,7 +1390,6 @@ async function applyCaptionToItem(i,rawCap,images=[]){
   showSheet();
 }
 
-// 일반 검색 (이름·가게명·주소로 찾기)
 async function runSearch(){
   const q=($('q').value||'').trim();
   const hint=($('hint').value||'').trim();
@@ -1321,18 +1411,6 @@ async function runSearch(){
   }
 }
 
-function fileToBase64(file){
-  return new Promise((res,rej)=>{
-    const r=new FileReader();
-    r.onload=()=>{
-      const s=String(r.result||'');
-      res({mime:file.type||'image/jpeg',data:s.split(',')[1]||''});
-    };
-    r.onerror=rej;
-    r.readAsDataURL(file);
-  });
-}
-
 async function autoFixCoords(){
   let fixed=0;
   for(const i of items){
@@ -1345,7 +1423,6 @@ async function autoFixCoords(){
   return fixed>0;
 }
 
-// ==================== 전체 클릭/이벤트 위임 ====================
 document.addEventListener('click',async e=>{
   const tb=e.target.closest('.tab-btn');
   if(tb)return tab(tb.dataset.tab);
@@ -1417,7 +1494,6 @@ document.addEventListener('click',async e=>{
     return;
   }
 
-  // 일괄 편집 액션
   if(act==='toggleEdit'){editMode[c]=!editMode[c];selected.clear();render();return;}
   if(act==='toggleSel'||act==='sel'){
     e.stopPropagation();
@@ -1436,7 +1512,6 @@ document.addEventListener('click',async e=>{
     return;
   }
 
-  // 시트 내부 액션
   const curItem=items.find(x=>x.id===cur);
   if(act==='close')return closeSheet();
   if(!curItem)return;
@@ -1446,7 +1521,7 @@ document.addEventListener('click',async e=>{
   if(act==='vphoto'){view='photo';showSheet();return;}
   if(act==='vmap'){view='google';showSheet();return;}
   if(act==='vmymap'){view='mymaps';showSheet();return;}
-  if(act==='chgpic'){curItem.v=(curItem.v||0)+1;curItem.useCustomImg=false;save();showSheet();return;}
+  if(act==='chgpic'){curItem.v=(curItem.v||0)+1;curItem.img='';curItem.useCustomImg=false;save();showSheet();toast('가벼운 외부 사진으로 변경되어 저장 공간이 확보되었어요');return;}
   if(act==='chcat'){curItem.category=c;save();showSheet();toast(`${CATS[c].n} 탭으로 이동했어요`);return;}
   if(act==='del'){items=items.filter(x=>x.id!==curItem.id);save();closeSheet();toast('삭제했어요');return;}
   if(act==='share'){
@@ -1479,9 +1554,8 @@ document.addEventListener('click',async e=>{
   }
 });
 
-// 기본 버튼 바인딩
 $('themeBtn').onclick=()=>setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
-$('settingsBtn').onclick=()=>tab('set');
+$('settingsBtn').onclick=()=>{renderUsageBox();tab('set');};
 $('sheet').onclick=e=>{if(e.target===$('sheet'))closeSheet()};
 
 $('pasteShare').onclick=async()=>{
@@ -1505,7 +1579,7 @@ $('file').onchange=async e=>{
   const fs=[...(e.target.files||[])];e.target.value='';
   if(!fs.length)return;
   pend=[];
-  for(const f of fs)pend.push(await fileToBase64(f));
+  for(const f of fs)pend.push(await fileToBase64(f,860,0.72));
   $('pc').textContent=`📷 사진 ${pend.length}장 선택됨`;
   toast(`사진 ${pend.length}장이 첨부되었어요. [🔎 인터넷에서 찾기]를 누르세요.`);
 };
@@ -1515,19 +1589,18 @@ $('q').onkeydown=e=>{if(e.key==='Enter')runSearch()};
 $('own').onchange=async e=>{
   const f=e.target.files?.[0];e.target.value='';
   if(!f||!cur)return;
-  const b64=await fileToBase64(f);
+  const b64=await fileToBase64(f,300,0.55);
   const i=items.find(x=>x.id===cur);
   if(i){i.img=`data:${b64.mime};base64,${b64.data}`;i.useCustomImg=true;view='photo';save();showSheet();}
 };
 $('sheetShot').onchange=async e=>{
   const f=e.target.files?.[0];e.target.value='';
   if(!f||!cur)return;
-  const b64=await fileToBase64(f);
+  const b64=await fileToBase64(f,860,0.72);
   const i=items.find(x=>x.id===cur);
   if(i)await applyCaptionToItem(i,'',[b64]);
 };
 
-// 설정 탭 이벤트
 $('aiSaveAll').onclick=()=>{saveAiProvFromUI();renderUsageBox();toast('AI 키 설정을 저장했어요')};
 $('aiClearAll').onclick=()=>{
   AI_DEFS.forEach(d=>aiCfg[d.id]={key:'',model:d.defModel});
@@ -1544,6 +1617,10 @@ $('diagBtn').onclick=async()=>{
   }catch(e){
     toast('⚠️ AI 진단 결과: '+e.message);
   }
+};
+$('slimBtn').onclick=async()=>{
+  await slimStorage(true);
+  renderUsageBox();
 };
 
 $('mapProvider').onchange=e=>{ls.set('TRIP_MAP_PROVIDER',e.target.value);location.reload()};
@@ -1576,7 +1653,6 @@ $('copyShareUrl').onclick=async()=>{
   catch(e){prompt('아래 주소를 복사하세요:',u);}
 };
 
-// KMZ 내보내기 & 가져오기 (원래 기능 복원)
 $('exportKmzBtn').onclick=async()=>{
   const kml=`<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>TripSync Master</name>${items.filter(i=>Number(i.lat)&&Number(i.lng)).map(i=>`<Placemark><name>${esc(i.name)}</name><description>${esc([i.address,i.price,i.info,i.note].filter(Boolean).join(' / '))}</description><Point><coordinates>${Number(i.lng)},${Number(i.lat)},0</coordinates></Point></Placemark>`).join('')}</Document></kml>`;
   const zip=new JSZip();zip.file('doc.kml',kml);
@@ -1606,7 +1682,6 @@ $('importKmzFile').onchange=async e=>{
   }catch(err){toast('KMZ 가져오기 실패: '+err.message);}
 };
 
-// CSV 가져오기 (원래 기능 복원)
 $('importBtn').onclick=()=>$('importFile').click();
 $('importFile').onchange=async e=>{
   const f=e.target.files?.[0];e.target.value='';if(!f)return;
@@ -1630,7 +1705,6 @@ $('importFile').onchange=async e=>{
   save();autoFixCoords();toast(`CSV에서 ${cnt}개 장소를 가져왔어요!`);
 };
 
-// 백업 / 복원
 $('bkOut').onclick=async()=>{
   const s=JSON.stringify(items);
   $('bk').value=s;
@@ -1643,7 +1717,6 @@ $('bkIn').onclick=()=>{
   }catch(e){toast('유효한 백업 데이터가 아니에요');}
 };
 
-// 당겨서 새로고침 (#ptr, 영상 00:40 동작 복원)
 (function initPullToRefresh(){
   let startY=0,pulling=false;
   window.addEventListener('touchstart',e=>{
@@ -1666,7 +1739,6 @@ $('bkIn').onclick=()=>{
   },{passive:true});
 })();
 
-// 지도 초기화
 function initMap(){
   mapProvider=ls.get('TRIP_MAP_PROVIDER')||'osm';
   $('mapProvider').value=mapProvider;
@@ -1710,14 +1782,13 @@ function initMap(){
   fallbackToOsm('default osm');
 }
 
-// 초기 구동
 setTheme(ls.get('TRIP_THEME')||'dark');
 buildAiProvUI();
 render();
 initMap();
+slimStorage(false);
 setTimeout(()=>autoFixCoords(),500);
 
-// 단축어(?share=)로 진입 시 자동 분석 실행
 (function checkShareParam(){
   const p=new URLSearchParams(location.search);
   const s=p.get('share')||p.get('text')||p.get('url');
