@@ -40,8 +40,9 @@ input:focus,textarea:focus{border-color:var(--pr)}textarea{min-height:76px;resiz
 .mid{flex:1;min-width:0}.nm{font-weight:700;font-size:15px;word-break:keep-all}.ds{font-size:12px;color:var(--sub);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.ds.in{color:var(--pr)}
 .ok{font-size:12px;color:var(--pr);white-space:nowrap}
 .act{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
-.mb{padding:7px 11px;border-radius:8px;font-family:inherit;font-size:12px;font-weight:700;border:1px solid var(--bd);background:var(--s);color:var(--tx);cursor:pointer;text-decoration:none;touch-action:manipulation;display:inline-flex;align-items:center;gap:3px}
+.mb{padding:7px 11px;border-radius:8px;font-family:inherit;font-size:12px;font-weight:700;border:1px solid var(--bd);background:var(--s);color:var(--tx);cursor:pointer;text-decoration:none;touch-action:manipulation;display:inline-flex;align-items:center;gap:4px}
 .mb.pr{background:var(--pr);color:#fff;border-color:var(--pr)}.mb.dg{color:var(--dg)}
+.reel-jump{background:linear-gradient(135deg,#e1306c,#833ab4);color:#fff!important;border:0!important;font-weight:800}
 .empty{text-align:center;padding:48px 0;color:var(--sub);font-size:13px}.empty i{display:block;font-style:normal;font-size:40px}
 #map-wrap{flex:1;position:relative;height:100%;z-index:0}#map{width:100%;height:100%}
 #mapmsg{display:none;position:absolute;left:12px;right:12px;top:12px;z-index:1100;background:var(--s);color:var(--tx);border:1px solid var(--bd);border-radius:12px;padding:10px 12px;font-size:12.5px;box-shadow:0 6px 20px rgba(0,0,0,.35)}
@@ -86,15 +87,19 @@ input[type=text],input[type=password],textarea{font-size:16px}
 
   <section id="tab-add" class="tab-content active">
     <div class="card">
-      <label style="margin-bottom:3px">🔗 릴스·쇼츠·캡션으로 찾기</label>
-      <div class="ds">릴스 링크, 스샷에서 복사한 캡션/주소, 또는 캡션 스크린샷을 넣으면 장소와 좌표를 자동으로 찾아요</div>
-      <textarea id="shareBox" placeholder="릴스/쇼츠 링크 또는 스샷에서 복사한 캡션·주소를 붙여넣으세요" style="margin-top:8px;min-height:68px"></textarea>
+      <label style="margin-bottom:3px">🎬 1. 릴스·쇼츠 원본 링크 (넣어두면 언제든 릴스로 바로 이동)</label>
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <input type="text" id="reelLinkBox" placeholder="https://www.instagram.com/reel/..." style="flex:1;margin-bottom:0">
+        <button class="mb pr" id="pasteReelLink" style="flex:none;white-space:nowrap">📋 링크 붙여넣기</button>
+      </div>
+      <label style="margin-bottom:3px">📋 2. 릴스 캡션·주소 텍스트 (또는 아래 스크린샷 첨부)</label>
+      <textarea id="shareBox" placeholder="릴스 캡션에서 복사한 글자·주소를 붙여넣으세요 (위의 링크만 넣고 분석해도 됩니다)" style="margin-top:4px;min-height:68px"></textarea>
       <div style="display:flex;gap:8px;margin-bottom:8px">
-        <button class="btn g" id="pasteShare" style="flex:1;margin-bottom:0">📋 붙여넣기</button>
-        <button class="btn" id="analyzeShare" style="flex:1">🔥 분석하기</button>
+        <button class="btn g" id="pasteShare" style="flex:1;margin-bottom:0">📋 캡션 붙여넣기</button>
+        <button class="btn" id="analyzeShare" style="flex:1">🔥 분석·저장하기</button>
       </div>
       <button class="btn g" id="pcShare" style="margin-bottom:0">📷 캡션/영상 스크린샷 첨부해서 분석 (선택)</button>
-      <small style="display:block;margin-top:6px;color:var(--sub);font-size:11px">💡 인스타 익명 차단으로 링크만으로는 캡션이 안 읽힐 때: 캡션 스샷에서 글자를 복사해 붙여넣거나, 스샷 사진을 첨부하면 100% 인식됩니다. (인스타 공유 → TripSync 선택이면 자동 열림 — 설정 탭에 단축어 방법 있음)</small>
+      <small style="display:block;margin-top:6px;color:var(--sub);font-size:11px">💡 1번 칸에 릴스 링크를 넣고 2번 칸에 캡션을 붙여넣거나 스크린샷을 첨부하면, 장소·좌표·릴스 바로가기 버튼이 한 번에 저장됩니다.</small>
     </div>
     <div class="card">
       <div class="seg" id="seg"><div data-cat="PLACE" class="on">📍 장소/식당</div><div data-cat="FOOD">🍙 편의점/음식</div><div data-cat="SHOP">🛍️ 구매 물건</div></div>
@@ -342,7 +347,7 @@ function parseVideoMeta(v){
   if(!s)return null;
   let m=s.match(/(?:instagram\.com|instagr\.am)\/(?:share\/)?(?:reel|reels|p|tv)\/([A-Za-z0-9_-]+)/i);
   if(m)return {platform:'ig',id:m[1],url:`https://www.instagram.com/reel/${m[1]}/`};
-  m=s.match(/https?:\/\/(?:www\.)?instagram\.com\/[^\s"'<>]+/i);
+  m=s.match(/https?:\/\/(?:www\.)?(?:instagram\.com|instagr\.am)\/[^\s"'<>]+/i);
   if(m)return {platform:'ig',id:'',url:m[0]};
   m=s.match(/(?:youtube\.com\/shorts\/|youtu\.be\/|youtube\.com\/watch\?v=)([A-Za-z0-9_-]{11})/i);
   if(m)return {platform:'yt',id:m[1],url:`https://www.youtube.com/shorts/${m[1]}`};
@@ -351,15 +356,35 @@ function parseVideoMeta(v){
     const vm=m[0].match(/\/video\/(\d+)/);
     return {platform:'tt',id:vm?vm[1]:'',url:m[0]};
   }
+  m=s.match(/https?:\/\/[^\s"'<>]+/i);
+  if(m&&/(instagram|instagr\.am|youtu|tiktok)/i.test(m[0]))return {platform:'etc',id:'',url:m[0]};
   return null;
+}
+function normalizeVidUrl(raw){
+  const m=parseVideoMeta(raw);
+  if(m)return m.url;
+  const s=String(raw||'').trim();
+  const u=s.match(/https?:\/\/[^\s"'<>]+/i);
+  return u?u[0]:'';
 }
 function getVidBtnLabel(v){
   const u=getVidUrlStr(v);
-  if(!u)return '';
-  if(/instagram\.com|instagr\.am/i.test(u))return '🎬 릴스 열기 ↗';
-  if(/youtu\.?be|youtube\.com/i.test(u))return '🎬 쇼츠 열기 ↗';
-  if(/tiktok\.com/i.test(u))return '🎬 틱톡 열기 ↗';
-  return '🎬 원본 영상 ↗';
+  if(!u)return '🎬 릴스 바로가기 ↗';
+  if(/instagram\.com|instagr\.am/i.test(u))return '🎬 릴스 바로가기 ↗';
+  if(/youtu\.?be|youtube\.com/i.test(u))return '🎬 쇼츠 바로가기 ↗';
+  if(/tiktok\.com/i.test(u))return '🎬 틱톡 바로가기 ↗';
+  return '🎬 원본 영상 열기 ↗';
+}
+function openExternalVideo(url){
+  const u=normalizeVidUrl(url)||String(url||'').trim();
+  if(!u)return toast('연결된 릴스/쇼츠 링크가 없어요');
+  const a=document.createElement('a');
+  a.href=u;
+  a.target='_blank';
+  a.rel='noopener noreferrer';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }
 function vidEmbedUrl(v,captioned=false){
   const meta=parseVideoMeta(v);
@@ -563,11 +588,15 @@ function draw(){
   });
 }
 
-// 저장한 목록 카드: 릴스/쇼츠 영상 링크가 있으면 카드에서 바로 타고 들어가는 [🎬 릴스 열기 ↗] 버튼 표시
+// 저장된 목록 카드:
+// 1) 링크가 있으면 [🎬 릴스 바로가기 ↗] 버튼을 표시해 누르면 즉시 릴스로 이동
+// 2) 링크가 없으면 [+🔗 릴스링크 넣기] 버튼을 표시해 목록에서 바로 링크를 넣을 수 있도록 지원
 const card=i=>{
   const vUrl=getVidUrlStr(i.vid);
-  const vBtn=vUrl?`<div style="margin-top:5px"><a class="mb pr" href="${esc(vUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="padding:4px 9px;font-size:11.5px">${esc(getVidBtnLabel(vUrl))}</a></div>`:'';
-  return `<div class="item${i.done?' done':''}${selected.has(i.id)?' selected':''}" data-act="${editMode[i.category]?'toggleSel':'open'}" data-id="${i.id}" style="${selected.has(i.id)?'outline:2px solid var(--pr)':''}">${editMode[i.category]?`<input type="checkbox" data-act="sel" data-id="${i.id}"${selected.has(i.id)?' checked':''} style="width:18px;height:18px;margin-right:8px">`:''}${ph(CATS[i.category]?CATS[i.category].e:'📍',itemThumb(i),'',i.img)}<div class="mid"><div class="nm">${esc(i.name)}${vUrl?' 🎬':''}</div><div class="ds">${esc(i.address||i.note||'')}</div>${i.price?`<div class="ds" style="color:var(--FOOD);font-weight:700">${esc(i.price)}</div>`:''}${i.info?`<div class="ds in">${esc(i.info)}</div>`:''}${vBtn}</div><input type="checkbox" data-act="done" data-id="${i.id}"${i.done?' checked':''}></div>`;
+  const vAction=vUrl
+    ?`<button class="mb reel-jump" data-act="openVid" data-id="${i.id}" style="padding:5px 10px;font-size:11.5px">${esc(getVidBtnLabel(vUrl))}</button>`
+    :`<button class="mb" data-act="quickAddVid" data-id="${i.id}" style="padding:4px 9px;font-size:11px;color:var(--pr);border-color:var(--pr)">+🔗 릴스링크 넣기</button>`;
+  return `<div class="item${i.done?' done':''}${selected.has(i.id)?' selected':''}" data-act="${editMode[i.category]?'toggleSel':'open'}" data-id="${i.id}" style="${selected.has(i.id)?'outline:2px solid var(--pr)':''}">${editMode[i.category]?`<input type="checkbox" data-act="sel" data-id="${i.id}"${selected.has(i.id)?' checked':''} style="width:18px;height:18px;margin-right:8px">`:''}${ph(CATS[i.category]?CATS[i.category].e:'📍',itemThumb(i),'',i.img)}<div class="mid"><div class="nm">${esc(i.name)}${vUrl?' 🎬':''}</div><div class="ds">${esc(i.address||i.note||'')}</div>${i.price?`<div class="ds" style="color:var(--FOOD);font-weight:700">${esc(i.price)}</div>`:''}${i.info?`<div class="ds in">${esc(i.info)}</div>`:''}<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">${vAction}</div></div><input type="checkbox" data-act="done" data-id="${i.id}"${i.done?' checked':''}></div>`;
 };
 
 function ph(e,src,c='',fb=''){
@@ -647,8 +676,18 @@ function showSheet(){
     ${!(lat&&lng)?`<div class="ds" style="color:var(--FOOD);font-weight:700;margin-top:4px">🔴 좌표 미설정 — 아래에 이름/주소 입력 후 [📍 위치 다시 찾기] 클릭</div>`:`<div class="ds" style="color:var(--pr);font-weight:700;margin-top:4px">🟢 좌표 설정됨 (${lat.toFixed(5)}, ${lng.toFixed(5)})</div>`}
     ${i.price?`<div class="ds" style="color:var(--FOOD);font-weight:700;margin-top:2px">${esc(i.price)}</div>`:''}
     ${i.info?`<div class="ds in" style="margin-top:4px;-webkit-line-clamp:4">${esc(i.info)}</div>`:''}
+
+    <div style="margin:10px 0;padding:10px;border-radius:12px;background:var(--s2);border:1px solid var(--bd)">
+      ${vUrl?`<button class="btn reel-jump" data-act="openVid" data-id="${i.id}" style="margin-bottom:8px;padding:11px">${esc(vLabel)} (인스타/유튜브 앱 열기)</button>`:''}
+      <label style="margin-bottom:4px">${vUrl?'🔗 연결된 릴스·쇼츠 링크 (수정 가능)':'🎬 릴스·쇼츠 링크 넣기 (넣으면 바로가기 버튼이 생겨요)'}</label>
+      <div style="display:flex;gap:6px">
+        <input type="text" id="sh-vid" value="${esc(vUrl)}" placeholder="https://www.instagram.com/reel/..." style="flex:1;margin-bottom:0">
+        <button class="mb pr" data-act="pasteVidInSheet" style="flex:none;white-space:nowrap">📋 링크 붙여넣기</button>
+      </div>
+    </div>
+
     <div class="act">
-      ${vUrl?`<button class="mb${view==='video'?' pr':''}" data-act="vvideo">🎬 영상</button><button class="mb${view==='caption'?' pr':''}" data-act="vcap">📋 릴스캡션</button><a class="mb pr" href="${esc(vUrl)}" target="_blank" rel="noopener">${esc(vLabel)}</a>`:''}
+      ${vUrl?`<button class="mb${view==='video'?' pr':''}" data-act="vvideo">🎬 앱내영상</button><button class="mb${view==='caption'?' pr':''}" data-act="vcap">📋 릴스캡션</button>`:''}
       <button class="mb${view==='photo'?' pr':''}" data-act="vphoto">🖼️ 사진</button>
       <button class="mb" data-act="chgpic">🔄 사진바꾸기</button>
       <button class="mb${view==='google'?' pr':''}" data-act="vmap">🗺️ 지도</button>
@@ -659,7 +698,6 @@ function showSheet(){
       <button class="mb pr" data-act="regeo">📍 위치 다시 찾기</button>
       <button class="mb pr" data-act="recap">📋 캡션으로 다시 분석</button>
       <button class="mb" data-act="share">🔗 공유</button>
-      ${vUrl?`<a class="mb" href="${esc(vUrl)}" target="_blank" rel="noopener">원본 ↗</a>`:''}
     </div>
     <div class="act">
       <button class="mb pr" data-act="pastecap">📋 복사한 캡션/주소 붙여넣기</button>
@@ -673,13 +711,11 @@ function showSheet(){
     <input type="text" id="sh-name" value="${esc(isGenericSharedName(i.name)?'':i.name)}" placeholder="예: 규카츠 마토 (비워둬도 주소로 위치 찾음)">
     <label>주소 / 지역 (붙여넣으면 자동으로 위치까지 찾아요)</label>
     <input type="text" id="sh-addr" value="${esc(i.address||'')}" placeholder="예: 〒542-0086 Osaka, Chuo Ward, Nishishinsaib...">
-    <label>릴스·쇼츠·원본 링크 (입력하면 바로가기 버튼이 생겨요)</label>
-    <input type="text" id="sh-vid" value="${esc(vUrl)}" placeholder="https://www.instagram.com/reel/...">
     <label>메모 (가격, 영업시간, 같이 갈 사람...)</label>
     <textarea id="sh-note" placeholder="메모 (가격, 영업시간, 같이 갈 사람...)">${esc(i.note||'')}</textarea>
     <div class="act" style="justify-content:space-between;margin-top:8px">
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        ${vUrl?`<a class="mb pr" href="${esc(vUrl)}" target="_blank" rel="noopener">${esc(vLabel)}</a>`:''}
+        ${vUrl?`<button class="mb reel-jump" data-act="openVid" data-id="${i.id}">${esc(vLabel)}</button>`:''}
         <a class="mb pr" href="https://www.google.com/maps/search/?api=1&query=${lat&&lng?`${lat},${lng}`:(q||encodeURIComponent(i.name||''))}" target="_blank" rel="noopener">구글지도 ↗</a>
         <a class="mb" href="https://www.google.com/search?q=${q||encodeURIComponent(i.name||'')}" target="_blank" rel="noopener">검색 ↗</a>
         <button class="mb dg" data-act="del">삭제</button>
@@ -721,11 +757,16 @@ function showSheet(){
     };
   }
   if(vdEl){
+    vdEl.oninput=()=>{
+      const rawV=vdEl.value.trim();
+      i.vid=normalizeVidUrl(rawV)||rawV;
+      save();
+    };
     vdEl.onchange=()=>{
       const rawV=vdEl.value.trim();
-      const meta=parseVideoMeta(rawV);
-      i.vid=meta?meta.url:rawV;
+      i.vid=normalizeVidUrl(rawV)||rawV;
       save();showSheet();
+      if(i.vid)toast('🎬 릴스 링크가 저장되었어요!');
     };
   }
   if(ntEl){
@@ -1291,7 +1332,7 @@ function renderCandidates(headerMsg='맞는 항목을 눌러 저장하세요 · 
         ${r.info?`<div class="ds in">${esc(r.info)}</div>`:''}
         <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">
           <button class="mb" data-act="resPic" data-idx="${idx}" style="padding:3px 8px;font-size:11px">🔄 다른 사진</button>
-          ${vUrl?`<a class="mb pr" href="${esc(vUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="padding:3px 8px;font-size:11px">${esc(getVidBtnLabel(vUrl))}</a>`:''}
+          ${vUrl?`<button class="mb reel-jump" data-act="openResVid" data-idx="${idx}" style="padding:3px 8px;font-size:11px">${esc(getVidBtnLabel(vUrl))}</button>`:''}
         </div>
       </div>
       <div class="ok">${r._saved?'✓ 저장됨':'선택'}</div>
@@ -1301,23 +1342,27 @@ function renderCandidates(headerMsg='맞는 항목을 눌러 저장하세요 · 
 
 async function runAnalyzeShare(files=[]){
   const raw=($('shareBox').value||'').trim();
+  const explicitLink=($('reelLinkBox').value||'').trim();
   const hint=($('hint').value||'').trim();
-  if(!raw&&!files.length)return toast('릴스/쇼츠 링크나 캡션을 붙여넣거나 스크린샷을 첨부해 주세요');
+  if(!raw&&!explicitLink&&!files.length)return toast('릴스 링크나 캡션을 붙여넣거나 스크린샷을 첨부해 주세요');
 
   const btn=$('analyzeShare');
   btn.disabled=true;btn.textContent='🔥 분석 중...';
 
   try{
-    const meta=parseVideoMeta(raw);
-    let vidUrl=meta?meta.url:'';
-    if(vidUrl)lastSharedVid=vidUrl;
-    else if(files.length&&lastSharedVid)vidUrl=lastSharedVid;
-    else if(files.length&&res[0]?.vid)vidUrl=getVidUrlStr(res[0].vid);
+    const metaFromBox=parseVideoMeta(explicitLink)||parseVideoMeta(raw);
+    let vidUrl=metaFromBox?metaFromBox.url:(normalizeVidUrl(explicitLink)||'');
+    if(vidUrl){
+      lastSharedVid=vidUrl;
+      $('reelLinkBox').value=vidUrl;
+    }else if(lastSharedVid){
+      vidUrl=lastSharedVid;
+    }
 
     const images=[];
     for(const f of files)images.push(await fileToBase64(f,860,0.72));
 
-    const {cands,aiErr,capStatus}=await analyzeContent({rawText:raw,vidUrl,images,hint});
+    const {cands,aiErr,capStatus}=await analyzeContent({rawText:raw||explicitLink,vidUrl,images,hint});
 
     if(cands.length&&(cands[0].name||cands[0].address)){
       let firstSaved=null;
@@ -1348,9 +1393,11 @@ async function runAnalyzeShare(files=[]){
       res=cands;
       renderCandidates('✅ 자동으로 저장되고 지도에 등록되었어요!');
       $('shareBox').value='';
+      $('reelLinkBox').value='';
+      lastSharedVid='';
       if(firstSaved&&firstSaved.lat&&firstSaved.lng){
         focusMapOnItem(firstSaved);
-        toast(`✅ '${firstSaved.name}' 자동 저장 및 지도 핀 표시 완료!`);
+        toast(`✅ '${firstSaved.name}' 자동 저장 완료! ${firstSaved.vid?'(릴스 바로가기 연결됨)':''}`);
       }else if(firstSaved){
         toast(`'${firstSaved.name}' 저장 완료! (상세창에서 주소를 보완하면 지도에 표시됩니다)`);
       }
@@ -1359,21 +1406,21 @@ async function runAnalyzeShare(files=[]){
 
     const failNote=['자동 인식 실패(인스타 익명차단·AI 한도 등) — 시트에서 [📋 복사한 캡션/주소 붙여넣기]를 누르면 캡션 글자만으로 어떤 장소든 한 번에 저장돼요',aiErr?`AI: ${aiErr}`:'',capStatus].filter(Boolean).join(' · ');
     const fallbackCand={
-      name:meta?.platform==='yt'?'공유 쇼츠':'공유 릴스',
+      name:metaFromBox?.platform==='yt'?'공유 쇼츠':'공유 릴스',
       address:'',
       info:failNote,
       note:'',
       category:cat,
       lat:null,
       lng:null,
-      vid:vidUrl||(meta?raw:''),
+      vid:vidUrl||(metaFromBox?raw:''),
       v:0
     };
     res=[fallbackCand];
     renderCandidates();
-    toast('링크에서 캡션이 차단되었어요. 아래 카드를 눌러 [📋 릴스캡션]에서 캡션을 복사해 붙여넣으세요.');
+    toast('링크에서 캡션이 차단되었어요. 2번 칸에 캡션을 붙여넣거나 아래 카드를 눌러 캡션을 붙여넣으세요.');
   }finally{
-    btn.disabled=false;btn.textContent='🔥 분석하기';
+    btn.disabled=false;btn.textContent='🔥 분석·저장하기';
   }
 }
 
@@ -1445,17 +1492,19 @@ async function applyCaptionToItem(i,rawCap,images=[]){
 async function runSearch(){
   const q=($('q').value||'').trim();
   const hint=($('hint').value||'').trim();
+  const explicitLink=($('reelLinkBox').value||'').trim();
+  const vidUrl=normalizeVidUrl(explicitLink)||lastSharedVid||'';
   if(!q&&!pend.length)return toast('이름·가게명·주소를 입력하거나 사진을 선택해 주세요');
   const btn=$('go');btn.disabled=true;btn.textContent='🔎 찾는 중...';
   try{
-    const {cands}=await analyzeContent({rawText:`${q} ${hint}`.trim(),images:pend,hint});
+    const {cands}=await analyzeContent({rawText:`${q} ${hint}`.trim(),vidUrl,images:pend,hint});
     pend=[];$('pc').textContent='📷 사진으로 찾기 (선택)';
     if(cands.length){
       res=cands;
       renderCandidates();
     }else{
       const g=await geocodePlace({name:q,address:`${q} ${hint}`.trim()},hint);
-      res=[{name:q,address:g?.formatted||hint||q,lat:g?.lat||null,lng:g?.lng||null,category:cat,v:0}];
+      res=[{name:q,address:g?.formatted||hint||q,lat:g?.lat||null,lng:g?.lng||null,vid:vidUrl,category:cat,v:0}];
       renderCandidates();
     }
   }finally{
@@ -1489,6 +1538,60 @@ document.addEventListener('click',async e=>{
   const actEl=e.target.closest('[data-act]');
   if(!actEl)return;
   const act=actEl.dataset.act,id=actEl.dataset.id,c=actEl.dataset.cat;
+
+  if(act==='openVid'){
+    e.stopPropagation();
+    const targetItem=items.find(x=>x.id===id)||items.find(x=>x.id===cur);
+    if(targetItem&&targetItem.vid)openExternalVideo(targetItem.vid);
+    return;
+  }
+  if(act==='openResVid'){
+    e.stopPropagation();
+    const idx=Number(actEl.dataset.idx);
+    if(res[idx]&&res[idx].vid)openExternalVideo(res[idx].vid);
+    return;
+  }
+  if(act==='quickAddVid'){
+    e.stopPropagation();
+    const it=items.find(x=>x.id===id);
+    if(!it)return;
+    let link='';
+    try{
+      const clip=await navigator.clipboard.readText();
+      const m=parseVideoMeta(clip);
+      if(m)link=m.url;
+    }catch(_){}
+    if(!link){
+      const inp=prompt('연결할 인스타그램 릴스 / 유튜브 쇼츠 링크를 붙여넣으세요:',getVidUrlStr(it.vid)||'');
+      if(inp&&inp.trim())link=normalizeVidUrl(inp.trim())||inp.trim();
+    }
+    if(link){
+      it.vid=link;
+      save();
+      toast('🎬 릴스 링크가 연결되었어요! 이제 [🎬 릴스 바로가기 ↗]로 바로 이동할 수 있습니다.');
+    }
+    return;
+  }
+  if(act==='pasteVidInSheet'){
+    e.stopPropagation();
+    const it=items.find(x=>x.id===cur);
+    if(!it)return;
+    let link='';
+    try{
+      const clip=await navigator.clipboard.readText();
+      if(clip&&clip.trim())link=normalizeVidUrl(clip.trim())||clip.trim();
+    }catch(_){}
+    if(!link){
+      const inp=prompt('복사한 릴스/쇼츠 링크를 붙여넣으세요:',getVidUrlStr(it.vid)||'');
+      if(inp&&inp.trim())link=normalizeVidUrl(inp.trim())||inp.trim();
+    }
+    if(link){
+      it.vid=link;
+      save();showSheet();
+      toast('🎬 릴스 링크가 연결되었어요!');
+    }
+    return;
+  }
 
   if(act==='done'){
     e.stopPropagation();
@@ -1534,7 +1637,7 @@ document.addEventListener('click',async e=>{
       category:CATS[r.category]?r.category:cat,
       lat:Number(r.lat)||null,
       lng:Number(r.lng)||null,
-      vid:r.vid||'',
+      vid:r.vid||lastSharedVid||'',
       v:r.v||0,
       done:false
     };
@@ -1588,7 +1691,7 @@ document.addEventListener('click',async e=>{
     const vd=($('sh-vid')?.value||'').trim();
     if(nm)curItem.name=nm;
     if(ad)curItem.address=ad;
-    if(vd){const m=parseVideoMeta(vd);curItem.vid=m?m.url:vd;}
+    if(vd){curItem.vid=normalizeVidUrl(vd)||vd;}
     await reGeoItem(curItem);
     return;
   }
@@ -1612,17 +1715,47 @@ $('themeBtn').onclick=()=>setTheme(document.documentElement.dataset.theme==='dar
 $('settingsBtn').onclick=()=>{renderUsageBox();tab('set');};
 $('sheet').onclick=e=>{if(e.target===$('sheet'))closeSheet()};
 
+$('reelLinkBox').oninput=()=>{
+  const u=normalizeVidUrl($('reelLinkBox').value);
+  if(u)lastSharedVid=u;
+};
+$('pasteReelLink').onclick=async()=>{
+  try{
+    const t=await navigator.clipboard.readText();
+    if(t&&t.trim()){
+      const u=normalizeVidUrl(t.trim())||t.trim();
+      $('reelLinkBox').value=u;
+      lastSharedVid=u;
+      toast('🎬 릴스 링크가 입력되었어요! 이제 캡션이나 스샷으로 분석하면 링크가 함께 저장됩니다.');
+      return;
+    }
+  }catch(_){}
+  const inp=prompt('복사한 릴스/쇼츠 링크를 여기에 붙여넣으세요:');
+  if(inp&&inp.trim()){
+    const u=normalizeVidUrl(inp.trim())||inp.trim();
+    $('reelLinkBox').value=u;
+    lastSharedVid=u;
+  }
+};
+
 $('shareBox').oninput=()=>{
   const m=parseVideoMeta($('shareBox').value);
-  if(m)lastSharedVid=m.url;
+  if(m){
+    lastSharedVid=m.url;
+    if(!$('reelLinkBox').value.trim())$('reelLinkBox').value=m.url;
+  }
 };
 
 $('pasteShare').onclick=async()=>{
   try{
     const t=await navigator.clipboard.readText();
     if(t){
+      const m=parseVideoMeta(t);
+      if(m){
+        lastSharedVid=m.url;
+        if(!$('reelLinkBox').value.trim())$('reelLinkBox').value=m.url;
+      }
       $('shareBox').value=t;
-      const m=parseVideoMeta(t);if(m)lastSharedVid=m.url;
       toast('붙여넣기 완료! 바로 분석합니다.');
       runAnalyzeShare();
     }
@@ -1877,8 +2010,12 @@ setTimeout(()=>autoFixCoords(),500);
   const p=new URLSearchParams(location.search);
   const s=p.get('share')||p.get('text')||p.get('url');
   if(s&&s.trim()){
+    const m=parseVideoMeta(s.trim());
+    if(m){
+      lastSharedVid=m.url;
+      $('reelLinkBox').value=m.url;
+    }
     $('shareBox').value=s.trim();
-    const m=parseVideoMeta(s.trim());if(m)lastSharedVid=m.url;
     history.replaceState({},'',location.pathname);
     setTimeout(()=>runAnalyzeShare(),350);
   }
