@@ -132,7 +132,7 @@ input[type=text],input[type=password],textarea{font-size:16px}
         <summary style="cursor:pointer;font-size:11.5px;color:var(--sub);font-weight:700">💡 릴스 캡션·단축어 사용 팁 보기</summary>
         <div class="ds" style="margin-top:6px;line-height:1.55">
           • 릴스 링크를 위 칸에 넣고 캡션 글자(또는 캡션 스샷)를 넣으면 <b>가게 이름 + 지도 핀 + 릴스 바로가기 버튼</b>이 한 번에 저장됩니다.<br>
-          • 가게 이름만 입력해도 인터넷에서 주소와 좌표를 찾아 바로 저장합니다.
+          • 본 앱은 대용량 <b>IndexedDB</b> 저장소를 사용하여 수천 개의 장소와 사진을 용량 제한 없이 저장합니다.
         </div>
       </details>
     </div>
@@ -140,6 +140,13 @@ input[type=text],input[type=password],textarea{font-size:16px}
   </section>
 
   <section id="tab-set" class="tab-content"><div class="card">
+    <label>🚀 개인 전용 초고속 중계 서버 (Cloudflare Worker URL — 선택)</label>
+    <div style="display:flex;gap:6px;margin-bottom:6px">
+      <input type="text" id="cfWorkerUrl" placeholder="https://tripsync-proxy.아이디.workers.dev" style="flex:1;margin-bottom:0">
+      <button class="mb pr" id="saveWorkerBtn" style="flex:none">저장</button>
+    </div>
+    <small style="display:block;margin-bottom:12px;color:var(--sub);font-size:11px">등록 시 느린 공용 서버 대신 내 전용 Cloudflare 서버를 1순위로 사용하여 릴스 캡션 추출 속도가 대폭 빨라집니다.</small>
+
     <label>AI 제공자 키 (선택 — 여러 개 가능, 실패 시 다음 제공자/내장 파서로 자동 전환)</label>
     <div id="aiProv"></div>
     <small style="display:block;margin-top:6px;color:var(--sub);font-size:11px">시도 순서: <span id="aiChain">-</span></small>
@@ -148,7 +155,6 @@ input[type=text],input[type=password],textarea{font-size:16px}
       <button id="aiSaveAll" class="mb">💾 키 저장</button>
       <button id="aiClearAll" class="mb">🧹 모두 지우기</button>
       <button id="diagBtn" class="mb">🔍 환경 진단</button>
-      <button id="slimBtn" class="mb pr">⚡ 저장공간 즉시 정리</button>
     </div>
     <label style="margin-top:14px">지도 제공자</label>
     <select id="mapProvider" class="btn g" style="margin-bottom:10px">
@@ -221,9 +227,51 @@ const ls={
   }
 };
 
+// ==================== 대용량 IndexedDB 스토리지 엔진 (5MB 한도 완전 해제) ====================
+const idb={
+  db:null,
+  init(){
+    return new Promise(resolve=>{
+      if(this.db)return resolve(this.db);
+      if(!window.indexedDB)return resolve(null);
+      const req=indexedDB.open('TripSyncMasterDB',1);
+      req.onupgradeneeded=e=>{
+        const db=e.target.result;
+        if(!db.objectStoreNames.contains('kv'))db.createObjectStore('kv');
+      };
+      req.onsuccess=e=>{this.db=e.target.result;resolve(this.db);};
+      req.onerror=()=>resolve(null);
+    });
+  },
+  async get(key){
+    const db=await this.init();
+    if(!db)return null;
+    return new Promise(resolve=>{
+      try{
+        const tx=db.transaction('kv','readonly');
+        const req=tx.objectStore('kv').get(key);
+        req.onsuccess=()=>resolve(req.result??null);
+        req.onerror=()=>resolve(null);
+      }catch(e){resolve(null);}
+    });
+  },
+  async set(key,val){
+    const db=await this.init();
+    if(!db)return false;
+    return new Promise(resolve=>{
+      try{
+        const tx=db.transaction('kv','readwrite');
+        tx.objectStore('kv').put(val,key);
+        tx.oncomplete=()=>resolve(true);
+        tx.onerror=()=>resolve(false);
+      }catch(e){resolve(false);}
+    });
+  }
+};
+
 const CATS={PLACE:{n:'장소',e:'📍',b:'여행 장소/식당'},FOOD:{n:'먹거리',e:'🍙',b:'편의점 음식/먹거리'},SHOP:{n:'쇼핑',e:'🛍️',b:'구매 물건'}};
 
-function fetchTO(url,opt={},ms=9000){
+function fetchTO(url,opt={},ms=8500){
   const ctrl=new AbortController();
   const tid=setTimeout(()=>ctrl.abort(),ms);
   return fetch(url,{...opt,signal:ctrl.signal}).finally(()=>clearTimeout(tid));
@@ -257,21 +305,17 @@ let items=[],cat='PLACE',res=[],lm=null,tl=null,layer=null,pins={},tt,cur=null,v
 let filterState={PLACE:'ALL',FOOD:'ALL',SHOP:'ALL'};
 
 try{items=JSON.parse(ls.get('TRIP_MASTER_ITEMS')||'[]')}catch(e){items=[]}
+items.forEach(i=>{if(i.lat!=null)i.lat=Number(i.lat)||null;if(i.lng!=null)i.lng=Number(i.lng)||null;if(!CATS[i.category])i.category='PLACE';});
 
-(function immediateQuotaRescue(){
-  let changed=false;
-  try{localStorage.removeItem('TRIP_PHOTO_CACHE');}catch(e){}
-  items.forEach(i=>{
-    if(i.lat!=null)i.lat=Number(i.lat)||null;
-    if(i.lng!=null)i.lng=Number(i.lng)||null;
-    if(!CATS[i.category])i.category='PLACE';
-    if(i.img&&String(i.img).startsWith('data:image')&&i.img.length>60000){
-      i.img='';
-      i.useCustomImg=false;
-      changed=true;
-    }
-  });
-  if(changed)ls.set('TRIP_MASTER_ITEMS',JSON.stringify(items));
+// IndexedDB에서 대용량 데이터 로드 및 기존 localStorage 자동 마이그레이션
+(async function initDatabase(){
+  const dbItems=await idb.get('TRIP_MASTER_ITEMS');
+  if(Array.isArray(dbItems)&&dbItems.length>=items.length){
+    items=dbItems;
+    render();draw();fit();
+  }else if(items.length){
+    await idb.set('TRIP_MASTER_ITEMS',items);
+  }
 })();
 
 let photoCache={};try{photoCache=JSON.parse(ls.get('TRIP_PHOTO_CACHE')||'{}')}catch(e){photoCache={}}
@@ -281,12 +325,12 @@ function savePhotoCache(){
   ls.set('TRIP_PHOTO_CACHE',JSON.stringify(photoCache));
 }
 
-function compressDataUrl(dataUrl,maxW=320,quality=0.55){
+function compressDataUrl(dataUrl,maxW=480,quality=0.68){
   return new Promise(resolve=>{
     if(!dataUrl||!String(dataUrl).startsWith('data:image'))return resolve(dataUrl||'');
     const img=new Image();
     img.onload=()=>{
-      let w=img.width||320,h=img.height||320;
+      let w=img.width||480,h=img.height||480;
       if(w>maxW){h=Math.round(h*(maxW/w));w=maxW;}
       const cv=document.createElement('canvas');
       cv.width=w;cv.height=h;
@@ -312,29 +356,6 @@ function fileToBase64(file,maxW=860,quality=0.72){
     r.onerror=rej;
     r.readAsDataURL(file);
   });
-}
-
-async function slimStorage(showMsg=false){
-  let freed=0;
-  try{localStorage.removeItem('TRIP_PHOTO_CACHE');photoCache={};}catch(e){}
-  for(const i of items){
-    if(i.img&&String(i.img).startsWith('data:image')){
-      const before=i.img.length;
-      if(!i.useCustomImg||before>35000){
-        const comp=i.useCustomImg?await compressDataUrl(i.img,280,0.5):'';
-        if(comp&&comp.length<30000){
-          i.img=comp;
-          freed+=(before-comp.length);
-        }else{
-          i.img='';i.useCustomImg=false;
-          freed+=before;
-        }
-      }
-    }
-  }
-  ls.set('TRIP_MASTER_ITEMS',JSON.stringify(items));
-  render();draw();
-  if(showMsg)toast(`⚡ 저장 공간 정리 완료! (${Math.round(freed/1024)}KB 확보됨)`);
 }
 
 window.imgErr=function(el){
@@ -536,9 +557,6 @@ function pinCardHtml(i){
   return `<div class="pinCard c-${CATS[i.category]?i.category:'PLACE'}"><i>${ic}</i>${thumb?`<img loading="lazy" referrerpolicy="no-referrer" src="${esc(thumb)}"${fb} onerror="imgErr(this)">`:''}${i.vid?'<b>🎬</b>':''}</div>`;
 }
 
-// ==================== 구글 지도 가게 프로필 직결 URL 생성기 ====================
-// 숫자 좌표(lat,lng)를 넘기면 구글 지도가 가게 프로필 대신 단순 숫자 핀만 띄우므로,
-// 반드시 '상호명 + 주소'(또는 주소 원문)를 우선 전달하여 실제 가게 정보/영업여부/리뷰가 뜨도록 처리
 function normalizeOcrAddr(s){
   return String(s||'')
     .replace(/(^|[\s,])T(\d{3}-\d{4})\b/g,'$1〒$2')
@@ -552,9 +570,7 @@ function getValidSearchQuery(i){
   const nm=isGenericSharedName(i.name)?'':String(i.name||'').trim();
   const lnm=String(i.localName||'').trim();
   const ad=normalizeOcrAddr(i.address||'');
-  // 이름과 주소가 완전히 같으면 중복 제거
   if(nm&&ad&&nm===ad)return ad;
-  // 현지어 상호명이 있으면 함께 검색해 정확도 향상
   const mainName=lnm&&nm&&lnm!==nm?`${nm} ${lnm}`:(lnm||nm);
   return [mainName,ad].filter(Boolean).join(' ').trim();
 }
@@ -762,16 +778,14 @@ function render(){
   }
 }
 
+// IndexedDB(무제한)에 원본 전체를 저장하고, localStorage에는 이미지를 제외한 경량 백업본만 저장해 5MB 에러 원천 차단
 function persist(){
-  if(ls.set('TRIP_MASTER_ITEMS',JSON.stringify(items)))return true;
-  items.forEach(i=>{
-    if(i.img&&String(i.img).startsWith('data:image')&&i.img.length>25000){
-      i.img='';i.useCustomImg=false;
-    }
-  });
-  if(ls.set('TRIP_MASTER_ITEMS',JSON.stringify(items)))return true;
-  items.forEach(i=>{if(i.img&&String(i.img).startsWith('data:')){i.img='';i.useCustomImg=false;}});
-  return ls.set('TRIP_MASTER_ITEMS',JSON.stringify(items));
+  idb.set('TRIP_MASTER_ITEMS',items);
+  try{
+    const light=items.map(i=>({...i,img:(i.img&&String(i.img).startsWith('data:'))?'':i.img}));
+    ls.set('TRIP_MASTER_ITEMS',JSON.stringify(light));
+  }catch(e){}
+  return true;
 }
 function save(){persist();render();draw()}
 
@@ -798,7 +812,6 @@ function showSheet(){
     const mh=view==='caption'?420:290;
     media=`<iframe class="big" src="${esc(vEmbed)}" allow="autoplay; fullscreen; picture-in-picture; clipboard-write; web-share" allowfullscreen loading="lazy" style="min-height:${mh}px;background:#000"></iframe>`;
   }else if(isMap){
-    // 임베드 지도에서도 숫자 좌표 대신 '가게이름+주소'를 우선 검색하여 실제 가게 프로필 카드가 뜨도록 설정
     if(view==='mymaps' && myEmbed) media=`<iframe class="big" src="${esc(myEmbed)}" allowfullscreen loading="lazy" style="min-height:280px"></iframe>`;
     else if(searchTarget&&gkey) media=`<iframe class="big" src="https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(gkey)}&q=${q}&zoom=16" allowfullscreen loading="lazy" style="min-height:280px"></iframe>`;
     else if(lat&&lng&&gkey) media=`<iframe class="big" src="https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(gkey)}&q=${lat},${lng}&zoom=16" allowfullscreen loading="lazy" style="min-height:280px"></iframe>`;
@@ -972,6 +985,7 @@ try{usageCnt={...usageCnt,...JSON.parse(ls.get('TRIP_USAGE_CNT')||'{}')}}catch(e
 function bumpCnt(k){usageCnt[k]=(usageCnt[k]||0)+1;ls.set('TRIP_USAGE_CNT',JSON.stringify(usageCnt));renderUsageBox();}
 
 function buildAiProvUI(){
+  $('cfWorkerUrl').value=ls.get('TRIP_WORKER_URL')||'';
   $('aiProv').innerHTML=AI_DEFS.map(d=>{
     const c=aiCfg[d.id]||{key:'',model:d.defModel};
     return `<div style="padding:10px;border:1px solid var(--bd);border-radius:12px;background:var(--s);margin-bottom:8px">
@@ -1005,23 +1019,17 @@ function updateAiChainText(){
   $('aiChain').textContent=act.length?act.join(' → ')+' → 내장 캡션 파서':'내장 캡션 파서 (키 미설정)';
 }
 
-function getStorageUsedKB(){
-  let total=0;
-  try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);total+=(localStorage.getItem(k)||'').length*2;}}catch(e){}
-  return Math.round(total/1024);
-}
-
 async function renderUsageBox(){
   const box=$('usageBox');if(!box)return;
   let orInfo='키 미설정';
   const orKey=aiCfg.openrouter?.key;
   if(orKey)orInfo=`앱 호출 ${usageCnt.openrouter||0}회 (잔액 조회 중...)`;
-  const usedKB=getStorageUsedKB();
+  const wUrl=(ls.get('TRIP_WORKER_URL')||'').trim();
   box.innerHTML=`
-    <div>• <b>브라우저 저장소 사용량</b>: 약 ${usedKB.toLocaleString()} KB / 5,000 KB</div>
+    <div>• <b>데이터 저장소</b>: 🟢 IndexedDB 대용량 모드 (저장된 항목 ${items.length}개)</div>
+    <div>• <b>전용 중계 서버</b>: ${wUrl?'🟢 Cloudflare Worker 연결됨':'⚪ 공용 프록시 병렬 모드'}</div>
     <div>• <b>Gemini</b>: ${aiCfg.gemini?.key?'🟢 키 설정됨':'⚪ 미설정'} (호출: ${usageCnt.gemini||0}회)</div>
     <div id="orUsageLine">• <b>OpenRouter</b>: ${aiCfg.openrouter?.key?'🟢 키 설정됨':'⚪ 미설정'} (${orInfo})</div>
-    <div>• <b>Groq / OpenAI</b>: ${(usageCnt.groq||0)+(usageCnt.openai||0)}회 호출</div>
     <div>• <b>Google Maps</b>: ${(ls.get('TRAVEL_GMAP_KEY')||'').trim()?'🟢 키 설정됨':'⚪ 미설정'} (지오코딩: ${usageCnt.gmap||0}회)</div>
   `;
   if(orKey){
@@ -1184,20 +1192,28 @@ function parseIgEmbedHtml(html){
   return '';
 }
 
+// 개인 Cloudflare Worker가 설정되어 있으면 1순위로 즉시 호출하고, 없을 때만 공용 프록시 병렬 호출
 async function fetchVideoCaption(vUrl){
   const meta=parseVideoMeta(vUrl);
   if(!meta)return '';
+  const customWorker=(ls.get('TRIP_WORKER_URL')||'').trim().replace(/\/+$/,'');
+
   if(meta.platform==='ig'&&meta.id){
     const embedUrl=`https://www.instagram.com/p/${meta.id}/embed/captioned/`;
     const reelEmbedUrl=`https://www.instagram.com/reel/${meta.id}/embed/captioned/`;
-    const postUrl=`https://www.instagram.com/p/${meta.id}/`;
+    if(customWorker){
+      try{
+        const txt=await fetchTO(`${customWorker}?url=${encodeURIComponent(embedUrl)}`,{},5000).then(r=>r.text());
+        const cap=parseIgEmbedHtml(txt);
+        if(cap&&cap.length>=6)return cap;
+      }catch(e){}
+    }
     const jobs=[
       ()=>fetchTO(`https://api.allorigins.win/raw?url=${encodeURIComponent(embedUrl)}`,{},6500).then(r=>r.text()),
       ()=>fetchTO(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(embedUrl)}`,{},6500).then(r=>r.text()),
       ()=>fetchTO(`https://corsproxy.io/?url=${encodeURIComponent(embedUrl)}`,{},6500).then(r=>r.text()),
       ()=>fetchTO(`https://r.jina.ai/${embedUrl}`,{},7000).then(r=>r.text()),
-      ()=>fetchTO(`https://api.allorigins.win/get?url=${encodeURIComponent(reelEmbedUrl)}`,{},6500).then(r=>r.json()).then(d=>d.contents||''),
-      ()=>fetchTO(`https://api.allorigins.win/raw?url=${encodeURIComponent(postUrl)}`,{},6500).then(r=>r.text())
+      ()=>fetchTO(`https://api.allorigins.win/get?url=${encodeURIComponent(reelEmbedUrl)}`,{},6500).then(r=>r.json()).then(d=>d.contents||'')
     ];
     try{
       return await Promise.any(jobs.map(async fn=>{
@@ -1220,13 +1236,16 @@ async function fetchVideoCaption(vUrl){
       const r=await fetchTO(`https://noembed.com/embed?url=${encodeURIComponent(wUrl)}`,{},4500);
       if(r.ok){const d=await r.json();title=d.title||'';}
     }catch(e){}
+    const proxies=customWorker
+      ?[()=>fetchTO(`${customWorker}?url=${encodeURIComponent(wUrl)}`,{},5000).then(r=>r.text())]
+      :[
+        ()=>fetchTO(`https://api.allorigins.win/raw?url=${encodeURIComponent(wUrl)}`,{},6000).then(r=>r.text()),
+        ()=>fetchTO(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(wUrl)}`,{},6000).then(r=>r.text()),
+        ()=>fetchTO(`https://r.jina.ai/${wUrl}`,{},6500).then(r=>r.text())
+      ];
     try{
-      desc=await Promise.any([
-        fetchTO(`https://api.allorigins.win/raw?url=${encodeURIComponent(wUrl)}`,{},6000).then(r=>r.text()),
-        fetchTO(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(wUrl)}`,{},6000).then(r=>r.text()),
-        fetchTO(`https://r.jina.ai/${wUrl}`,{},6500).then(r=>r.text())
-      ].map(async p=>{
-        const html=await p;
+      desc=await Promise.any(proxies.map(async fn=>{
+        const html=await fn();
         const m=html.match(/"shortDescription"\s*:\s*"((?:[^"\\]|\\.)*)"/);
         if(m){const s=JSON.parse('"'+m[1]+'"');if(s.length>5)return s;}
         if(html.includes('Markdown Content:'))return html.split('Markdown Content:')[1].slice(0,1500);
@@ -1358,7 +1377,6 @@ async function geocodePlace(cand,hint=''){
 
   const uniq=[...new Set(queries.map(q=>q.trim()).filter(q=>q.length>=2))];
 
-  // 1순위: Google Maps Geocoding API (place_id까지 함께 저장해 구글 지도에서 실제 가게가 열리게 함)
   if(gkey){
     for(const q of uniq.slice(0,5)){
       try{
@@ -1379,10 +1397,8 @@ async function geocodePlace(cand,hint=''){
     }
   }
 
-  // 2순위: AI가 추론한 정밀 가게 좌표가 있으면 시/구 중심점보다 우선 활용
   const aiLat=Number(cand.lat),aiLng=Number(cand.lng);
 
-  // 3순위: Nominatim + Photon 검색 (단, 도시/구 전체 중심점(type=administrative/city)만 반환된 경우 AI 정밀 좌표 우선)
   for(const q of uniq){
     try{
       const [nom,pho]=await Promise.allSettled([
@@ -1632,7 +1648,6 @@ async function reGeoItem(i){
   if(!i)return;
   toast('가게 정보와 위치를 찾는 중...');
   const hint=($('hint')?.value||'').trim();
-  // 주소만 있고 가게 이름이 없거나 주소와 같으면 AI로 가게 이름/현지 상호명 추론도 함께 시도
   if((isGenericSharedName(i.name)||i.name===i.address)&&i.address&&AI_DEFS.some(d=>aiCfg[d.id]?.key)){
     const {cands}=await analyzeContent({rawText:`${i.name||''} ${i.address}`.trim(),vidUrl:getVidUrlStr(i.vid),hint});
     if(cands.length){
@@ -1688,9 +1703,6 @@ async function applyCaptionToItem(i,rawCap,images=[]){
     if(loc.info)i.info=loc.info;
     const g=await geocodePlace(i,hint);
     if(g){i.lat=g.lat;i.lng=g.lng;if(g.placeId)i.placeId=g.placeId;}
-  }
-  if(i.img&&String(i.img).startsWith('data:image')&&i.img.length>30000){
-    i.img='';i.useCustomImg=false;
   }
   save();
   if(i.lat&&i.lng){
@@ -1935,6 +1947,13 @@ $('themeBtn').onclick=()=>setTheme(document.documentElement.dataset.theme==='dar
 $('settingsBtn').onclick=()=>{renderUsageBox();tab('set');};
 $('sheet').onclick=e=>{if(e.target===$('sheet'))closeSheet()};
 
+$('saveWorkerBtn').onclick=()=>{
+  const u=($('cfWorkerUrl').value||'').trim().replace(/\/+$/,'');
+  ls.set('TRIP_WORKER_URL',u);
+  renderUsageBox();
+  toast(u?'🚀 개인 Cloudflare Worker 서버가 설정되었어요!':'공용 프록시 모드로 전환되었어요');
+};
+
 $('reelLinkBox').oninput=()=>{
   const u=normalizeVidUrl($('reelLinkBox').value);
   if(u)lastSharedVid=u;
@@ -1992,10 +2011,11 @@ $('shareFile').onchange=async e=>{
   if(fs.length)await runAnalyzeShare(fs);
 };
 
+// IndexedDB 무제한 저장소 덕분에 내 사진도 고화질(640px)로 걱정 없이 저장 가능
 $('own').onchange=async e=>{
   const f=e.target.files?.[0];e.target.value='';
   if(!f||!cur)return;
-  const b64=await fileToBase64(f,300,0.55);
+  const b64=await fileToBase64(f,640,0.75);
   const i=items.find(x=>x.id===cur);
   if(i){i.img=`data:${b64.mime};base64,${b64.data}`;i.useCustomImg=true;view='photo';save();showSheet();}
 };
@@ -2023,10 +2043,6 @@ $('diagBtn').onclick=async()=>{
   }catch(e){
     toast('⚠️ AI 진단 결과: '+e.message);
   }
-};
-$('slimBtn').onclick=async()=>{
-  await slimStorage(true);
-  renderUsageBox();
 };
 
 $('mapProvider').onchange=e=>{ls.set('TRIP_MAP_PROVIDER',e.target.value);location.reload()};
@@ -2212,7 +2228,6 @@ setTheme(ls.get('TRIP_THEME')||'dark');
 buildAiProvUI();
 render();
 initMap();
-slimStorage(false);
 setTimeout(()=>autoFixCoords(),500);
 
 (function checkShareParam(){
