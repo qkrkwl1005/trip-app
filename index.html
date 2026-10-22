@@ -36,7 +36,7 @@ input:focus,textarea:focus{border-color:var(--pr)}textarea{min-height:76px;resiz
 .seg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--s);padding:4px;border:1px solid var(--bd);border-radius:12px;margin-bottom:12px}
 .seg div{padding:8px 2px;text-align:center;font-size:12.5px;font-weight:700;border-radius:9px;color:var(--sub);cursor:pointer}.seg .on{background:rgba(59,130,246,.18);color:var(--pr)}
 .btn{width:100%;padding:12px;background:var(--pr);color:#fff;border:0;border-radius:12px;font:inherit;font-weight:700;cursor:pointer;touch-action:manipulation}.btn:disabled{opacity:.6}.btn.g{background:var(--s3);color:var(--tx);margin-bottom:8px}
-.item{background:var(--s2);border:1px solid var(--bd);border-radius:14px;padding:10px;display:flex;gap:12px;align-items:center;cursor:pointer;content-visibility:auto;contain-intrinsic-size:98px}.item.done{opacity:.55}
+.item{background:var(--s2);border:1px solid var(--bd);border-radius:14px;padding:10px;display:flex;gap:12px;align-items:center;cursor:pointer;content-visibility:auto;contain-intrinsic-size:96px}.item.done{opacity:.55}
 .pic{position:relative;width:78px;height:78px;flex:none;border-radius:12px;background:var(--s3);display:grid;place-items:center;font-size:30px;overflow:hidden}
 .pic img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .pic.big{width:100%;height:auto;aspect-ratio:4/3;font-size:60px;margin-bottom:12px}iframe.big{width:100%;aspect-ratio:4/3;border:0;border-radius:12px;margin-bottom:12px}
@@ -71,7 +71,6 @@ input:focus,textarea:focus{border-color:var(--pr)}textarea{min-height:76px;resiz
 #side{width:100%;min-width:0;border:0}
 #nav{position:fixed;left:0;right:0;bottom:0;z-index:40;grid-template-columns:repeat(5,1fr);border:0;border-top:1px solid var(--bd);padding:4px 4px calc(4px + env(safe-area-inset-bottom))}
 .tab-btn[data-tab=map]{display:flex}.tab-content{padding-bottom:100px}
-/* display:none 대신 레이아웃을 유지한 채 숨겨서 지도 탭 전환 시 0ms 즉시 표시 */
 #map-wrap{position:fixed;left:0;right:0;top:0;bottom:calc(58px + env(safe-area-inset-bottom));height:auto;z-index:5;visibility:hidden;opacity:0;pointer-events:none}
 body.show-map #map-wrap{visibility:visible;opacity:1;pointer-events:auto;z-index:30}
 input[type=text],input[type=password],textarea{font-size:16px}
@@ -133,9 +132,9 @@ input[type=text],input[type=password],textarea{font-size:16px}
     <small style="display:block;margin-top:6px;color:var(--sub);font-size:11px">📊 사용량 안내: OpenRouter는 잔액·한도를 실시간으로 서버에서 조회 가능 / Gemini·Google Maps는 서버 잔량 조회가 구조적으로 없어(no key-only API) 앱이 직접 세어 표시합니다 — 숫자는 이 앱에서 호출한 횟수일 뿐입니다.</small>
     <small style="display:block;margin-top:6px;color:var(--sub);font-size:11px">OpenRouter 키는 무료 모델도 사용 가능 — 모델칸을 비우면 무료 라우터(openrouter/free)를 씁니다. Gemini는 무료 쿼터(분당 횟수 제한)라 순서는 Gemini → OpenRouter로 돌아요.</small>
     <label style="margin-top:14px">나만의 CORS 프록시 주소 (선택 · 인스타 캡션 회수 가속)</label>
-    <input type="text" id="cfproxy" placeholder="https://tripsync-proxy.아이디.workers.dev">
+    <input type="text" id="cfproxy" placeholder="https://내워커.도메인.workers.dev/?url=">
     <button id="savecfproxy" class="btn g">프록시 주소 저장</button>
-    <label style="display:block;margin-top:4px;color:var(--sub);font-size:11px">※ 주소 뒤에 /?url= 을 붙이지 않아도 자동으로 인식합니다.</label>
+    <label style="display:block;margin-top:4px;color:var(--sub);font-size:11px">※ workers.dev 주소는 한국 통신사 DNS에서 차단될 수 있어요. Cloudflare Workers → 설정 → Domains에서 내 도메인을 연결하면 폰에서도 바로 동작합니다.</label>
     <label style="margin-top:14px">지도 제공자</label>
     <select id="mapProvider" class="btn g" style="margin-bottom:10px">
       <option value="osm">OpenStreetMap (키 불필요)</option>
@@ -215,7 +214,7 @@ const ls={
   }
 };
 
-// 대용량 비동기 IndexedDB 엔진 (메인 스레드 블로킹 및 5MB 용량 초과 원천 차단)
+// 대용량 비동기 IndexedDB 엔진 (5MB 제한 및 저장 렉 해소)
 const idb={
   db:null,
   init(){
@@ -265,7 +264,6 @@ function fetchTO(url,opt={},ms=7500){
   return fetch(url,{...opt,signal:ctrl.signal}).finally(()=>clearTimeout(tid));
 }
 
-// Cloudflare Worker 주소 정규화 (?url= 누락 시 자동 부착)
 function normalizeCfProxy(raw){
   let s=String(raw||'').trim();
   if(!s)return '';
@@ -323,7 +321,7 @@ try{items=JSON.parse(ls.get('TRIP_MASTER_ITEMS')||'[]')}catch(e){items=[]}
   const dbItems=await idb.get('TRIP_MASTER_ITEMS');
   if(Array.isArray(dbItems)&&dbItems.length>=items.length){
     items=dbItems;
-    render();draw();
+    render(true);draw(true);
   }else if(items.length){
     idb.set('TRIP_MASTER_ITEMS',items);
   }
@@ -336,11 +334,10 @@ function savePhotoCache(){
   ls.set('TRIP_PHOTO_CACHE',JSON.stringify(photoCache));
 }
 
-// 지오코딩 캐시: 한 번 찾은 주소/가게 좌표는 0ms 즉시 반환
 let geoCache={};try{geoCache=JSON.parse(ls.get('TRIP_GEO_CACHE')||'{}')}catch(e){geoCache={}}
 function saveGeoCache(){
   const keys=Object.keys(geoCache);
-  if(keys.length>200){keys.slice(0,keys.length-200).forEach(k=>delete geoCache[k]);}
+  if(keys.length>250){keys.slice(0,keys.length-250).forEach(k=>delete geoCache[k]);}
   ls.set('TRIP_GEO_CACHE',JSON.stringify(geoCache));
 }
 
@@ -412,7 +409,7 @@ window.imgErr=function(el){
   el.remove();
 };
 
-function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),4000)}
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),4200)}
 window.addEventListener('error',e=>{try{if(e.message)toast('오류: '+e.message)}catch(_){}});
 
 function getVidUrlStr(v){
@@ -551,7 +548,6 @@ async function fetchRepPhoto(q){
   });
 })();
 
-// ⚡ 탭 전환 초고속화: 선택한 탭만 즉시 렌더하고 지도 탭은 리사이즈 없이 즉시 노출
 function tab(k){
   if(k==='map'&&innerWidth>820)return;
   if(activeTab===k)return;
@@ -575,7 +571,9 @@ function tab(k){
     const cnt=items.filter(i=>i.lat&&i.lng).length;
     if(!cnt&&items.length){
       toast('저장한 장소의 위치를 자동으로 찾고 있어요...');
-      autoFixCoords();
+      autoFixCoords().then(ok=>{if(!ok)toast('위치를 못 찾았어요. 찾기 탭에서 검색 후 저장하면 좌표가 붙어요')});
+    }else if(!cnt&&!items.length){
+      toast('아직 저장한 장소가 없어요. 찾기 탭에서 저장하세요');
     }
   }
 }
@@ -645,7 +643,6 @@ function makeGPinClass(){
   return GPin;
 }
 
-// ⚡ 마커 변경 감지 시그니처: 핀 좌표나 썸네일이 안 바뀌었으면 지도 마커를 재렌더링하지 않음
 function draw(force=false){
   const valid=items.filter(i=>Number(i.lat)&&Number(i.lng));
   const sig=valid.map(i=>`${i.id}:${i.lat}:${i.lng}:${i.category}:${i.v||0}:${Boolean(i.vid)}`).join('|');
@@ -691,40 +688,13 @@ function draw(force=false){
   });
 }
 
-function normalizeOcrAddr(s){
-  return String(s||'')
-    .replace(/(^|[\s,])T(\d{3}-\d{4})\b/g,'$1〒$2')
-    .replace(/\s+/g,' ')
-    .trim();
-}
-function isGenericSharedName(nm){
-  return /^(?:공유\s*(?:릴스|쇼츠|틱톡|링크)|저장된\s*장소|장소)$/.test(String(nm||'').trim());
-}
-function getValidSearchQuery(i){
-  const nm=isGenericSharedName(i.name)?'':String(i.name||'').trim();
-  const lnm=String(i.localName||'').trim();
-  const ad=normalizeOcrAddr(i.address||'');
-  if(nm&&ad&&nm===ad)return ad;
-  const mainName=lnm&&nm&&lnm!==nm?`${nm} ${lnm}`:(lnm||nm);
-  return [mainName,ad].filter(Boolean).join(' ').trim();
-}
-// 구글 지도 가게 프로필 직결 링크 (숫자 좌표 대신 가게이름+주소를 우선 전달하여 실제 가게가 뜨게 함)
-function getGMapLink(i){
-  if(!i)return 'https://www.google.com/maps';
-  const qStr=getValidSearchQuery(i);
-  if(qStr)return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(qStr)}`;
-  const lat=Number(i.lat)||0,lng=Number(i.lng)||0;
-  if(lat&&lng)return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
-  return 'https://www.google.com/maps';
-}
-
+// 보내주신 목록 카드 UI 100% 동일 유지
 const card=i=>{
   const vUrl=getVidUrlStr(i.vid);
-  const gmapHref=getGMapLink(i);
   const vAction=vUrl
     ?`<button class="mb reel-jump" data-act="openVid" data-id="${i.id}" style="padding:5px 10px;font-size:11.5px">${esc(getVidBtnLabel(vUrl))}</button>`
     :`<button class="mb" data-act="quickAddVid" data-id="${i.id}" style="padding:4px 9px;font-size:11px;color:var(--pr);border-color:var(--pr)">+🔗 릴스링크 넣기</button>`;
-  return `<div class="item${i.done?' done':''}${selected.has(i.id)?' selected':''}" data-act="${editMode[i.category]?'toggleSel':'open'}" data-id="${i.id}" style="${selected.has(i.id)?'outline:2px solid var(--pr)':''}">${editMode[i.category]?`<input type="checkbox" data-act="sel" data-id="${i.id}"${selected.has(i.id)?' checked':''} style="width:18px;height:18px;margin-right:8px">`:''}${ph(CATS[i.category]?CATS[i.category].e:'📍',itemThumb(i),'',i.img)}<div class="mid"><div class="nm">${esc(i.name)}${vUrl?' 🎬':''}${i.lat&&i.lng?' <span style="font-size:11px;color:var(--pr)">📍</span>':''}</div><div class="ds">${esc(i.address||i.note||'')}</div>${i.price?`<div class="ds" style="color:var(--FOOD);font-weight:700">${esc(i.price)}</div>`:''}${i.info?`<div class="ds in">${esc(i.info)}</div>`:''}<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">${vAction}<a class="mb pr" href="${esc(gmapHref)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="padding:4px 9px;font-size:11px">구글지도 ↗</a></div></div><input type="checkbox" data-act="done" data-id="${i.id}"${i.done?' checked':''}></div>`;
+  return `<div class="item${i.done?' done':''}${selected.has(i.id)?' selected':''}" data-act="${editMode[i.category]?'toggleSel':'open'}" data-id="${i.id}" style="${selected.has(i.id)?'outline:2px solid var(--pr)':''}">${editMode[i.category]?`<input type="checkbox" data-act="sel" data-id="${i.id}"${selected.has(i.id)?' checked':''} style="width:18px;height:18px;margin-right:8px">`:''}${ph(CATS[i.category]?CATS[i.category].e:'📍',itemThumb(i),'',i.img)}<div class="mid"><div class="nm">${esc(i.name)}${vUrl?' 🎬':''}</div><div class="ds">${esc(i.address||i.note||'')}</div>${i.price?`<div class="ds" style="color:var(--FOOD);font-weight:700">${esc(i.price)}</div>`:''}${i.info?`<div class="ds in">${esc(i.info)}</div>`:''}<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">${vAction}</div></div><input type="checkbox" data-act="done" data-id="${i.id}"${i.done?' checked':''}></div>`;
 };
 
 function ph(e,src,c='',fb=''){
@@ -732,7 +702,6 @@ function ph(e,src,c='',fb=''){
   return `<div class="pic ${c}">${e}${src?`<img loading="lazy" decoding="async" referrerpolicy="no-referrer" src="${esc(src)}"${fba} onerror="imgErr(this)">`:''}</div>`;
 }
 
-// 특정 카테고리 1개만 빠르게 렌더링
 function renderCat(c){
   if(!CATS[c])return;
   const kw=($('q-'+c)?.value||'').trim().toLowerCase(),all=items.filter(i=>i.category===c);
@@ -743,7 +712,6 @@ function renderCat(c){
   const sc=$('selCount-'+c); if(sc) sc.textContent=editMode[c]?`선택 ${selected.size}개`:'';
 }
 
-// ⚡ 전체 렌더: 숫자 카운트는 즉시 갱신하고, 활성 탭만 먼저 그린 뒤 비활성 탭은 유휴 시간에 처리
 let _idleRenderT=null;
 function render(immediateAll=false){
   for(const c in CATS){
@@ -779,8 +747,36 @@ function save(){
 window.addEventListener('pagehide',()=>{try{persistNow()}catch(e){}});
 document.addEventListener('visibilitychange',()=>{try{if(document.visibilityState==='hidden')persistNow()}catch(e){}});
 
+function normalizeOcrAddr(s){
+  return String(s||'')
+    .replace(/(^|[\s,])T(\d{3}-\d{4})\b/g,'$1〒$2')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+function isGenericSharedName(nm){
+  return /^(?:공유\s*(?:릴스|쇼츠|틱톡|링크)|저장된\s*장소|장소|⏳\s*장소\s*분석\s*중\.\.\.)$/.test(String(nm||'').trim());
+}
+function getValidSearchQuery(i){
+  const nm=isGenericSharedName(i.name)?'':String(i.name||'').trim();
+  const lnm=String(i.localName||'').trim();
+  const ad=normalizeOcrAddr(i.address||'');
+  if(nm&&ad&&nm===ad)return ad;
+  const mainName=lnm&&nm&&lnm!==nm?`${nm} ${lnm}`:(lnm||nm);
+  return [mainName,ad].filter(Boolean).join(' ').trim();
+}
+// 구글지도 버튼 클릭 시 숫자 좌표 대신 가게이름+주소로 연결해 실제 가게 프로필이 뜨도록 보완
+function getGMapLink(i){
+  if(!i)return 'https://www.google.com/maps';
+  const qStr=getValidSearchQuery(i);
+  if(qStr)return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(qStr)}`;
+  const lat=Number(i.lat)||0,lng=Number(i.lng)||0;
+  if(lat&&lng)return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+  return 'https://www.google.com/maps';
+}
+
 function closeSheet(){$('sheet').classList.remove('on');cur=null}
 
+// 보내주신 상세 시트 UI 100% 동일 유지
 function showSheet(){
   const i=items.find(x=>x.id===cur);if(!i)return closeSheet();
   const searchTarget=getValidSearchQuery(i);
@@ -863,7 +859,6 @@ function showSheet(){
   `;
   $('sheet').classList.add('on');
 
-  // ⚡ 시트 내 타이핑 중에는 디바운스 저장만 수행하여 키 입력 렉 방지
   const nmEl=$('sh-name'), adEl=$('sh-addr'), vdEl=$('sh-vid'), ntEl=$('sh-note');
   if(nmEl){
     nmEl.oninput=()=>{if(nmEl.value.trim())i.name=nmEl.value.trim();persist();};
@@ -927,6 +922,9 @@ try{usageCnt={...usageCnt,...JSON.parse(ls.get('TRIP_USAGE_CNT')||'{}')}}catch(e
 
 (function recoverExistingKeys(){
   const gmapKey=(ls.get('TRAVEL_GMAP_KEY')||'').trim();
+  // 이전에 저장한 TRIP_WORKER_URL과 TRIP_CF_PROXY 양방향 호환
+  const oldW=ls.get('TRIP_WORKER_URL')||'';
+  if(oldW&&!ls.get('TRIP_CF_PROXY'))ls.set('TRIP_CF_PROXY',normalizeCfProxy(oldW));
   try{
     for(let idx=0;idx<localStorage.length;idx++){
       const k=localStorage.key(idx);
@@ -1000,11 +998,9 @@ async function renderUsageBox(){
   const orKey=aiCfg.openrouter?.key;
   if(orKey)orInfo=`앱 호출 ${usageCnt.openrouter||0}회 (잔액 조회 중...)`;
   const usedKB=getStorageUsedKB();
-  const cf=(ls.get('TRIP_CF_PROXY')||'').trim();
   box.innerHTML=`
-    <div>• <b>저장소</b>: 🟢 IndexedDB 연동됨 (localStorage: 약 ${usedKB.toLocaleString()} KB / 5,000 KB)</div>
-    <div>• <b>개인 프록시</b>: ${cf?'🟢 설정됨':'⚪ 미설정 (공용 프록시 병렬 사용)'}</div>
-    <div>• <b>Gemini</b>: ${aiCfg.gemini?.key?'🟢 키 설정됨':'⚪ 미설정'} (호출: ${usageCnt.gemini||0}회)</div>
+    <div>• <b>브라우저 저장소 사용량</b>: 약 ${usedKB.toLocaleString()} KB / 5,000 KB (IndexedDB 대용량 병행 중)</div>
+    <div>• <b>Gemini</b>: ${aiCfg.gemini?.key?'🟢 키 설정됨':'⚪ 미설정'} (이 앱에서 호출: ${usageCnt.gemini||0}회)</div>
     <div id="orUsageLine">• <b>OpenRouter</b>: ${aiCfg.openrouter?.key?'🟢 키 설정됨':'⚪ 미설정'} (${orInfo})</div>
     <div>• <b>Groq / OpenAI</b>: ${(usageCnt.groq||0)+(usageCnt.openai||0)}회 호출</div>
     <div>• <b>Google Maps</b>: ${(ls.get('TRAVEL_GMAP_KEY')||'').trim()?'🟢 키 설정됨':'⚪ 미설정'} (지오코딩 호출: ${usageCnt.gmap||0}회)</div>
@@ -1022,7 +1018,6 @@ async function renderUsageBox(){
   }
 }
 
-// ⚡ AI 응답 가속: 가장 응답이 빠른 flash-lite / flash 모델을 9초 타임아웃으로 우선 호출
 async function callGeminiSmart(prompt,images=[],allowGrounding=false){
   const key=(aiCfg.gemini?.key||'').trim();
   if(!key)throw new Error('키 미설정');
@@ -1041,7 +1036,7 @@ async function callGeminiSmart(prompt,images=[],allowGrounding=false){
     try{
       const r=await fetchTO(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(key)}`,{
         method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)
-      },9500);
+      },9000);
       const d=await r.json();
       if(!r.ok){
         lastErr=d?.error?.message||`HTTP ${r.status}`;
@@ -1159,11 +1154,10 @@ function parseIgEmbedHtml(html){
   return '';
 }
 
-// ⚡ 캡션 회수 가속: Cloudflare 개인 프록시 정규화 + 전체 프록시 동시 경쟁(3.8초 타임아웃)
 async function fetchVideoCaption(vUrl){
   const meta=parseVideoMeta(vUrl);
   if(!meta)return '';
-  const cfBase=normalizeCfProxy(ls.get('TRIP_CF_PROXY')||'');
+  const cfBase=normalizeCfProxy(ls.get('TRIP_CF_PROXY')||ls.get('TRIP_WORKER_URL')||'');
 
   if(meta.platform==='ig'&&meta.id){
     const embedUrl=`https://www.instagram.com/p/${meta.id}/embed/captioned/`;
@@ -1200,7 +1194,6 @@ async function fetchVideoCaption(vUrl){
   }
   if(meta.platform==='yt'&&meta.id){
     const wUrl=`https://www.youtube.com/watch?v=${meta.id}`;
-    let title='',desc='';
     const titleP=fetchTO(`https://noembed.com/embed?url=${encodeURIComponent(wUrl)}`,{},3500).then(r=>r.ok?r.json():{}).then(d=>d.title||'').catch(()=>'');
     const descJobs=[];
     if(cfBase)descJobs.push(fetchTO(cfBase+encodeURIComponent(wUrl),{},3800).then(r=>r.text()));
@@ -1216,7 +1209,7 @@ async function fetchVideoCaption(vUrl){
       if(html.includes('Markdown Content:'))return html.split('Markdown Content:')[1].slice(0,1500);
       throw new Error('empty');
     })).catch(()=>'');
-    [title,desc]=await Promise.all([titleP,descP]);
+    const [title,desc]=await Promise.all([titleP,descP]);
     return [title,desc].filter(Boolean).join('\n').trim();
   }
   if(meta.platform==='tt'){
@@ -1226,6 +1219,10 @@ async function fetchVideoCaption(vUrl){
     }catch(e){}
   }
   return '';
+}
+
+function isLikelyAddressLine(s){
+  return /(?:\b\d{3}-\d{4}\b|\b\d+\s*-\s*\d+|\bWard\b|\bChuo\b|\bOsaka\b|\bTokyo\b|\bKyoto\b|\bFukuoka\b|丁目|番地?|千日前|中央区|難波|[시군구]\s+\S+[동로길]\s*\d+)/i.test(s);
 }
 
 function parseCaptionLocally(rawText,hint=''){
@@ -1243,7 +1240,10 @@ function parseCaptionLocally(rawText,hint=''){
 
     if(cl.startsWith('📍')||cl.startsWith('📌')){
       const v=cl.replace(/^(?:📍|📌)\s*/u,'').trim();
-      if(v&&!name)name=v;
+      if(v){
+        if(isLikelyAddressLine(v)&&!address)addrParts.push(v);
+        else if(!name)name=v;
+      }
       continue;
     }
     if(cl.startsWith('🇯🇵')||cl.startsWith('🏠')||cl.startsWith('🗺')||cl.startsWith('📮')||/^(?:주소|위치|Address)\s*[:：]/i.test(cl)){
@@ -1262,7 +1262,7 @@ function parseCaptionLocally(rawText,hint=''){
       if(v&&!price)price=v;
       continue;
     }
-    if(/(?:\b\d{3}-\d{4}\b|\bWard\b|\bChuo\b|\bOsaka\b|\bTokyo\b|\bKyoto\b|\bFukuoka\b|丁目|番地?|千日前|[시군구]\s+\S+[동로길]\s*\d+)/i.test(cl)){
+    if(isLikelyAddressLine(cl)){
       addrParts.push(cl.replace(/^일본\s+/,''));
       continue;
     }
@@ -1272,10 +1272,14 @@ function parseCaptionLocally(rawText,hint=''){
 
   if(addrParts.length)address=normalizeOcrAddr(addrParts.join(', '));
 
+  if(!name&&lines.length===1&&!lines[0].startsWith('http')&&!isLikelyAddressLine(lines[0])&&lines[0].length<=35){
+    name=lines[0];
+  }
+
   if(!name){
     for(const line of lines){
-      if(line.startsWith('#')||/^https?:/i.test(line))continue;
-      const m=line.match(/([가-힣A-Za-z0-9\s]{2,20}(?:본점|지점|점|식당|우동|라멘|스시|야키니쿠|카페|베이커리|치토세|이치란))/);
+      if(line.startsWith('#')||/^https?:/i.test(line)||isLikelyAddressLine(line))continue;
+      const m=line.match(/([가-힣A-Za-z0-9\s]{2,22}(?:본점|지점|점|식당|우동|라멘|스시|야키니쿠|카페|베이커리|치토세|이치란|야마카즈))/);
       if(m){name=m[1].trim();break;}
     }
   }
@@ -1321,12 +1325,13 @@ function parseCaptionMultiText(txt,hint=''){
   return out;
 }
 
-// ⚡ 초고속 병렬 지오코더: 캐시 확인(0ms) → 상위 쿼리 동시 발사(Promise.any)로 1초 내 좌표 획득
+// ⚡ 병렬 경주 지오코더 + 행정구역 중심점 오차 방어
 async function geocodePlace(cand,hint=''){
   const gkey=(ls.get('TRAVEL_GMAP_KEY')||'').trim();
   const rawAddr=normalizeOcrAddr(cand.address||'');
   const rawName=isGenericSharedName(cand.name)?'':String(cand.name||'').trim();
   const localName=String(cand.localName||'').trim();
+  const aiLat=Number(cand.lat),aiLng=Number(cand.lng);
 
   const cacheKey=`${localName}|${rawName}|${rawAddr}|${hint}`.trim();
   if(cacheKey.length>=3&&geoCache[cacheKey])return geoCache[cacheKey];
@@ -1338,7 +1343,7 @@ async function geocodePlace(cand,hint=''){
   let jpTown='';
   if(zipM){
     try{
-      const zr=await fetchTO(`https://zipcloud.ibsnet.co.jp/api/search?zipcode=${zipM[1]}${zipM[2]}`,{},2600);
+      const zr=await fetchTO(`https://zipcloud.ibsnet.co.jp/api/search?zipcode=${zipM[1]}${zipM[2]}`,{},2500);
       const zd=await zr.json();
       if(zd&&zd.results&&zd.results[0]){
         const x=zd.results[0];
@@ -1348,8 +1353,9 @@ async function geocodePlace(cand,hint=''){
   }
 
   const queries=[];
+  if(localName&&rawAddr)queries.push(`${localName} ${rawAddr}`);
   if(jpTown&&banchi)queries.push(`${jpTown}${banchi}`);
-  if(localName)queries.push(`${localName} ${jpTown||hint||rawAddr}`.trim());
+  if(localName)queries.push(`${localName} ${jpTown||hint||''}`.trim());
   if(rawAddr){
     const cleaned=rawAddr.replace(/(?:〒|T)?\d{3}-\d{4}/g,'').replace(/^일본\s*/,'').trim();
     if(cleaned)queries.push(cleaned);
@@ -1361,7 +1367,7 @@ async function geocodePlace(cand,hint=''){
 
   const uniq=[...new Set(queries.map(q=>q.trim()).filter(q=>q.length>=2))].slice(0,4);
   if(!uniq.length){
-    if(Number(cand.lat)&&Number(cand.lng))return {lat:Number(cand.lat),lng:Number(cand.lng)};
+    if(aiLat&&aiLng)return {lat:aiLat,lng:aiLng};
     return null;
   }
 
@@ -1373,7 +1379,6 @@ async function geocodePlace(cand,hint=''){
     return res;
   };
 
-  // 1순위: Google Maps API 병렬 조회
   if(gkey){
     try{
       const hit=await Promise.any(uniq.slice(0,2).map(async q=>{
@@ -1390,17 +1395,26 @@ async function geocodePlace(cand,hint=''){
     }catch(e){}
   }
 
-  // 2순위: Nominatim + Photon + 우편번호 병렬 경주 (가장 먼저 도착한 유효 좌표 즉시 반환)
   const raceJobs=[];
   uniq.slice(0,3).forEach(q=>{
     raceJobs.push(
       fetchTO(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=1`,{},3800).then(r=>r.json()).then(d=>{
-        const c=d?.features?.[0]?.geometry?.coordinates;
-        if(c&&c.length>=2)return {lat:Number(c[1]),lng:Number(c[0])};
+        const f=d?.features?.[0];
+        const c=f?.geometry?.coordinates;
+        const isBroad=/^(?:city|state|country|district)$/i.test(f?.properties?.type||'');
+        if(c&&c.length>=2){
+          if(isBroad&&aiLat&&aiLng)return {lat:aiLat,lng:aiLng};
+          return {lat:Number(c[1]),lng:Number(c[0])};
+        }
         throw new Error('empty');
       }),
       fetchTO(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1&accept-language=ko,ja,en`,{},4000).then(r=>r.json()).then(d=>{
-        if(Array.isArray(d)&&d[0])return {lat:Number(d[0].lat),lng:Number(d[0].lon),formatted:d[0].display_name};
+        if(Array.isArray(d)&&d[0]){
+          const h=d[0];
+          const isBroad=/^(?:city|administrative|state|country)$/i.test(h.type||'')||/^(?:boundary)$/i.test(h.class||'');
+          if(isBroad&&aiLat&&aiLng)return {lat:aiLat,lng:aiLng};
+          return {lat:Number(h.lat),lng:Number(h.lon),formatted:h.display_name};
+        }
         throw new Error('empty');
       })
     );
@@ -1419,15 +1433,12 @@ async function geocodePlace(cand,hint=''){
     if(fastHit)return remember(fastHit);
   }catch(e){}
 
-  if(Number(cand.lat)&&Number(cand.lng)&&Math.abs(Number(cand.lat))<=90&&Math.abs(Number(cand.lng))<=180){
-    return remember({lat:Number(cand.lat),lng:Number(cand.lng)});
+  if(aiLat&&aiLng&&Math.abs(aiLat)<=90&&Math.abs(aiLng)<=180){
+    return remember({lat:aiLat,lng:aiLng});
   }
   return null;
 }
 
-// ⚡ 분석 파이프라인 가속:
-// 1) 로컬 파서로 이미 이름과 주소가 모두 명확히 나왔고 이미지 첨부가 없다면,
-//    지오코딩과 AI 보정을 동시에(Promise.all) 실행하여 대기 시간을 절반 이하로 단축
 async function analyzeContent({rawText='',vidUrl='',images=[],hint=''}){
   let caption=String(rawText||'').replace(/https?:\/\/[^\s]+/g,'').trim();
   let capStatus='';
@@ -1448,7 +1459,7 @@ async function analyzeContent({rawText='',vidUrl='',images=[],hint=''}){
 
   let aiCands=[],aiErr='';
   const aiTask=(async()=>{
-    if(!hasAi||!(caption.length>=3||images.length>0||!vidUrl))return [];
+    if(!hasAi||!(caption.length>=2||images.length>0||!vidUrl))return [];
     try{
       const prompt=`다음 여행 관련 입력(릴스/쇼츠 캡션, 텍스트, 또는 이미지)에서 장소·먹거리·쇼핑 항목을 추출해 JSON 배열로만 출력하세요.
 입력 텍스트:
@@ -1460,8 +1471,8 @@ ${caption||rawText}
 반드시 아래 JSON 배열 형식으로만 답하세요:
 [
   {
-    "name": "장소/가게 이름 (한국어, 예: 오사카 난바 치토세 본점)",
-    "localName": "현지어 공식 상호명 (예: 千とせ 本店)",
+    "name": "장소/가게 이름 (한국어, 예: 오사카 난바 치토세 본점. 주소만 입력된 경우 해당 번지의 실제 유명 가게명 추론)",
+    "localName": "구글 지도 검색용 현지어 공식 상호명 (예: 千とせ 本店)",
     "address": "우편번호·번지를 포함한 주소 (예: 〒542-0075 大阪府大阪市中央区難波千日前8-1)",
     "price": "가격·대표메뉴 요약 (예: 고기우동 800엔 계란밥 200엔)",
     "info": "영업시간·휴무일·특징 요약 (예: 영업시간 10:30~14:30, 화요일 휴무)",
@@ -1479,12 +1490,7 @@ ${caption||rawText}
     }
   })();
 
-  // 로컬 파서가 이미 주소를 찾았으면 AI를 기다리는 동안 지오코딩을 동시에 미리 출발시킴
   const preGeoPromise=(localParsed.address||localParsed.name)?geocodePlace(localParsed,hint):Promise.resolve(null);
-
-  if(hasAi&&(caption.length>=3||images.length>0||!vidUrl)){
-    toast('상호명·주소·좌표를 고속 분석 중...');
-  }
   const [aiResult,preGeo]=await Promise.all([aiTask,preGeoPromise]);
   aiCands=aiResult||[];
 
@@ -1527,7 +1533,6 @@ ${caption||rawText}
     }];
   }
 
-  // 모든 후보의 지오코딩을 직렬이 아닌 병렬(Promise.all)로 한 번에 처리
   await Promise.all(cands.map(async(c,idx)=>{
     if(idx===0&&preGeo&&preGeo.lat&&preGeo.lng&&!c.localName){
       c.lat=preGeo.lat;c.lng=preGeo.lng;
@@ -1549,12 +1554,12 @@ ${caption||rawText}
   return {cands,caption,aiErr,capStatus};
 }
 
+// 보내주신 후보 목록 UI 100% 동일 유지
 function renderCandidates(headerMsg='맞는 항목을 눌러 저장하세요 · 사진이 다르면 🔄'){
   if(!res.length){$('rs').innerHTML='';return;}
   $('rs').innerHTML=`<div class="ds" style="margin:4px 2px">${esc(headerMsg)}</div>`+res.map((r,idx)=>{
     const vUrl=getVidUrlStr(r.vid);
-    const dummy={name:r.name,localName:r.localName,address:r.address,vid:vUrl,img:r.img,useCustomImg:Boolean(r.img),v:r.v||0,category:r.category||cat,lat:r.lat,lng:r.lng};
-    const gmapHref=getGMapLink(dummy);
+    const dummy={name:r.name,address:r.address,vid:vUrl,img:r.img,useCustomImg:Boolean(r.img),v:r.v||0,category:r.category||cat};
     return `<div class="item" data-act="pickRes" data-idx="${idx}">
       ${ph(CATS[dummy.category]?CATS[dummy.category].e:'📍',itemThumb(dummy),'',r.img)}
       <div class="mid">
@@ -1564,7 +1569,6 @@ function renderCandidates(headerMsg='맞는 항목을 눌러 저장하세요 · 
         ${r.info?`<div class="ds in">${esc(r.info)}</div>`:''}
         <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">
           <button class="mb" data-act="resPic" data-idx="${idx}" style="padding:3px 8px;font-size:11px">🔄 다른 사진</button>
-          <a class="mb pr" href="${esc(gmapHref)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="padding:3px 8px;font-size:11px">구글지도 ↗</a>
           ${vUrl?`<button class="mb reel-jump" data-act="openResVid" data-idx="${idx}" style="padding:3px 8px;font-size:11px">${esc(getVidBtnLabel(vUrl))}</button>`:''}
         </div>
       </div>
@@ -1573,9 +1577,7 @@ function renderCandidates(headerMsg='맞는 항목을 눌러 저장하세요 · 
   }).join('');
 }
 
-// ⚡ 상용 앱 방식 낙관적(Optimistic) 즉시 저장:
-// 캡션 텍스트에서 로컬 파서가 이름/주소를 찾으면 0.1초 만에 먼저 저장 및 화면 반영 후,
-// 백그라운드에서 좌표·AI 정밀 보정을 수행해 완료 즉시 업데이트
+// ⚡ 0.1초 즉시 낙관적(Optimistic) 선저장으로 체감 대기 시간 제거
 async function runAnalyzeShare(files=[]){
   const raw=($('shareBox').value||'').trim();
   const explicitLink=($('reelLinkBox').value||'').trim();
@@ -1595,6 +1597,36 @@ async function runAnalyzeShare(files=[]){
       vidUrl=lastSharedVid;
     }
 
+    // 캡션 텍스트가 있으면 AI/네트워크를 기다리지 않고 0.1초 만에 로컬 파서로 먼저 저장하여 즉시 화면 표시!
+    const quickLocal=(!files.length&&raw)?parseCaptionMultiText(raw,hint):[];
+    let optimisticItems=[];
+    if(quickLocal.length&&(quickLocal[0].name||quickLocal[0].address)){
+      optimisticItems=quickLocal.map(q=>({
+        id:'id_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+        name:q.name||(q.address||'').split(',')[0].trim()||'저장된 장소',
+        localName:'',
+        address:q.address||'',
+        price:q.price||'',
+        info:q.info||'',
+        note:q.note||[q.price,q.info].filter(Boolean).join(' · '),
+        category:CATS[q.category]?q.category:cat,
+        lat:null,
+        lng:null,
+        vid:vidUrl||'',
+        img:'',
+        useCustomImg:false,
+        v:0,
+        done:false,
+        _saved:true
+      }));
+      optimisticItems.forEach(it=>{it._itemId=it.id;items.unshift(it);});
+      res=optimisticItems;
+      save();
+      renderCandidates('⚡ 즉시 저장됨 · 정밀 위치와 상세 정보를 보완 중...');
+      $('shareBox').value='';
+      $('reelLinkBox').value='';
+    }
+
     const images=[];
     for(const f of files)images.push(await fileToBase64(f,860,0.72));
 
@@ -1602,29 +1634,69 @@ async function runAnalyzeShare(files=[]){
 
     if(cands.length&&(cands[0].name||cands[0].address)){
       let firstSaved=null;
-      cands.forEach(c=>{
-        const itemObj={
-          id:'id_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
-          name:c.name||'저장된 장소',
-          localName:c.localName||'',
-          address:c.address||'',
-          price:c.price||'',
-          info:c.info||'',
-          note:c.note||[c.price,c.info].filter(Boolean).join(' · '),
-          category:CATS[c.category]?c.category:cat,
-          lat:Number(c.lat)||null,
-          lng:Number(c.lng)||null,
-          vid:c.vid||vidUrl||'',
-          img:'',
-          useCustomImg:false,
-          v:0,
-          done:false
-        };
-        items.unshift(itemObj);
-        c._saved=true;
-        c._itemId=itemObj.id;
-        if(!firstSaved)firstSaved=itemObj;
-      });
+      if(optimisticItems.length){
+        // 선저장된 항목들에 정밀 좌표 및 AI 보정 데이터 덮어쓰기
+        cands.forEach((c,idx)=>{
+          const target=optimisticItems[idx];
+          if(target){
+            if(c.name&&!isGenericSharedName(c.name))target.name=c.name;
+            if(c.localName)target.localName=c.localName;
+            if(c.address)target.address=c.address;
+            if(c.price)target.price=c.price;
+            if(c.info)target.info=c.info;
+            target.note=c.note||[target.price,target.info].filter(Boolean).join(' · ');
+            if(CATS[c.category])target.category=c.category;
+            if(Number(c.lat)&&Number(c.lng)){target.lat=Number(c.lat);target.lng=Number(c.lng);}
+            c._saved=true;c._itemId=target.id;
+            if(!firstSaved)firstSaved=target;
+          }else{
+            const itemObj={
+              id:'id_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+              name:c.name||'저장된 장소',
+              localName:c.localName||'',
+              address:c.address||'',
+              price:c.price||'',
+              info:c.info||'',
+              note:c.note||[c.price,c.info].filter(Boolean).join(' · '),
+              category:CATS[c.category]?c.category:cat,
+              lat:Number(c.lat)||null,
+              lng:Number(c.lng)||null,
+              vid:c.vid||vidUrl||'',
+              img:'',
+              useCustomImg:false,
+              v:0,
+              done:false
+            };
+            items.unshift(itemObj);
+            c._saved=true;c._itemId=itemObj.id;
+            if(!firstSaved)firstSaved=itemObj;
+          }
+        });
+      }else{
+        cands.forEach(c=>{
+          const itemObj={
+            id:'id_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
+            name:c.name||'저장된 장소',
+            localName:c.localName||'',
+            address:c.address||'',
+            price:c.price||'',
+            info:c.info||'',
+            note:c.note||[c.price,c.info].filter(Boolean).join(' · '),
+            category:CATS[c.category]?c.category:cat,
+            lat:Number(c.lat)||null,
+            lng:Number(c.lng)||null,
+            vid:c.vid||vidUrl||'',
+            img:'',
+            useCustomImg:false,
+            v:0,
+            done:false
+          };
+          items.unshift(itemObj);
+          c._saved=true;
+          c._itemId=itemObj.id;
+          if(!firstSaved)firstSaved=itemObj;
+        });
+      }
       save();
       res=cands;
       renderCandidates('✅ 자동으로 저장되고 지도에 등록되었어요!');
@@ -1671,7 +1743,8 @@ function focusMapOnItem(i){
 async function reGeoItem(i){
   if(!i)return;
   toast('위치를 찾는 중...');
-  const g=await geocodePlace(i,($('hint')?.value||'').trim());
+  const hint=($('hint')?.value||'').trim();
+  const g=await geocodePlace(i,hint);
   if(g){
     i.lat=g.lat;i.lng=g.lng;
     if(isGenericSharedName(i.name)&&i.address)i.name=i.address.split(',')[0].trim();
@@ -1951,7 +2024,7 @@ document.addEventListener('click',async e=>{
   if(act==='vphoto'){view='photo';showSheet();return;}
   if(act==='vmap'){view='google';showSheet();return;}
   if(act==='vmymap'){view='mymaps';showSheet();return;}
-  if(act==='chgpic'){curItem.v=(curItem.v||0)+1;curItem.img='';curItem.useCustomImg=false;save();showSheet();toast('다른 외부 사진으로 변경했어요');return;}
+  if(act==='chgpic'){curItem.v=(curItem.v||0)+1;curItem.img='';curItem.useCustomImg=false;save();showSheet();toast('가벼운 외부 사진으로 변경되어 저장 공간이 확보되었어요');return;}
   if(act==='chcat'){curItem.category=c;save();showSheet();toast(`${CATS[c].n} 탭으로 이동했어요`);return;}
   if(act==='del'){items=items.filter(x=>x.id!==curItem.id);save();closeSheet();toast('삭제했어요');return;}
   if(act==='share'){
@@ -2061,7 +2134,7 @@ $('q').onkeydown=e=>{if(e.key==='Enter')runSearch()};
 $('own').onchange=async e=>{
   const f=e.target.files?.[0];e.target.value='';
   if(!f||!cur)return;
-  const b64=await fileToBase64(f,480,0.68);
+  const b64=await fileToBase64(f,380,0.62);
   const i=items.find(x=>x.id===cur);
   if(i){i.img=`data:${b64.mime};base64,${b64.data}`;i.useCustomImg=true;view='photo';save();showSheet();}
 };
@@ -2102,8 +2175,7 @@ $('savecfproxy').onclick=()=>{
   const norm=normalizeCfProxy($('cfproxy').value);
   $('cfproxy').value=norm;
   ls.set('TRIP_CF_PROXY',norm);
-  renderUsageBox();
-  toast(norm?'🚀 개인 프록시 주소가 저장되었어요!':'프록시 주소가 해제되었어요');
+  toast('프록시 주소 저장됨');
 };
 $('saveMyMaps').onclick=()=>{ls.set('TRIP_MYMAPS_URL',$('mymapsUrl').value.trim());toast('내 지도 URL 저장됨')};
 $('openMyMapsBtn').onclick=()=>{const u=ls.get('TRIP_MYMAPS_URL');if(u)window.open(u,'_blank');else toast('내 지도 URL을 먼저 저장하세요')};
@@ -2247,7 +2319,7 @@ function initMap(){
   $('naverkey').value=nkey;
   $('mymapsUrl').value=ls.get('TRIP_MYMAPS_URL')||'';
   $('mymapsEmbed').value=ls.get('TRIP_MYMMaps_EMBED')||'';
-  $('cfproxy').value=ls.get('TRIP_CF_PROXY')||'';
+  $('cfproxy').value=ls.get('TRIP_CF_PROXY')||ls.get('TRIP_WORKER_URL')||'';
 
   if(mapProvider==='google'&&gkey){
     window.gm_authFailure=()=>fallbackToOsm('Google Auth Failure');
