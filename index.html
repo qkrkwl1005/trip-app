@@ -536,13 +536,44 @@ function pinCardHtml(i){
   return `<div class="pinCard c-${CATS[i.category]?i.category:'PLACE'}"><i>${ic}</i>${thumb?`<img loading="lazy" referrerpolicy="no-referrer" src="${esc(thumb)}"${fb} onerror="imgErr(this)">`:''}${i.vid?'<b>🎬</b>':''}</div>`;
 }
 
-// 지도 하단 미니 프리뷰 카드 (지도를 가리지 않고 핵심 정보 + 릴스 바로가기 + 상세 열기 제공)
+// ==================== 구글 지도 가게 프로필 직결 URL 생성기 ====================
+// 숫자 좌표(lat,lng)를 넘기면 구글 지도가 가게 프로필 대신 단순 숫자 핀만 띄우므로,
+// 반드시 '상호명 + 주소'(또는 주소 원문)를 우선 전달하여 실제 가게 정보/영업여부/리뷰가 뜨도록 처리
+function normalizeOcrAddr(s){
+  return String(s||'')
+    .replace(/(^|[\s,])T(\d{3}-\d{4})\b/g,'$1〒$2')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+function isGenericSharedName(nm){
+  return /^(?:공유\s*(?:릴스|쇼츠|틱톡|링크)|저장된\s*장소|장소)$/.test(String(nm||'').trim());
+}
+function getValidSearchQuery(i){
+  const nm=isGenericSharedName(i.name)?'':String(i.name||'').trim();
+  const lnm=String(i.localName||'').trim();
+  const ad=normalizeOcrAddr(i.address||'');
+  // 이름과 주소가 완전히 같으면 중복 제거
+  if(nm&&ad&&nm===ad)return ad;
+  // 현지어 상호명이 있으면 함께 검색해 정확도 향상
+  const mainName=lnm&&nm&&lnm!==nm?`${nm} ${lnm}`:(lnm||nm);
+  return [mainName,ad].filter(Boolean).join(' ').trim();
+}
+function getGMapLink(i){
+  if(!i)return 'https://www.google.com/maps';
+  const qStr=getValidSearchQuery(i);
+  if(qStr){
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(qStr)}${i.placeId?`&query_place_id=${encodeURIComponent(i.placeId)}`:''}`;
+  }
+  const lat=Number(i.lat)||0,lng=Number(i.lng)||0;
+  if(lat&&lng)return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+  return 'https://www.google.com/maps';
+}
+
 function showMapPreview(i){
   const box=$('mapPreview');
   if(!box||!i){if(box)box.classList.remove('show');return;}
   const vUrl=getVidUrlStr(i.vid);
-  const q=encodeURIComponent(getValidSearchQuery(i)||i.name||'');
-  const lat=Number(i.lat)||0,lng=Number(i.lng)||0;
+  const gmapHref=getGMapLink(i);
   box.innerHTML=`
     ${ph(CATS[i.category]?.e||'📍',itemThumb(i),'',i.img)}
     <div class="mid" data-act="open" data-id="${i.id}" style="cursor:pointer">
@@ -551,7 +582,7 @@ function showMapPreview(i){
       <div class="badges">
         ${i.price?`<span class="badge price">${esc(i.price)}</span>`:''}
         ${vUrl?`<button class="mb reel-jump" data-act="openVid" data-id="${i.id}" style="padding:3px 8px;font-size:11px">${esc(getVidBtnLabel(vUrl))}</button>`:''}
-        <a class="mb pr" href="https://www.google.com/maps/search/?api=1&query=${lat&&lng?`${lat},${lng}`:q}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="padding:3px 8px;font-size:11px">구글지도 ↗</a>
+        <a class="mb pr" href="${esc(gmapHref)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="padding:3px 8px;font-size:11px">구글지도 ↗</a>
         <button class="mb" data-act="open" data-id="${i.id}" style="padding:3px 8px;font-size:11px">상세·수정 ›</button>
       </div>
     </div>
@@ -669,11 +700,12 @@ function matchRegion(i,r){
 const card=i=>{
   const vUrl=getVidUrlStr(i.vid);
   const hasCoord=Boolean(Number(i.lat)&&Number(i.lng));
+  const gmapHref=getGMapLink(i);
   const vAction=vUrl
     ?`<button class="mb reel-jump" data-act="openVid" data-id="${i.id}" style="padding:4px 9px;font-size:11px">${esc(getVidBtnLabel(vUrl))}</button>`
     :`<button class="mb" data-act="quickAddVid" data-id="${i.id}" style="padding:4px 8px;font-size:11px;color:var(--pr);border-color:var(--pr)">+🔗 릴스링크</button>`;
   const mapAction=hasCoord
-    ?`<button class="mb" data-act="jumpMap" data-id="${i.id}" style="padding:4px 8px;font-size:11px">🗺️ 지도핀</button>`
+    ?`<button class="mb" data-act="jumpMap" data-id="${i.id}" style="padding:4px 8px;font-size:11px">🗺️ 앱지도</button>`
     :`<span class="badge nocoord">위치미설정</span>`;
 
   return `<div class="item${i.done?' done':''}${selected.has(i.id)?' selected':''}" data-act="${editMode[i.category]?'toggleSel':'open'}" data-id="${i.id}" style="${selected.has(i.id)?'outline:2px solid var(--pr)':''}">
@@ -688,6 +720,7 @@ const card=i=>{
       </div>
       <div style="margin-top:7px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         ${vAction}
+        <a class="mb pr" href="${esc(gmapHref)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="padding:4px 8px;font-size:11px">구글지도 ↗</a>
         ${mapAction}
       </div>
     </div>
@@ -706,7 +739,6 @@ function render(){
     const all=items.filter(i=>i.category===c);
     $('cnt-'+c).textContent=all.length;
 
-    // 상단 필터 칩 렌더링
     const regions=detectRegions(all);
     const curF=filterState[c]||'ALL';
     const chipBox=$('chips-'+c);
@@ -743,28 +775,13 @@ function persist(){
 }
 function save(){persist();render();draw()}
 
-function normalizeOcrAddr(s){
-  return String(s||'')
-    .replace(/(^|[\s,])T(\d{3}-\d{4})\b/g,'$1〒$2')
-    .replace(/\s+/g,' ')
-    .trim();
-}
-function isGenericSharedName(nm){
-  return /^공유\s*(릴스|쇼츠|틱톡|링크)/.test(String(nm||'').trim());
-}
-function getValidSearchQuery(i){
-  const nm=isGenericSharedName(i.name)?'':String(i.name||'').trim();
-  const ad=normalizeOcrAddr(i.address||'');
-  return (nm+' '+ad).trim();
-}
-
 function closeSheet(){$('sheet').classList.remove('on');cur=null;sheetEditOpen=false;}
 
-// 상세 시트: 깔끔한 보기 모드 + 접이식 편집/보완 서랍(Drawer) 구조
 function showSheet(){
   const i=items.find(x=>x.id===cur);if(!i)return closeSheet();
   const searchTarget=getValidSearchQuery(i);
   const q=encodeURIComponent(searchTarget||i.name||'');
+  const gmapHref=getGMapLink(i);
   const gkey=(ls.get('TRAVEL_GMAP_KEY')||'').trim();
   const myEmbed=(ls.get('TRIP_MYMMaps_EMBED')||'').trim();
   const v=i.vid;
@@ -774,7 +791,6 @@ function showSheet(){
   const isMap=(view==='mymaps'||view==='google')&&view!=='video'&&view!=='caption';
   const lat=Number(i.lat)||0, lng=Number(i.lng)||0;
 
-  // 좌표가 없거나 임시 이름이면 편집 서랍을 자동으로 열어둠
   if((!lat||!lng)||isGenericSharedName(i.name))sheetEditOpen=true;
 
   let media='';
@@ -782,9 +798,10 @@ function showSheet(){
     const mh=view==='caption'?420:290;
     media=`<iframe class="big" src="${esc(vEmbed)}" allow="autoplay; fullscreen; picture-in-picture; clipboard-write; web-share" allowfullscreen loading="lazy" style="min-height:${mh}px;background:#000"></iframe>`;
   }else if(isMap){
+    // 임베드 지도에서도 숫자 좌표 대신 '가게이름+주소'를 우선 검색하여 실제 가게 프로필 카드가 뜨도록 설정
     if(view==='mymaps' && myEmbed) media=`<iframe class="big" src="${esc(myEmbed)}" allowfullscreen loading="lazy" style="min-height:280px"></iframe>`;
+    else if(searchTarget&&gkey) media=`<iframe class="big" src="https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(gkey)}&q=${q}&zoom=16" allowfullscreen loading="lazy" style="min-height:280px"></iframe>`;
     else if(lat&&lng&&gkey) media=`<iframe class="big" src="https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(gkey)}&q=${lat},${lng}&zoom=16" allowfullscreen loading="lazy" style="min-height:280px"></iframe>`;
-    else if(searchTarget&&gkey) media=`<iframe class="big" src="https://www.google.com/maps/embed/v1/search?key=${encodeURIComponent(gkey)}&q=${q}&zoom=16" allowfullscreen loading="lazy" style="min-height:280px"></iframe>`;
     else if(lat&&lng) media=`<iframe class="big" src="https://www.openstreetmap.org/export/embed.html?bbox=${lng-0.005},${lat-0.005},${lng+0.005},${lat+0.005}&layer=mapnik&marker=${lat},${lng}" style="min-height:280px"></iframe>`;
     else media=`<div class="empty" style="padding:28px 0"><i>🗺️</i>아래에서 주소나 캡션을 입력하면 지도가 표시됩니다</div>`;
   }else{
@@ -805,20 +822,19 @@ function showSheet(){
 
     ${media}
 
-    <div class="nm" style="font-size:18px">${esc(i.name)}</div>
+    <div class="nm" style="font-size:18px">${esc(i.name)}${i.localName&&i.localName!==i.name?` <span style="font-size:13px;color:var(--sub);font-weight:500">(${esc(i.localName)})</span>`:''}</div>
     <div class="ds" style="font-size:13px;margin-top:3px">${esc(i.address||'주소 미입력')}</div>
 
     <div class="badges" style="margin-top:8px">
-      ${lat&&lng?`<span class="badge coord">📍 좌표 (${lat.toFixed(4)}, ${lng.toFixed(4)})</span>`:`<span class="badge nocoord">🔴 좌표 미설정</span>`}
+      ${lat&&lng?`<span class="badge coord">📍 지도핀 등록됨</span>`:`<span class="badge nocoord">🔴 좌표 미설정</span>`}
       ${i.price?`<span class="badge price">💴 ${esc(i.price)}</span>`:''}
       ${i.info?`<span class="badge info">⏰ ${esc(i.info)}</span>`:''}
     </div>
     ${i.note&&i.note!==(i.price+' · '+i.info)?`<div class="ds" style="margin-top:8px;padding:8px 10px;background:var(--s2);border-radius:10px;-webkit-line-clamp:4">${esc(i.note)}</div>`:''}
 
-    <!-- 핵심 외부 이동 버튼 바 -->
     <div style="display:grid;grid-template-columns:${vUrl?'1.2fr 1fr 1fr':'1fr 1fr'};gap:8px;margin-top:12px">
       ${vUrl?`<button class="btn reel-jump" data-act="openVid" data-id="${i.id}" style="padding:11px 8px;font-size:13px">${esc(vLabel)}</button>`:''}
-      <a class="btn" href="https://www.google.com/maps/search/?api=1&query=${lat&&lng?`${lat},${lng}`:(q||encodeURIComponent(i.name||''))}" target="_blank" rel="noopener" style="text-align:center;text-decoration:none;padding:11px 8px;font-size:13px">🗺️ 구글지도 ↗</a>
+      <a class="btn" href="${esc(gmapHref)}" target="_blank" rel="noopener" style="text-align:center;text-decoration:none;padding:11px 8px;font-size:13px">🗺️ 구글지도 가게열기 ↗</a>
       <a class="btn g" href="https://www.google.com/search?q=${q||encodeURIComponent(i.name||'')}" target="_blank" rel="noopener" style="text-align:center;text-decoration:none;margin:0;padding:11px 8px;font-size:13px">🔎 웹검색 ↗</a>
     </div>
 
@@ -828,12 +844,11 @@ function showSheet(){
       <button class="mb" data-act="share" style="padding:9px">🔗 공유</button>
     </div>
 
-    <!-- 접이식 편집·보완 서랍 -->
     <div class="edit-drawer${sheetEditOpen?' open':''}" id="sheetDrawer">
       <div class="act" style="margin-top:0">
         <button class="mb pr" data-act="pastecap">📋 복사한 캡션/주소 붙여넣기</button>
         <button class="mb" onclick="$('sheetShot').click()">📷 캡션 스샷 추출</button>
-        <button class="mb pr" data-act="regeo">📍 위치 다시 찾기</button>
+        <button class="mb pr" data-act="regeo">📍 위치·가게 다시 찾기</button>
         <button class="mb" data-act="recap">🔄 캡션 재분석</button>
         <button class="mb" data-act="chgpic">🖼️ 다른 사진</button>
         <button class="mb" onclick="$('own').click()">📷 내 사진</button>
@@ -850,7 +865,7 @@ function showSheet(){
         <button class="mb pr" data-act="pasteVidInSheet" style="flex:none;white-space:nowrap">📋 붙여넣기</button>
       </div>
 
-      <label>장소명 / 가게 이름</label>
+      <label>장소명 / 가게 이름 (구글지도에서 가게가 바로 뜨려면 상호명을 적어주세요)</label>
       <input type="text" id="sh-name" value="${esc(isGenericSharedName(i.name)?'':i.name)}" placeholder="예: 오사카 난바 치토세 본점">
 
       <label>주소 / 지역 (붙여넣으면 자동으로 위치까지 찾아요)</label>
@@ -873,7 +888,7 @@ function showSheet(){
     nmEl.onchange=async()=>{
       if(nmEl.value.trim()){
         i.name=nmEl.value.trim();save();
-        if(!i.lat||!i.lng)await reGeoItem(i);
+        await reGeoItem(i);
       }
     };
   }
@@ -1229,6 +1244,10 @@ async function fetchVideoCaption(vUrl){
   return '';
 }
 
+function isLikelyAddressLine(s){
+  return /(?:\b\d{3}-\d{4}\b|\b\d+\s*-\s*\d+|\bWard\b|\bChuo\b|\bOsaka\b|\bTokyo\b|\bKyoto\b|\bFukuoka\b|丁目|番地?|千日前|中央区|難波|[시군구]\s+\S+[동로길]\s*\d+)/i.test(s);
+}
+
 function parseCaptionLocally(rawText,hint=''){
   const norm=normalizeOcrAddr(String(rawText||'').replace(/\r/g,''));
   const lines=String(rawText||'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
@@ -1244,7 +1263,10 @@ function parseCaptionLocally(rawText,hint=''){
 
     if(cl.startsWith('📍')||cl.startsWith('📌')){
       const v=cl.replace(/^(?:📍|📌)\s*/u,'').trim();
-      if(v&&!name)name=v;
+      if(v){
+        if(isLikelyAddressLine(v)&&!address)addrParts.push(v);
+        else if(!name)name=v;
+      }
       continue;
     }
     if(cl.startsWith('🇯🇵')||cl.startsWith('🏠')||cl.startsWith('🗺')||cl.startsWith('📮')||/^(?:주소|위치|Address)\s*[:：]/i.test(cl)){
@@ -1263,7 +1285,7 @@ function parseCaptionLocally(rawText,hint=''){
       if(v&&!price)price=v;
       continue;
     }
-    if(/(?:\b\d{3}-\d{4}\b|\bWard\b|\bChuo\b|\bOsaka\b|\bTokyo\b|\bKyoto\b|\bFukuoka\b|丁目|番地?|千日前|[시군구]\s+\S+[동로길]\s*\d+)/i.test(cl)){
+    if(isLikelyAddressLine(cl)){
       addrParts.push(cl.replace(/^일본\s+/,''));
       continue;
     }
@@ -1273,15 +1295,14 @@ function parseCaptionLocally(rawText,hint=''){
 
   if(addrParts.length)address=normalizeOcrAddr(addrParts.join(', '));
 
-  // 한 줄짜리 짧은 상호명 검색(예: '이치란 도톤보리')인 경우 그대로 이름으로 채택
-  if(!name&&lines.length===1&&!lines[0].startsWith('http')&&lines[0].length<=35){
+  if(!name&&lines.length===1&&!lines[0].startsWith('http')&&!isLikelyAddressLine(lines[0])&&lines[0].length<=35){
     name=lines[0];
   }
 
   if(!name){
     for(const line of lines){
-      if(line.startsWith('#')||/^https?:/i.test(line))continue;
-      const m=line.match(/([가-힣A-Za-z0-9\s]{2,20}(?:본점|지점|점|식당|우동|라멘|스시|야키니쿠|카페|베이커리|치토세|이치란))/);
+      if(line.startsWith('#')||/^https?:/i.test(line)||isLikelyAddressLine(line))continue;
+      const m=line.match(/([가-힣A-Za-z0-9\s]{2,22}(?:본점|지점|점|식당|우동|라멘|스시|야키니쿠|카페|베이커리|치토세|이치란|야마카즈))/);
       if(m){name=m[1].trim();break;}
     }
   }
@@ -1322,8 +1343,10 @@ async function geocodePlace(cand,hint=''){
   const banchi=banchiM?banchiM[1].replace(/\s+/g,''):'';
 
   const queries=[];
+  if(localName&&rawAddr)queries.push(`${localName} ${rawAddr}`);
+  if(rawName&&rawAddr&&rawName!==rawAddr)queries.push(`${rawName} ${rawAddr}`);
   if(jpTown&&banchi)queries.push(`${jpTown}${banchi}`);
-  if(localName)queries.push(`${localName} ${jpTown||hint||rawAddr}`.trim());
+  if(localName)queries.push(`${localName} ${jpTown||hint||''}`.trim());
   if(rawAddr)queries.push(rawAddr);
   if(rawAddr){
     const cleaned=rawAddr.replace(/(?:〒|T)?\d{3}-\d{4}/g,'').replace(/^일본\s*/,'').trim();
@@ -1335,20 +1358,31 @@ async function geocodePlace(cand,hint=''){
 
   const uniq=[...new Set(queries.map(q=>q.trim()).filter(q=>q.length>=2))];
 
+  // 1순위: Google Maps Geocoding API (place_id까지 함께 저장해 구글 지도에서 실제 가게가 열리게 함)
   if(gkey){
-    for(const q of uniq.slice(0,4)){
+    for(const q of uniq.slice(0,5)){
       try{
         bumpCnt('gmap');
         const r=await fetchTO(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(q)}&key=${encodeURIComponent(gkey)}&language=ko`,{},5000);
         const d=await r.json();
         if(d.status==='OK'&&d.results&&d.results[0]){
-          const loc=d.results[0].geometry.location;
-          return {lat:Number(loc.lat),lng:Number(loc.lng),formatted:d.results[0].formatted_address};
+          const hit=d.results[0];
+          const loc=hit.geometry.location;
+          return {
+            lat:Number(loc.lat),
+            lng:Number(loc.lng),
+            formatted:hit.formatted_address,
+            placeId:hit.place_id||''
+          };
         }
       }catch(e){}
     }
   }
 
+  // 2순위: AI가 추론한 정밀 가게 좌표가 있으면 시/구 중심점보다 우선 활용
+  const aiLat=Number(cand.lat),aiLng=Number(cand.lng);
+
+  // 3순위: Nominatim + Photon 검색 (단, 도시/구 전체 중심점(type=administrative/city)만 반환된 경우 AI 정밀 좌표 우선)
   for(const q of uniq){
     try{
       const [nom,pho]=await Promise.allSettled([
@@ -1356,13 +1390,25 @@ async function geocodePlace(cand,hint=''){
         fetchTO(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=1`,{},5000).then(r=>r.json())
       ]);
       if(nom.status==='fulfilled'&&Array.isArray(nom.value)&&nom.value[0]){
-        return {lat:Number(nom.value[0].lat),lng:Number(nom.value[0].lon),formatted:nom.value[0].display_name};
+        const h=nom.value[0];
+        const isBroad=/^(?:city|administrative|state|country)$/i.test(h.type||'')||/^(?:boundary)$/i.test(h.class||'');
+        if(isBroad&&aiLat&&aiLng)return {lat:aiLat,lng:aiLng};
+        return {lat:Number(h.lat),lng:Number(h.lon),formatted:h.display_name};
       }
       if(pho.status==='fulfilled'&&pho.value?.features?.[0]){
-        const c=pho.value.features[0].geometry?.coordinates;
-        if(c&&c.length>=2)return {lat:Number(c[1]),lng:Number(c[0])};
+        const f=pho.value.features[0];
+        const c=f.geometry?.coordinates;
+        const isBroad=/^(?:city|state|country|district)$/i.test(f.properties?.type||'');
+        if(c&&c.length>=2){
+          if(isBroad&&aiLat&&aiLng)return {lat:aiLat,lng:aiLng};
+          return {lat:Number(c[1]),lng:Number(c[0])};
+        }
       }
     }catch(e){}
+  }
+
+  if(aiLat&&aiLng&&Math.abs(aiLat)<=90&&Math.abs(aiLng)<=180){
+    return {lat:aiLat,lng:aiLng};
   }
 
   if(zipM){
@@ -1373,9 +1419,6 @@ async function geocodePlace(cand,hint=''){
     }catch(e){}
   }
 
-  if(Number(cand.lat)&&Number(cand.lng)&&Math.abs(Number(cand.lat))<=90&&Math.abs(Number(cand.lng))<=180){
-    return {lat:Number(cand.lat),lng:Number(cand.lng)};
-  }
   return null;
 }
 
@@ -1400,7 +1443,7 @@ async function analyzeContent({rawText='',vidUrl='',images=[],hint=''}){
   if(hasAi&&(caption.length>=2||images.length>0||!vidUrl)){
     try{
       toast('AI로 상호명·주소·좌표를 분석하는 중...');
-      const prompt=`다음 여행 관련 입력(릴스/쇼츠 캡션, 가게 이름, 텍스트, 또는 이미지)에서 장소·먹거리·쇼핑 항목을 추출해 JSON 배열로만 출력하세요.
+      const prompt=`다음 여행 관련 입력(릴스/쇼츠 캡션, 가게 이름, 주소 텍스트, 또는 이미지)에서 장소·먹거리·쇼핑 항목을 추출해 JSON 배열로만 출력하세요.
 입력 텍스트:
 """
 ${caption||rawText}
@@ -1410,9 +1453,9 @@ ${caption||rawText}
 반드시 아래 JSON 배열 형식으로만 답하세요:
 [
   {
-    "name": "장소/가게 이름 (한국어, 예: 오사카 난바 치토세 본점)",
-    "localName": "현지어 공식 상호명 (예: 千とせ 本店)",
-    "address": "우편번호·번지를 포함한 주소 (예: 〒542-0075 大阪府大阪市中央区難波千日前8-1)",
+    "name": "장소/가게 이름 (한국어 상호명, 예: 오사카 난바 치토세 본점. 만약 주소만 입력되었다면 해당 주소에 있는 대표 유명 가게명이나 건물명을 추론해서 작성)",
+    "localName": "구글 지도 검색이 가장 잘 되는 현지어 공식 상호명 (예: 千とせ 本店 / 地焼うなぎ 法善寺山かづ)",
+    "address": "우편번호·번지를 포함한 정확한 주소 (예: 〒542-0075 大阪府大阪市中央区難波千日前8-1)",
     "price": "가격·대표메뉴 요약 (예: 고기우동 800엔 계란밥 200엔)",
     "info": "영업시간·휴무일·특징 요약 (예: 영업시간 10:30~14:30, 화요일 휴무)",
     "category": "PLACE 또는 FOOD 또는 SHOP",
@@ -1420,7 +1463,7 @@ ${caption||rawText}
     "lng": 135.5038
   }
 ]
-중요: 실제 존재하는 유명 장소라면 정확한 위경도(lat, lng)와 현지어 상호명(localName)을 반드시 포함하세요.`;
+중요: 구글 지도에서 숫자 좌표가 아니라 실제 가게 프로필이 검색되도록 localName(현지어 상호명)과 address(정확한 번지 주소), 그리고 가게의 정확한 위경도(lat, lng)를 반드시 포함하세요.`;
       const txt=await askAI(prompt,images,false);
       aiCands=extractJsonArray(txt);
     }catch(e){
@@ -1454,6 +1497,7 @@ ${caption||rawText}
     if(geo){
       c.lat=geo.lat;
       c.lng=geo.lng;
+      if(geo.placeId)c.placeId=geo.placeId;
       if(!c.address&&geo.formatted)c.address=geo.formatted;
     }
     if(!c.name&&c.address)c.name=c.address.split(',')[0].trim();
@@ -1469,7 +1513,8 @@ function renderCandidates(headerMsg='맞는 항목을 눌러 상세 확인 · �
   if(!res.length){$('rs').innerHTML='';return;}
   $('rs').innerHTML=`<div class="ds" style="margin:4px 2px">${esc(headerMsg)}</div>`+res.map((r,idx)=>{
     const vUrl=getVidUrlStr(r.vid);
-    const dummy={name:r.name,address:r.address,vid:vUrl,img:r.img,useCustomImg:Boolean(r.img),v:r.v||0,category:r.category||cat};
+    const dummy={name:r.name,localName:r.localName,address:r.address,vid:vUrl,img:r.img,useCustomImg:Boolean(r.img),v:r.v||0,category:r.category||cat,lat:r.lat,lng:r.lng,placeId:r.placeId};
+    const gmapHref=getGMapLink(dummy);
     return `<div class="item" data-act="pickRes" data-idx="${idx}">
       ${ph(CATS[dummy.category]?CATS[dummy.category].e:'📍',itemThumb(dummy),'',r.img)}
       <div class="mid">
@@ -1481,6 +1526,7 @@ function renderCandidates(headerMsg='맞는 항목을 눌러 상세 확인 · �
         </div>
         <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
           <button class="mb" data-act="resPic" data-idx="${idx}" style="padding:3px 8px;font-size:11px">🔄 다른 사진</button>
+          <a class="mb pr" href="${esc(gmapHref)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="padding:3px 8px;font-size:11px">구글지도 ↗</a>
           ${vUrl?`<button class="mb reel-jump" data-act="openResVid" data-idx="${idx}" style="padding:3px 8px;font-size:11px">${esc(getVidBtnLabel(vUrl))}</button>`:''}
         </div>
       </div>
@@ -1527,6 +1573,7 @@ async function runAnalyzeShare(files=[]){
           category:CATS[c.category]?c.category:cat,
           lat:Number(c.lat)||null,
           lng:Number(c.lng)||null,
+          placeId:c.placeId||'',
           vid:c.vid||vidUrl||'',
           img:'',
           useCustomImg:false,
@@ -1583,17 +1630,34 @@ function focusMapOnItem(i){
 
 async function reGeoItem(i){
   if(!i)return;
-  toast('위치를 찾는 중...');
-  const g=await geocodePlace(i,($('hint')?.value||'').trim());
+  toast('가게 정보와 위치를 찾는 중...');
+  const hint=($('hint')?.value||'').trim();
+  // 주소만 있고 가게 이름이 없거나 주소와 같으면 AI로 가게 이름/현지 상호명 추론도 함께 시도
+  if((isGenericSharedName(i.name)||i.name===i.address)&&i.address&&AI_DEFS.some(d=>aiCfg[d.id]?.key)){
+    const {cands}=await analyzeContent({rawText:`${i.name||''} ${i.address}`.trim(),vidUrl:getVidUrlStr(i.vid),hint});
+    if(cands.length){
+      const c=cands[0];
+      if(c.name&&!isGenericSharedName(c.name))i.name=c.name;
+      if(c.localName)i.localName=c.localName;
+      if(c.lat&&c.lng){i.lat=c.lat;i.lng=c.lng;}
+      if(c.placeId)i.placeId=c.placeId;
+      save();focusMapOnItem(i);
+      if(cur===i.id)showSheet();
+      toast(`✅ '${i.name}' 위치 설정 완료!`);
+      return;
+    }
+  }
+  const g=await geocodePlace(i,hint);
   if(g){
     i.lat=g.lat;i.lng=g.lng;
+    if(g.placeId)i.placeId=g.placeId;
     if(isGenericSharedName(i.name)&&i.address)i.name=i.address.split(',')[0].trim();
     save();focusMapOnItem(i);
     if(cur===i.id)showSheet();
-    toast(`📍 위치 설정 완료! (${g.lat.toFixed(4)}, ${g.lng.toFixed(4)})`);
+    toast(`📍 위치 설정 완료! 이제 [구글지도 가게열기 ↗]로 가게를 바로 볼 수 있어요.`);
   }else{
     save();if(cur===i.id)showSheet();
-    toast('위치를 찾지 못했어요. 우편번호나 번지를 포함한 주소를 입력해 보세요.');
+    toast('위치를 찾지 못했어요. 가게 이름이나 번지 주소를 입력해 보세요.');
   }
 }
 
@@ -1614,6 +1678,7 @@ async function applyCaptionToItem(i,rawCap,images=[]){
     if(c.info)i.info=c.info;
     if(c.note&&!i.note)i.note=c.note;
     if(c.lat&&c.lng){i.lat=c.lat;i.lng=c.lng;}
+    if(c.placeId)i.placeId=c.placeId;
   }else{
     const loc=parseCaptionLocally(rawCap,hint);
     if(loc.name)i.name=loc.name;
@@ -1622,7 +1687,7 @@ async function applyCaptionToItem(i,rawCap,images=[]){
     if(loc.price)i.price=loc.price;
     if(loc.info)i.info=loc.info;
     const g=await geocodePlace(i,hint);
-    if(g){i.lat=g.lat;i.lng=g.lng;}
+    if(g){i.lat=g.lat;i.lng=g.lng;if(g.placeId)i.placeId=g.placeId;}
   }
   if(i.img&&String(i.img).startsWith('data:image')&&i.img.length>30000){
     i.img='';i.useCustomImg=false;
@@ -1643,7 +1708,7 @@ async function autoFixCoords(){
   for(const i of items){
     if((!Number(i.lat)||!Number(i.lng))&&(i.address||(!isGenericSharedName(i.name)&&i.name))){
       const g=await geocodePlace(i);
-      if(g){i.lat=g.lat;i.lng=g.lng;fixed++;}
+      if(g){i.lat=g.lat;i.lng=g.lng;if(g.placeId)i.placeId=g.placeId;fixed++;}
     }
   }
   if(fixed){save();fit();}
@@ -1791,6 +1856,7 @@ document.addEventListener('click',async e=>{
       category:CATS[r.category]?r.category:cat,
       lat:Number(r.lat)||null,
       lng:Number(r.lng)||null,
+      placeId:r.placeId||'',
       vid:r.vid||lastSharedVid||'',
       v:r.v||0,
       done:false
@@ -1834,8 +1900,8 @@ document.addEventListener('click',async e=>{
   if(act==='chcat'){curItem.category=c;save();showSheet();toast(`${CATS[c].n} 탭으로 이동했어요`);return;}
   if(act==='del'){items=items.filter(x=>x.id!==curItem.id);save();closeSheet();toast('삭제했어요');return;}
   if(act==='share'){
-    const shareTxt=`${curItem.name}\n${curItem.address||''}\n${getVidUrlStr(curItem.vid)}`.trim();
-    if(navigator.share){try{await navigator.share({title:curItem.name,text:shareTxt,url:getVidUrlStr(curItem.vid)||location.href});return;}catch(_){}}
+    const shareTxt=`${curItem.name}\n${curItem.address||''}\n${getGMapLink(curItem)}\n${getVidUrlStr(curItem.vid)}`.trim();
+    if(navigator.share){try{await navigator.share({title:curItem.name,text:shareTxt,url:getVidUrlStr(curItem.vid)||getGMapLink(curItem)});return;}catch(_){}}
     try{await navigator.clipboard.writeText(shareTxt);toast('장소 정보를 클립보드에 복사했어요');}catch(_){}
     return;
   }
