@@ -70,6 +70,15 @@ input:focus,textarea:focus{border-color:var(--pr);box-shadow:0 0 0 3px var(--pr-
 #toast{position:fixed;left:50%;bottom:20px;transform:translate(-50%,150%);max-width:90vw;z-index:9999;background:var(--s);color:var(--tx);border:1px solid var(--bd);border-left:4px solid var(--pr);padding:12px 16px;border-radius:14px;box-shadow:0 10px 25px rgba(0,0,0,.4);font-size:13px;font-weight:600;opacity:0;transition:.2s;pointer-events:none}#toast.show{transform:translate(-50%,0);opacity:1}
 #ptr{position:fixed;top:0;left:50%;transform:translate(-50%,-100%);z-index:100000;padding:10px 18px;background:var(--s);color:var(--tx);border-radius:0 0 14px 14px;box-shadow:0 4px 16px rgba(0,0,0,.25);font-size:13px;font-weight:700;transition:transform .2s,opacity .2s;opacity:0;pointer-events:none}
 #ptr.show{transform:translate(-50%,0);opacity:1}
+details.acc{border:1px solid var(--bd);border-radius:14px;background:var(--s2);margin-bottom:12px;box-shadow:var(--sh-card)}
+details.acc>summary{list-style:none;cursor:pointer;padding:12px 14px;font-size:13px;font-weight:800;display:flex;align-items:center;gap:6px;color:var(--tx);touch-action:manipulation;-webkit-user-select:none;user-select:none}
+details.acc>summary::-webkit-details-marker{display:none}
+details.acc>summary:active{background:var(--s3)}
+details.acc>summary::after{content:'';margin-left:auto;flex:none;width:8px;height:8px;border-right:2px solid var(--sub);border-bottom:2px solid var(--sub);transform:rotate(45deg);transition:transform .18s}
+details.acc[open]>summary::after{transform:rotate(225deg)}
+.acc-in{padding:2px 14px 14px}
+.acc-in .act{margin:8px 0}
+.acc-in>label:first-child{margin-top:4px}
 @media(max-width:820px){
 #side{width:100%;min-width:0;border:0}
 #nav{position:fixed;left:10px;right:10px;bottom:calc(6px + env(safe-area-inset-bottom));z-index:40;grid-template-columns:repeat(5,1fr);border:1px solid var(--bd);border-radius:18px;padding:4px 4px calc(4px + env(safe-area-inset-bottom));background:var(--s);box-shadow:0 10px 30px rgba(0,0,0,.25)}
@@ -108,6 +117,9 @@ input[type=text],input[type=password],textarea{font-size:16px}
       <small style="display:block;margin-top:6px;color:var(--sub);font-size:11px">💡 1번 칸에 릴스 링크를 넣고 2번 칸에 캡션을 붙여넣거나 스크린샷을 첨부하면, 장소·좌표·릴스 바로가기 버튼이 한 번에 저장됩니다.</small>
     </div>
     <div class="card">
+      <details class="acc" id="searchAcc">
+        <summary>🔎 직접 찾기 (이름·주소·사진)</summary>
+        <div class="acc-in">
       <div class="seg" id="seg"><div data-cat="PLACE" class="on">📍 장소/식당</div><div data-cat="FOOD">🍙 편의점/음식</div><div data-cat="SHOP">🛍️ 구매 물건</div></div>
       <label>지역 힌트 (선택)</label>
       <input type="text" id="hint" placeholder="예: 일본 오사카 / 강릉 / 시드니">
@@ -117,6 +129,8 @@ input[type=text],input[type=password],textarea{font-size:16px}
       <input type="file" id="shareFile" accept="image/*" multiple hidden>
       <button class="btn g" onclick="$('file').click()" id="pc">📷 사진으로 찾기 (선택)</button>
       <button id="go" class="btn">🔎 인터넷에서 찾기</button>
+        </div>
+      </details>
     </div>
     <div id="rs"></div>
   </section>
@@ -806,6 +820,8 @@ function showSheet(){
   }else{
     media=ph(CATS[i.category]?CATS[i.category].e:'📍',itemThumb(i),'big',i.img);
   }
+  const prior=$('sheet').classList.contains('on');
+  const prevAcc=prior?[...$('sbody').querySelectorAll('details.acc')].map(d=>d.open):[];
   $('sbody').innerHTML=`
     ${media}
     <div class="nm" style="font-size:18px">${esc(i.name)}${vUrl?' 🎬':''}</div>
@@ -823,6 +839,7 @@ function showSheet(){
       </div>
     </div>
 
+    <details class="acc"><summary>⚙️ 상세 버튼 (사진·지도·위치·공유)</summary><div class="acc-in">
     <div class="act">
       ${vUrl?`<button class="mb${view==='video'?' pr':''}" data-act="vvideo">🎬 앱내영상</button><button class="mb${view==='caption'?' pr':''}" data-act="vcap">📋 릴스캡션</button>`:''}
       <button class="mb${view==='photo'?' pr':''}" data-act="vphoto">🖼️ 사진</button>
@@ -840,6 +857,8 @@ function showSheet(){
       <button class="mb pr" data-act="pastecap">📋 복사한 캡션/주소 붙여넣기</button>
       <button class="mb" onclick="$('sheetShot').click()">📷 캡션 스샷 자동 추출</button>
     </div>
+    </div></details>
+    <details class="acc"><summary>✏️ 직접 수정 (카테고리·이름·주소·메모)</summary><div class="acc-in">
     <label style="margin-top:8px">카테고리 이동</label>
     <div class="seg">
       ${Object.keys(CATS).map(k=>`<div data-act="chcat" data-cat="${k}" class="${i.category===k?'on':''}">${CATS[k].e} ${CATS[k].n}${i.category===k?' ✓':''}</div>`).join('')}
@@ -850,6 +869,7 @@ function showSheet(){
     <input type="text" id="sh-addr" value="${esc(i.address||'')}" placeholder="예: 〒542-0086 Osaka, Chuo Ward, Nishishinsaib...">
     <label>메모 (가격, 영업시간, 같이 갈 사람...)</label>
     <textarea id="sh-note" placeholder="메모 (가격, 영업시간, 같이 갈 사람...)">${esc(i.note||'')}</textarea>
+    </div></details>
     <div class="act" style="justify-content:space-between;margin-top:8px">
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         ${vUrl?`<button class="mb reel-jump" data-act="openVid" data-id="${i.id}">${esc(vLabel)}</button>`:''}
@@ -860,6 +880,7 @@ function showSheet(){
       <button class="mb" data-act="close">닫기</button>
     </div>
   `;
+  [...$('sbody').querySelectorAll('details.acc')].forEach((d,ix)=>{if(prevAcc[ix])d.open=true;});
   $('sheet').classList.add('on');
 
   const nmEl=$('sh-name'), adEl=$('sh-addr'), vdEl=$('sh-vid'), ntEl=$('sh-note');
