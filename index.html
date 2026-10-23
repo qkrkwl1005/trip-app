@@ -67,7 +67,6 @@ input:focus,textarea:focus{border-color:var(--pr);box-shadow:0 0 0 3px var(--pr-
 #mapChips .chip.off{opacity:.55;background:var(--s3);box-shadow:0 2px 8px rgba(0,0,0,.25)}
 #mapChips .chip i{font-style:normal}
 
-/* 내지도 오버레이: 노치/Safe Area 완벽 대응 상단바 + 하단 복귀 버튼 */
 #myMapsOverlay{position:fixed;inset:0;z-index:200;background:var(--bg);display:none;flex-direction:column}
 #myMapsOverlay.show{display:flex}
 #myMapsHeader{padding:calc(10px + env(safe-area-inset-top)) 14px 10px;background:var(--s);border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;gap:8px;z-index:202;box-shadow:0 4px 14px rgba(0,0,0,.25)}
@@ -127,14 +126,14 @@ input[type=text],input[type=password],textarea{font-size:16px}
         <input type="text" id="reelLinkBox" placeholder="https://www.instagram.com/reel/..." style="flex:1;margin-bottom:0">
         <button class="mb pr" id="pasteReelLink" style="flex:none;white-space:nowrap">📋 링크 붙여넣기</button>
       </div>
-      <label style="margin-bottom:3px">📋 2. 릴스 캡션·주소 텍스트 (또는 아래 스크린샷 첨부)</label>
-      <textarea id="shareBox" placeholder="릴스 캡션에서 복사한 글자·주소를 붙여넣으세요 (위의 링크만 넣고 분석해도 됩니다)" style="margin-top:4px;min-height:68px"></textarea>
+      <label style="margin-bottom:3px">📋 2. 릴스 캡션·고정댓글 텍스트 (최대 10곳 동시 분석·저장)</label>
+      <textarea id="shareBox" placeholder="릴스/쇼츠 캡션이나 고정댓글에서 복사한 맛집 리스트·주소를 붙여넣으세요 (위의 링크만 넣고 분석해도 됩니다)" style="margin-top:4px;min-height:68px"></textarea>
       <div style="display:flex;gap:8px;margin-bottom:8px">
         <button class="btn g" id="pasteShare" style="flex:1;margin-bottom:0">📋 캡션 붙여넣기</button>
         <button class="btn" id="analyzeShare" style="flex:1">🔥 분석·저장하기</button>
       </div>
-      <button class="btn g" id="pcShare" style="margin-bottom:0">📷 캡션/영상 스크린샷 첨부해서 분석 (선택)</button>
-      <small style="display:block;margin-top:6px;color:var(--sub);font-size:11px">💡 1번 칸에 릴스 링크를 넣고 2번 칸에 캡션을 붙여넣거나 스크린샷을 첨부하면, 장소·좌표·릴스 바로가기 버튼이 한 번에 저장됩니다.</small>
+      <button class="btn g" id="pcShare" style="margin-bottom:0">📷 캡션/영상 스크린샷 여러 장 첨부해서 분석 (최대 10곳)</button>
+      <small style="display:block;margin-top:6px;color:var(--sub);font-size:11px">💡 Top 6·Top 10 쇼츠도 고정댓글을 붙여넣거나 가게가 나오는 장면 스샷을 여러 장 선택하면 최대 10곳까지 한 번에 각각 지도에 등록됩니다.</small>
     </div>
     <div class="card" style="padding:0;background:transparent;border:0;box-shadow:none">
       <details class="acc" id="searchAcc" style="margin-bottom:0">
@@ -229,7 +228,6 @@ input[type=text],input[type=password],textarea{font-size:16px}
   <div id="mapStrip"></div>
 </main>
 
-<!-- 내지도 오버레이: 노치에 가려지지 않는 상단 안전 헤더바 + 하단 복귀 플로팅 버튼 -->
 <div id="myMapsOverlay">
   <div id="myMapsHeader">
     <button id="myMapsClose" class="mb pr" style="padding:8px 14px;font-size:13px">← 앱 지도로 돌아가기</button>
@@ -242,7 +240,7 @@ input[type=text],input[type=password],textarea{font-size:16px}
 
 <div id="sheet"><div class="sh" id="sbody"></div></div>
 <input type="file" id="own" accept="image/*" hidden>
-<input type="file" id="sheetShot" accept="image/*" hidden>
+<input type="file" id="sheetShot" accept="image/*" multiple hidden>
 <div id="toast"></div>
 <div id="ptr">↻ 새로고침</div>
 
@@ -311,6 +309,7 @@ const idb={
 };
 
 const CATS={PLACE:{n:'장소',e:'📍',b:'여행 장소/식당'},FOOD:{n:'먹거리',e:'🍙',b:'편의점 음식/먹거리'},SHOP:{n:'쇼핑',e:'🛍️',b:'구매 물건'}};
+const MAX_MULTI_PLACES=10;
 
 function fetchTO(url,opt={},ms=7500){
   const ctrl=new AbortController();
@@ -327,7 +326,6 @@ function normalizeCfProxy(raw){
   return s;
 }
 
-// 일반 Google My Maps 링크(viewer/edit)를 넣어도 iframe에서 차단되지 않는 embed URL로 자동 변환
 function toEmbedMyMapsUrl(raw){
   const s=String(raw||'').trim();
   if(!s)return '';
@@ -380,7 +378,6 @@ try{items=JSON.parse(ls.get('TRIP_MASTER_ITEMS')||'[]')}catch(e){items=[]}
   if(changed)ls.set('TRIP_MASTER_ITEMS',JSON.stringify(items));
 })();
 
-// 타임스탬프 기반 동기화 (삭제한 항목이 새로고침 시 되살아나는 버그 원천 차단)
 (async function syncIndexedDB(){
   const dbData=await idb.get('TRIP_MASTER_DATA');
   const lsTime=Number(ls.get('TRIP_UPDATED_AT')||0);
@@ -618,7 +615,6 @@ function closeMyMapsOverlay(){
 }
 
 function tab(k){
-  // 내지도 오버레이가 열려있을 때 하단 탭바를 누르면 즉시 내지도 닫기
   closeMyMapsOverlay();
   if(k==='map'&&innerWidth>820)return;
   if(activeTab===k)return;
@@ -1167,30 +1163,33 @@ async function callGeminiSmart(prompt,images=[],allowGrounding=false){
   for(const im of images){
     if(im&&im.data)parts.push({inline_data:{mime_type:im.mime||'image/jpeg',data:im.data}});
   }
-  const t0=Date.now(),DEADLINE=22000;
+  const t0=Date.now(),DEADLINE=24000;
   let lastErr='';
   const fixed=[...new Set([userModel,'gemini-2.5-flash-lite','gemini-2.5-flash','gemini-2.0-flash','gemini-2.0-flash-lite'].filter(Boolean))];
   for(const m of fixed){
     if(Date.now()-t0>DEADLINE)break;
-    const body={contents:[{parts}],generationConfig:{temperature:0.1}};
-    if(allowGrounding&&m==='gemini-2.5-flash')body.tools=[{google_search:{}}];
-    try{
-      const r=await fetchTO(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(key)}`,{
-        method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)
-      },9000);
-      const d=await r.json();
-      if(!r.ok){
-        lastErr=d?.error?.message||`HTTP ${r.status}`;
-        if(/api key not valid/i.test(lastErr))throw new Error(lastErr);
-        continue;
+    const tries=(allowGrounding&&m==='gemini-2.5-flash')?[true,false]:[false];
+    for(const useGround of tries){
+      const body={contents:[{parts}],generationConfig:{temperature:0.1}};
+      if(useGround)body.tools=[{google_search:{}}];
+      try{
+        const r=await fetchTO(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(key)}`,{
+          method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)
+        },11000);
+        const d=await r.json();
+        if(!r.ok){
+          lastErr=d?.error?.message||`HTTP ${r.status}`;
+          if(/api key not valid/i.test(lastErr))throw new Error(lastErr);
+          continue;
+        }
+        const txt=d?.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('')||'';
+        if(txt.trim()){
+          bumpCnt('gemini');
+          return txt;
+        }
+      }catch(e){
+        lastErr=e.message||'네트워크 오류';
       }
-      const txt=d?.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('')||'';
-      if(txt.trim()){
-        bumpCnt('gemini');
-        return txt;
-      }
-    }catch(e){
-      lastErr=e.message||'네트워크 오류';
     }
   }
   throw new Error(lastErr||'Gemini 응답 지연');
@@ -1208,7 +1207,7 @@ async function callOpenAICompat(endpoint,key,models,prompt,images=[],provId='ope
         method:'POST',
         headers:{'Content-Type':'application/json','Authorization':`Bearer ${key}`},
         body:JSON.stringify({model:m,messages:[{role:'user',content:images.length?content:prompt}],temperature:0.1})
-      },10000);
+      },11000);
       const d=await r.json();
       if(!r.ok){lastErr=d?.error?.message||`HTTP ${r.status}`;continue;}
       const txt=d?.choices?.[0]?.message?.content||'';
@@ -1438,6 +1437,7 @@ function parseCaptionLocally(rawText,hint=''){
   return {name,address,price,info,note,postal,category};
 }
 
+// ⚡ 멀티 장소 최대 10곳 분리 (📍, 📌, ①~⑩, 1. 2. 번호 리스트 모두 지원)
 function parseCaptionMultiText(txt,hint=''){
   const t=String(txt||'');
   const parts=t.split(/(📍|📌)/);
@@ -1448,16 +1448,21 @@ function parseCaptionMultiText(txt,hint=''){
       i++;
     }
   }
-  const circ=t.split(/(?=[\u2460-\u2468])/).map(s=>s.trim()).filter(s=>s.length>=8);
+  const circ=t.split(/(?=[\u2460-\u2469])/).map(s=>s.trim()).filter(s=>s.length>=6);
+  // 줄 시작이 "1. 상호명", "2. 상호명" 형태인 다중 리스트 분리
+  const numLines=t.split(/\n(?=\s*(?:[1-9]|10)[\.\)]\s+[^\d])/).map(s=>s.trim()).filter(s=>/^\s*(?:[1-9]|10)[\.\)]\s+/.test(s)&&s.length>=5);
+
   const useChunks=chunks.length>=1;
   const useCirc=!useChunks&&circ.length>1;
-  const pool=useChunks?chunks:(useCirc?circ:[t]);
+  const useNum=!useChunks&&!useCirc&&numLines.length>1;
+  const pool=useChunks?chunks:(useCirc?circ:(useNum?numLines:[t]));
   const out=[];
   for(const c of pool){
-    if(out.length>=4)break;
-    const s=c.replace(/^[•·\-\*]\s*/,'').replace(/^[\u2460-\u2468]\s*/,'').trim();
+    if(out.length>=MAX_MULTI_PLACES)break;
+    let s=c.replace(/^[•·\-\*]\s*/,'').replace(/^[\u2460-\u2469]\s*/,'').trim();
+    if(useNum)s='📍 '+s.replace(/^\s*(?:[1-9]|10)[\.\)]\s*/,'');
     const p=parseCaptionLocally(s,hint);
-    if(useChunks||useCirc){
+    if(useChunks||useCirc||useNum){
       if(p.name&&p.name.length>=2)out.push(p);
     }else{
       if(p.name||p.address)out.push(p);
@@ -1601,14 +1606,16 @@ async function analyzeContent({rawText='',vidUrl='',images=[],hint=''}){
   const aiTask=(async()=>{
     if(!hasAi||!(caption.length>=2||images.length>0||!vidUrl))return [];
     try{
-      const prompt=`다음 여행 관련 입력(릴스/쇼츠 캡션, 텍스트, 또는 이미지)에서 장소·먹거리·쇼핑 항목을 추출해 JSON 배열로만 출력하세요.
+      const needWebSearch=Boolean(vidUrl&&caption.length<80&&!images.length);
+      const prompt=`다음 여행 관련 입력(릴스/쇼츠 캡션, 다중 맛집 리스트, 또는 최대 10장의 이미지)에서 장소·먹거리·쇼핑 항목을 모두 추출해(최대 10곳) JSON 배열로만 출력하세요.
 입력 텍스트:
 """
 ${caption||rawText}
 """
+원본 영상 URL: ${vidUrl||'없음'}
 지역 힌트: ${hint||'없음'}
 
-반드시 아래 JSON 배열 형식으로만 답하세요:
+반드시 아래 JSON 배열 형식으로만 답하세요(여러 곳이면 배열에 모두 포함, 최대 10개):
 [
   {
     "name": "장소/가게 이름 (한국어, 예: 오사카 난바 치토세 본점. 주소만 입력된 경우 해당 번지의 실제 유명 가게명 추론)",
@@ -1621,9 +1628,9 @@ ${caption||rawText}
     "lng": 135.5038
   }
 ]
-중요: 실제 존재하는 유명 장소라면 정확한 위경도(lat, lng)와 현지어 상호명(localName)을 반드시 포함하세요.`;
-      const txt=await askAI(prompt,images,false);
-      return extractJsonArray(txt);
+중요: 입력에 여러 가게(예: Top 6, Top 10, 여러 장의 스크린샷)가 있으면 1곳만 뽑지 말고 등장하는 모든 가게를 최대 10곳까지 배열로 반환하세요. 실제 존재하는 유명 장소라면 정확한 위경도(lat, lng)와 현지어 상호명(localName)을 반드시 포함하세요.`;
+      const txt=await askAI(prompt,images.slice(0,MAX_MULTI_PLACES),needWebSearch);
+      return extractJsonArray(txt).slice(0,MAX_MULTI_PLACES);
     }catch(e){
       aiErr=e.message;
       return [];
@@ -1649,10 +1656,19 @@ ${caption||rawText}
   });
 
   let cands=[];
-  if(aiCands.length<=1&&multiLocal.length>1){
-    cands=multiLocal.map(mapLocal);
+  if(aiCands.length<multiLocal.length&&multiLocal.length>1){
+    cands=multiLocal.slice(0,MAX_MULTI_PLACES).map((m,idx)=>{
+      const aiMatch=aiCands[idx];
+      const base=mapLocal(m);
+      if(aiMatch){
+        base.localName=aiMatch.localName||base.localName;
+        if(!base.address&&aiMatch.address)base.address=normalizeOcrAddr(aiMatch.address);
+        if(Number(aiMatch.lat)&&Number(aiMatch.lng)){base.lat=Number(aiMatch.lat);base.lng=Number(aiMatch.lng);}
+      }
+      return base;
+    });
   }else if(aiCands.length){
-    cands=aiCands.map(c=>({
+    cands=aiCands.slice(0,MAX_MULTI_PLACES).map(c=>({
       name:c.name||localParsed.name||'',
       localName:c.localName||'',
       address:normalizeOcrAddr(c.address||localParsed.address||''),
@@ -1738,7 +1754,7 @@ async function runAnalyzeShare(files=[]){
     const quickLocal=(!files.length&&raw)?parseCaptionMultiText(raw,hint):[];
     let optimisticItems=[];
     if(quickLocal.length&&(quickLocal[0].name||quickLocal[0].address)){
-      optimisticItems=quickLocal.map(q=>({
+      optimisticItems=quickLocal.slice(0,MAX_MULTI_PLACES).map(q=>({
         id:'id_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
         name:q.name||(q.address||'').split(',')[0].trim()||'저장된 장소',
         localName:'',
@@ -1763,13 +1779,13 @@ async function runAnalyzeShare(files=[]){
       }
       res=optimisticItems;
       save();
-      renderCandidates('⚡ 즉시 저장됨 · 정밀 위치와 상세 정보를 보완 중...');
+      renderCandidates(`⚡ ${optimisticItems.length}곳 즉시 저장됨 · 정밀 위치와 상세 정보를 보완 중...`);
       $('shareBox').value='';
       $('reelLinkBox').value='';
     }
 
     const images=[];
-    for(const f of files)images.push(await fileToBase64(f,860,0.72));
+    for(const f of files.slice(0,MAX_MULTI_PLACES))images.push(await fileToBase64(f,860,0.72));
 
     const {cands,aiErr,capStatus}=await analyzeContent({rawText:raw||explicitLink,vidUrl,images,hint});
 
@@ -1780,7 +1796,7 @@ async function runAnalyzeShare(files=[]){
           const extraIds=new Set(optimisticItems.slice(cands.length).map(x=>x.id));
           items=items.filter(x=>!extraIds.has(x.id));
         }
-        cands.forEach((c,idx)=>{
+        cands.slice(0,MAX_MULTI_PLACES).forEach((c,idx)=>{
           const target=optimisticItems[idx];
           if(target){
             if(c.name&&!isGenericSharedName(c.name))target.name=c.name;
@@ -1817,8 +1833,9 @@ async function runAnalyzeShare(files=[]){
           }
         });
       }else{
-        for(let k=cands.length-1;k>=0;k--){
-          const c=cands[k];
+        const limited=cands.slice(0,MAX_MULTI_PLACES);
+        for(let k=limited.length-1;k>=0;k--){
+          const c=limited[k];
           const itemObj={
             id:'id_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
             name:c.name||'저장된 장소',
@@ -1843,17 +1860,17 @@ async function runAnalyzeShare(files=[]){
         }
       }
       save();
-      res=cands;
-      renderCandidates('✅ 자동으로 저장되고 지도에 등록되었어요!');
+      res=cands.slice(0,MAX_MULTI_PLACES);
+      renderCandidates(`✅ 총 ${res.length}곳이 자동으로 저장되고 지도에 등록되었어요!`);
       if(cur&&$('sheet').classList.contains('on'))showSheet();
       $('shareBox').value='';
       $('reelLinkBox').value='';
       lastSharedVid='';
       if(firstSaved&&firstSaved.lat&&firstSaved.lng){
-        focusMapOnItem(firstSaved);
-        toast(`✅ '${firstSaved.name}' 자동 저장 완료! ${firstSaved.vid?'(릴스 바로가기 연결됨)':''}`);
+        if(res.length>1)fit();else focusMapOnItem(firstSaved);
+        toast(res.length>1?`✅ '${firstSaved.name}' 외 ${res.length-1}곳(총 ${res.length}곳) 일괄 저장 및 지도 등록 완료!`:`✅ '${firstSaved.name}' 자동 저장 완료! ${firstSaved.vid?'(릴스 바로가기 연결됨)':''}`);
       }else if(firstSaved){
-        toast(`'${firstSaved.name}' 저장 완료! (상세창에서 주소를 보완하면 지도에 표시됩니다)`);
+        toast(`'${firstSaved.name}'${res.length>1?` 외 ${res.length-1}곳`:''} 저장 완료! (상세창에서 주소를 보완하면 지도에 표시됩니다)`);
       }
       return;
     }
@@ -1872,7 +1889,7 @@ async function runAnalyzeShare(files=[]){
     };
     res=[fallbackCand];
     renderCandidates();
-    toast('링크에서 캡션이 차단되었어요. 2번 칸에 캡션을 붙여넣거나 아래 카드를 눌러 캡션을 붙여넣으세요.');
+    toast('링크에서 캡션이 차단되었어요. 2번 칸에 캡션·고정댓글을 붙여넣거나 스샷을 첨부해 주세요.');
   }finally{
     btn.disabled=false;btn.textContent='🔥 분석·저장하기';
   }
@@ -1903,6 +1920,7 @@ async function reGeoItem(i){
   }
 }
 
+// ⚡ 시트 내 다중 캡션/스샷 적용 시에도 최대 10곳까지 동시 분리 저장
 async function applyCaptionToItem(i,rawCap,images=[]){
   if(!i)return;
   toast('캡션에서 상호명과 위치를 추출 중...');
@@ -1925,7 +1943,7 @@ async function applyCaptionToItem(i,rawCap,images=[]){
     if(c.info)i.info=c.info;
     if(c.note&&!i.note)i.note=c.note;
     if(c.lat&&c.lng){i.lat=c.lat;i.lng=c.lng;}
-    for(const c2 of array.slice(1,4)){
+    for(const c2 of array.slice(1,MAX_MULTI_PLACES)){
       if(!c2.name&&!c2.address)continue;
       const ni={
         id:'id_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),
@@ -1971,7 +1989,7 @@ async function applyCaptionToItem(i,rawCap,images=[]){
   if(i.lat&&i.lng){
     focusMapOnItem(i);
     view='google';
-    toast(added?`✅ '${i.name}' 저장 + 나머지 ${added}곳도 각각 지도에 등록했어요`:`✅ '${i.name}' 이름·위치 설정 및 지도 등록 완료!`);
+    toast(added?`✅ '${i.name}' 저장 + 나머지 ${added}곳(총 ${added+1}곳)도 각각 지도에 등록했어요`:`✅ '${i.name}' 이름·위치 설정 및 지도 등록 완료!`);
   }else{
     toast(added?`✅ 나머지 ${added}곳을 각각 저장했어요 (현재 항목은 좌표 미발견)`:'내용을 반영했지만 좌표를 찾지 못했습니다.');
   }
@@ -2310,7 +2328,7 @@ $('file').onchange=async e=>{
   const fs=[...(e.target.files||[])];e.target.value='';
   if(!fs.length)return;
   pend=[];
-  for(const f of fs)pend.push(await fileToBase64(f,860,0.72));
+  for(const f of fs.slice(0,MAX_MULTI_PLACES))pend.push(await fileToBase64(f,860,0.72));
   $('pc').textContent=`📷 사진 ${pend.length}장 선택됨`;
   toast(`사진 ${pend.length}장이 첨부되었어요. [🔎 인터넷에서 찾기]를 누르세요.`);
 };
@@ -2325,11 +2343,12 @@ $('own').onchange=async e=>{
   if(i){i.img=`data:${b64.mime};base64,${b64.data}`;i.useCustomImg=true;view='photo';save();showSheet();}
 };
 $('sheetShot').onchange=async e=>{
-  const f=e.target.files?.[0];e.target.value='';
-  if(!f||!cur)return;
-  const b64=await fileToBase64(f,860,0.72);
+  const fs=[...(e.target.files||[])];e.target.value='';
+  if(!fs.length||!cur)return;
+  const b64s=[];
+  for(const f of fs.slice(0,MAX_MULTI_PLACES))b64s.push(await fileToBase64(f,860,0.72));
   const i=items.find(x=>x.id===cur);
-  if(i)await applyCaptionToItem(i,'',[b64]);
+  if(i)await applyCaptionToItem(i,'',b64s);
 };
 
 $('aiSaveAll').onclick=()=>{saveAiProvFromUI();renderUsageBox();toast('AI 키 설정을 저장했어요')};
@@ -2364,7 +2383,6 @@ $('savecfproxy').onclick=()=>{
   toast('프록시 주소 저장됨');
 };
 
-// 내지도 URL 저장 시 자동으로 embed URL도 함께 추출해 저장
 $('saveMyMaps').onclick=()=>{
   const u=$('mymapsUrl').value.trim();
   ls.set('TRIP_MYMAPS_URL',u);
