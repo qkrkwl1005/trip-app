@@ -109,6 +109,12 @@ input:focus,textarea:focus{border-color:var(--pr);box-shadow:0 0 0 3px var(--pr-
 .pinCard b{position:absolute;right:2px;bottom:2px;background:rgba(0,0,0,.65);border-radius:6px;font-size:10px;padding:1px 4px;pointer-events:none}
 .pinCard em{position:absolute;left:2px;top:2px;font-style:normal;background:rgba(37,99,235,.92);color:#fff;border-radius:5px;font-size:9px;font-weight:800;padding:0 4px;line-height:1.4;pointer-events:none}
 .pinCard .pstar{position:absolute;right:2px;top:2px;font-size:10px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.8));pointer-events:none}
+.pinCard .pinNum{position:absolute;left:2px;bottom:2px;z-index:2;min-width:17px;height:17px;padding:0 4px;box-sizing:border-box;border-radius:9px;background:#111827;color:#fff;font-size:10px;font-style:normal;font-weight:900;line-height:17px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.7);pointer-events:none}
+.mapPinPopup{min-width:190px;max-width:260px;font:13px/1.4 system-ui,sans-serif;color:#111827}
+.mapPinPopup strong{display:block;font-size:14px;margin-bottom:4px}
+.mapPinPopup .mapPinAddress{margin-bottom:8px;overflow-wrap:anywhere}
+.mapPinPopup .mapPinActions{display:flex;gap:6px;flex-wrap:wrap}
+#groupedPlacesSummary .selectedMapPlace{outline:3px solid var(--pr);outline-offset:1px}
 .lnk{color:#2563eb;font-weight:700;cursor:pointer}
 #sheet{position:fixed;inset:0;z-index:100;background:rgba(9,11,15,.6);display:none;align-items:flex-end;justify-content:center}#sheet.on{display:flex}
 .sh{background:var(--s);width:100%;max-width:520px;max-height:92dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;border-radius:20px 20px 0 0;padding:14px 16px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -12px 40px rgba(0,0,0,.35);animation:shUp .22s ease}
@@ -416,7 +422,7 @@ const SUF=['',' photo',' review',' menu',' exterior'];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pic=(q,v=0)=>'https://tse1.mm.bing.net/th?w=480&h=360&c=7&rs=1&p=0&q='+encodeURIComponent(String(q||'').trim()+SUF[v%5]);
 
-let items=[],cat='PLACE',pend=[],res=[],lm=null,tl=null,layer=null,pins={},tt,cur=null,view='photo',tileIndex=1,tileFails=0,gmap=null,gmarkers=[],nmap=null,nmarkers=[],mapProvider='osm',editMode={},selected=new Set(),prevTab='add',activeTab='add',gpins=[],gposPts=[],GPinClass=null,lastSharedVid='',_lastDrawSig='',_lastStripSig='',_mapFitted=false,_mapFallbackNotice='';
+let items=[],cat='PLACE',pend=[],res=[],lm=null,tl=null,layer=null,pins={},tt,cur=null,view='photo',tileIndex=1,tileFails=0,gmap=null,gmarkers=[],nmap=null,nmarkers=[],mapProvider='osm',editMode={},selected=new Set(),prevTab='add',activeTab='add',gpins=[],gposPts=[],GPinClass=null,mapInfoWindow=null,nMapInfoWindow=null,lastSharedVid='',_lastDrawSig='',_lastStripSig='',_mapFitted=false,_mapFallbackNotice='';
 let mapCat='ALL',mapOnlyVid=false,mapOnlyStar=false,mapOnlyTodo=false,mapDay=0,mapRouteOn=false,userPos=null,nearSortOn=false;
 let lRoute=null,gRoute=null,nRoute=null,_undoFn=null;
 let listFilter={PLACE:'ALL',CAFE:'ALL',FOOD:'ALL',SHOP:'ALL'};
@@ -815,7 +821,33 @@ function pinCardHtml(i){
   const fb=(t1&&t2&&t1!==t2)?` data-fbsrc="${esc(t2)}"`:'';
   const dayBadge=i.day?`<em>D${i.day}</em>`:'';
   const starBadge=i.star?`<span class="pstar">⭐</span>`:'';
-  return `<div class="pinCard c-${CATS[i.category]?i.category:'PLACE'}${i.star?' starred':''}">${dayBadge}${starBadge}<i>${ic}</i>${thumb?`<img loading="lazy" decoding="async" referrerpolicy="no-referrer" src="${esc(thumb)}"${fb} onerror="imgErr(this)">`:''}${getVidUrlStr(i.vid)?'<b>🎬</b>':''}</div>`;
+  const placeNumber=i._pinNumber?`<em class="pinNum">${i._pinNumber}</em>`:'';
+  return `<div class="pinCard c-${CATS[i.category]?i.category:'PLACE'}${i.star?' starred':''}">${dayBadge}${starBadge}${placeNumber}<i>${ic}</i>${thumb?`<img loading="lazy" decoding="async" referrerpolicy="no-referrer" src="${esc(thumb)}"${fb} onerror="imgErr(this)">`:''}${getVidUrlStr(i.vid)?'<b>🎬</b>':''}</div>`;
+}
+
+function mapPinPopupHtml(item){
+  const title=item._pinNumber?`${item._pinNumber}. ${item.name||'장소'}`:(item.name||'장소');
+  const address=item.address||'주소 미입력';
+  return `<div class="mapPinPopup"><strong>${esc(title)}</strong><div class="mapPinAddress">${esc(address)}</div><div class="mapPinActions"><a class="mb pr" href="${esc(getGMapDirLink(item))}" target="_blank" rel="noopener">🧭 길찾기</a><button type="button" class="mb" data-act="openGroupedItem" data-id="${esc(item.id)}" data-place-idx="${Number.isInteger(item._placeIndex)?item._placeIndex:-1}">전체 장소 보기</button><button type="button" class="mb dg" data-act="hideMapItem" data-id="${esc(item.id)}">지도에서 삭제</button></div></div>`;
+}
+function openMapPinPopup(item){
+  if(gmap&&window.google?.maps){
+    if(nMapInfoWindow)nMapInfoWindow.close();
+    if(!mapInfoWindow)mapInfoWindow=new google.maps.InfoWindow();
+    mapInfoWindow.setContent(mapPinPopupHtml(item));
+    mapInfoWindow.setPosition({lat:Number(item.lat),lng:Number(item.lng)});
+    mapInfoWindow.open({map:gmap});
+    return;
+  }
+  if(nmap&&window.naver?.maps){
+    if(mapInfoWindow)mapInfoWindow.close();
+    if(!nMapInfoWindow)nMapInfoWindow=new naver.maps.InfoWindow({maxWidth:280,backgroundColor:'#fff',borderColor:'#d1d5db',anchorSize:new naver.maps.Size(10,10)});
+    nMapInfoWindow.setContent(mapPinPopupHtml(item));
+    nMapInfoWindow.open(nmap,new naver.maps.LatLng(Number(item.lat),Number(item.lng)));
+    return;
+  }
+  const marker=pins[item._pinKey];
+  if(marker)marker.openPopup();
 }
 
 function makeGPinClass(){
@@ -930,13 +962,13 @@ function draw(force=false){
     valid.forEach(i=>gposPts.push(new google.maps.LatLng(Number(i.lat),Number(i.lng))));
     if(GPinClass){
       valid.forEach(i=>{
-        const o=new GPinClass(gmap,i,()=>{cur=i.id;view=getVidUrlStr(i.vid)?'video':'photo';showSheet()});
+        const o=new GPinClass(gmap,i,()=>openMapPinPopup(i));
         gpins.push(o);
       });
     }else{
       valid.forEach(i=>{
         const m=new google.maps.Marker({position:{lat:Number(i.lat),lng:Number(i.lng)},map:gmap,title:i.name});
-        m.addListener('click',()=>{cur=i.id;view=getVidUrlStr(i.vid)?'video':'photo';showSheet()});
+        m.addListener('click',()=>openMapPinPopup(i));
         gmarkers.push(m);
       });
     }
@@ -948,7 +980,7 @@ function draw(force=false){
     valid.forEach(i=>{
       const m=new naver.maps.Marker({position:new naver.maps.LatLng(Number(i.lat),Number(i.lng)),map:nmap,
         icon:{content:pinCardHtml(i),anchor:new naver.maps.Point(26,66)}});
-      naver.maps.Event.addListener(m,'click',()=>{cur=i.id;view=getVidUrlStr(i.vid)?'video':'photo';showSheet()});
+      naver.maps.Event.addListener(m,'click',()=>openMapPinPopup(i));
       nmarkers.push(m);
     });
     updateRouteLine(valid);
@@ -957,17 +989,16 @@ function draw(force=false){
   if(!lm||!layer)return;layer.clearLayers();pins={};
   valid.forEach(i=>{
     const m=L.marker([Number(i.lat),Number(i.lng)],{icon:L.divIcon({className:'',html:pinCardHtml(i),iconSize:[52,66],iconAnchor:[26,66]})});
-    if(getVidUrlStr(i.vid)){m.on('click',()=>{cur=i.id;view='video';showSheet()});}
-    else{m.bindPopup(`<b>${esc(i.name)}</b><br>${esc(i.address||'')}<br><button type="button" class="mb" data-act="open" data-id="${esc(i.id)}">사진·상세 보기</button> <button type="button" class="mb dg" data-act="hideMapItem" data-id="${esc(i.id)}">지도에서 삭제</button>`);}
-    m.addTo(layer);pins[i.id]=m;
+    m.bindPopup(mapPinPopupHtml(i));
+    m.addTo(layer);pins[i._pinKey]=m;
   });
   updateRouteLine(valid);
 }
 
 function renderMapStrip(force=false){
   const s=$('mapStrip'),wrap=$('map-wrap');if(!s||!wrap)return;
-  const valid=sortNear([...mapValid()]);
-  const sig=valid.map(i=>`"${i.id}:${i.category}:${i.star?1:0}:${i.day||0}:${getVidUrlStr(i.vid)?'v':''}:${((i.name||'')+'').slice(0,24)}:${fmtDist(itemDist(i))}"`).join('|');
+  const valid=sortNear([...expandMapPins(mapValid())]);
+  const sig=valid.map(i=>`"${i._pinKey}:${i.category}:${i.star?1:0}:${i.day||0}:${getVidUrlStr(i.vid)?'v':''}:${((i.name||'')+'').slice(0,24)}:${fmtDist(itemDist(i))}"`).join('|');
   if(!valid.length){
     if(s.classList.contains('on')||wrap.classList.contains('has-strip')||_lastStripSig){s.innerHTML='';s.classList.remove('on');wrap.classList.remove('has-strip');_lastStripSig='';}
     return;
@@ -977,7 +1008,7 @@ function renderMapStrip(force=false){
   _lastStripSig=sig;
   s.innerHTML=valid.map(i=>{
     const d=itemDist(i);
-    return `<button type="button" class="stripCard" data-act="mapopen" data-id="${i.id}">${pinCardHtml(i)}<span>${esc(i.name||'무제')}</span>${d!=null?`<small>${fmtDist(d)}</small>`:''}</button>`;
+    return `<button type="button" class="stripCard" data-act="mapopen" data-pin-key="${esc(i._pinKey)}">${pinCardHtml(i)}<span>${esc(i.name||'무제')}</span>${d!=null?`<small>${fmtDist(d)}</small>`:''}</button>`;
   }).join('');
   s.classList.add('on');
 }
@@ -1004,13 +1035,16 @@ function expandMapPins(validItems){
   validItems.forEach(i=>{
     const explicitlyRegistered=i.mapVisible===true;
     const places=Array.isArray(i.places)?i.places:[];
-    const subPlaces=places.filter(p=>Number(p.lat)&&Number(p.lng)&&(explicitlyRegistered||hasMapAddress(p)));
+    const subPlaces=places.map((place,placeIndex)=>({place,placeIndex})).filter(({place})=>Number(place.lat)&&Number(place.lng)&&(explicitlyRegistered||hasMapAddress(place)));
     const parentHasPin=Number(i.lat)&&Number(i.lng)&&(!places.length||(!explicitlyRegistered&&!subPlaces.length&&hasMapAddress(i))||explicitlyRegistered);
-    const subs=subPlaces.length?subPlaces:(parentHasPin?[i]:[]);
-    subs.forEach((p,idx)=>{
+    const subs=subPlaces.length?subPlaces.map(({place,placeIndex})=>({place,placeIndex})):(parentHasPin?[{place:i,placeIndex:-1}]:[]);
+    subs.forEach(({place:p,placeIndex})=>{
       pinsOut.push({
         ...i,
-        _pinKey:`${i.id}_${idx}`,
+        _pinKey:`${i.id}_${placeIndex<0?'parent':placeIndex}`,
+        _placeIndex:placeIndex,
+        _placeCount:places.length,
+        _pinNumber:places.length>1&&placeIndex>=0?placeIndex+1:null,
         name:p.name||i.name,
         localName:p.localName||i.localName,
         address:p.address||i.address,
@@ -1379,7 +1413,7 @@ function groupedPlacesSummaryHtml(item){
       </div>
       <div style="display:flex;flex-direction:column;gap:8px">
         ${item.places.map((p,idx)=>`
-          <div style="padding:8px;border-radius:10px;background:var(--s);border:1px solid var(--bd)">
+          <div id="sub-place-${idx}" style="padding:8px;border-radius:10px;background:var(--s);border:1px solid var(--bd)">
             <div style="font-weight:700;font-size:13.5px">${idx+1}. ${esc(p.name)} ${p.lat&&p.lng?'🟢':'🔴'}</div>
             <div class="ds" style="margin-top:2px">${esc(p.address||'주소 미입력')}</div>
             ${p.price||p.info?`<div class="ds in" style="margin-top:2px">${esc([p.price,p.info].filter(Boolean).join(' · '))}</div>`:''}
@@ -2950,7 +2984,25 @@ document.addEventListener('click',async e=>{
     },{timeout:8000,enableHighAccuracy:false});
     return;
   }
-  if(act==='mapopen'){const it=items.find(x=>x.id===id);if(it){cur=it.id;view=getVidUrlStr(it.vid)?'video':'photo';focusMapOnItem(it);showSheet();}return;}
+  if(act==='mapopen'){
+    const pin=expandMapPins(mapValid()).find(x=>x._pinKey===actEl.dataset.pinKey);
+    if(pin){focusMapOnItem(pin);openMapPinPopup(pin);}
+    return;
+  }
+  if(act==='openGroupedItem'){
+    const it=items.find(x=>x.id===id);
+    if(it){
+      if(mapInfoWindow)mapInfoWindow.close();
+      if(nMapInfoWindow)nMapInfoWindow.close();
+      cur=it.id;view='photo';showSheet();
+      const idx=Number(actEl.dataset.placeIdx);
+      if(Number.isInteger(idx)&&idx>=0){
+        const card=$(`sub-place-${idx}`);
+        if(card){card.classList.add('selectedMapPlace');card.scrollIntoView({block:'center',behavior:'smooth'});}
+      }
+    }
+    return;
+  }
   if(act==='toggleEdit'){editMode[c]=!editMode[c];selected.clear();const allCb=$('bulk-'+c)?.querySelector('input[data-act=selectAll]');if(allCb)allCb.checked=false;renderCat(c);return;}
   if(act==='toggleSel'||act==='sel'){
     e.stopPropagation();
