@@ -214,8 +214,9 @@ input[type=text],input[type=password],textarea{font-size:16px}
       <option value="google">Google Maps</option>
       <option value="naver">Naver Maps</option>
     </select>
-    <label>Google Maps API 키 (선택)</label>
+    <label>Google Maps API 키 (Google 지도 사용 시 필수)</label>
     <input type="password" id="gmapkey" placeholder="AIzaSy...">
+    <small style="display:block;margin:-6px 0 10px;color:var(--sub);font-size:11px">Google Cloud에서 Maps JavaScript API를 사용 설정하고 결제 계정 및 현재 사이트의 HTTP 리퍼러 제한을 확인하세요. 키가 없거나 인증에 실패하면 OpenStreetMap으로 전환하고 지도에 안내를 표시합니다.</small>
     <button id="savegmap" class="btn g">Google 키 저장</button>
     <label style="margin-top:14px">Naver Maps API 키 (선택)</label>
     <input type="password" id="naverkey" placeholder="NCP API Key ID">
@@ -415,7 +416,7 @@ const SUF=['',' photo',' review',' menu',' exterior'];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pic=(q,v=0)=>'https://tse1.mm.bing.net/th?w=480&h=360&c=7&rs=1&p=0&q='+encodeURIComponent(String(q||'').trim()+SUF[v%5]);
 
-let items=[],cat='PLACE',pend=[],res=[],lm=null,tl=null,layer=null,pins={},tt,cur=null,view='photo',tileIndex=1,tileFails=0,gmap=null,gmarkers=[],nmap=null,nmarkers=[],mapProvider='osm',editMode={},selected=new Set(),prevTab='add',activeTab='add',gpins=[],gposPts=[],GPinClass=null,lastSharedVid='',_lastDrawSig='',_lastStripSig='',_mapFitted=false;
+let items=[],cat='PLACE',pend=[],res=[],lm=null,tl=null,layer=null,pins={},tt,cur=null,view='photo',tileIndex=1,tileFails=0,gmap=null,gmarkers=[],nmap=null,nmarkers=[],mapProvider='osm',editMode={},selected=new Set(),prevTab='add',activeTab='add',gpins=[],gposPts=[],GPinClass=null,lastSharedVid='',_lastDrawSig='',_lastStripSig='',_mapFitted=false,_mapFallbackNotice='';
 let mapCat='ALL',mapOnlyVid=false,mapOnlyStar=false,mapOnlyTodo=false,mapDay=0,mapRouteOn=false,userPos=null,nearSortOn=false;
 let lRoute=null,gRoute=null,nRoute=null,_undoFn=null;
 let listFilter={PLACE:'ALL',CAFE:'ALL',FOOD:'ALL',SHOP:'ALL'};
@@ -661,11 +662,31 @@ function rebuildTiles(){
   tl=L.tileLayer(currentTileUrl(),{maxZoom:19,subdomains:carto?'abcd':'abc',attribution:'© OpenStreetMap © CARTO'}).addTo(lm);
   tl.on('tileerror',onTileError);tl.on('tileload',onTileLoad);
 }
-function onTileError(){tileFails++;if(tileIndex===0&&tileFails>3){tileIndex=1;tileFails=0;rebuildTiles();toast('지도 타일을 전환했어요')}else if(tileIndex===1){$('mapmsg').style.display='block'}}
-function onTileLoad(){tileFails=0;$('mapmsg').style.display='none'}
+function onTileError(){
+  tileFails++;
+  if(tileIndex===0&&tileFails>3){
+    tileIndex=1;tileFails=0;rebuildTiles();toast('지도 타일을 전환했어요');
+  }else if(tileIndex===1&&!_mapFallbackNotice){
+    $('mapmsg').textContent='지도 타일을 불러오지 못했어요. 인터넷 연결을 확인해 주세요.';
+    $('mapmsg').style.display='block';
+  }
+}
+function onTileLoad(){
+  tileFails=0;
+  if(!_mapFallbackNotice)$('mapmsg').style.display='none';
+}
 function setTheme(t){document.documentElement.dataset.theme=t;ls.set('TRIP_THEME',t);$('themeBtn').textContent=t==='dark'?'☀️':'🌙';if(lm)rebuildTiles();renderMapChips();}
 function fallbackToOsm(reason){
-  if(lm) return;
+  const isExpectedFallback=reason==='default osm';
+  _mapFallbackNotice=isExpectedFallback?'':String(reason||'지도 제공자를 사용할 수 없습니다.');
+  if(_mapFallbackNotice){
+    $('mapmsg').textContent=`${_mapFallbackNotice} OpenStreetMap으로 전환했습니다. Google Maps를 사용하려면 설정에서 유효한 API 키를 저장해 주세요.`;
+    $('mapmsg').style.display='block';
+  }
+  if(lm){
+    if(isExpectedFallback)$('mapmsg').style.display='none';
+    return;
+  }
   gmap=null;nmap=null;
   if(window.L){
     $('map').innerHTML='';
@@ -1011,6 +1032,12 @@ function toPlace(c){
     lng:Number(c.lng)||null
   };
 }
+function ensureEditablePlaces(item){
+  if(Array.isArray(item.places)&&item.places.length)return item.places;
+  const primary={...item,name:isGenericSharedName(item.name)?'':item.name};
+  item.places=[toPlace(primary)];
+  return item.places;
+}
 function samePlace(a,b){
   const norm=s=>String(s||'').replace(/\s+/g,'').toLowerCase();
   const placeName=s=>{
@@ -1342,6 +1369,38 @@ async function copyFormattedPlan(){
 
 function closeSheet(){$('sheet').classList.remove('on');cur=null}
 
+function groupedPlacesSummaryHtml(item){
+  if(!Array.isArray(item.places)||item.places.length<2)return '';
+  return `
+    <div id="groupedPlacesSummary" style="margin-top:10px;padding:10px;border-radius:12px;background:var(--s2);border:1px solid var(--bd)">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
+        <label style="margin:0">📍 이 릴스에 통합된 장소 (${item.places.length}곳)</label>
+        <button type="button" class="mb pr" data-act="addSubPlace" style="padding:4px 8px;font-size:11px">＋ 장소 추가</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${item.places.map((p,idx)=>`
+          <div style="padding:8px;border-radius:10px;background:var(--s);border:1px solid var(--bd)">
+            <div style="font-weight:700;font-size:13.5px">${idx+1}. ${esc(p.name)} ${p.lat&&p.lng?'🟢':'🔴'}</div>
+            <div class="ds" style="margin-top:2px">${esc(p.address||'주소 미입력')}</div>
+            ${p.price||p.info?`<div class="ds in" style="margin-top:2px">${esc([p.price,p.info].filter(Boolean).join(' · '))}</div>`:''}
+            <div style="display:flex;gap:5px;margin-top:6px;flex-wrap:wrap">
+              <a class="mb pr" href="${esc(getGMapDirLink(p))}" target="_blank" rel="noopener" style="padding:3px 8px;font-size:11px">🧭 길찾기</a>
+              ${p.address?`<button type="button" class="mb" data-act="copySubAddr" data-idx="${idx}" style="padding:3px 8px;font-size:11px">📋 주소복사</button>`:''}
+              <button type="button" class="mb" data-act="focusSubPin" data-idx="${idx}" style="padding:3px 8px;font-size:11px">🎯 지도위치</button>
+              <button type="button" class="mb" data-act="taxiSub" data-idx="${idx}" style="padding:3px 8px;font-size:11px">🚕 택시화면</button>
+              <button type="button" class="mb dg" data-act="delSubPlace" data-idx="${idx}" style="padding:3px 8px;font-size:11px">삭제</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+function refreshGroupedPlacesSummary(item){
+  const summary=$('groupedPlacesSummary');
+  if(summary)summary.outerHTML=groupedPlacesSummaryHtml(item);
+}
+
 function showSheet(){
   const i=items.find(x=>x.id===cur);if(!i)return closeSheet();
   const searchTarget=getValidSearchQuery(i);
@@ -1375,6 +1434,17 @@ function showSheet(){
 
   const curDay=Number(i.day)||0;
   const dayChips=[0,1,2,3,4,5,6,7,8,9,10].map(d=>`<button type="button" class="lchip${curDay===d?' on':''}" data-act="setDay" data-day="${d}">${d===0?'일차 미정':'Day '+d}</button>`).join('');
+  const editPlaces=Array.isArray(i.places)&&i.places.length?i.places:[toPlace(i)];
+  const addressFields=editPlaces.map((p,idx)=>`
+    <div style="padding:9px;border:1px solid var(--bd);border-radius:11px;background:var(--s)">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:5px">
+        <label style="margin:0">${idx===0?'대표 장소':'추가 장소 '+(idx+1)}</label>
+        ${idx>0?`<button type="button" class="mb dg" data-act="removeEditAddress" data-idx="${idx}" style="padding:3px 8px;font-size:11px">주소칸 삭제</button>`:''}
+      </div>
+      <input type="text" class="edit-place-name" data-idx="${idx}" value="${esc(idx===0&&isGenericSharedName(p.name)?'':p.name||'')}" placeholder="장소명 (선택)" style="margin-bottom:6px">
+      <input type="text" class="edit-place-address" data-idx="${idx}" value="${esc(p.address||'')}" placeholder="주소 / 지역" style="margin-bottom:0">
+    </div>
+  `).join('');
 
   $('sbody').innerHTML=`
     ${media}
@@ -1401,30 +1471,7 @@ function showSheet(){
 
     ${i.price?`<div class="ds" style="color:var(--FOOD);font-weight:700;margin-top:4px">${esc(i.price)}</div>`:''}
     ${i.info?`<div class="ds in" style="margin-top:3px;line-clamp:4">${esc(i.info)}</div>`:''}
-    ${Array.isArray(i.places)&&i.places.length>1?`
-      <div style="margin-top:10px;padding:10px;border-radius:12px;background:var(--s2);border:1px solid var(--bd)">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
-          <label style="margin:0">📍 이 릴스에 통합된 장소 (${i.places.length}곳)</label>
-          <button type="button" class="mb pr" data-act="addSubPlace" style="padding:4px 8px;font-size:11px">＋ 장소 추가</button>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:8px">
-          ${i.places.map((p,idx)=>`
-            <div style="padding:8px;border-radius:10px;background:var(--s);border:1px solid var(--bd)">
-              <div style="font-weight:700;font-size:13.5px">${idx+1}. ${esc(p.name)} ${p.lat&&p.lng?'🟢':'🔴'}</div>
-              <div class="ds" style="margin-top:2px">${esc(p.address||'주소 미입력')}</div>
-              ${p.price||p.info?`<div class="ds in" style="margin-top:2px">${esc([p.price,p.info].filter(Boolean).join(' · '))}</div>`:''}
-              <div style="display:flex;gap:5px;margin-top:6px;flex-wrap:wrap">
-                <a class="mb pr" href="${esc(getGMapDirLink(p))}" target="_blank" rel="noopener" style="padding:3px 8px;font-size:11px">🧭 길찾기</a>
-                ${p.address?`<button type="button" class="mb" data-act="copySubAddr" data-idx="${idx}" style="padding:3px 8px;font-size:11px">📋 주소복사</button>`:''}
-                <button type="button" class="mb" data-act="focusSubPin" data-idx="${idx}" style="padding:3px 8px;font-size:11px">🎯 지도위치</button>
-                <button type="button" class="mb" data-act="taxiSub" data-idx="${idx}" style="padding:3px 8px;font-size:11px">🚕 택시화면</button>
-                <button type="button" class="mb dg" data-act="delSubPlace" data-idx="${idx}" style="padding:3px 8px;font-size:11px">삭제</button>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    `:''}
+    ${groupedPlacesSummaryHtml(i)}
 
     <div style="margin-top:10px">
       <label style="margin-bottom:4px">🗓️ 여행 일차 배정</label>
@@ -1464,10 +1511,11 @@ function showSheet(){
     <div class="seg">
       ${Object.keys(CATS).map(k=>`<div data-act="chcat" data-cat="${k}" class="${i.category===k?'on':''}">${CATS[k].e} ${CATS[k].n}${i.category===k?' ✓':''}</div>`).join('')}
     </div>
-    <label>장소명 / 가게 이름</label>
-    <input type="text" id="sh-name" value="${esc(isGenericSharedName(i.name)?'':i.name)}" placeholder="예: 규카츠 마토 (비워둬도 주소로 위치 찾음)">
-    <label>주소 / 지역 (붙여넣으면 자동으로 위치까지 찾아요)</label>
-    <input type="text" id="sh-addr" value="${esc(i.address||'')}" placeholder="예: 〒542-0086 Osaka, Chuo Ward, Nishishinsaib...">
+    <label>장소명과 주소 (장소별로 한 칸씩 입력)</label>
+    <div id="editAddressList" style="display:flex;flex-direction:column;gap:8px">
+      ${addressFields}
+    </div>
+    <button type="button" class="mb pr" data-act="addEditAddress" style="margin:8px 0">＋ 주소 추가</button>
     <label>메모 (가격, 영업시간, 같이 갈 사람...)</label>
     <textarea id="sh-note" placeholder="메모 (가격, 영업시간, 같이 갈 사람...)">${esc(i.note||'')}</textarea>
     </div></details>
@@ -1485,39 +1533,46 @@ function showSheet(){
   [...$('sbody').querySelectorAll('details.acc')].forEach((d,ix)=>{if(prevAcc[ix])d.open=true;});
   $('sheet').classList.add('on');
 
-  const nmEl=$('sh-name'), adEl=$('sh-addr'), vdEl=$('sh-vid'), ntEl=$('sh-note');
-  if(nmEl){
-    nmEl.oninput=()=>{if(nmEl.value.trim())i.name=nmEl.value.trim();persist();};
-    nmEl.onchange=async()=>{
-      if(nmEl.value.trim()){
-        i.name=nmEl.value.trim();save();
-        if(!i.lat||!i.lng)await reGeoItem(i);
+  const vdEl=$('sh-vid'), ntEl=$('sh-note');
+  const editPlaceFields=()=>ensureEditablePlaces(i);
+  const syncEditedPlace=idx=>{
+    const places=editPlaceFields();
+    if(idx===0)syncGroupedItem(i);
+    else if(places.length>1)syncGroupedItem(i);
+  };
+  $('sbody').querySelectorAll('.edit-place-name').forEach(el=>{
+    const idx=Number(el.dataset.idx);
+    el.oninput=()=>{
+      const place=editPlaceFields()[idx];
+      if(place){place.name=el.value.trim();syncEditedPlace(idx);refreshGroupedPlacesSummary(i);persist();}
+    };
+    el.onchange=()=>{
+      syncEditedPlace(idx);
+      save();
+      refreshGroupedPlacesSummary(i);
+    };
+  });
+  $('sbody').querySelectorAll('.edit-place-address').forEach(el=>{
+    const idx=Number(el.dataset.idx);
+    el.oninput=()=>{
+      const place=editPlaceFields()[idx];
+      if(place){place.address=normalizeOcrAddr(el.value);syncEditedPlace(idx);refreshGroupedPlacesSummary(i);persist();}
+    };
+    el.onchange=async()=>{
+      const place=editPlaceFields()[idx];
+      if(!place||!place.address)return;
+      const geo=await geocodePlace(place,($('hint')?.value||'').trim());
+      if(geo){
+        place.lat=geo.lat;place.lng=geo.lng;
+        if(!place.address&&geo.formatted)place.address=geo.formatted;
       }
+      syncEditedPlace(idx);
+      save();
+      refreshGroupedPlacesSummary(i);
+      if(geo)toast(`📍 ${idx===0?'대표 장소':'추가 장소'} 위치를 설정했어요`);
+      else toast('주소는 저장했지만 좌표를 찾지 못했어요');
     };
-  }
-  if(adEl){
-    adEl.oninput=()=>{i.address=normalizeOcrAddr(adEl.value);persist();};
-    adEl.onpaste=()=>{
-      setTimeout(async()=>{
-        const v=adEl.value.trim();
-        if(!v)return;
-        const isAddress=v.split(/\r?\n/).join(' ').trim().match(/^(?:일본\s*)?(?:〒|T)?\d{3}-\d{4}\b/i);
-        const isMultiLineCaption=v.includes('\n')&&!isAddress;
-        if(isMultiLineCaption){
-          await applyCaptionToItem(i,v);
-        }else{
-          i.address=normalizeOcrAddr(v.replace(/^주소\s*[:：]\s*/i,''));
-          await reGeoItem(i);
-        }
-      },60);
-    };
-    adEl.onchange=async()=>{
-      if(adEl.value.trim()){
-        i.address=normalizeOcrAddr(adEl.value);
-        await reGeoItem(i);
-      }
-    };
-  }
+  });
   if(vdEl){
     vdEl.oninput=()=>{
       const rawV=vdEl.value.trim();
@@ -2434,6 +2489,10 @@ async function applyCaptionToItem(i,rawCap,images=[]){
   if(!array.length){
     array=parseCaptionMultiText(rawCap,hint);
   }
+  if(images.length&&!rawCap.trim()&&!array.length){
+    toast('사진에서 장소를 찾지 못했어요. 이미지 분석이 가능한 AI 설정을 확인한 뒤 다시 시도해 주세요.');
+    return;
+  }
   if(array.length){
     if(!Array.isArray(i.places)||!i.places.length){
       i.places=!isGenericSharedName(i.name)&&(i.name||i.address||i.lat||i.lng)?[toPlace(i)]:[];
@@ -2482,11 +2541,19 @@ async function applyCaptionToItem(i,rawCap,images=[]){
   if(i.lat&&i.lng){
     focusMapOnItem(i);
     view='google';
-    toast(added?`✅ '${i.name}'에 ${added}곳을 추가했어요 (총 ${i.places?.length||1}곳)`:`✅ '${i.name}' 이름·위치 설정 및 지도 등록 완료!`);
+    toast(images.length
+      ?(added?`✅ 사진에서 ${added}곳을 추가했어요 (총 ${i.places?.length||1}곳)`:`✅ 사진에서 인식한 장소가 이미 등록되어 있어요 (총 ${i.places?.length||1}곳)`)
+      :added?`✅ '${i.name}'에 ${added}곳을 추가했어요 (총 ${i.places?.length||1}곳)`:`✅ '${i.name}' 이름·위치 설정 및 지도 등록 완료!`);
   }else{
-    toast(added?`✅ '${i.name}'에 ${added}곳을 추가했어요 (좌표 미발견)`:'내용을 반영했지만 좌표를 찾지 못했습니다.');
+    toast(images.length
+      ?(added?`✅ 사진에서 ${added}곳을 추가했어요 (좌표 미발견, 총 ${i.places?.length||1}곳)`:`✅ 사진에서 인식한 장소가 이미 등록되어 있어요 (총 ${i.places?.length||1}곳)`)
+      :added?`✅ '${i.name}'에 ${added}곳을 추가했어요 (좌표 미발견)`:'내용을 반영했지만 좌표를 찾지 못했습니다.');
   }
   showSheet();
+  if(images.length&&array.length){
+    const editSection=$('sbody').querySelectorAll('details.acc')[1];
+    if(editSection)editSection.open=true;
+  }
 }
 
 async function runSearch(){
@@ -2603,6 +2670,35 @@ document.addEventListener('click',async e=>{
     if(cur===it.id)showSheet();
     draw(true);
     toast('지도에서 숨겼어요. 저장된 장소는 목록에 남아 있어요.');
+    return;
+  }
+  if(act==='addEditAddress'){
+    const it=items.find(x=>x.id===cur);
+    if(!it)return;
+    const places=ensureEditablePlaces(it);
+    if(places.length>=MAX_MULTI_PLACES){
+      toast(`장소는 한 릴스에 최대 ${MAX_MULTI_PLACES}곳까지 추가할 수 있어요`);
+      return;
+    }
+    places.push({name:'',localName:'',address:'',price:'',info:'',lat:null,lng:null});
+    save();
+    showSheet();
+    $('sbody').querySelectorAll('details.acc')[1].open=true;
+    toast('주소 입력칸을 추가했어요');
+    return;
+  }
+  if(act==='removeEditAddress'){
+    const it=items.find(x=>x.id===cur);
+    const idx=Number(actEl.dataset.idx);
+    const places=it?ensureEditablePlaces(it):[];
+    if(idx>0&&Number.isInteger(idx)&&idx<places.length){
+      places.splice(idx,1);
+      syncGroupedItem(it);
+      save();
+      showSheet();
+      $('sbody').querySelectorAll('details.acc')[1].open=true;
+      toast('주소 입력칸을 삭제했어요');
+    }
     return;
   }
   if(act==='addSubPlace'){
@@ -3256,23 +3352,43 @@ function initMap(){
   $('mymapsEmbed').value=getMyMapsEmbedUrl();
   $('cfproxy').value=ls.get('TRIP_CF_PROXY')||ls.get('TRIP_WORKER_URL')||'';
 
-  if(mapProvider==='google'&&gkey){
-    window.gm_authFailure=()=>fallbackToOsm('Google Auth Failure');
+  if(mapProvider==='google'){
+    if(!gkey){
+      fallbackToOsm('Google Maps API 키가 설정되지 않았습니다.');
+      return;
+    }
+    let initialized=false,failed=false;
+    const failGoogle=message=>{
+      if(failed)return;
+      failed=true;
+      fallbackToOsm(message);
+    };
+    window.gm_authFailure=()=>failGoogle('Google Maps 인증에 실패했습니다. 키, 결제 설정, Maps JavaScript API 활성화 및 HTTP 리퍼러 제한을 확인하세요.');
     const s=document.createElement('script');
-    s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(gkey)}`;
+    s.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(gkey)}&loading=async&callback=initGoogleMap`;
     s.async=true;
-    s.onload=()=>{
+    s.onerror=()=>failGoogle('Google Maps JavaScript API를 불러오지 못했습니다. 네트워크와 API 키 제한을 확인하세요.');
+    window.initGoogleMap=()=>{
+      if(initialized||failed)return;
       try{
+        if(!window.google?.maps?.Map)throw new Error('Google Maps API가 초기화되지 않았습니다.');
         gmap=new google.maps.Map($('map'),{center:{lat:34.668,lng:135.501},zoom:12,mapTypeControl:false,fullscreenControl:false,streetViewControl:false});
         GPinClass=makeGPinClass();
+        initialized=true;
+        _mapFallbackNotice='';
+        $('mapmsg').style.display='none';
         draw(true);fit();
-      }catch(e){fallbackToOsm(e.message)}
+      }catch(e){failGoogle(`Google Maps 초기화 오류: ${e.message}`)}
     };
-    s.onerror=()=>fallbackToOsm('Google Script Error');
     document.head.appendChild(s);
+    setTimeout(()=>{if(!initialized)failGoogle('Google Maps 응답 시간이 초과되었습니다. API 키와 네트워크를 확인하세요.');},12000);
     return;
   }
-  if(mapProvider==='naver'&&nkey){
+  if(mapProvider==='naver'){
+    if(!nkey){
+      fallbackToOsm('Naver Maps API 키가 설정되지 않았습니다.');
+      return;
+    }
     const s=document.createElement('script');
     s.src=`https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${encodeURIComponent(nkey)}`;
     s.async=true;
@@ -3280,10 +3396,11 @@ function initMap(){
       try{
         nmap=new naver.maps.Map('map',{center:new naver.maps.LatLng(37.5665,126.9780),zoom:11});
         draw(true);fit();
-      }catch(e){fallbackToOsm(e.message)}
+      }catch(e){fallbackToOsm(`Naver Maps 초기화 오류: ${e.message}`)}
     };
-    s.onerror=()=>fallbackToOsm('Naver Script Error');
+    s.onerror=()=>fallbackToOsm('Naver Maps JavaScript API를 불러오지 못했습니다. 네트워크와 API 키를 확인하세요.');
     document.head.appendChild(s);
+    setTimeout(()=>{if(!nmap)fallbackToOsm('Naver Maps 응답 시간이 초과되었습니다. API 키와 네트워크를 확인하세요.');},12000);
     return;
   }
   fallbackToOsm('default osm');
