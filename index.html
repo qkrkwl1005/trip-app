@@ -112,6 +112,7 @@ input:focus,textarea:focus{border-color:var(--pr);box-shadow:0 0 0 3px var(--pr-
 .pinCard .pinNum{position:absolute;left:2px;bottom:2px;z-index:2;min-width:17px;height:17px;padding:0 4px;box-sizing:border-box;border-radius:9px;background:#111827;color:#fff;font-size:10px;font-style:normal;font-weight:900;line-height:17px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.7);pointer-events:none}
 .mapPinPopup{min-width:190px;max-width:260px;font:13px/1.4 system-ui,sans-serif;color:#111827}
 .mapPinPopup strong{display:block;font-size:14px;margin-bottom:4px}
+.mapPinPopup .mapPinPlace{padding-bottom:8px;margin-bottom:8px;border-bottom:1px solid #d1d5db}
 .mapPinPopup .mapPinAddress{margin-bottom:8px;overflow-wrap:anywhere}
 .mapPinPopup .mapPinActions{display:flex;gap:6px;flex-wrap:wrap}
 #groupedPlacesSummary .selectedMapPlace{outline:3px solid var(--pr);outline-offset:1px}
@@ -148,7 +149,7 @@ input[type=text],input[type=password],textarea{font-size:16px}
 <body>
 <aside id="side">
   <header>
-    <div class="brand"><div class="logo">⚡</div><div><b>TripSync Master</b><small>장소·카페·먹거리·쇼핑 플래너</small></div></div>
+    <div class="brand"><div class="logo">⚡</div><div><b>TripSync Master</b><small>장소·카페·음식·쇼핑 플래너</small></div></div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="planCopyTopBtn" class="mb" title="일정 텍스트 복사">📋 일정복사</button>
       <button id="themeBtn" class="mb"></button>
@@ -162,7 +163,7 @@ input[type=text],input[type=password],textarea{font-size:16px}
       <div class="seg" id="seg">
         <div data-cat="PLACE" class="on">📍 장소</div>
         <div data-cat="CAFE">☕ 카페</div>
-        <div data-cat="FOOD">🍙 먹거리</div>
+        <div data-cat="FOOD">🍙 음식</div>
         <div data-cat="SHOP">🛍️ 쇼핑</div>
       </div>
       <label style="margin-bottom:3px">🎬 1. 릴스·쇼츠 원본 링크 (넣어두면 언제든 릴스로 바로 이동)</label>
@@ -361,7 +362,7 @@ const idb={
 const CATS={
   PLACE:{n:'장소',e:'📍',b:'여행 장소/식당'},
   CAFE:{n:'카페',e:'☕',b:'카페/디저트'},
-  FOOD:{n:'먹거리',e:'🍙',b:'편의점 음식/먹거리'},
+  FOOD:{n:'음식',e:'🍙',b:'식당/간식'},
   SHOP:{n:'쇼핑',e:'🛍️',b:'구매 물건'}
 };
 const MAX_MULTI_PLACES=10;
@@ -734,7 +735,7 @@ async function fetchRepPhoto(q){
 }
 
 (function build(){
-  const tabs=[['add','🔎','찾기'],['PLACE','📍','장소'],['CAFE','☕','카페'],['FOOD','🍙','먹거리'],['SHOP','🛍️','쇼핑'],['map','🗺️','지도']];
+  const tabs=[['add','🔎','찾기'],['PLACE','📍','장소'],['CAFE','☕','카페'],['FOOD','🍙','음식'],['SHOP','🛍️','쇼핑'],['map','🗺️','지도']];
   $('nav').innerHTML=tabs.map(([k,e,n])=>`<button class="tab-btn${k==='add'?' active':''}" data-tab="${k}"><i>${e}</i><span>${n}${CATS[k]?` <span id="cnt-${k}">0</span>`:''}</span></button>`).join('');
   Object.keys(CATS).forEach(c=>{
     const s=document.createElement('section');s.id='tab-'+c;s.className='tab-content';
@@ -825,16 +826,28 @@ function pinCardHtml(i){
   return `<div class="pinCard c-${CATS[i.category]?i.category:'PLACE'}${i.star?' starred':''}">${dayBadge}${starBadge}${placeNumber}<i>${ic}</i>${thumb?`<img loading="lazy" decoding="async" referrerpolicy="no-referrer" src="${esc(thumb)}"${fb} onerror="imgErr(this)">`:''}${getVidUrlStr(i.vid)?'<b>🎬</b>':''}</div>`;
 }
 
-function mapPinPopupHtml(item){
-  const title=item._pinNumber?`${item._pinNumber}. ${item.name||'장소'}`:(item.name||'장소');
-  const address=item.address||'주소 미입력';
-  return `<div class="mapPinPopup"><strong>${esc(title)}</strong><div class="mapPinAddress">${esc(address)}</div><div class="mapPinActions"><a class="mb pr" href="${esc(getGMapDirLink(item))}" target="_blank" rel="noopener">🧭 길찾기</a><button type="button" class="mb" data-act="openGroupedItem" data-id="${esc(item.id)}" data-place-idx="${Number.isInteger(item._placeIndex)?item._placeIndex:-1}">전체 장소 보기</button><button type="button" class="mb dg" data-act="hideMapItem" data-id="${esc(item.id)}">지도에서 삭제</button></div></div>`;
+function mapPinPlaceHtml(item,place,index){
+  const searchQuery=getValidSearchQuery(place)||place.name||place.address||'';
+  return `<div class="mapPinPlace"><strong>${index+1}. ${esc(place.name||'장소')}</strong><div class="mapPinAddress">${esc(place.address||'주소 미입력')}</div><div class="mapPinActions"><a class="mb pr" href="${esc(getGMapLink(place))}" target="_blank" rel="noopener">🗺️ 구글지도</a><a class="mb" href="https://www.google.com/search?q=${encodeURIComponent(searchQuery)}" target="_blank" rel="noopener">🔎 검색</a><a class="mb" href="${esc(getGMapDirLink(place))}" target="_blank" rel="noopener">🧭 길찾기</a><button type="button" class="mb" data-act="openGroupedItem" data-id="${esc(item.id)}" data-place-idx="${index}">릴스에서 보기</button></div></div>`;
 }
-function openMapPinPopup(item){
+function mapPinPopupHtml(item,expanded=false){
+  const places=Array.isArray(item.places)?item.places:[];
+  const grouped=places.length>1;
+  const selectedIndex=Number.isInteger(item._placeIndex)&&item._placeIndex>=0?item._placeIndex:-1;
+  const selectedPlace=selectedIndex>=0&&places[selectedIndex]?places[selectedIndex]:item;
+  const visiblePlaces=expanded?places.map((place,index)=>({place,index})):
+    [{place:selectedPlace,index:selectedIndex>=0?selectedIndex:0}];
+  const selectedHtml=visiblePlaces.map(({place,index})=>mapPinPlaceHtml(item,place,index)).join('');
+  const expandButton=grouped
+    ?`<button type="button" class="mb" data-act="toggleMapPinGroup" data-id="${esc(item.id)}" data-place-idx="${selectedIndex}" data-expanded="${expanded?'true':'false'}">${expanded?'장소 목록 접기':`같은 릴스 장소 ${places.length}곳 펼쳐보기`}</button>`
+    :'';
+  return `<div class="mapPinPopup">${selectedHtml}<div class="mapPinActions" style="margin-top:8px">${expandButton}<button type="button" class="mb dg" data-act="hideMapItem" data-id="${esc(item.id)}">지도에서 삭제</button></div></div>`;
+}
+function openMapPinPopup(item,expanded=false){
   if(gmap&&window.google?.maps){
     if(nMapInfoWindow)nMapInfoWindow.close();
     if(!mapInfoWindow)mapInfoWindow=new google.maps.InfoWindow();
-    mapInfoWindow.setContent(mapPinPopupHtml(item));
+    mapInfoWindow.setContent(mapPinPopupHtml(item,expanded));
     mapInfoWindow.setPosition({lat:Number(item.lat),lng:Number(item.lng)});
     mapInfoWindow.open({map:gmap});
     return;
@@ -842,12 +855,15 @@ function openMapPinPopup(item){
   if(nmap&&window.naver?.maps){
     if(mapInfoWindow)mapInfoWindow.close();
     if(!nMapInfoWindow)nMapInfoWindow=new naver.maps.InfoWindow({maxWidth:280,backgroundColor:'#fff',borderColor:'#d1d5db',anchorSize:new naver.maps.Size(10,10)});
-    nMapInfoWindow.setContent(mapPinPopupHtml(item));
+    nMapInfoWindow.setContent(mapPinPopupHtml(item,expanded));
     nMapInfoWindow.open(nmap,new naver.maps.LatLng(Number(item.lat),Number(item.lng)));
     return;
   }
   const marker=pins[item._pinKey];
-  if(marker)marker.openPopup();
+  if(marker){
+    marker.setPopupContent(mapPinPopupHtml(item,expanded));
+    marker.openPopup();
+  }
 }
 
 function makeGPinClass(){
@@ -2198,7 +2214,7 @@ async function analyzeContent({rawText='',vidUrl='',images=[],hint=''}){
     if(!hasAi||!(caption.length>=2||images.length>0||!vidUrl))return [];
     try{
       const needWebSearch=Boolean(images.length>0||caption.length<200||!/\d{3}-\d{4}/.test(caption));
-      const prompt=`다음 여행 관련 입력(릴스/쇼츠 캡션, 다중 맛집·카페 리스트, 또는 최대 10장의 이미지)에서 장소·카페·먹거리·쇼핑 항목을 모두 추출해(최대 10곳) JSON 배열로만 출력하세요.
+      const prompt=`다음 여행 관련 입력(릴스/쇼츠 캡션, 다중 맛집·카페 리스트, 또는 최대 10장의 이미지)에서 장소·카페·음식·쇼핑 항목을 모두 추출해(최대 10곳) JSON 배열로만 출력하세요.
 입력 텍스트:
 """
 ${caption||rawText}
@@ -2987,6 +3003,15 @@ document.addEventListener('click',async e=>{
   if(act==='mapopen'){
     const pin=expandMapPins(mapValid()).find(x=>x._pinKey===actEl.dataset.pinKey);
     if(pin){focusMapOnItem(pin);openMapPinPopup(pin);}
+    return;
+  }
+  if(act==='toggleMapPinGroup'){
+    const it=items.find(x=>x.id===id);
+    if(it){
+      const placeIndex=Number(actEl.dataset.placeIdx);
+      const pin=expandMapPins([it]).find(x=>x._placeIndex===placeIndex)||expandMapPins([it])[0];
+      if(pin)openMapPinPopup(pin,actEl.dataset.expanded!=='true');
+    }
     return;
   }
   if(act==='openGroupedItem'){
