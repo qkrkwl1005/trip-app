@@ -1025,6 +1025,7 @@ try{items=JSON.parse(ls.get('TRIP_MASTER_ITEMS')||'[]')}catch(e){items=[]}
 })();
 
 let photoCache={};try{photoCache=JSON.parse(ls.get('TRIP_PHOTO_CACHE')||'{}')}catch(e){photoCache={}}
+const reelThumbCache={};
 function savePhotoCache(){
   const keys=Object.keys(photoCache);
   if(keys.length>100){keys.slice(0,keys.length-100).forEach(k=>delete photoCache[k]);}
@@ -1227,6 +1228,7 @@ function itemThumbCandidates(i){
   if(i.useCustomImg&&i.img)add(i.img);
   if(i.vid){
     const meta=parseVideoMeta(i.vid);
+    if(meta&&meta.platform==='ig'&&meta.id&&reelThumbCache[meta.id])add(reelThumbCache[meta.id]);
     if(meta&&meta.platform==='yt'&&meta.id)add(`https://i.ytimg.com/vi/${meta.id}/hqdefault.jpg`);
     if(meta&&meta.platform==='ig'&&meta.id){
       const direct=`https://www.instagram.com/p/${meta.id}/media/?size=l`;
@@ -1241,6 +1243,44 @@ function itemThumbCandidates(i){
     add(pic(i.name+' '+(i.address||''),i.v||0));
   }
   return out;
+}
+
+async function hydrateInstagramThumb(item){
+  const meta=parseVideoMeta(item?.vid);
+  if(!meta||meta.platform!=='ig'||!meta.id||reelThumbCache[meta.id])return false;
+  const target=`https://www.instagram.com/reel/${meta.id}/`;
+  const sources=[
+    `https://r.jina.ai/http://www.instagram.com/reel/${meta.id}/`,
+    `https://r.jina.ai/https://www.instagram.com/reel/${meta.id}/`
+  ];
+  for(const source of sources){
+    try{
+      const r=await fetchTO(source,{},5500);
+      if(!r.ok)continue;
+      const text=await r.text();
+      const match=text.match(/property=["']og:image["'][^>]+content=["']([^"']+)/i)
+        ||text.match(/content=["']([^"']+)["'][^>]+property=["']og:image["']/i)
+        ||text.match(/!\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/i);
+      const url=match&&match[1]?decodeHtml(match[1]).replace(/&amp;/g,'&'):'';
+      if(/^https?:\/\//i.test(url)){
+        reelThumbCache[meta.id]=url;
+        return true;
+      }
+    }catch(_){}
+  }
+  reelThumbCache[meta.id]='';
+  return false;
+}
+
+let _reelThumbHydrating=false;
+async function hydrateInstagramThumbs(){
+  if(_reelThumbHydrating)return;
+  _reelThumbHydrating=true;
+  try{
+    const targets=items.filter(i=>!i.useCustomImg&&parseVideoMeta(i.vid)?.platform==='ig');
+    const changed=(await Promise.all(targets.map(hydrateInstagramThumb))).some(Boolean);
+    if(changed){render(true);draw(true);}
+  }finally{_reelThumbHydrating=false;}
 }
 
 function currentTileUrl(){return tileIndex===0?`https://{s}.basemaps.cartocdn.com/${document.documentElement.dataset.theme==='dark'?'dark':'light'}_all/{z}/{x}/{y}{r}.png`:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'}
@@ -1886,7 +1926,7 @@ function persist(){
 function save(){
   render();
   clearTimeout(_drawT);
-  _drawT=setTimeout(()=>{persistNow();draw();},200);
+  _drawT=setTimeout(()=>{persistNow();draw();hydrateInstagramThumbs();},200);
 }
 window.addEventListener('pagehide',()=>{try{persistNow()}catch(e){}});
 document.addEventListener('visibilitychange',()=>{try{if(document.visibilityState==='hidden')persistNow()}catch(e){}});
@@ -4141,6 +4181,7 @@ if(firebaseConfigured()&&window.firebase?.auth){
 }
 if(getStorageUsedKB()>3800)slimStorage(false);
 setTimeout(()=>autoFixCoords(),2000);
+setTimeout(()=>hydrateInstagramThumbs(),700);
 
 (function checkShareParam(){
   const p=new URLSearchParams(location.search);
