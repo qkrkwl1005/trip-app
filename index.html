@@ -1097,6 +1097,12 @@ async function slimStorage(showMsg=false){
 window.imgErr=function(el){
   if(!el)return;
   const s=el.getAttribute('src')||'';
+  const alternatives=(el.dataset.imgalts||'').split('|').filter(Boolean);
+  if(alternatives.length){
+    el.dataset.imgalts=alternatives.slice(1).join('|');
+    el.src=alternatives[0];
+    return;
+  }
   if(s&&!el.dataset.wsrv&&/(cdninstagram\.com|fbcdn\.net|scontent|tiktokcdn|instagram\.com|tse\d*\.mm\.bing\.net)/.test(s)){
     el.dataset.wsrv='1';
     el.src='https://wsrv.nl/?url='+encodeURIComponent(s)+'&w=480&h=360&fit=cover&output=jpg';
@@ -1212,19 +1218,29 @@ function vidEmbedUrl(v,captioned=false){
   return meta.url;
 }
 function itemThumb(i){
-  if(!i)return '';
-  if(i.useCustomImg&&i.img)return i.img;
+  return itemThumbCandidates(i)[0]||'';
+}
+function itemThumbCandidates(i){
+  if(!i)return [];
+  const out=[];
+  const add=u=>{if(u&&!out.includes(u))out.push(u)};
+  if(i.useCustomImg&&i.img)add(i.img);
   if(i.vid){
     const meta=parseVideoMeta(i.vid);
-    if(meta&&meta.platform==='yt'&&meta.id)return `https://i.ytimg.com/vi/${meta.id}/hqdefault.jpg`;
-    if(meta&&meta.platform==='ig'&&meta.id)return `https://www.instagram.com/p/${meta.id}/media/?size=l`;
+    if(meta&&meta.platform==='yt'&&meta.id)add(`https://i.ytimg.com/vi/${meta.id}/hqdefault.jpg`);
+    if(meta&&meta.platform==='ig'&&meta.id){
+      const direct=`https://www.instagram.com/p/${meta.id}/media/?size=l`;
+      add(direct);
+      add(`https://wsrv.nl/?url=${encodeURIComponent(direct)}&w=480&h=360&fit=cover&output=jpg`);
+      add(`https://www.instagram.com/reel/${meta.id}/media/?size=l`);
+    }
   }
-  if(i.img)return i.img;
+  if(i.img&&!i.useCustomImg)add(i.img);
   if(i.name&&!isGenericSharedName(i.name)){
-    if(photoCache[i.name])return photoCache[i.name];
-    return pic(i.name+' '+(i.address||''),i.v||0);
+    if(photoCache[i.name])add(photoCache[i.name]);
+    add(pic(i.name+' '+(i.address||''),i.v||0));
   }
-  return '';
+  return out;
 }
 
 function currentTileUrl(){return tileIndex===0?`https://{s}.basemaps.cartocdn.com/${document.documentElement.dataset.theme==='dark'?'dark':'light'}_all/{z}/{x}/{y}{r}.png`:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'}
@@ -1383,13 +1399,14 @@ function fit(){
 
 function pinCardHtml(i){
   const ic=CATS[i.category]?CATS[i.category].e:'📍';
-  const t1=itemThumb(i);const t2=(i.useCustomImg&&i.img)?'':(i.img||'');
-  const thumb=t1||t2;
-  const fb=(t1&&t2&&t1!==t2)?` data-fbsrc="${esc(t2)}"`:'';
+  const thumbs=itemThumbCandidates(i);
+  const thumb=thumbs[0]||'';
+  const alts=thumbs.slice(1).join('|');
+  const altAttr=alts?` data-imgalts="${esc(alts)}"`:'';
   const dayBadge=i.day?`<em>D${i.day}</em>`:'';
   const starBadge=i.star?`<span class="pstar">⭐</span>`:'';
   const placeNumber=i._pinNumber?`<em class="pinNum">${i._pinNumber}</em>`:'';
-  return `<div class="pinCard c-${CATS[i.category]?i.category:'PLACE'}${i.star?' starred':''}">${dayBadge}${starBadge}${placeNumber}<i>${ic}</i>${thumb?`<img loading="eager" fetchpriority="high" decoding="async" referrerpolicy="no-referrer" src="${esc(thumb)}"${fb} onerror="imgErr(this)">`:''}${getVidUrlStr(i.vid)?'<b>🎬</b>':''}</div>`;
+  return `<div class="pinCard c-${CATS[i.category]?i.category:'PLACE'}${i.star?' starred':''}">${dayBadge}${starBadge}${placeNumber}<i>${ic}</i>${thumb?`<img loading="eager" fetchpriority="high" decoding="async" referrerpolicy="no-referrer" src="${esc(thumb)}"${altAttr} onerror="imgErr(this)">`:''}${getVidUrlStr(i.vid)?'<b>🎬</b>':''}</div>`;
 }
 
 function mapPinPlaceHtml(item,place,index){
@@ -1758,7 +1775,7 @@ const card=i=>{
     :`<button class="mb" data-act="quickAddVid" data-id="${i.id}" style="padding:4px 8px;font-size:11px;color:var(--pr);border-color:var(--pr)">+🔗 릴스링크</button>`;
   return `<div class="item${i.done?' done':''}${i.star?' starred':''}${selected.has(i.id)?' selected':''}" data-act="${editMode[i.category]?'toggleSel':'open'}" data-id="${i.id}" style="${selected.has(i.id)?'outline:2px solid var(--pr)':''}">
     ${editMode[i.category]?`<input type="checkbox" data-act="sel" data-id="${i.id}"${selected.has(i.id)?' checked':''} style="width:18px;height:18px;margin-right:4px">`:''}
-    ${ph(CATS[i.category]?CATS[i.category].e:'📍',itemThumb(i),'',i.img,i.day)}
+    ${ph(CATS[i.category]?CATS[i.category].e:'📍',itemThumb(i),'',i.img,i.day,itemThumbCandidates(i).slice(1).join('|'))}
     <div class="mid">
       <div class="nm">
         <span style="flex:1;min-width:0">${esc(i.name)}</span>
@@ -1781,11 +1798,12 @@ const card=i=>{
   </div>`;
 };
 
-function ph(e,src,c='',fb='',day=0){
+function ph(e,src,c='',fb='',day=0,alts=''){
   const fba=(fb&&fb!==src)?` data-fbsrc="${esc(fb)}"`:'';
+  const altAttr=alts?` data-imgalts="${esc(alts)}"`:'';
   const dTag=(day&&!c.includes('big'))?`<span class="dayTag">D${day}</span>`:'';
   const priority=c.includes('big')?' fetchpriority="high"':'';
-  return `<div class="pic ${c}">${dTag}${e}${src?`<img loading="${c.includes('big')?'eager':'lazy'}"${priority} decoding="async" referrerpolicy="no-referrer" src="${esc(src)}"${fba} onerror="imgErr(this)">`:''}</div>`;
+  return `<div class="pic ${c}">${dTag}${e}${src?`<img loading="${c.includes('big')?'eager':'lazy'}"${priority} decoding="async" referrerpolicy="no-referrer" src="${esc(src)}"${fba}${altAttr} onerror="imgErr(this)">`:''}</div>`;
 }
 
 function renderCat(c){
@@ -2046,7 +2064,7 @@ function showSheet(){
     else if(lat&&lng) media=`<iframe class="big" src="https://www.openstreetmap.org/export/embed.html?bbox=${lng-0.005},${lat-0.005},${lng+0.005},${lat+0.005}&layer=mapnik&marker=${lat},${lng}" style="min-height:300px"></iframe>`;
     else media=`<div class="empty"><i>🗺️</i>위치를 찾으려면 아래에 이름이나 주소를 입력 후 [📍 위치 다시 찾기]를 눌러주세요</div>`;
   }else{
-    media=ph(CATS[i.category]?CATS[i.category].e:'📍',itemThumb(i),'big',i.img);
+    media=ph(CATS[i.category]?CATS[i.category].e:'📍',itemThumb(i),'big',i.img,0,itemThumbCandidates(i).slice(1).join('|'));
   }
   const prior=$('sheet').classList.contains('on');
   const prevAcc=prior?[...$('sbody').querySelectorAll('details.acc')].map(d=>d.open):[];
@@ -2911,7 +2929,7 @@ function renderCandidates(headerMsg='맞는 항목을 눌러 저장하세요 · 
     const vUrl=getVidUrlStr(r.vid);
     const dummy={name:r.name,address:r.address,vid:vUrl,img:r.img,useCustomImg:Boolean(r.img),v:r.v||0,category:r.category||cat};
     return `<div class="item" data-act="pickRes" data-idx="${idx}">
-      ${ph(CATS[dummy.category]?CATS[dummy.category].e:'📍',itemThumb(dummy),'',r.img)}
+      ${ph(CATS[dummy.category]?CATS[dummy.category].e:'📍',itemThumb(dummy),'',r.img,0,itemThumbCandidates(dummy).slice(1).join('|'))}
       <div class="mid">
         <div class="nm">${esc(r.name||'장소')}${vUrl?' 🎬':''}${r.lat&&r.lng?' 📍':''}</div>
         <div class="ds">${esc(r.address||'입력한 그대로 저장')}</div>
