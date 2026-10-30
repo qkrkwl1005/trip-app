@@ -201,6 +201,14 @@ input[type=text],input[type=password],textarea{font-size:16px}
   <section id="tab-set" class="tab-content"><div class="card">
     <label>📋 동행자 공유용 일정·장소 리스트 내보내기</label>
     <button id="exportPlanBtn" class="btn" style="margin-bottom:14px">📋 카톡·메모장용 깔끔 리스트 복사</button>
+    <label style="margin-top:14px">👥 친구들과 실시간 공유</label>
+    <div id="sharedRoomStatus" class="ds" style="margin-bottom:8px">공유 방에 연결되지 않았어요.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <button id="createRoomBtn" class="btn g">➕ 공유 방 만들기</button>
+      <button id="joinRoomBtn" class="btn g">🔗 방 링크 열기</button>
+    </div>
+    <button id="copyRoomBtn" class="btn g" style="margin-top:8px">📋 현재 방 링크 복사</button>
+    <small style="display:block;margin:4px 0 10px;color:var(--sub);font-size:11px">공유 방에 연결하면 이 방의 장소·메모·완료 상태가 친구들과 실시간으로 동기화됩니다. 방 링크를 가진 사람은 편집할 수 있으니 신뢰할 수 있는 친구에게만 보내세요.</small>
 
     <label>AI 제공자 키 (선택 — 여러 개 가능, 위부터 순서대로 시도하고 실패하면 자동으로 다음 제공자)</label>
     <div id="aiProv"></div>
@@ -298,6 +306,10 @@ input[type=text],input[type=password],textarea{font-size:16px}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
 <script>
 const $=id=>document.getElementById(id);
 
@@ -427,6 +439,106 @@ let items=[],cat='PLACE',pend=[],res=[],lm=null,tl=null,layer=null,pins={},tt,cu
 let mapCat='ALL',mapOnlyVid=false,mapOnlyStar=false,mapOnlyTodo=false,mapDay=0,mapRouteOn=false,userPos=null,nearSortOn=false;
 let lRoute=null,gRoute=null,nRoute=null,_undoFn=null;
 let listFilter={PLACE:'ALL',CAFE:'ALL',FOOD:'ALL',SHOP:'ALL'};
+let sharedRoomId='',sharedUnsubscribe=null,sharedWriteTimer=null,remoteApplying=false;
+
+const FIREBASE_CONFIG=window.TRIPSYNC_FIREBASE_CONFIG||{};
+function firebaseConfigured(){
+  return Boolean(FIREBASE_CONFIG.apiKey&&FIREBASE_CONFIG.authDomain&&FIREBASE_CONFIG.projectId&&FIREBASE_CONFIG.appId);
+}
+function roomUrl(roomId=sharedRoomId){
+  return `${location.origin}${location.pathname}?room=${encodeURIComponent(roomId)}`;
+}
+function setSharedRoomStatus(message,kind=''){
+  const el=$('sharedRoomStatus');
+  if(!el)return;
+  el.textContent=message;
+  el.style.color=kind==='ok'?'var(--ok)':kind==='error'?'var(--dg)':'var(--sub)';
+}
+function sanitizeSharedItems(rawItems){
+  if(!Array.isArray(rawItems))return [];
+  return rawItems.slice(0,200).filter(item=>item&&typeof item==='object').map((raw,index)=>{
+    const item={...raw};
+    item.id=/^[A-Za-z0-9_-]{1,100}$/.test(String(raw.id||''))?String(raw.id):`shared_${Date.now()}_${index}`;
+    item.category=CATS[raw.category]?raw.category:'PLACE';
+    item.done=raw.done===true;
+    item.star=raw.star===true;
+    item.mapVisible=raw.mapVisible===true?true:raw.mapVisible===false?false:undefined;
+    item.lat=Number.isFinite(Number(raw.lat))?Number(raw.lat):null;
+    item.lng=Number.isFinite(Number(raw.lng))?Number(raw.lng):null;
+    item.places=Array.isArray(raw.places)?raw.places.slice(0,20).filter(place=>place&&typeof place==='object').map(place=>({
+      ...place,
+      name:String(place.name||'').slice(0,500),
+      localName:String(place.localName||'').slice(0,500),
+      address:String(place.address||'').slice(0,1000),
+      lat:Number.isFinite(Number(place.lat))?Number(place.lat):null,
+      lng:Number.isFinite(Number(place.lng))?Number(place.lng):null
+    })):undefined;
+    return item;
+  });
+}
+function scheduleSharedWrite(){
+  if(!sharedRoomId||remoteApplying||!window.firestoreDb)return;
+  clearTimeout(sharedWriteTimer);
+  sharedWriteTimer=setTimeout(async()=>{
+    try{
+      await window.firestoreDb.collection('rooms').doc(sharedRoomId).set({
+        items,
+        updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+      });
+      setSharedRoomStatus(`✅ 공유 중 · ${sharedRoomId}`,'ok');
+    }catch(e){
+      setSharedRoomStatus(`공유 저장 실패: ${e.message}`,'error');
+    }
+  },500);
+}
+async function connectSharedRoom(roomId){
+  if(!roomId)return;
+  if(!firebaseConfigured()){
+    setSharedRoomStatus('firebase-config.js에 Firebase 설정을 먼저 입력하세요.','error');
+    return;
+  }
+  if(!window.firebase||!window.firebase.firestore){
+    setSharedRoomStatus('Firebase 라이브러리를 불러오지 못했어요. 네트워크를 확인하세요.','error');
+    return;
+  }
+  try{
+    if(!firebase.apps.length)firebase.initializeApp(FIREBASE_CONFIG);
+    const user=await firebase.auth().signInAnonymously();
+    if(!user.user)throw new Error('익명 로그인에 실패했습니다.');
+    window.firestoreDb=firebase.firestore();
+    sharedRoomId=roomId;
+    if(sharedUnsubscribe)sharedUnsubscribe();
+    const ref=window.firestoreDb.collection('rooms').doc(roomId);
+    sharedUnsubscribe=ref.onSnapshot(snapshot=>{
+      if(snapshot.exists){
+        const data=snapshot.data();
+        if(Array.isArray(data.items)){
+          remoteApplying=true;
+          items=sanitizeSharedItems(data.items);
+          persistNow();
+          remoteApplying=false;
+          render(true);draw(true);
+        }
+      }else{
+        scheduleSharedWrite();
+      }
+      setSharedRoomStatus(`✅ 실시간 공유 중 · 방 ${roomId}`,'ok');
+    },e=>setSharedRoomStatus(`실시간 연결 실패: ${e.message}`,'error'));
+  }catch(e){
+    setSharedRoomStatus(`공유 방 연결 실패: ${e.message}`,'error');
+  }
+}
+function makeRoomId(){
+  const bytes=new Uint8Array(6);
+  crypto.getRandomValues(bytes);
+  return [...bytes].map(x=>x.toString(36).padStart(2,'0')).join('').slice(0,8);
+}
+async function copyRoomLink(){
+  if(!sharedRoomId)return toast('먼저 공유 방을 만들어 주세요');
+  const url=roomUrl();
+  try{await navigator.clipboard.writeText(url);toast('공유 방 링크를 복사했어요');}
+  catch(e){prompt('이 링크를 친구들에게 보내세요:',url);}
+}
 
 try{items=JSON.parse(ls.get('TRIP_MASTER_ITEMS')||'[]')}catch(e){items=[]}
 
@@ -1290,7 +1402,9 @@ function persistNow(){
   idb.set('TRIP_MASTER_DATA',{items,updatedAt:now});
   if(ls.set('TRIP_MASTER_ITEMS',JSON.stringify(items)))return true;
   const light=items.map(i=>({...i,img:(i.img&&String(i.img).startsWith('data:image')&&i.img.length>25000)?'':i.img}));
-  return ls.set('TRIP_MASTER_ITEMS',JSON.stringify(light));
+  const saved=ls.set('TRIP_MASTER_ITEMS',JSON.stringify(light));
+  scheduleSharedWrite();
+  return saved;
 }
 function persist(){
   clearTimeout(_persistT);
@@ -3112,6 +3226,18 @@ document.addEventListener('click',async e=>{
 
 $('themeBtn').onclick=()=>setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
 $('settingsBtn').onclick=()=>{renderUsageBox();tab('set');};
+$('createRoomBtn').onclick=()=>{
+  if(!firebaseConfigured())return setSharedRoomStatus('firebase-config.js에 Firebase 설정을 먼저 입력하세요.','error');
+  const id=makeRoomId();
+  location.href=roomUrl(id);
+};
+$('joinRoomBtn').onclick=()=>{
+  const id=prompt('친구에게 받은 방 링크 또는 방 코드를 입력하세요:','');
+  if(!id)return;
+  const match=String(id).match(/[?&]room=([A-Za-z0-9_-]+)/);
+  location.href=roomUrl(match?decodeURIComponent(match[1]):String(id).trim());
+};
+$('copyRoomBtn').onclick=copyRoomLink;
 $('planCopyTopBtn').onclick=copyFormattedPlan;
 $('exportPlanBtn').onclick=copyFormattedPlan;
 $('sheet').onclick=e=>{if(e.target===$('sheet')){save();closeSheet();}};
@@ -3487,6 +3613,8 @@ setTheme(ls.get('TRIP_THEME')||'dark');
 buildAiProvUI();
 render(true);
 initMap();
+const initialRoom=new URLSearchParams(location.search).get('room');
+if(initialRoom)connectSharedRoom(initialRoom);
 if(getStorageUsedKB()>3800)slimStorage(false);
 setTimeout(()=>autoFixCoords(),2000);
 

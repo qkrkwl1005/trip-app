@@ -15,4 +15,41 @@
 ## 로컬 실행
 ```bash
 python3 -m http.server 8765
-# http://localhost:8765# trip-app
+# http://localhost:8765
+```
+
+## 친구들과 실시간 공유 설정
+
+이 앱은 기본적으로 브라우저의 로컬 저장소에 데이터를 저장합니다. 친구들과 같은 일정을 함께 편집하려면 Firebase Firestore 공유 방을 설정하세요.
+
+### 1. Firebase 프로젝트 만들기
+
+1. [Firebase Console](https://console.firebase.google.com/)에서 프로젝트를 만듭니다.
+2. **Authentication → Sign-in method → Anonymous**를 활성화합니다.
+3. **Firestore Database → Create database**를 만들고, 처음에는 테스트 모드로 시작해도 됩니다.
+4. 프로젝트 설정(톱니바퀴) → **Your apps → Web 앱 추가**에서 앱을 등록합니다.
+5. 표시되는 `firebaseConfig` 값을 [firebase-config.js](./firebase-config.js)에 붙여 넣습니다. `apiKey`는 웹에 공개되어도 되는 식별자이며 비밀번호가 아닙니다.
+
+### 2. Firestore 보안 규칙 설정
+
+테스트 모드는 기간이 지나면 만료되므로 다음 규칙으로 바꾸는 것을 권장합니다. 이 앱은 익명 로그인 사용자만 방 데이터를 읽고 쓸 수 있게 합니다.
+
+```text
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /rooms/{roomId} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
+```
+
+### 3. 배포 및 사용
+
+1. `index.html`, `manifest.json`, `sw.js`, `firebase-config.js`를 함께 정적 호스팅에 올립니다. 로컬 파일(`file://`)로는 Firebase가 정상 동작하지 않으므로 GitHub Pages, Netlify, Vercel 중 하나를 사용하세요.
+2. 앱에서 **설정 → 친구들과 실시간 공유 → 공유 방 만들기**를 누릅니다.
+3. 생성된 URL을 친구들에게 보냅니다.
+4. 같은 링크를 연 친구가 장소를 추가하거나 메모·완료 상태를 바꾸면 다른 사람 화면에도 자동 반영됩니다.
+
+방 링크를 가진 사람은 편집할 수 있으므로 신뢰할 수 있는 친구에게만 공유하세요. 현재 구현은 익명 로그인 기반이며, 방별 초대/읽기 전용 권한이 필요하면 Firebase 계정 로그인과 별도 권한 모델을 추가해야 합니다.
