@@ -8,13 +8,16 @@ service cloud.firestore {
           && data.members[request.auth.uid].role in ['owner', 'editor'];
       }
       function validRoom(data) {
-        return data.keys().hasOnly(['items', 'updatedAt', 'ownerUid', 'members', 'settings', 'settingsShared'])
+        return data.keys().hasOnly(['items', 'updatedAt', 'ownerUid', 'members', 'settings', 'settingsShared', 'revision', 'history'])
           && data.items is list
           && data.items.size() <= 200
           && data.ownerUid is string
           && data.members is map
           && data.settingsShared is bool
-          && data.settings is map;
+          && data.settings is map
+          && data.revision is number
+          && data.history is list
+          && data.history.size() <= 10;
       }
       allow read: if isMember(resource.data);
       allow create: if request.auth != null
@@ -24,6 +27,14 @@ service cloud.firestore {
       allow update: if isMember(resource.data)
         && validRoom(request.resource.data)
         && request.resource.data.ownerUid == resource.data.ownerUid
+        && (
+          (!resource.data.keys().hasAny(['revision', 'history'])
+            && request.resource.data.revision == 0)
+          || (
+            resource.data.keys().hasAll(['revision', 'history'])
+            && request.resource.data.revision == resource.data.revision + 1
+          )
+        )
         && (request.auth.uid == resource.data.ownerUid
           || (
             request.resource.data.members == resource.data.members
@@ -32,6 +43,13 @@ service cloud.firestore {
           ));
       allow delete: if request.auth != null
         && resource.data.ownerUid == request.auth.uid;
+      match /joinRequests/{uid} {
+        allow create, update: if request.auth != null && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['uid', 'name', 'createdAt'])
+          && request.resource.data.uid == uid;
+        allow read, delete: if request.auth != null
+          && get(/databases/$(database)/documents/rooms/$(roomId)).data.ownerUid == request.auth.uid;
+      }
     }
   }
 }
