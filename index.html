@@ -637,8 +637,8 @@ function applySharedSettings(raw){
   aiCfg=next;
   ls.set('TRIP_AI_CFG',JSON.stringify(aiCfg));
   if(['osm','google','naver'].includes(raw.mapProvider))ls.set('TRIP_MAP_PROVIDER',raw.mapProvider);
-  if(typeof raw.googleMapsKey==='string')ls.set('TRAVEL_GMAP_KEY',raw.googleMapsKey.slice(0,500));
-  if(typeof raw.naverMapsKey==='string')ls.set('TRAVEL_NAVER_KEY',raw.naverMapsKey.slice(0,500));
+  if(typeof raw.googleMapsKey==='string'&&raw.googleMapsKey.trim())ls.set('TRAVEL_GMAP_KEY',raw.googleMapsKey.slice(0,500));
+  if(typeof raw.naverMapsKey==='string'&&raw.naverMapsKey.trim())ls.set('TRAVEL_NAVER_KEY',raw.naverMapsKey.slice(0,500));
   if(typeof raw.cfProxy==='string')ls.set('TRIP_CF_PROXY',raw.cfProxy.slice(0,1000));
   if(typeof raw.myMapsUrl==='string'&&toEmbedMyMapsUrl(raw.myMapsUrl))ls.set('TRIP_MYMAPS_URL',raw.myMapsUrl.slice(0,2000));
   if(typeof raw.myMapsEmbed==='string'&&toEmbedMyMapsUrl(raw.myMapsEmbed))ls.set(MYMAPS_EMBED_KEY,toEmbedMyMapsUrl(raw.myMapsEmbed));
@@ -722,7 +722,7 @@ const TRIP_OFFLINE_QUEUE_KEY='TRIP_OFFLINE_QUEUE';
 const TRIP_PENDING_CONFLICT_KEY='TRIP_PENDING_CONFLICT';
 const TRIP_LAST_ROOM_KEY='TRIP_LAST_ROOM';
 const TRIP_CREATING_ROOM_KEY='TRIP_CREATING_ROOM';
-const APP_VERSION='v55';
+const APP_VERSION='v56';
 const TRANSIENT_NET_RE=/unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
 let _offlineFlushBusy=false,_offlineFastRetries=0,_autoResolveBusy=false;
 let _ownJoinReqHadPending=false,_roomListenRetryTimer=null;
@@ -1406,8 +1406,9 @@ function scheduleSharedWrite(){
           items:removeUndefined(sanitizeSharedItems(items)),
           ownerUid:sharedOwnerUid||firebase.auth().currentUser.uid,
           members:Object.keys(sharedMembers).length?sharedMembers:{[firebase.auth().currentUser.uid]:{role:'owner',name:firebase.auth().currentUser.displayName||firebase.auth().currentUser.email||'방장'}},
+          // v56: 설정 업로드는 방장 기기 전용 — 멤버의 빈 키로 방 설정이 지워지는 사고 차단
           settingsShared:sharedSettingsShared,
-          settings:sharedSettingsShared?collectSharedSettings():{},
+          ...(((firebase.auth().currentUser?.uid||'')===sharedOwnerUid&&sharedSettingsShared&&sharedOwnerUid)?{settings:collectSharedSettings()}:{}),
           history,
           revision:revision+1,
           updatedAt:firebase.firestore.FieldValue.serverTimestamp()
@@ -1526,6 +1527,16 @@ async function connectSharedRoom(roomId){
           sharedSettingsShared=true;
           ref.update({settings:collectSharedSettings(),settingsShared:true})
             .catch(e=>setSharedRoomStatus(`API 설정 공유 활성화 실패: ${e.message}`,'error'));
+        }else if(currentUser?.uid===sharedOwnerUid&&sharedSettingsShared&&data.settings&&sharedOwnerUid){
+          // v56: 방 설정의 맵 키가 비어 있고 방장 기기에 키가 있다면 한 번 되살림 (전염 사고 자동 치유)
+          const roomG=String(data.settings.googleMapsKey||'').trim(),roomN=String(data.settings.naverMapsKey||'').trim();
+          const locG=String(ls.get('TRAVEL_GMAP_KEY')||'').trim(),locN=String(ls.get('TRAVEL_NAVER_KEY')||'').trim();
+          if((!roomG&&locG)||(!roomN&&locN)){
+            setSharedRoomStatus('🔑 공유 설정의 맵 키가 비어 있어서 방장 키로 복구하는 중…','');
+            ref.update({settings:collectSharedSettings()})
+              .then(()=>setSharedRoomStatus('✅ 맵 API 키를 방 설정에 되살렸어요','ok'))
+              .catch(e=>setSharedRoomStatus(`맵 키 자동 복구 실패: ${e.message}`,'error'));
+          }
         }
         renderRoomMembers();
         if(!joinRequestsUnsubscribe)listenJoinRequests();
