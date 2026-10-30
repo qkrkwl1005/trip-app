@@ -29,7 +29,7 @@ python3 -m http.server 8765
 3. **Firestore Database → Create database**를 만들고, 처음에는 테스트 모드로 시작해도 됩니다.
 4. 프로젝트 설정(톱니바퀴) → **Your apps → Web 앱 추가**에서 앱을 등록합니다.
 5. 표시되는 `firebaseConfig` 값을 [firebase-config.js](./firebase-config.js)에 붙여 넣습니다. `apiKey`는 웹에 공개되어도 되는 식별자이며 비밀번호가 아닙니다.
-6. **Authentication → Settings → Authorized domains**에 실제 사용 주소를 추가합니다. GitHub Pages라면 `qkrkwl1005.github.io`를 추가하세요. 모바일에서는 팝업 대신 Google 로그인 페이지로 이동한 뒤 앱으로 돌아옵니다.
+6. **Authentication → Settings → Authorized domains**에 실제 사용 주소를 추가합니다. GitHub Pages라면 `qkrkwl1005.github.io`를 추가하세요. `https://`나 `/trip-app/` 경로를 포함하지 말고 호스트 이름만 입력해야 합니다. 로컬 테스트 시에는 `localhost`와 `127.0.0.1`도 각각 추가할 수 있습니다. 모바일에서는 팝업 대신 Google 로그인 페이지로 이동한 뒤 앱으로 돌아옵니다.
 
 ### 2. Firestore 보안 규칙 설정
 
