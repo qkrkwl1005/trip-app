@@ -657,7 +657,7 @@ let items=[],cat='PLACE',pend=[],res=[],lm=null,tl=null,layer=null,pins={},tt,cu
 let mapCat='ALL',mapOnlyVid=false,mapOnlyStar=false,mapOnlyTodo=false,mapDay=0,mapRouteOn=false,userPos=null,nearSortOn=false;
 let lRoute=null,gRoute=null,nRoute=null,_undoFn=null;
 let listFilter={PLACE:'ALL',CAFE:'ALL',FOOD:'ALL',SHOP:'ALL'};
-let sharedRoomId='',sharedUnsubscribe=null,sharedWriteTimer=null,remoteApplying=false,sharedOwnerUid='',sharedMembers={},sharedSettingsShared=false,sharedRevision=0,sharedHistory=[],joinRequestsUnsubscribe=null,joinRequestUnsubscribe=null,sharedLocalDirty=false,sharedWriteRevision=null,sharedConflict=null;
+let sharedRoomId='',sharedUnsubscribe=null,sharedWriteTimer=null,remoteApplying=false,sharedOwnerUid='',sharedMembers={},sharedSettingsShared=false,sharedRevision=0,sharedHistory=[],joinRequestsUnsubscribe=null,joinRequestUnsubscribe=null,sharedLocalDirty=false,sharedWriteRevision=null,sharedConflict=null,creatingSharedRoom=false;
 
 const FIREBASE_CONFIG=window.TRIPSYNC_FIREBASE_CONFIG||{};
 function firebaseConfigured(){
@@ -788,6 +788,25 @@ function syncSharedSettings(){
   updateRoomWithRevision({settings:collectSharedSettings(),settingsShared:true})
     .catch(e=>setSharedRoomStatus(`API 설정 공유 실패: ${e.message}`,'error'));
 }
+async function createSharedRoomDocument(ref,user){
+  const member={role:'owner',name:user.displayName||user.email||'방장'};
+  const room={
+    items:sanitizeSharedItems(items),
+    ownerUid:user.uid,
+    members:{[user.uid]:member},
+    settingsShared:true,
+    settings:collectSharedSettings(),
+    history:[],
+    revision:0,
+    updatedAt:firebase.firestore.FieldValue.serverTimestamp()
+  };
+  await ref.set(room);
+  sharedOwnerUid=user.uid;
+  sharedMembers=room.members;
+  sharedSettingsShared=true;
+  sharedRevision=0;
+  sharedLocalDirty=false;
+}
 async function updateRoomWithRevision(fields){
   const ref=window.firestoreDb.collection('rooms').doc(sharedRoomId);
   await window.firestoreDb.runTransaction(async tx=>{
@@ -866,8 +885,18 @@ async function connectSharedRoom(roomId){
           render(true);draw(true);
         }
       }else{
-        sharedSettingsShared=true;
-        scheduleSharedWrite();
+        const currentUser=firebase.auth().currentUser;
+        if(!currentUser){
+          setSharedRoomStatus('Google 로그인 확인 중이에요. 잠시 후 다시 시도해 주세요.','error');
+          return;
+        }
+        if(!creatingSharedRoom){
+          creatingSharedRoom=true;
+          createSharedRoomDocument(ref,currentUser)
+            .then(()=>setSharedRoomStatus(`✅ 실시간 공유 중 · 방 ${roomId}`,'ok'))
+            .catch(e=>setSharedRoomStatus(`공유 방 생성 실패: ${e.message}`,'error'))
+            .finally(()=>{creatingSharedRoom=false;});
+        }
       }
       setSharedRoomStatus(`✅ 실시간 공유 중 · 방 ${roomId}`,'ok');
     },e=>setSharedRoomStatus(`실시간 연결 실패: ${e.message}`,'error'));
