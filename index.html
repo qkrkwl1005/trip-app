@@ -353,7 +353,8 @@ function listenJoinRequests(){
     .onSnapshot(snapshot=>{
       const rows=snapshot.docs.map(doc=>{
         const data=doc.data()||{};
-        return `<div style="margin-top:5px">${esc(String(data.name||doc.id))} <button class="mb" data-room-action="approve-request" data-uid="${esc(doc.id)}" data-name="${esc(String(data.name||'친구'))}" style="padding:2px 6px;font-size:11px">승인</button></div>`;
+        const label=data.email?`${data.name||'친구'} · ${data.email}`:String(data.name||doc.id);
+        return `<div style="margin-top:5px">${esc(label)} <button class="mb" data-room-action="approve-request" data-uid="${esc(doc.id)}" data-name="${esc(String(data.name||'친구'))}" style="padding:2px 6px;font-size:11px">승인</button></div>`;
       });
       el.innerHTML=rows.length?`<b>참여 요청 <span class="badge">${rows.length}</span></b>${rows.join('')}`:'';
       renderJoinBadge(rows.length?`🙋 참여 요청 ${rows.length}건 · 승인 대기 중`:'');
@@ -427,7 +428,7 @@ async function requestJoin(){
   if(sharedMembers[user.uid])return toast('이미 이 방의 멤버예요');
   try{
     await window.firestoreDb.collection('rooms').doc(sharedRoomId).collection('joinRequests').doc(user.uid).set({
-      uid:user.uid,name:user.displayName||user.email||'친구',createdAt:firebase.firestore.FieldValue.serverTimestamp()
+      uid:user.uid,name:user.displayName||user.email||'친구',email:(user.email||'').toLowerCase(),createdAt:firebase.firestore.FieldValue.serverTimestamp()
     });
     toast('방장에게 참여 요청을 보냈어요');
   }catch(e){
@@ -957,13 +958,27 @@ async function addMember(){
   const user=window.firebase?.auth?.().currentUser;
   if(!user||!sharedRoomId)return toast('공유 방에 로그인한 뒤 사용해 주세요');
   if(sharedOwnerUid!==user.uid)return toast('방 소유자만 친구를 승인할 수 있어요');
-  const uid=prompt('승인할 친구의 Google 사용자 ID를 입력하세요:','');
-  if(!uid||!/^[A-Za-z0-9_-]{20,200}$/.test(uid.trim()))return toast('올바른 사용자 ID가 아니에요');
+  const input=prompt('친구의 Google 이메일 또는 사용자 ID를 입력하세요:','');
+  if(!input)return;
+  const value=input.trim();
+  let uid=value;
+  let requestedName='';
+  if(value.includes('@')){
+    const snapshot=await window.firestoreDb.collection('rooms').doc(sharedRoomId).collection('joinRequests')
+      .where('email','==',value.toLowerCase()).limit(2).get();
+    if(snapshot.empty)return toast('이 이메일로 온 참여 요청이 없어요. 친구가 먼저 참여 요청을 보내야 합니다.');
+    if(snapshot.size>1)return toast('같은 이메일의 참여 요청이 여러 개예요. 참여 요청 목록에서 승인해 주세요.');
+    const request=snapshot.docs[0];
+    uid=request.id;
+    requestedName=String(request.data()?.name||'친구');
+  }
+  if(!/^[A-Za-z0-9_-]{20,200}$/.test(uid))return toast('올바른 사용자 ID 또는 Google 이메일이 아니에요');
   try{
-    const name=prompt('친구 이름을 입력하세요 (예: 민수):',uid.trim());
+    const name=prompt('친구 이름을 입력하세요 (예: 민수):',requestedName||uid);
     await updateRoomWithRevision({
-      [`members.${uid.trim()}`]:{role:'editor',name:String(name||uid.trim()).slice(0,80)}
+      [`members.${uid}`]:{role:'editor',name:String(name||uid).slice(0,80)}
     });
+    await window.firestoreDb.collection('rooms').doc(sharedRoomId).collection('joinRequests').doc(uid).delete().catch(()=>{});
     toast('친구를 방 멤버로 승인했어요');
   }catch(e){toast(`멤버 승인 실패: ${e.message}`);}
 }

@@ -49,7 +49,7 @@ service cloud.firestore {
         && resource.data.ownerUid == request.auth.uid;
       match /joinRequests/{uid} {
         allow create, update: if request.auth != null && request.auth.uid == uid
-          && request.resource.data.keys().hasOnly(['uid', 'name', 'createdAt'])
+          && request.resource.data.keys().hasOnly(['uid', 'name', 'email', 'createdAt'])
           && request.resource.data.uid == uid;
         allow read, delete: if request.auth != null
           && (
