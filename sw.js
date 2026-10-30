@@ -1,4 +1,4 @@
-const CACHE='tripsync-v40';
+const CACHE='tripsync-v41';
 const CORE=['./index.html','./manifest.json'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)).catch(()=>{}))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))))});
