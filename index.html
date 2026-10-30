@@ -45,11 +45,13 @@ input:focus,textarea:focus{border-color:var(--pr);box-shadow:0 0 0 3px var(--pr-
 .mid{flex:1;min-width:0}.nm{font-weight:700;font-size:15px;word-break:keep-all;display:flex;align-items:center;gap:4px}.ds{font-size:12px;color:var(--sub);display:-webkit-box;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.ds.in{color:var(--pr)}
 .ok{font-size:12px;color:var(--pr);white-space:nowrap}
 .act{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
-.mb{padding:7px 11px;border-radius:10px;font-family:inherit;font-size:12px;font-weight:700;border:1px solid var(--bd);background:var(--s);color:var(--tx);cursor:pointer;text-decoration:none;touch-action:manipulation;display:inline-flex;align-items:center;gap:4px;transition:background .15s,transform .12s}
+.mb{min-height:36px;padding:7px 11px;border-radius:10px;font-family:inherit;font-size:12px;font-weight:700;border:1px solid var(--bd);background:var(--s);color:var(--tx);cursor:pointer;touch-action:manipulation;display:inline-flex;align-items:center;gap:4px;transition:background .15s,transform .12s}
 .mb:active{transform:scale(.95)}
 .mb.pr{background:var(--pr);color:#fff;border-color:var(--pr)}.mb.dg{color:var(--dg)}
 .reel-jump{background:linear-gradient(135deg,#e1306c,#833ab4);color:#fff!important;border:0!important;font-weight:800;box-shadow:0 3px 10px rgba(225,48,108,.28)}
 .star-btn{background:none;border:0;font-size:16px;line-height:1;cursor:pointer;padding:2px 4px;opacity:.45;transition:transform .12s,opacity .15s}.star-btn.on{opacity:1;transform:scale(1.1)}
+#netStatus{font-size:10px;font-weight:800;color:var(--ok);white-space:nowrap}
+.search-row{display:flex;gap:6px;align-items:center;flex:1;min-width:0}.search-row input{flex:1;margin-bottom:0;min-width:0}.clear-search{min-width:36px;padding:7px 8px;justify-content:center}
 
 /* 목록 가로 필터 칩 & 상태 배지 */
 .lchips{display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-bottom:2px;margin-bottom:4px;flex:none}
@@ -152,6 +154,7 @@ input[type=text],input[type=password],textarea{font-size:16px}
     <div class="brand"><div class="logo">⚡</div><div><b>여행플래너</b><small>장소·카페·음식·쇼핑 플래너</small></div></div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="planCopyTopBtn" class="mb" title="일정 텍스트 복사">📋 일정복사</button>
+      <span id="netStatus" aria-live="polite">● 온라인</span>
       <button id="themeBtn" class="mb"></button>
       <button id="settingsBtn" class="mb">⚙️</button>
     </div>
@@ -1364,7 +1367,7 @@ async function fetchRepPhoto(q){
     const s=document.createElement('section');s.id='tab-'+c;s.className='tab-content';
     s.innerHTML=`
       <div style="display:flex;gap:6px;align-items:center;margin-bottom:2px">
-        <input type="text" id="q-${c}" placeholder="${CATS[c].n} 이름·주소·메뉴 검색..." oninput="renderCat('${c}')" style="flex:1;margin-bottom:0">
+        <div class="search-row"><input type="text" id="q-${c}" placeholder="${CATS[c].n} 이름·주소·메뉴 검색..." oninput="renderCat('${c}')"><button type="button" class="mb clear-search" data-act="clearSearch" data-cat="${c}" aria-label="검색어 지우기">×</button></div>
         <button class="mb" data-act="nearSort" data-cat="${c}" style="flex:none">⚡ 가까운순</button>
         <button class="mb" data-act="toggleEdit" data-cat="${c}" style="flex:none">✏️</button>
       </div>
@@ -3308,6 +3311,11 @@ document.addEventListener('click',async e=>{
     renderCat(c);
     return;
   }
+  if(act==='clearSearch'){
+    const input=$(`q-${c}`);
+    if(input){input.value='';input.focus();renderCat(c);}
+    return;
+  }
   if(act==='toggleStar'){
     e.stopPropagation();
     const it=items.find(x=>x.id===id);
@@ -3985,6 +3993,7 @@ $('importKmzFile').onchange=async e=>{
       const extCat=pm.querySelector('Data[name="category"] value')?.textContent?.trim()||'PLACE';
       const extVid=pm.querySelector('Data[name="vid"] value')?.textContent?.trim()||'';
       const extDay=Number(pm.querySelector('Data[name="day"] value')?.textContent?.trim()||0)||0;
+      if(findExistingDuplicate({name:nm,address:desc}))return;
       items.unshift({id:'id_'+Date.now()+'_'+(cnt++),name:nm,address:desc,category:CATS[extCat]?extCat:'PLACE',vid:extVid,day:extDay,lat,lng,done:false});
     });
     save();fit();toast(`KMZ에서 ${cnt}개 장소를 가져왔어요!`);
@@ -4009,6 +4018,7 @@ $('importFile').onchange=async e=>{
     const ad=iAddr>=0?(row[iAddr]||''):'';
     const lat=iLat>=0?Number(row[iLat])||null:null;
     const lng=iLng>=0?Number(row[iLng])||null:null;
+    if(findExistingDuplicate({name:nm,address:ad}))continue;
     items.unshift({id:'id_'+Date.now()+'_'+(cnt++),name:nm,address:ad,category:'PLACE',lat,lng,done:false});
   }
   save();autoFixCoords();toast(`CSV에서 ${cnt}개 장소를 가져왔어요!`);
@@ -4158,10 +4168,34 @@ function initMap(){
   fallbackToOsm('default osm');
 }
 
+function updateNetworkStatus(){
+  const el=$('netStatus');if(!el)return;
+  const online=navigator.onLine!==false;
+  el.textContent=online?'● 온라인':'● 오프라인';
+  el.style.color=online?'var(--ok)':'var(--dg)';
+  el.title=online?'인터넷 연결됨':'인터넷이 끊겼어요. 저장된 일정은 계속 볼 수 있어요.';
+}
+window.addEventListener('online',updateNetworkStatus);
+window.addEventListener('offline',updateNetworkStatus);
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    if($('sheet').classList.contains('on'))closeSheet();
+    if($('myMapsOverlay').classList.contains('show'))closeMyMapsOverlay();
+    return;
+  }
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){
+    e.preventDefault();
+    const input=$(`q-${activeTab}`)||$('q');
+    input?.focus();
+  }
+});
+updateNetworkStatus();
 setTheme(ls.get('TRIP_THEME')||'dark');
 buildAiProvUI();
 render(true);
 initMap();
+const savedTab=ls.get('TRIP_LAST_TAB');
+if(savedTab&&(['add','PLACE','CAFE','FOOD','SHOP','map'].includes(savedTab)))tab(savedTab);
 let initialRoom=extractRoomId(new URLSearchParams(location.search).get('room'));
 if(new URLSearchParams(location.search).get('room')&&!initialRoom){
   history.replaceState(null,'',location.pathname);
