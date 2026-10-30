@@ -218,6 +218,8 @@ input[type=text],input[type=password],textarea{font-size:16px}
       <button id="joinRoomBtn" class="btn g">🔗 방 링크 열기</button>
     </div>
     <button id="copyRoomBtn" class="btn g" style="margin-top:8px">📋 현재 방 링크 복사</button>
+    <button id="leaveRoomBtn" class="btn g" style="margin-top:8px">🚪 이 기기에서 방 연결 끊기</button>
+    <small id="roomSyncInfo" style="display:block;margin:2px 0 6px;color:var(--sub);font-size:11px;min-height:13px"></small>
     <button id="copyUserIdBtn" class="btn g" style="margin-top:8px">🪪 내 사용자 ID 복사</button>
     <button id="requestJoinBtn" class="btn g" style="margin-top:8px">🙋 방장에게 참여 요청</button>
     <button id="addMemberBtn" class="btn g" style="margin-top:8px">👤 친구 사용자 ID 승인</button>
@@ -321,6 +323,7 @@ input[type=text],input[type=password],textarea{font-size:16px}
 <div id="sheet"><div class="sh" id="sbody"></div></div>
 <input type="file" id="own" accept="image/*" hidden>
 <input type="file" id="sheetShot" accept="image/*" multiple hidden>
+<div id="roomAlertStrip" style="position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:1500;display:none;gap:8px;flex-wrap:wrap;pointer-events:none"></div>
 <div id="toast"></div>
 <div id="ptr">↻ 새로고침</div>
 
@@ -361,7 +364,9 @@ function listenJoinRequests(){
     .onSnapshot(snapshot=>{
       const rows=snapshot.docs.map(doc=>{
         const data=doc.data()||{};
-        const label=data.email?`${data.name||'친구'} · ${data.email}`:String(data.name||doc.id);
+        let label=data.email?`${data.name||'친구'} · ${data.email}`:String(data.name||doc.id);
+        const created=(data.createdAt&&typeof data.createdAt.toMillis==='function')?data.createdAt.toMillis():Number(data.createdAt||0);
+        if(created&&Date.now()-created>7*86400000)label+=' (7일 경과 요청)';
         return `<div style="margin-top:5px">${esc(label)} <button class="mb" data-room-action="approve-request" data-uid="${esc(doc.id)}" data-name="${esc(String(data.name||'친구'))}" style="padding:2px 6px;font-size:11px">승인</button></div>`;
       });
       el.innerHTML=rows.length?`<b>참여 요청 <span class="badge">${rows.length}</span></b>${rows.join('')}`:'';
@@ -369,9 +374,11 @@ function listenJoinRequests(){
     },()=>{el.innerHTML='';});
 }
 function renderJoinBadge(message){
+  _joinBadgeText=String(message||'');
   const el=$('joinBadge');if(!el)return;
-  el.innerHTML=message?`<span class="badge">${esc(message)}</span>`:'';
-  el.style.display=message?'block':'none';
+  el.innerHTML=_joinBadgeText?`<span class="badge">${esc(_joinBadgeText)}</span>`:'';
+  el.style.display=_joinBadgeText?'block':'none';
+  if(typeof updateRoomAlert==='function')updateRoomAlert();
 }
 function listenOwnJoinRequest(){
   if(joinRequestUnsubscribe)joinRequestUnsubscribe();
@@ -382,7 +389,17 @@ function listenOwnJoinRequest(){
   }
   joinRequestUnsubscribe=window.firestoreDb.collection('rooms').doc(sharedRoomId).collection('joinRequests').doc(user.uid)
     .onSnapshot(snapshot=>{
-      renderJoinBadge(snapshot.exists?'🙋 승인 대기 중 · 방장이 요청을 확인하면 참여할 수 있어요':'');
+      if(snapshot.exists){
+        _ownJoinReqHadPending=true;
+        renderJoinBadge('🙋 승인 대기 중 · 방장이 요청을 확인하면 참여할 수 있어요');
+      }else if(_ownJoinReqHadPending){
+        _ownJoinReqHadPending=false;
+        renderJoinBadge('');
+        toast('✅ 방 참여가 승인됐어요! 방에 다시 연결하는 중…');
+        connectSharedRoom(sharedRoomId);
+      }else{
+        renderJoinBadge('');
+      }
     },()=>renderJoinBadge(''));
 }
 function itemLabel(item,id){
@@ -413,6 +430,7 @@ function renderRoomConflict(){
       </div>`;
     }).join('');
   el.style.display='block';
+  if(typeof updateRoomAlert==='function')updateRoomAlert();
 }
 function resolveRoomConflict(id,source){
   if(!sharedConflict)return;
@@ -526,9 +544,42 @@ async function undoRoomChange(){
   }catch(e){toast(e.message==='CONCURRENT_EDIT'?'친구가 먼저 수정했어요. 최신 화면을 확인해 주세요.':`되돌리기 실패: ${e.message}`);}
 }
 function memberRole(member){return typeof member==='string'?member:String(member?.role||'');}
+function maskUid(id){const s=String(id||'');return s.length>10?`${s.slice(0,4)}…${s.slice(-4)}`:s;}
+function safeAuthUser(){
+  try{return window.firebase&&window.firebase.apps&&window.firebase.apps.length?window.firebase.auth().currentUser:null;}catch(_){return null;}
+}
 function memberName(member,uid){
   if(typeof member==='object'&&member?.name)return String(member.name).slice(0,80);
-  return uid;
+  return `계정 ${maskUid(uid)}`;
+}
+function updateRoomButtons(){
+  const user=safeAuthUser();
+  const connected=Boolean(sharedRoomId);
+  const isOwner=connected&&Boolean(user)&&user.uid===sharedOwnerUid;
+  const del=$('deleteRoomBtn'),undo=$('undoRoomBtn'),add=$('addMemberBtn'),copy=$('copyRoomBtn'),leave=$('leaveRoomBtn'),sync=$('roomSyncInfo');
+  if(del)del.style.display=isOwner?'':'none';
+  if(undo)undo.style.display=isOwner?'':'none';
+  if(add)add.style.display=isOwner?'':'none';
+  if(copy)copy.style.display=connected?'':'none';
+  if(leave)leave.style.display=connected?'':'none';
+  if(sync)sync.style.display=connected?'block':'none';
+}
+function updateRoomAlert(){
+  const el=$('roomAlertStrip');if(!el)return;
+  const chips=[];
+  if(sharedConflict&&(sharedConflict.pending||[]).length)chips.push({txt:`⚠️ 동시 수정 ${sharedConflict.pending.length}건 해결 필요`,kind:'warn'});
+  if(_joinBadgeText)chips.push({txt:_joinBadgeText,kind:'info'});
+  if(sharedRoomId&&hasOfflineQueue())chips.push({txt:'📴 전송 대기 변경 있음 — 네트워크 복구 시 자동 전송',kind:'info'});
+  if(!chips.length){el.innerHTML='';el.style.display='none';return;}
+  el.innerHTML=chips.map(c=>`<button type="button" data-room-alert="1" style="pointer-events:auto;cursor:pointer;border:0;border-radius:999px;padding:6px 12px;font-size:12px;font-weight:800;font-family:inherit;box-shadow:0 4px 14px rgba(15,23,42,.3);background:${c.kind==='warn'?'#b91c1c':'#1d4ed8'};color:#fff;max-width:92vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.txt)}</button>`).join('');
+  el.style.display='flex';
+}
+function renderRoomSyncInfo(){
+  const el=$('roomSyncInfo');if(!el)return;
+  if(!sharedRoomId||!_lastRoomSyncAt){el.textContent='';return;}
+  const sec=Math.floor((Date.now()-_lastRoomSyncAt)/1000);
+  const label=sec<5?'방금 전':sec<60?`${sec}초 전`:sec<3600?`${Math.floor(sec/60)}분 전`:`1시간 이상 · 연결을 확인하세요`;
+  el.textContent=`🔄 마지막 동기화: ${label}`;
 }
 function renderRoomMembers(){
   const el=$('roomMembers');if(!el)return;
@@ -546,6 +597,7 @@ function renderRoomMembers(){
     requestButton.disabled=Boolean(isOwner||user&&sharedMembers[user.uid]);
     requestButton.textContent=isOwner?'✅ 방장으로 참여 중':user&&sharedMembers[user.uid]?'✅ 이미 참여 중':'🙋 방장에게 참여 요청';
   }
+  updateRoomButtons();
 }
 function renderRoomGuide(){
   const el=$('roomGuide');if(!el)return;
@@ -604,6 +656,8 @@ function downloadAutoBackup(label){
       sharedRoomId='';sharedOwnerUid='';sharedMembers={};
       sharedConflict=null;
       sharedBaseItems=[];
+      try{localStorage.removeItem(TRIP_LAST_ROOM_KEY);}catch(_){}
+      _lastRoomSyncAt=null;
       clearOfflineQueue();
       clearPendingConflict();
       setSharedRoomStatus('공유 방이 삭제되었어요','ok');
@@ -611,7 +665,27 @@ function downloadAutoBackup(label){
       renderRoomGuide();
       listenJoinRequests();
       renderRoomConflict();
+      renderRoomSyncInfo();
     }catch(e){toast(`방 삭제 실패: ${e.message}`);}
+  }
+  function leaveRoom(){
+    if(!sharedRoomId)return toast('현재 연결된 공유 방이 없어요');
+    if(!confirm('이 기기에서 이 공유 방 연결을 끊을까요?\n(방과 친구 일정에는 영향이 없어요. 다시 참여하려면 방 링크를 열면 돼요)'))return;
+    if(sharedUnsubscribe){sharedUnsubscribe();sharedUnsubscribe=null;}
+    if(joinRequestUnsubscribe){joinRequestUnsubscribe();joinRequestUnsubscribe=null;}
+    if(joinRequestsUnsubscribe){joinRequestsUnsubscribe();joinRequestsUnsubscribe=null;}
+    clearTimeout(_roomListenRetryTimer);_roomListenRetryTimer=null;
+    _roomListenRetries=0;_ownJoinReqHadPending=false;
+    sharedRoomId='';sharedOwnerUid='';sharedMembers={};sharedRevision=0;sharedHistory=[];sharedBaseItems=[];
+    sharedConflict=null;sharedLocalDirty=false;sharedWriteRevision=null;creatingSharedRoom=false;
+    _lastRoomSyncAt=null;
+    try{localStorage.removeItem(TRIP_LAST_ROOM_KEY);}catch(_){}
+    clearPendingConflict();clearOfflineQueue();
+    try{history.replaceState(null,'',location.pathname);}catch(_){}
+    setSharedRoomStatus('방 연결을 끊었어요. 다시 참여하려면 방 링크를 열거나 "공유 방 만들기"를 사용하세요.','');
+    renderRoomMembers();renderRoomGuide();renderJoinBadge('');listenJoinRequests();renderRoomConflict();
+    render(true);draw(true);
+    toast('🚪 공유 방 연결을 끊었어요');
   }
   function collectSharedSettings(){
     return {
@@ -630,8 +704,23 @@ function downloadAutoBackup(label){
 // 친구 변경과 겹치지 않는 부분은 자동 병합한 뒤 겹치는 부분만 충돌 선택 UI로 넘깁니다.
 const TRIP_OFFLINE_QUEUE_KEY='TRIP_OFFLINE_QUEUE';
 const TRIP_PENDING_CONFLICT_KEY='TRIP_PENDING_CONFLICT';
+const TRIP_LAST_ROOM_KEY='TRIP_LAST_ROOM';
+const TRIP_CREATING_ROOM_KEY='TRIP_CREATING_ROOM';
 const TRANSIENT_NET_RE=/unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
 let _offlineFlushBusy=false,_offlineFastRetries=0,_autoResolveBusy=false;
+let _ownJoinReqHadPending=false,_roomListenRetryTimer=null;
+function scheduleRoomListenRetry(roomId,ms=15000){
+  if(_roomListenRetries>=5){
+    setSharedRoomStatus('⚠️ 방 연결에 여러 번 실패했어요. 네트워크를 확인한 뒤 방 링크를 다시 열거나 새로고침해 주세요.','error');
+    return;
+  }
+  _roomListenRetries++;
+  clearTimeout(_roomListenRetryTimer);
+  _roomListenRetryTimer=setTimeout(()=>{
+    _roomListenRetryTimer=null;
+    connectSharedRoom(roomId).catch(()=>{});
+  },ms);
+}
 
 function sameJsonish(a,b){return JSON.stringify(a===undefined?null:a)===JSON.stringify(b===undefined?null:b);}
 const SHARE_FIELDS=['name','localName','address','price','info','note','category','day','lat','lng','done','star','mapVisible','vid','img','useCustomImg','v','places'];
@@ -956,6 +1045,7 @@ let mapCat='ALL',mapOnlyVid=false,mapOnlyStar=false,mapOnlyTodo=false,mapDay=0,m
 let lRoute=null,gRoute=null,nRoute=null,_undoFn=null;
 let listFilter={PLACE:'ALL',CAFE:'ALL',FOOD:'ALL',SHOP:'ALL'};
 let sharedRoomId='',sharedUnsubscribe=null,sharedWriteTimer=null,remoteApplying=false,sharedOwnerUid='',sharedMembers={},sharedSettingsShared=false,sharedRevision=0,sharedHistory=[],joinRequestsUnsubscribe=null,joinRequestUnsubscribe=null,sharedLocalDirty=false,sharedWriteRevision=null,sharedConflict=null,creatingSharedRoom=false,sharedBaseItems=[];
+let _joinBadgeText='',_lastRoomSyncAt=null,_roomListenRetries=0;
 
 const FIREBASE_CONFIG=window.TRIPSYNC_FIREBASE_CONFIG||{};
 function firebaseConfigured(){
@@ -985,6 +1075,7 @@ function setSharedRoomStatus(message,kind=''){
   if(!el)return;
   el.textContent=message;
   el.style.color=kind==='ok'?'var(--ok)':kind==='error'?'var(--dg)':'var(--sub)';
+  if(typeof updateRoomAlert==='function')updateRoomAlert();
 }
 function setSharedUserStatus(message,kind=''){
   const el=$('sharedUserStatus');
@@ -995,7 +1086,7 @@ function setSharedUserStatus(message,kind=''){
 function updateGoogleLoginBtn(user){
   const btn=$('googleLoginBtn');if(!btn)return;
   if(user){
-    const label=user.displayName&&user.email?`${user.displayName} (${user.email})`:(user.displayName||user.email||user.uid);
+    const label=user.displayName&&user.email?`${user.displayName} (${user.email})`:(user.displayName||user.email||`계정 ${maskUid(user.uid)}`);
     btn.textContent=`✅ ${label} 로그인됨`;
   }else{
     btn.textContent='🔐 Google 계정으로 로그인';
@@ -1198,12 +1289,18 @@ async function connectSharedRoom(roomId){
     try{await window.firestoreDb.enablePersistence({synchronizeTabs:true});}catch(_){}
     setSharedUserStatus(`✅ 로그인됨 · ${user.email||user.uid}`,'ok');
     sharedRoomId=roomId;
+    try{ls.set(TRIP_LAST_ROOM_KEY,roomId);}catch(_){}
     restorePendingConflict(roomId);
     listenOwnJoinRequest();
     if(sharedUnsubscribe)sharedUnsubscribe();
     const ref=window.firestoreDb.collection('rooms').doc(roomId);
     sharedUnsubscribe=ref.onSnapshot(snapshot=>{
+      clearTimeout(_roomListenRetryTimer);_roomListenRetryTimer=null;
+      _roomListenRetries=0;
       if(snapshot.exists){
+        _lastRoomSyncAt=Date.now();
+        if(String(ls.get(TRIP_CREATING_ROOM_KEY)||'')===roomId){try{localStorage.removeItem(TRIP_CREATING_ROOM_KEY);}catch(_){}}
+        renderRoomSyncInfo();
         const data=snapshot.data();
         const incomingRevision=Number(data.revision||0);
         if(sharedLocalDirty&&sharedWriteRevision===incomingRevision){
@@ -1250,25 +1347,42 @@ async function connectSharedRoom(roomId){
           setSharedRoomStatus('Google 로그인 확인 중이에요. 잠시 후 다시 시도해 주세요.','error');
           return;
         }
-        if(!creatingSharedRoom){
+        const creatingIntent=String(ls.get(TRIP_CREATING_ROOM_KEY)||'')===roomId;
+        if(creatingIntent&&!creatingSharedRoom){
           creatingSharedRoom=true;
           createSharedRoomDocument(ref,currentUser)
-            .then(()=>setSharedRoomStatus(`✅ 실시간 공유 중 · 방 ${roomId}`,'ok'))
+            .then(()=>{
+              try{localStorage.removeItem(TRIP_CREATING_ROOM_KEY);}catch(_){}
+              setSharedRoomStatus(`✅ 새 공유 방 생성 완료 · 방 ${roomId}`,'ok');
+            })
             .catch(e=>setSharedRoomStatus(`공유 방 생성 실패: ${e.message}`,'error'))
             .finally(()=>{creatingSharedRoom=false;});
+        }else if(!creatingIntent){
+          // 존재하지 않는(삭제된) 방을 멤버가 열었을 때 유령 방으로 재생성하지 않음
+          setSharedRoomStatus('이 링크의 공유 방이 없어졌어요(삭제됨). 새 방을 만들려면 상단 "공유 방 만들기"를 눌러 주세요.','error');
+          sharedOwnerUid='';sharedMembers={};sharedRevision=0;sharedHistory=[];sharedBaseItems=[];
+          if(joinRequestUnsubscribe){joinRequestUnsubscribe();joinRequestUnsubscribe=null;}
+          if(String(ls.get(TRIP_LAST_ROOM_KEY)||'')===roomId){try{localStorage.removeItem(TRIP_LAST_ROOM_KEY);}catch(_){}}
+          clearOfflineQueue();
+          renderRoomMembers();
+          return;
         }
+        return;
       }
-      setSharedRoomStatus(`✅ 실시간 공유 중 · 방 ${roomId}`,'ok');
     },e=>{
       if(e?.code==='permission-denied'||/insufficient permissions/i.test(e?.message||'')){
         sharedOwnerUid='';
         sharedMembers={};
+        _lastRoomSyncAt=null;renderRoomSyncInfo();
         listenOwnJoinRequest();
         renderRoomMembers();
-        setSharedRoomStatus('🔒 아직 승인되지 않은 방이에요. 아래 참여 요청을 눌러 방장에게 승인을 요청하세요.','');
+        setSharedRoomStatus('🔒 아직 이 방의 멤버가 아니에요. 아래 참여 요청을 눌러 방장에게 승인을 요청하세요. 승인되면 자동으로 연결돼요.','');
+        renderRoomSyncInfo();
+        scheduleRoomListenRetry(roomId,30000);
         return;
       }
       setSharedRoomStatus(`실시간 연결 실패: ${e.message}`,'error');
+      scheduleRoomListenRetry(roomId);
     });
     flushOfflineQueue().catch(()=>{});
   }catch(e){
@@ -4254,6 +4368,7 @@ $('settingsBtn').onclick=()=>{renderUsageBox();tab('set');};
 $('createRoomBtn').onclick=()=>{
   if(!firebaseConfigured())return setSharedRoomStatus('firebase-config.js에 Firebase 설정을 먼저 입력하세요.','error');
   const id=makeRoomId();
+  try{ls.set(TRIP_CREATING_ROOM_KEY,id);}catch(_){}
   location.href=roomUrl(id);
 };
 $('joinRoomBtn').onclick=()=>{
@@ -4270,6 +4385,8 @@ $('requestJoinBtn').onclick=requestJoin;
 $('addMemberBtn').onclick=addMember;
 $('undoRoomBtn').onclick=undoRoomChange;
 $('deleteRoomBtn').onclick=deleteRoom;
+$('leaveRoomBtn').onclick=leaveRoom;
+$('roomAlertStrip').onclick=e=>{if(e.target&&e.target.dataset&&e.target.dataset.roomAlert)tab('set');};
 $('planCopyTopBtn').onclick=copyFormattedPlan;
 $('exportPlanBtn').onclick=copyFormattedPlan;
 document.addEventListener('click',e=>{
@@ -4687,11 +4804,18 @@ document.addEventListener('keydown',e=>{
 updateNetworkStatus();
 setTheme(ls.get('TRIP_THEME')||'dark');
 buildAiProvUI();
+updateRoomButtons();
+updateRoomAlert();
+setInterval(renderRoomSyncInfo,5000);
 render(true);
 initMap();
 const savedTab=ls.get('TRIP_LAST_TAB');
 if(savedTab&&(['add','PLACE','CAFE','FOOD','SHOP','map'].includes(savedTab)))tab(savedTab);
 let initialRoom=extractRoomId(new URLSearchParams(location.search).get('room'));
+if(!initialRoom){
+  initialRoom=extractRoomId(ls.get(TRIP_LAST_ROOM_KEY)||'');
+  if(initialRoom)setSharedRoomStatus('이전에 접속했던 공유 방에 다시 연결하는 중…','');
+}
 if(new URLSearchParams(location.search).get('room')&&!initialRoom){
   history.replaceState(null,'',location.pathname);
   setSharedRoomStatus('공유 방 링크 형식이 올바르지 않습니다. 방장에게 새 링크를 받아 주세요.','error');
