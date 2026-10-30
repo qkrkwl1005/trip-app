@@ -19,7 +19,11 @@ service cloud.firestore {
           && data.history is list
           && data.history.size() <= 10;
       }
-      allow read: if isMember(resource.data);
+      allow read: if request.auth != null
+        && (
+          !exists(/databases/$(database)/documents/rooms/$(roomId))
+          || isMember(resource.data)
+        );
       allow create: if request.auth != null
         && validRoom(request.resource.data)
         && request.resource.data.ownerUid == request.auth.uid
