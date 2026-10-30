@@ -41,25 +41,31 @@ service cloud.firestore {
     match /rooms/{roomId} {
       function isMember(data) {
         return request.auth != null
-          && data.members[request.auth.uid] in ['owner', 'editor'];
+          && data.members[request.auth.uid].role in ['owner', 'editor'];
       }
       function validRoom(data) {
         return data.keys().hasOnly(['items', 'updatedAt', 'ownerUid', 'members'])
           && data.items is list
           && data.items.size() <= 200
           && data.ownerUid is string
-          && data.members is map;
+          && data.members is map
+          && data.settingsShared is bool
+          && data.settings is map;
       }
       allow read: if isMember(resource.data);
       allow create: if request.auth != null
         && validRoom(request.resource.data)
         && request.resource.data.ownerUid == request.auth.uid
-        && request.resource.data.members[request.auth.uid] == 'owner';
+        && request.resource.data.members[request.auth.uid].role == 'owner';
       allow update: if isMember(resource.data)
         && validRoom(request.resource.data)
         && request.resource.data.ownerUid == resource.data.ownerUid
         && (request.auth.uid == resource.data.ownerUid
-          || request.resource.data.members == resource.data.members);
+          || (
+            request.resource.data.members == resource.data.members
+            && request.resource.data.settingsShared == resource.data.settingsShared
+            && request.resource.data.settings == resource.data.settings
+          ));
       allow delete: if request.auth != null
         && resource.data.ownerUid == request.auth.uid;
     }
@@ -90,4 +96,4 @@ firebase deploy --only firestore:rules
 
 방 소유자는 설정 화면에서 친구의 Google 사용자 ID를 승인해야 합니다. 일반 멤버는 일정 데이터를 수정할 수 있지만 다른 멤버를 승인하거나 방을 삭제할 수 없습니다.
 
-공유 방에는 장소 데이터만 저장됩니다. API 키는 각 기기의 브라우저에만 저장되므로, 키가 필요한 기능은 각 사용자가 자신의 제한된 키를 입력해야 합니다.
+설정 화면에서 현재 참여자 이름과 역할을 확인할 수 있으며, 방 소유자는 공유 방 삭제도 할 수 있습니다. API·지도 설정 공유는 기본적으로 꺼져 있고, 방 소유자가 확인창에서 승인한 경우에만 현재 승인 멤버에게 전달됩니다. API 키를 공유하면 멤버의 브라우저에 저장되므로, Google Cloud와 각 AI 제공자에서 도메인·사용량 제한을 설정하세요.

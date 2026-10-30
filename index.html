@@ -212,6 +212,9 @@ input[type=text],input[type=password],textarea{font-size:16px}
     <button id="copyRoomBtn" class="btn g" style="margin-top:8px">📋 현재 방 링크 복사</button>
     <button id="copyUserIdBtn" class="btn g" style="margin-top:8px">🪪 내 사용자 ID 복사</button>
     <button id="addMemberBtn" class="btn g" style="margin-top:8px">👤 친구 사용자 ID 승인</button>
+    <button id="shareSettingsBtn" class="btn g" style="margin-top:8px">🔑 내 API·지도 설정을 멤버에게 공유</button>
+    <button id="deleteRoomBtn" class="btn g" style="margin-top:8px;color:var(--dg)">🗑️ 이 공유 방 삭제</button>
+    <div id="roomMembers" class="ds" style="margin-top:8px;white-space:pre-line">참여자 정보를 불러오는 중...</div>
     <small style="display:block;margin:4px 0 10px;color:var(--sub);font-size:11px">장소·메모·완료 상태만 공유됩니다. AI·지도 API 키는 각 기기에만 저장되며 친구에게 전송되지 않습니다.</small>
 
     <label>AI 제공자 키 (선택 — 여러 개 가능, 위부터 순서대로 시도하고 실패하면 자동으로 다음 제공자)</label>
@@ -333,6 +336,66 @@ const ls={
     }
   }
 };
+function memberRole(member){return typeof member==='string'?member:String(member?.role||'');}
+function memberName(member,uid){
+  if(typeof member==='object'&&member?.name)return String(member.name).slice(0,80);
+  return uid;
+}
+function renderRoomMembers(){
+  const el=$('roomMembers');if(!el)return;
+  const rows=Object.entries(sharedMembers||{}).map(([uid,member])=>{
+    const role=memberRole(member);
+    return `${role==='owner'?'👑':'👤'} ${memberName(member,uid)} · ${role==='owner'?'방장':'멤버'}`;
+  });
+  el.textContent=rows.length?`현재 참여자 (${rows.length}명)\n${rows.join('\n')}`:'참여자 없음';
+}
+function applySharedSettings(raw){
+  if(!raw||typeof raw!=='object')return;
+  const next={};
+  AI_DEFS.forEach(d=>{
+    const source=raw.aiCfg?.[d.id];
+    next[d.id]={key:typeof source?.key==='string'?source.key.slice(0,500):'',model:typeof source?.model==='string'?source.model.slice(0,200):d.defModel};
+  });
+  aiCfg=next;
+  ls.set('TRIP_AI_CFG',JSON.stringify(aiCfg));
+  if(['osm','google','naver'].includes(raw.mapProvider))ls.set('TRIP_MAP_PROVIDER',raw.mapProvider);
+  if(typeof raw.googleMapsKey==='string')ls.set('TRAVEL_GMAP_KEY',raw.googleMapsKey.slice(0,500));
+  if(typeof raw.naverMapsKey==='string')ls.set('TRAVEL_NAVER_KEY',raw.naverMapsKey.slice(0,500));
+  if(typeof raw.cfProxy==='string')ls.set('TRIP_CF_PROXY',raw.cfProxy.slice(0,1000));
+  if(typeof raw.myMapsUrl==='string'&&toEmbedMyMapsUrl(raw.myMapsUrl))ls.set('TRIP_MYMAPS_URL',raw.myMapsUrl.slice(0,2000));
+  if(typeof raw.myMapsEmbed==='string'&&toEmbedMyMapsUrl(raw.myMapsEmbed))ls.set(MYMAPS_EMBED_KEY,toEmbedMyMapsUrl(raw.myMapsEmbed));
+}
+  async function deleteRoom(){
+    const user=window.firebase?.auth?.().currentUser;
+    if(!user||sharedOwnerUid!==user.uid)return toast('방 소유자만 삭제할 수 있어요');
+    if(!confirm('이 공유 방과 모든 일정을 삭제할까요?'))return;
+    try{
+      await window.firestoreDb.collection('rooms').doc(sharedRoomId).delete();
+      if(sharedUnsubscribe)sharedUnsubscribe();
+      sharedRoomId='';sharedOwnerUid='';sharedMembers={};
+      setSharedRoomStatus('공유 방이 삭제되었어요','ok');
+      renderRoomMembers();
+    }catch(e){toast(`방 삭제 실패: ${e.message}`);}
+  }
+  function collectSharedSettings(){
+    return {
+      aiCfg,
+      mapProvider:ls.get('TRIP_MAP_PROVIDER')||'osm',
+      googleMapsKey:ls.get('TRAVEL_GMAP_KEY')||'',
+      naverMapsKey:ls.get('TRAVEL_NAVER_KEY')||'',
+      cfProxy:ls.get('TRIP_CF_PROXY')||'',
+      myMapsUrl:ls.get('TRIP_MYMAPS_URL')||'',
+      myMapsEmbed:getMyMapsEmbedUrl()||''
+    };
+  }
+  function shareSettings(){
+    const user=window.firebase?.auth?.().currentUser;
+    if(!user||sharedOwnerUid!==user.uid)return toast('방 소유자만 API 설정을 공유할 수 있어요');
+    if(!confirm('API 키가 현재 방의 모든 승인 멤버에게 전달됩니다. 계속할까요?'))return;
+    window.firestoreDb.collection('rooms').doc(sharedRoomId).update({
+      settings:collectSharedSettings(),settingsShared:true
+    }).then(()=>toast('API·지도 설정을 승인 멤버에게 공유했어요')).catch(e=>toast(`설정 공유 실패: ${e.message}`));
+  }
 
 const idb={
   db:null,
@@ -448,7 +511,7 @@ let items=[],cat='PLACE',pend=[],res=[],lm=null,tl=null,layer=null,pins={},tt,cu
 let mapCat='ALL',mapOnlyVid=false,mapOnlyStar=false,mapOnlyTodo=false,mapDay=0,mapRouteOn=false,userPos=null,nearSortOn=false;
 let lRoute=null,gRoute=null,nRoute=null,_undoFn=null;
 let listFilter={PLACE:'ALL',CAFE:'ALL',FOOD:'ALL',SHOP:'ALL'};
-let sharedRoomId='',sharedUnsubscribe=null,sharedWriteTimer=null,remoteApplying=false,sharedOwnerUid='',sharedMembers={};
+let sharedRoomId='',sharedUnsubscribe=null,sharedWriteTimer=null,remoteApplying=false,sharedOwnerUid='',sharedMembers={},sharedSettingsShared=false;
 
 const FIREBASE_CONFIG=window.TRIPSYNC_FIREBASE_CONFIG||{};
 function firebaseConfigured(){
@@ -510,8 +573,9 @@ function scheduleSharedWrite(){
       await window.firestoreDb.collection('rooms').doc(sharedRoomId).set({
         items,
         ownerUid:sharedOwnerUid||firebase.auth().currentUser.uid,
-        members:Object.keys(sharedMembers).length?sharedMembers:{[firebase.auth().currentUser.uid]:'owner'},
-        settings:firebase.firestore.FieldValue.delete(),
+        members:Object.keys(sharedMembers).length?sharedMembers:{[firebase.auth().currentUser.uid]:{role:'owner',name:firebase.auth().currentUser.displayName||firebase.auth().currentUser.email||'방장'}},
+        settingsShared:sharedSettingsShared,
+        settings:sharedSettingsShared?collectSharedSettings():{},
         updatedAt:firebase.firestore.FieldValue.serverTimestamp()
       },{merge:true});
       setSharedRoomStatus(`✅ 공유 중 · ${sharedRoomId}`,'ok');
@@ -544,9 +608,14 @@ async function connectSharedRoom(roomId){
         const data=snapshot.data();
         sharedOwnerUid=String(data.ownerUid||'');
         sharedMembers=data.members&&typeof data.members==='object'?data.members:{};
+        sharedSettingsShared=data.settingsShared===true;
+        renderRoomMembers();
         if(Array.isArray(data.items)){
           remoteApplying=true;
           items=sanitizeSharedItems(data.items);
+          if(sharedSettingsShared&&data.settings&&sharedOwnerUid){
+            applySharedSettings(data.settings);
+          }
           persistNow();
           remoteApplying=false;
           render(true);draw(true);
@@ -578,8 +647,9 @@ async function addMember(){
   const uid=prompt('승인할 친구의 Google 사용자 ID를 입력하세요:','');
   if(!uid||!/^[A-Za-z0-9_-]{20,200}$/.test(uid.trim()))return toast('올바른 사용자 ID가 아니에요');
   try{
+    const name=prompt('친구 이름을 입력하세요 (예: 민수):',uid.trim());
     await window.firestoreDb.collection('rooms').doc(sharedRoomId).update({
-      [`members.${uid.trim()}`]:'editor'
+      [`members.${uid.trim()}`]:{role:'editor',name:String(name||uid.trim()).slice(0,80)}
     });
     toast('친구를 방 멤버로 승인했어요');
   }catch(e){toast(`멤버 승인 실패: ${e.message}`);}
@@ -3292,6 +3362,8 @@ $('copyRoomBtn').onclick=copyRoomLink;
 $('googleLoginBtn').onclick=signInGoogle;
 $('copyUserIdBtn').onclick=copyUserId;
 $('addMemberBtn').onclick=addMember;
+$('shareSettingsBtn').onclick=shareSettings;
+$('deleteRoomBtn').onclick=deleteRoom;
 $('planCopyTopBtn').onclick=copyFormattedPlan;
 $('exportPlanBtn').onclick=copyFormattedPlan;
 $('sheet').onclick=e=>{if(e.target===$('sheet')){save();closeSheet();}};
