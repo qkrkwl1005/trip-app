@@ -213,6 +213,17 @@ input[type=text],input[type=password],textarea{font-size:16px}
     <div id="sharedRoomStatus" class="ds" style="margin-bottom:8px">공유 방에 연결되지 않았어요.</div>
     <button id="googleLoginBtn" class="btn g">🔐 Google 계정으로 로그인</button>
     <small id="sharedUserStatus" style="display:block;margin:4px 0 8px;color:var(--sub);font-size:11px">방 권한 관리를 위해 Google 로그인이 필요합니다.</small>
+    <small id="appVersionChip" style="display:block;margin:2px 0 4px;color:var(--sub);font-size:10px"></small>
+    <details style="margin:2px 0 8px">
+      <summary style="font-size:11px;color:var(--sub);cursor:pointer">로그인이 안 될 때 해결 순서</summary>
+      <small style="display:block;margin-top:3px;color:var(--sub);font-size:10px;line-height:1.7">
+        1) Firebase Console → Authentication → 설정 → 승인된 도메인(Authorized domains)에 <b>qkrkwl1005.github.io</b> 가 있는지 확인 — 이게 없으면 모든 기기에서 로그인이 막힙니다(로딩 중 흰 화면)<br>
+        2) 새로고침 2번(홈 화면 앱은 완전히 닫았다 다시 열기) · 위 "이 앱 버전"이 최신(v53)인지 확인<br>
+        3) 아이폰·아이패드: 설정 → 사파리 → "모든 쿠키 차단"은 꺼짐이어야 하고, "사이트 간 추적 방지"가 원인이면 해제 후 재시도<br>
+        4) iCloud 프라이빗 릴레이 사용 중이면 잠시 끄고 재시도<br>
+        5) 그래도 실패하면 빨간 문구 전체(끝에 앱 버전 표시됨). 그대로 알려주세요
+      </small>
+    </details>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <button id="createRoomBtn" class="btn g">➕ 공유 방 만들기</button>
       <button id="joinRoomBtn" class="btn g">🔗 방 링크 열기</button>
@@ -706,6 +717,7 @@ const TRIP_OFFLINE_QUEUE_KEY='TRIP_OFFLINE_QUEUE';
 const TRIP_PENDING_CONFLICT_KEY='TRIP_PENDING_CONFLICT';
 const TRIP_LAST_ROOM_KEY='TRIP_LAST_ROOM';
 const TRIP_CREATING_ROOM_KEY='TRIP_CREATING_ROOM';
+const APP_VERSION='v53';
 const TRANSIENT_NET_RE=/unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
 let _offlineFlushBusy=false,_offlineFastRetries=0,_autoResolveBusy=false;
 let _ownJoinReqHadPending=false,_roomListenRetryTimer=null;
@@ -1107,53 +1119,106 @@ async function handleGoogleLoginBtn(){
     setSharedUserStatus(`로그아웃 실패: ${e.message}`,'error');
   }
 }
+let _ggFallbackUsed=false;
+function iphoneIpadLike(){
+  const ua=navigator.userAgent||'';
+  return /iPad|iPhone|iPod/i.test(ua)||(/Macintosh/i.test(ua)&&Number(navigator.maxTouchPoints||0)>1);
+}
+function googleErrText(e){
+  const code=(e&&e.code)||'';
+  if(code==='auth/unauthorized-domain')return '앱 개발자의 Firebase Console → Authentication → 설정 → 승인된 도메인에 이 사이트 도메인을 등록해야 로그인할 수 있어요.';
+  if(code==='auth/operation-not-allowed')return 'Firebase Console에서 Google 로그인 제공업체가 꺼져 있어요. 콘솔에서 켜 주세요.';
+  if(code==='auth/popup-blocked')return '브라우저가 로그인 팝업을 차단했어요.';
+  return `${(e&&e.message)||String(e||'알 수 없는 오류')}${code?` (${code})`:''}`;
+}
+function clearGoogleLoginFlags(){
+  try{sessionStorage.removeItem('TRIP_GOOGLE_REDIRECT_PENDING');}catch(_){}
+  try{sessionStorage.removeItem('TRIP_GOOGLE_REDIRECT_FALLBACK');}catch(_){}
+  _ggFallbackUsed=false;
+}
+function googleAcceptUser(user){
+  updateGoogleLoginBtn(user);
+  setSharedUserStatus(`✅ 로그인됨 · ${user.email||user.uid}`,'ok');
+  const room=new URLSearchParams(location.search).get('room');
+  if(room)connectSharedRoom(room);
+}
+function googleRedirectStart(provider,msg){
+  try{sessionStorage.setItem('TRIP_GOOGLE_REDIRECT_PENDING','1');}catch(_){}
+  setSharedUserStatus(msg||'Google 로그인 페이지로 이동 중...','ok');
+  try{
+    Promise.resolve(firebase.auth().signInWithRedirect(provider)).catch(e=>{
+      setSharedUserStatus(`Google 로그인 페이지 이동 실패: ${googleErrText(e)} · 앱 ${typeof APP_VERSION!=='undefined'?APP_VERSION:''}`,'error');
+    });
+  }catch(e){
+    setSharedUserStatus(`Google 로그인 페이지 이동 실패: ${googleErrText(e)} · 앱 ${typeof APP_VERSION!=='undefined'?APP_VERSION:''}`,'error');
+  }
+}
 async function signInGoogle(){
   if(!firebaseConfigured())return setSharedUserStatus('firebase-config.js 설정이 필요합니다.','error');
+  const btn=$('googleLoginBtn');
+  if(btn){btn.disabled=true;setTimeout(()=>{btn.disabled=false;},4000);}
   try{
+    if(!window.firebase||!window.firebase.auth)return setSharedUserStatus('Firebase가 아직 준비되지 않았어요. 잠시 후 다시 눌러 주세요.','error');
     if(!firebase.apps.length)firebase.initializeApp(FIREBASE_CONFIG);
     await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
     const provider=new firebase.auth.GoogleAuthProvider();
-    const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||window.matchMedia?.('(max-width: 700px)').matches;
-    if(isMobile){
-      sessionStorage.setItem('TRIP_GOOGLE_REDIRECT_PENDING','1');
-      setSharedUserStatus('Google 로그인 페이지로 이동 중...','ok');
-      await firebase.auth().signInWithRedirect(provider);
-      return;
+    try{provider.setCustomParameters({prompt:'select_account'});}catch(_){}
+    setSharedUserStatus('Google 로그인 창을 여는 중...','ok');
+    let result=null;
+    try{
+      result=await firebase.auth().signInWithPopup(provider);
+    }catch(pe){
+      const code=(pe&&pe.code)||'';
+      if(code==='auth/popup-blocked'||code==='auth/operation-not-supported-in-this-environment'){
+        // 팝업이 차단된 환경 → 리다이렉트로 전환
+        googleRedirectStart(provider,'팝업이 차단되어 로그인 페이지로 이동 중...');
+        return;
+      }
+      if(code==='auth/popup-closed-by-user'||code==='auth/cancelled-popup-request'){
+        // iOS(아이폰/아이패드)는 쿠키·추적 방지로 팝업이 저절로 닫히는 일이 잦아, 세션당 1회만 리다이렉트로 자동 전환
+        if(iphoneIpadLike()&&!_ggFallbackUsed&&!sessionStorage.getItem('TRIP_GOOGLE_REDIRECT_FALLBACK')){
+          _ggFallbackUsed=true;
+          try{sessionStorage.setItem('TRIP_GOOGLE_REDIRECT_FALLBACK','1');}catch(_){}
+          googleRedirectStart(provider,'Google 로그인 페이지로 이동 중...');
+          return;
+        }
+        setSharedUserStatus('Google 로그인 창이 닫혔어요. 로그인 버튼을 다시 눌러 주세요.','');
+        return;
+      }
+      throw pe;
     }
-    const result=await firebase.auth().signInWithPopup(provider);
-    const user=result.user;
-    updateGoogleLoginBtn(user);
-    setSharedUserStatus(`✅ 로그인됨 · ${user.email||user.uid}`,'ok');
-    const room=new URLSearchParams(location.search).get('room');
-    if(room)connectSharedRoom(room);
+    clearGoogleLoginFlags();
+    googleAcceptUser(result.user);
   }catch(e){
-    const message=e?.code==='auth/unauthorized-domain'
-      ? `Firebase 인증 도메인에 ${location.hostname}을(를) 추가해야 합니다. https://나 경로(/trip-app)는 제외하고 호스트만 등록하세요.`
-      : e?.code==='auth/operation-not-allowed'
-        ? 'Firebase Console에서 Google 로그인 제공업체를 활성화해야 합니다.'
-        : e.message;
-    setSharedUserStatus(`Google 로그인 실패: ${message}`,'error');
+    const user=(typeof safeAuthUser==='function')?safeAuthUser():null;
+    if(user){clearGoogleLoginFlags();googleAcceptUser(user);return;}
+    const hint=iphoneIpadLike()?' · (아이폰/아이패드) 계속 막히면 설정 → 사파리 → 사이트 간 추적 방지·모든 쿠키 차단을 확인하세요':'';
+    setSharedUserStatus(`Google 로그인 실패: ${googleErrText(e)}${hint} · 앱 ${typeof APP_VERSION!=='undefined'?APP_VERSION:''}`,'error');
   }
 }
 async function completeGoogleRedirectLogin(){
-  if(!firebaseConfigured()||!window.firebase?.auth)return;
+  if(!firebaseConfigured()||!window.firebase||!window.firebase.auth)return;
+  if(!firebase.apps||!firebase.apps.length)return;
+  let hadRedirect=false;
+  try{hadRedirect=sessionStorage.getItem('TRIP_GOOGLE_REDIRECT_PENDING')==='1';}catch(_){}
+  let user=null,error=null;
   try{
     const result=await firebase.auth().getRedirectResult();
-    const user=result?.user||firebase.auth().currentUser;
-    sessionStorage.removeItem('TRIP_GOOGLE_REDIRECT_PENDING');
-    if(!user)return;
-    updateGoogleLoginBtn(user);
-    setSharedUserStatus(`✅ 로그인됨 · ${user.email||user.uid}`,'ok');
-    const room=new URLSearchParams(location.search).get('room');
-    if(room)connectSharedRoom(room);
+    user=(result&&result.user)||(typeof safeAuthUser==='function'?safeAuthUser():null);
   }catch(e){
-    sessionStorage.removeItem('TRIP_GOOGLE_REDIRECT_PENDING');
-    const message=e?.code==='auth/unauthorized-domain'
-      ? `Firebase 인증 도메인에 ${location.hostname}을(를) 추가해야 합니다.`
-      : e?.code==='auth/operation-not-allowed'
-        ? 'Firebase Console에서 Google 로그인 제공업체를 활성화해야 합니다.'
-        : e.message;
-    setSharedUserStatus(`Google 로그인 실패: ${message}`,'error');
+    error=e;
+    user=(typeof safeAuthUser==='function')?safeAuthUser():null;
+  }
+  clearGoogleLoginFlags();
+  if(user)return googleAcceptUser(user);
+  if(error){
+    setSharedUserStatus(`로그인 복귀 처리 실패: ${googleErrText(error)} · 로그인 버튼을 다시 눌러 주세요.`,'error');
+    return;
+  }
+  // 로그인 페이지로 다녀왔지만 결과가 없음: 계정 취소·창 차단·리다이렉트 오류
+  if(hadRedirect){
+    const iosHint=iphoneIpadLike()?' · (아이폰/아이패드) 설정 → 사파리 → 사이트 간 추적 방지·모든 쿠키 차단을 확인해 보세요':'';
+    setSharedUserStatus(`Google 로그인이 완료되지 않았어요. 로그인 버튼을 다시 눌러 주세요.${iosHint} · 앱 ${typeof APP_VERSION!=='undefined'?APP_VERSION:''}`,'error');
   }
 }
 function sanitizeSharedItems(rawItems){
@@ -4820,6 +4885,8 @@ if(new URLSearchParams(location.search).get('room')&&!initialRoom){
   history.replaceState(null,'',location.pathname);
   setSharedRoomStatus('공유 방 링크 형식이 올바르지 않습니다. 방장에게 새 링크를 받아 주세요.','error');
 }
+const appVersionChip=$('appVersionChip');
+if(appVersionChip)appVersionChip.textContent=`이 앱 버전: ${APP_VERSION}`;
 if(firebaseConfigured()&&window.firebase?.auth){
   if(!firebase.apps.length)firebase.initializeApp(FIREBASE_CONFIG);
   firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(()=>{});
