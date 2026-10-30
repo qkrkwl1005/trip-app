@@ -16,8 +16,6 @@
 <title>여행플래너</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.min.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.min.css">
 <style>
 :root{--bg:#f2f4f7;--s:#fff;--s2:#f6f7fa;--s3:#e9edf3;--bd:#e2e6ee;--bd2:#ccd3de;--tx:#111827;--sub:#5b6472;--pr:#2563eb;--dg:#ef4444;--ok:#10b981;--PLACE:#2563eb;--CAFE:#ec4899;--FOOD:#f59e0b;--SHOP:#8b5cf6;--pr-soft:rgba(59,130,246,.15);--sh-card:0 1px 2px rgba(15,23,42,.04),0 4px 14px rgba(15,23,42,.05)}
 [data-theme=dark]{--bg:#0f1115;--s:#181b20;--s2:#20242b;--s3:#2a2f38;--bd:#2e343e;--bd2:#3c434d;--tx:#f3f4f6;--sub:#9ca3af;--pr:#3b82f6;--dg:#f87171;--ok:#34d399;--PLACE:#60a5fa;--CAFE:#f472b6;--FOOD:#fbbf24;--SHOP:#a78bfa;--pr-soft:rgba(59,130,246,.18);--sh-card:0 1px 2px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.28)}
@@ -327,9 +325,7 @@ input[type=text],input[type=password],textarea{font-size:16px}
 <div id="ptr">↻ 새로고침</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-<script defer src="https://unpkg.com/@googlemaps/markerclusterer@2.5.3/dist/index.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -916,7 +912,7 @@ const pic=(q,v=0)=>'https://tse1.mm.bing.net/th?w=480&h=360&c=7&rs=1&p=0&q='+enc
 
 let items=[],cat='PLACE',pend=[],res=[],lm=null,tl=null,layer=null,pins={},tt,cur=null,view='photo',tileIndex=1,tileFails=0,gmap=null,gmarkers=[],nmap=null,nmarkers=[],mapProvider='osm',editMode={},selected=new Set(),prevTab='add',activeTab='add',gpins=[],gposPts=[],GPinClass=null,mapInfoWindow=null,nMapInfoWindow=null,lastSharedVid='',_lastDrawSig='',_lastStripSig='',_mapFitted=false,_mapFallbackNotice='';
 let mapCat='ALL',mapOnlyVid=false,mapOnlyStar=false,mapOnlyTodo=false,mapDay=0,mapRouteOn=false,userPos=null,nearSortOn=false;
-let lRoute=null,gRoute=null,nRoute=null,_undoFn=null;let _clusterGroup=null,_gCluster=null;
+let lRoute=null,gRoute=null,nRoute=null,_undoFn=null;
 let listFilter={PLACE:'ALL',CAFE:'ALL',FOOD:'ALL',SHOP:'ALL'};
 let sharedRoomId='',sharedUnsubscribe=null,sharedWriteTimer=null,remoteApplying=false,sharedOwnerUid='',sharedMembers={},sharedSettingsShared=false,sharedRevision=0,sharedHistory=[],joinRequestsUnsubscribe=null,joinRequestUnsubscribe=null,sharedLocalDirty=false,sharedWriteRevision=null,sharedConflict=null,creatingSharedRoom=false,sharedBaseItems=[];
 
@@ -955,6 +951,30 @@ function setSharedUserStatus(message,kind=''){
   el.textContent=message;
   el.style.color=kind==='ok'?'var(--ok)':kind==='error'?'var(--dg)':'var(--sub)';
 }
+function updateGoogleLoginBtn(user){
+  const btn=$('googleLoginBtn');if(!btn)return;
+  if(user){
+    const label=user.displayName&&user.email?`${user.displayName} (${user.email})`:(user.displayName||user.email||user.uid);
+    btn.textContent=`✅ ${label} 로그인됨`;
+  }else{
+    btn.textContent='🔐 Google 계정으로 로그인';
+  }
+}
+async function handleGoogleLoginBtn(){
+  let user=null;
+  try{user=(firebaseConfigured()&&firebase.apps?.length)?firebase.auth().currentUser:null;}catch(e){user=null;}
+  if(!user)return signInGoogle();
+  if(!confirm('Google 계정에서 로그아웃할까요? 공유 방을 다시 쓰려면 다시 로그인이 필요해요.'))return;
+  try{
+    await firebase.auth().signOut();
+    updateGoogleLoginBtn(null);
+    setSharedUserStatus('Google 계정에서 로그아웃했어요. 공유 방 사용 시 다시 로그인해 주세요.','');
+    const room=new URLSearchParams(location.search).get('room');
+    if(room)setSharedRoomStatus('공유 방에 참여하려면 다시 Google 계정으로 로그인해 주세요.','error');
+  }catch(e){
+    setSharedUserStatus(`로그아웃 실패: ${e.message}`,'error');
+  }
+}
 async function signInGoogle(){
   if(!firebaseConfigured())return setSharedUserStatus('firebase-config.js 설정이 필요합니다.','error');
   try{
@@ -970,6 +990,7 @@ async function signInGoogle(){
     }
     const result=await firebase.auth().signInWithPopup(provider);
     const user=result.user;
+    updateGoogleLoginBtn(user);
     setSharedUserStatus(`✅ 로그인됨 · ${user.email||user.uid}`,'ok');
     const room=new URLSearchParams(location.search).get('room');
     if(room)connectSharedRoom(room);
@@ -989,6 +1010,7 @@ async function completeGoogleRedirectLogin(){
     const user=result?.user||firebase.auth().currentUser;
     sessionStorage.removeItem('TRIP_GOOGLE_REDIRECT_PENDING');
     if(!user)return;
+    updateGoogleLoginBtn(user);
     setSharedUserStatus(`✅ 로그인됨 · ${user.email||user.uid}`,'ok');
     const room=new URLSearchParams(location.search).get('room');
     if(room)connectSharedRoom(room);
@@ -1676,7 +1698,7 @@ function fallbackToOsm(reason){
     if(isExpectedFallback)$('mapmsg').style.display='none';
     return;
   }
-  gmap=null;nmap=null;_clusterGroup=null;_gCluster=null;
+  gmap=null;nmap=null;
   if(window.L){
     $('map').innerHTML='';
     lm=L.map('map').setView([36.5,128],6);
@@ -1795,12 +1817,6 @@ function fit(){
   if(!lm||!layer)return;
   let b=null;
   try{b=layer.getBounds();}catch(e){b=null;}
-  if(_clusterGroup){
-    try{
-      const cb=_clusterGroup.getBounds();
-      if(cb&&cb.isValid())b=(b&&b.isValid())?b.extend(cb):cb;
-    }catch(e){}
-  }
   if(b&&b.isValid())lm.fitBounds(b,{padding:[50,50],maxZoom:15});
 }
 
@@ -1852,11 +1868,7 @@ function openMapPinPopup(item,expanded=false){
   const marker=pins[item._pinKey];
   if(marker){
     marker.setPopupContent(mapPinPopupHtml(item,expanded));
-    const tryOpen=()=>{try{marker.openPopup();}catch(e){}};
-    if(_clusterGroup&&lm&&lm.getZoom()<16){
-      try{lm.setView([Number(item.lat),Number(item.lng)],17,{animate:true});}catch(e){}
-      setTimeout(tryOpen,450);
-    }else tryOpen();
+    try{marker.openPopup();}catch(e){}
   }
 }
 
@@ -1970,16 +1982,7 @@ function draw(force=false){
     gmarkers.forEach(m=>m.setMap(null));gmarkers=[];
     gposPts=[];
     valid.forEach(i=>gposPts.push(new google.maps.LatLng(Number(i.lat),Number(i.lng))));
-    const gClusterOn=Boolean(window.markerClusterer&&window.markerClusterer.MarkerClusterer&&valid.length>=30);
-    if(_gCluster){try{_gCluster.setMap(null);}catch(e){}_gCluster=null;}
-    if(gClusterOn){
-      const gClusterMarkers=valid.map(i=>{
-        const m=new google.maps.Marker({position:{lat:Number(i.lat),lng:Number(i.lng)},title:i.name});
-        m.addListener('click',()=>openMapPinPopup(i));
-        return m;
-      });
-      _gCluster=new window.markerClusterer.MarkerClusterer({map:gmap,markers:gClusterMarkers});
-    }else if(GPinClass){
+    if(GPinClass){
       valid.forEach(i=>{
         const o=new GPinClass(gmap,i,()=>openMapPinPopup(i));
         gpins.push(o);
@@ -2006,21 +2009,10 @@ function draw(force=false){
     return;
   }
   if(!lm||!layer)return;layer.clearLayers();pins={};
-  // 핀 30개 이상이면 자동 클러스터링 (확대 시 자동 해산)
-  const clusterOn=Boolean(window.L&&L.markerClusterGroup&&valid.length>=30);
-  if(clusterOn){
-    if(_clusterGroup){try{lm.removeLayer(_clusterGroup);}catch(e){}}
-    _clusterGroup=L.markerClusterGroup({showCoverageOnHover:false,maxClusterRadius:62,disableClusteringAtZoom:16,spiderfyDistanceMultiplier:1.5,polygonOptions:{color:'#3b82f6',weight:2,opacity:.6}});
-    lm.addLayer(_clusterGroup);
-  }else if(_clusterGroup){
-    try{lm.removeLayer(_clusterGroup);}catch(e){}
-    _clusterGroup=null;
-  }
-  const pinTarget=clusterOn?_clusterGroup:layer;
   valid.forEach(i=>{
     const m=L.marker([Number(i.lat),Number(i.lng)],{icon:L.divIcon({className:'',html:pinCardHtml(i),iconSize:[52,66],iconAnchor:[26,66]})});
     m.bindPopup(mapPinPopupHtml(i));
-    m.addTo(pinTarget);pins[i._pinKey]=m;
+    m.addTo(layer);pins[i._pinKey]=m;
   });
   updateRouteLine(valid);
 }
@@ -4239,7 +4231,7 @@ $('joinRoomBtn').onclick=()=>{
   location.href=roomUrl(roomId);
 };
 $('copyRoomBtn').onclick=copyRoomLink;
-$('googleLoginBtn').onclick=signInGoogle;
+$('googleLoginBtn').onclick=handleGoogleLoginBtn;
 $('copyUserIdBtn').onclick=copyUserId;
 $('requestJoinBtn').onclick=requestJoin;
 $('addMemberBtn').onclick=addMember;
@@ -4600,7 +4592,6 @@ function initMap(){
         if(!window.google?.maps?.Map)throw new Error('Google Maps API가 초기화되지 않았습니다.');
         gmap=new google.maps.Map($('map'),{center:{lat:34.668,lng:135.501},zoom:12,mapTypeControl:false,fullscreenControl:false,streetViewControl:false});
         GPinClass=makeGPinClass();
-        _gCluster=null;
         initialized=true;
         _mapFallbackNotice='';
         $('mapmsg').style.display='none';
@@ -4674,6 +4665,7 @@ if(firebaseConfigured()&&window.firebase?.auth){
   if(!firebase.apps.length)firebase.initializeApp(FIREBASE_CONFIG);
   firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(()=>{});
   firebase.auth().onAuthStateChanged(user=>{
+    updateGoogleLoginBtn(user);
     if(user){
       setSharedUserStatus(`✅ 로그인됨 · ${user.email||user.uid}`,'ok');
       if(initialRoom)connectSharedRoom(initialRoom);
