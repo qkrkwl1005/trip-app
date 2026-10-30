@@ -397,7 +397,11 @@ function renderRoomConflict(){
   const ids=[...new Set([...localMap.keys(),...remoteMap.keys()])].filter(id=>{
     return JSON.stringify(localMap.get(id)||null)!==JSON.stringify(remoteMap.get(id)||null);
   });
-  el.innerHTML=`<b>⚠️ 장소별 수정 충돌 ${ids.length}건</b><br><small>각 장소에서 내 변경 또는 친구 변경을 선택하세요.</small>`+
+  el.innerHTML=`<b>⚠️ 같은 항목 동시 수정 ${ids.length}건</b><br><small>겹치지 않는 변경은 자동으로 합쳐졌어요. 겹치는 항목만 고르세요 (한 번에 처리도 가능).</small>`+
+    `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+      <button class="mb pr" data-room-action="conflict-all-local">✅ 전체 내 변경 적용</button>
+      <button class="mb" data-room-action="conflict-all-remote">👥 전체 친구 변경 유지</button>
+    </div>`+
     ids.map(id=>{
       const local=localMap.get(id),remote=remoteMap.get(id);
       return `<div style="margin-top:8px;padding:8px;border:1px solid var(--bd);border-radius:8px">
@@ -432,6 +436,43 @@ function resolveRoomConflict(id,source){
     savePendingConflict();
   }
   renderRoomConflict();
+}
+function resolveRoomConflictAll(source){
+  if(!sharedConflict)return;
+  const pending=[...(sharedConflict.pending||[])];
+  if(!pending.length){renderRoomConflict();return;}
+  const localMap=new Map(sharedConflict.localItems.map(item=>[String(item.id),item]));
+  const remoteMap=new Map(sharedConflict.remoteItems.map(item=>[String(item.id),item]));
+  const skipped=pending.filter(id=>{
+    const hasLocal=localMap.has(id),hasRemote=remoteMap.has(id);
+    return !(source==='local'?hasLocal:hasRemote);
+  }).length;
+  const msg=source==='local'
+    ?`미해결 수정 ${pending.length}건을 전부 내 변경으로 적용할까요?\n겹치는 친구의 수정은 사라져요.${skipped?'\n(친구가 새로 만든 항목 '+skipped+'건은 유지돼요)':''}`
+    :`미해결 수정 ${pending.length}건을 전부 친구 변경으로 유지할까요?\n겹치는 내 수정은 사라져요${skipped?'\n(이 기기에만 있는 항목 '+skipped+'건은 그대로 유지돼요)':''}`;
+  if(!confirm(msg))return;
+  pending.forEach(id=>{
+    const selected=(source==='local'?localMap.get(id):remoteMap.get(id))||null;
+    if(!selected)return;
+    const remaining=sharedConflict.pending.filter(c=>c!==id);
+    const base=sharedConflict.remoteItems.filter(item=>String(item.id)!==id);
+    base.push(selected);
+    sharedConflict={...sharedConflict,remoteItems:base,pending:remaining};
+  });
+  if(!sharedConflict.pending.length){
+    items=sharedConflict.remoteItems;
+    const rev=sharedConflict.remoteRevision;
+    sharedConflict=null;
+    clearPendingConflict();
+    sharedLocalDirty=true;
+    sharedRevision=Number(rev||sharedRevision);
+    scheduleSharedWrite();
+  }else{
+    savePendingConflict();
+  }
+  renderRoomConflict();
+  render(true);draw(true);
+  toast('✅ 충돌을 한 번에 정리했어요. 잠시 후 공유 방에 반영돼요.');
 }
 async function requestJoin(){
   const user=window.firebase?.auth?.().currentUser;
@@ -1168,17 +1209,9 @@ async function connectSharedRoom(roomId){
         if(sharedLocalDirty&&sharedWriteRevision===incomingRevision){
           sharedLocalDirty=false;
         }else if(sharedLocalDirty&&incomingRevision!==sharedRevision){
-          const remoteItems=sanitizeSharedItems(data.items);
-          const localMap=new Map(items.map(item=>[String(item.id),item]));
-          const remoteMap=new Map(remoteItems.map(item=>[String(item.id),item]));
-          const pending=[...new Set([...localMap.keys(),...remoteMap.keys()])].filter(id=>{
-            return JSON.stringify(localMap.get(id)||null)!==JSON.stringify(remoteMap.get(id)||null);
-          });
-          sharedConflict={localItems:items.map(item=>({...item})),remoteItems,remoteRevision:incomingRevision,pending};
-          if(Array.isArray(data.items))sharedBaseItems=remoteItems;
-          savePendingConflict();
-          renderRoomConflict();
-          setSharedRoomStatus('⚠️ 친구가 수정한 장소가 있어요. 겹치는 장소는 아래에서 선택해 주세요.','error');
+          if(_autoResolveBusy)return;
+          setSharedRoomStatus('🔄 친구의 변경과 내 변경을 자동으로 합치는 중이에요…','');
+          autoResolveSharedConflict();
           return;
         }else if(sharedLocalDirty){
           return;
@@ -4246,6 +4279,8 @@ document.addEventListener('click',e=>{
   if(action.dataset.roomAction==='approve-request')approveJoinRequest(action.dataset.uid,action.dataset.name);
   if(action.dataset.roomAction==='conflict-local')resolveRoomConflict(action.dataset.id,'local');
   if(action.dataset.roomAction==='conflict-remote')resolveRoomConflict(action.dataset.id,'remote');
+  if(action.dataset.roomAction==='conflict-all-local')resolveRoomConflictAll('local');
+  if(action.dataset.roomAction==='conflict-all-remote')resolveRoomConflictAll('remote');
 });
 $('sheet').onclick=e=>{if(e.target===$('sheet')){save();closeSheet();}};
 $('taxiModal').onclick=e=>{if(e.target===$('taxiModal'))$('taxiModal').classList.remove('show');};
