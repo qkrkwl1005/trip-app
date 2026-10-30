@@ -430,7 +430,11 @@ async function requestJoin(){
       uid:user.uid,name:user.displayName||user.email||'친구',createdAt:firebase.firestore.FieldValue.serverTimestamp()
     });
     toast('방장에게 참여 요청을 보냈어요');
-  }catch(e){toast(`참여 요청 실패: ${e.message}`);}
+  }catch(e){
+    toast(e?.code==='permission-denied'
+      ? '참여 요청 권한이 없습니다. Firebase Rules에 최신 joinRequests 규칙을 게시해 주세요.'
+      : `참여 요청 실패: ${e.message}`);
+  }
 }
 async function approveJoinRequest(uid,name){
   const user=window.firebase?.auth?.().currentUser;
@@ -666,9 +670,6 @@ function firebaseConfigured(){
 function roomUrl(roomId=sharedRoomId){
   return `${location.origin}${location.pathname}?room=${encodeURIComponent(roomId)}`;
 }
-function isValidRoomId(value){
-  return /^[A-Za-z0-9_-]{8,100}$/.test(String(value||''));
-}
 function extractRoomId(value){
   let text=String(value||'').trim();
   for(let attempt=0;attempt<3;attempt++){
@@ -678,12 +679,12 @@ function extractRoomId(value){
       if(nested&&nested!==text){text=nested;continue;}
     }catch(_){}
     try{text=decodeURIComponent(text);}catch(_){}
-    if(isValidRoomId(text))return text;
+    if(/^[A-Za-z0-9_-]{8,100}$/.test(text))return text;
     const match=text.match(/[?&]room=([^&#]+)/);
     if(match){text=match[1];continue;}
     break;
   }
-  return isValidRoomId(text)?text:'';
+  return /^[A-Za-z0-9_-]{8,100}$/.test(text)?text:'';
 }
 function setSharedRoomStatus(message,kind=''){
   const el=$('sharedRoomStatus');
@@ -926,7 +927,17 @@ async function connectSharedRoom(roomId){
         }
       }
       setSharedRoomStatus(`✅ 실시간 공유 중 · 방 ${roomId}`,'ok');
-    },e=>setSharedRoomStatus(`실시간 연결 실패: ${e.message}`,'error'));
+    },e=>{
+      if(e?.code==='permission-denied'||/insufficient permissions/i.test(e?.message||'')){
+        sharedOwnerUid='';
+        sharedMembers={};
+        listenOwnJoinRequest();
+        renderRoomMembers();
+        setSharedRoomStatus('🔒 아직 승인되지 않은 방이에요. 아래 참여 요청을 눌러 방장에게 승인을 요청하세요.','');
+        return;
+      }
+      setSharedRoomStatus(`실시간 연결 실패: ${e.message}`,'error');
+    });
   }catch(e){
     setSharedRoomStatus(`공유 방 연결 실패: ${e.message}`,'error');
   }
@@ -957,10 +968,8 @@ async function addMember(){
   }catch(e){toast(`멤버 승인 실패: ${e.message}`);}
 }
 async function copyRoomLink(){
-  const roomId=extractRoomId(sharedRoomId)||extractRoomId(new URLSearchParams(location.search).get('room'));
-  if(!roomId)return toast('아직 유효한 공유 방이 없습니다. 먼저 공유 방을 만들어 주세요.');
-  sharedRoomId=roomId;
-  const url=roomUrl(roomId);
+  if(!sharedRoomId)return toast('먼저 공유 방을 만들어 주세요');
+  const url=roomUrl();
   try{await navigator.clipboard.writeText(url);toast('공유 방 링크를 복사했어요');}
   catch(e){prompt('이 링크를 친구들에게 보내세요:',url);}
 }
