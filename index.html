@@ -224,6 +224,11 @@ input[type=text],input[type=password],textarea{font-size:16px}
         5) 그래도 실패하면 빨간 문구 전체(끝에 앱 버전 표시됨). 그대로 알려주세요
       </small>
     </details>
+    <details style="margin:2px 0 8px">
+      <summary style="font-size:11px;color:var(--sub);cursor:pointer">로그인 진단 · 기록 보기</summary>
+      <button id="loginDiagCopyBtn" class="mb" style="margin-top:4px">📋 진단 내용 복사</button>
+      <small id="loginDiagOut" style="display:block;margin:4px 0 0;color:var(--sub);font-size:10px;line-height:1.6;white-space:pre-wrap;word-break:break-all">복사 버튼을 누르면 최신 진단이 채워져 클립보드로 복사돼요. 문제가 계속되면 그 내용을 그대로 보내 주세요.</small>
+    </details>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <button id="createRoomBtn" class="btn g">➕ 공유 방 만들기</button>
       <button id="joinRoomBtn" class="btn g">🔗 방 링크 열기</button>
@@ -717,7 +722,7 @@ const TRIP_OFFLINE_QUEUE_KEY='TRIP_OFFLINE_QUEUE';
 const TRIP_PENDING_CONFLICT_KEY='TRIP_PENDING_CONFLICT';
 const TRIP_LAST_ROOM_KEY='TRIP_LAST_ROOM';
 const TRIP_CREATING_ROOM_KEY='TRIP_CREATING_ROOM';
-const APP_VERSION='v53';
+const APP_VERSION='v54';
 const TRANSIENT_NET_RE=/unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
 let _offlineFlushBusy=false,_offlineFastRetries=0,_autoResolveBusy=false;
 let _ownJoinReqHadPending=false,_roomListenRetryTimer=null;
@@ -1120,6 +1125,42 @@ async function handleGoogleLoginBtn(){
   }
 }
 let _ggFallbackUsed=false;
+function logLoginEvent(ev){
+  try{
+    const arr=JSON.parse(localStorage.getItem('TRIP_LOGIN_LOG')||'[]');
+    arr.push({t:new Date().toISOString().slice(11,19),v:APP_VERSION,...ev});
+    while(arr.length>10)arr.shift();
+    localStorage.setItem('TRIP_LOGIN_LOG',JSON.stringify(arr));
+  }catch(_){}
+}
+function buildLoginDiagnostics(){
+  const out=[];
+  out.push('앱 버전: '+APP_VERSION);
+  out.push('사이트: '+location.host+location.pathname);
+  let authDomain='';
+  try{authDomain=(typeof FIREBASE_CONFIG!=='undefined'&&FIREBASE_CONFIG.authDomain)||'';}catch(_){}
+  out.push('authDomain: '+authDomain);
+  let lsOk='',pending='';
+  try{
+    localStorage.setItem('trip_diag','1');
+    lsOk=localStorage.getItem('trip_diag')==='1'?'정상':'이상';
+    localStorage.removeItem('trip_diag');
+    const key='firebase:pendingRedirect:'+((FIREBASE_CONFIG&&FIREBASE_CONFIG.apiKey)||'')+':[DEFAULT]';
+    pending=localStorage.getItem(key)?'대기 표식 있음':'없음';
+  }catch(e){lsOk='접근 불가('+e.name+')';}
+  out.push('로컬 저장소: '+lsOk+' / 로그인 대기 표식: '+pending);
+  out.push('IndexedDB: '+(window.indexedDB?'사용 가능':'사용 불가'));
+  try{
+    const arr=JSON.parse(localStorage.getItem('TRIP_LOGIN_LOG')||'[]');
+    out.push('최근 로그인 기록 (최대 10건):');
+    if(!arr.length)out.push(' · 기록 없음');
+    arr.forEach(r=>{
+      out.push(` · ${r.t} [${r.v}] ${r.at}${r.code?' '+r.code:''}${r.user!==undefined?' user:'+r.user:''}${r.hadRedirect!==undefined?' flag:'+r.hadRedirect:''}${r.hash?' url:'+r.hash:''}`);
+    });
+  }catch(_){}
+  out.push('※ 추적 방지(사파리 설정)는 스크린샷상 꺼짐 확인됨.');
+  return out.join('\n');
+}
 function iphoneIpadLike(){
   const ua=navigator.userAgent||'';
   return /iPad|iPhone|iPod/i.test(ua)||(/Macintosh/i.test(ua)&&Number(navigator.maxTouchPoints||0)>1);
@@ -1145,11 +1186,14 @@ function googleAcceptUser(user){
 function googleRedirectStart(provider,msg){
   try{sessionStorage.setItem('TRIP_GOOGLE_REDIRECT_PENDING','1');}catch(_){}
   setSharedUserStatus(msg||'Google 로그인 페이지로 이동 중...','ok');
+  logLoginEvent({at:'redirect-start'});
   try{
     Promise.resolve(firebase.auth().signInWithRedirect(provider)).catch(e=>{
+      logLoginEvent({at:'redirect-fail',code:(e&&e.code)||''});
       setSharedUserStatus(`Google 로그인 페이지 이동 실패: ${googleErrText(e)} · 앱 ${typeof APP_VERSION!=='undefined'?APP_VERSION:''}`,'error');
     });
   }catch(e){
+    logLoginEvent({at:'redirect-fail',code:(e&&e.code)||''});
     setSharedUserStatus(`Google 로그인 페이지 이동 실패: ${googleErrText(e)} · 앱 ${typeof APP_VERSION!=='undefined'?APP_VERSION:''}`,'error');
   }
 }
@@ -1164,11 +1208,14 @@ async function signInGoogle(){
     const provider=new firebase.auth.GoogleAuthProvider();
     try{provider.setCustomParameters({prompt:'select_account'});}catch(_){}
     setSharedUserStatus('Google 로그인 창을 여는 중...','ok');
+    logLoginEvent({at:'tap'});
     let result=null;
     try{
       result=await firebase.auth().signInWithPopup(provider);
+      logLoginEvent({at:'popup-ok',user:!!(result&&result.user)});
     }catch(pe){
       const code=(pe&&pe.code)||'';
+      logLoginEvent({at:'popup-fail',code});
       if(code==='auth/popup-blocked'||code==='auth/operation-not-supported-in-this-environment'){
         // 팝업이 차단된 환경 → 리다이렉트로 전환
         googleRedirectStart(provider,'팝업이 차단되어 로그인 페이지로 이동 중...');
@@ -1191,6 +1238,7 @@ async function signInGoogle(){
     googleAcceptUser(result.user);
   }catch(e){
     const user=(typeof safeAuthUser==='function')?safeAuthUser():null;
+    logLoginEvent({at:'fail',code:(e&&e.code)||''});
     if(user){clearGoogleLoginFlags();googleAcceptUser(user);return;}
     const hint=iphoneIpadLike()?' · (아이폰/아이패드) 계속 막히면 설정 → 사파리 → 사이트 간 추적 방지·모든 쿠키 차단을 확인하세요':'';
     setSharedUserStatus(`Google 로그인 실패: ${googleErrText(e)}${hint} · 앱 ${typeof APP_VERSION!=='undefined'?APP_VERSION:''}`,'error');
@@ -1209,6 +1257,7 @@ async function completeGoogleRedirectLogin(){
     error=e;
     user=(typeof safeAuthUser==='function')?safeAuthUser():null;
   }
+  logLoginEvent({at:'redirect-back',user:!!user,error:(error&&error.code)||'',hadRedirect,hash:(location.hash+' '+location.search).slice(0,100)});
   clearGoogleLoginFlags();
   if(user)return googleAcceptUser(user);
   if(error){
@@ -4445,6 +4494,13 @@ $('joinRoomBtn').onclick=()=>{
 };
 $('copyRoomBtn').onclick=copyRoomLink;
 $('googleLoginBtn').onclick=handleGoogleLoginBtn;
+$('loginDiagCopyBtn').onclick=async()=>{
+  const text=buildLoginDiagnostics();
+  const out=$('loginDiagOut');
+  if(out)out.textContent=text;
+  try{await navigator.clipboard.writeText(text);toast('진단 내용이 복사됐어요');}
+  catch(e){toast('복사 실패 — 보이는 진단 텍스트를 직접 선택해 복사해 주세요');}
+};
 $('copyUserIdBtn').onclick=copyUserId;
 $('requestJoinBtn').onclick=requestJoin;
 $('addMemberBtn').onclick=addMember;
