@@ -3524,7 +3524,7 @@
           }
         }, 500);
       }
-      function syncSharedSettings() {
+      async function syncSharedSettings() {
         const user = window.firebase?.auth?.().currentUser;
         if (
           !user ||
@@ -3532,14 +3532,18 @@
           sharedOwnerUid !== user.uid ||
           !window.firestoreDb
         )
-          return;
+        return false;
         sharedSettingsShared = true;
-        updateRoomWithRevision({
+        try {
+        await updateRoomWithRevision({
           settings: collectSharedSettings(),
           settingsShared: true,
-        }).catch((e) =>
-          setSharedRoomStatus(`API 설정 공유 실패: ${e.message}`, "error"),
-        );
+        });
+        return true;
+        } catch (e) {
+        setSharedRoomStatus(`API 설정 공유 실패: ${e.message}`, "error");
+        return false;
+        }
       }
       async function createSharedRoomDocument(ref, user) {
         const member = {
@@ -3695,13 +3699,13 @@
                 if (Array.isArray(data.items)) {
                   remoteApplying = true;
                   items = sanitizeSharedItems(data.items);
-                  if (sharedSettingsShared && data.settings && sharedOwnerUid) {
-                    applySharedSettings(data.settings);
-                  }
                   persistNow();
                   remoteApplying = false;
                   render(true);
                   draw(true);
+                }
+                if (sharedSettingsShared && data.settings) {
+                  applySharedSettings(data.settings);
                 }
               } else {
                 const currentUser = firebase.auth().currentUser;
@@ -8824,16 +8828,16 @@ ${caption || rawText}
         if (i) await applyCaptionToItem(i, "", b64s);
       };
 
-      $("aiSaveAll").onclick = () => {
+      $("aiSaveAll").onclick = async () => {
         saveAiProvFromUI();
-        syncSharedSettings();
+        await syncSharedSettings();
         renderUsageBox();
         toast("AI 키 설정을 저장했어요");
       };
-      $("aiClearAll").onclick = () => {
+      $("aiClearAll").onclick = async () => {
         AI_DEFS.forEach((d) => (aiCfg[d.id] = { key: "", model: d.defModel }));
         ls.set("TRIP_AI_CFG", JSON.stringify(aiCfg));
-        syncSharedSettings();
+        await syncSharedSettings();
         buildAiProvUI();
 
         toast("모든 AI 키를 지웠어요");
@@ -8853,31 +8857,31 @@ ${caption || rawText}
         renderUsageBox();
       };
 
-      $("mapProvider").onchange = (e) => {
+      $("mapProvider").onchange = async (e) => {
         ls.set("TRIP_MAP_PROVIDER", e.target.value);
-        syncSharedSettings();
+        await syncSharedSettings();
         location.reload();
       };
-      $("savegmap").onclick = () => {
+      $("savegmap").onclick = async () => {
         ls.set("TRAVEL_GMAP_KEY", $("gmapkey").value.trim());
-        syncSharedSettings();
+        await syncSharedSettings();
         toast("Google Maps 키 저장됨");
         location.reload();
       };
-      $("savenaver").onclick = () => {
+      $("savenaver").onclick = async () => {
         ls.set("TRAVEL_NAVER_KEY", $("naverkey").value.trim());
-        syncSharedSettings();
+        await syncSharedSettings();
         toast("Naver Maps 키 저장됨");
       };
-      $("savecfproxy").onclick = () => {
+      $("savecfproxy").onclick = async () => {
         const norm = normalizeCfProxy($("cfproxy").value);
         $("cfproxy").value = norm;
         ls.set("TRIP_CF_PROXY", norm);
-        syncSharedSettings();
+        await syncSharedSettings();
         toast("프록시 주소 저장됨");
       };
 
-      $("saveMyMaps").onclick = () => {
+      $("saveMyMaps").onclick = async () => {
         const u = $("mymapsUrl").value.trim();
         const em = toEmbedMyMapsUrl(u);
         if (u && !em) return toast("Google My Maps 주소만 사용할 수 있어요");
@@ -8886,7 +8890,7 @@ ${caption || rawText}
           $("mymapsEmbed").value = em;
           ls.set(MYMAPS_EMBED_KEY, em);
         }
-        syncSharedSettings();
+        await syncSharedSettings();
         toast("내 지도 URL 저장됨");
       };
       $("openMyMapsBtn").onclick = () => {
@@ -8894,12 +8898,12 @@ ${caption || rawText}
         if (!raw) return toast("내 지도 URL을 먼저 저장하세요");
         openMyMapsOverlay(raw);
       };
-      $("saveMyMapsEmbed").onclick = () => {
+      $("saveMyMapsEmbed").onclick = async () => {
         ls.set(
           MYMAPS_EMBED_KEY,
           toEmbedMyMapsUrl($("mymapsEmbed").value.trim()),
         );
-        syncSharedSettings();
+        await syncSharedSettings();
         toast("임베드 URL 저장됨");
       };
 
