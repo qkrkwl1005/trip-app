@@ -666,6 +666,22 @@ function firebaseConfigured(){
 function roomUrl(roomId=sharedRoomId){
   return `${location.origin}${location.pathname}?room=${encodeURIComponent(roomId)}`;
 }
+function extractRoomId(value){
+  let text=String(value||'').trim();
+  for(let attempt=0;attempt<3;attempt++){
+    try{
+      const parsed=new URL(text,location.origin);
+      const nested=parsed.searchParams.get('room');
+      if(nested&&nested!==text){text=nested;continue;}
+    }catch(_){}
+    try{text=decodeURIComponent(text);}catch(_){}
+    if(/^[A-Za-z0-9_-]{8,100}$/.test(text))return text;
+    const match=text.match(/[?&]room=([^&#]+)/);
+    if(match){text=match[1];continue;}
+    break;
+  }
+  return /^[A-Za-z0-9_-]{8,100}$/.test(text)?text:'';
+}
 function setSharedRoomStatus(message,kind=''){
   const el=$('sharedRoomStatus');
   if(!el)return;
@@ -3651,8 +3667,9 @@ $('createRoomBtn').onclick=()=>{
 $('joinRoomBtn').onclick=()=>{
   const id=prompt('친구에게 받은 방 링크 또는 방 코드를 입력하세요:','');
   if(!id)return;
-  const match=String(id).match(/[?&]room=([A-Za-z0-9_-]+)/);
-  location.href=roomUrl(match?decodeURIComponent(match[1]):String(id).trim());
+  const roomId=extractRoomId(id);
+  if(!roomId)return toast('올바른 공유 방 링크나 방 코드를 입력해 주세요.');
+  location.href=roomUrl(roomId);
 };
 $('copyRoomBtn').onclick=copyRoomLink;
 $('googleLoginBtn').onclick=signInGoogle;
@@ -4050,7 +4067,11 @@ setTheme(ls.get('TRIP_THEME')||'dark');
 buildAiProvUI();
 render(true);
 initMap();
-const initialRoom=new URLSearchParams(location.search).get('room');
+let initialRoom=extractRoomId(new URLSearchParams(location.search).get('room'));
+if(new URLSearchParams(location.search).get('room')&&!initialRoom){
+  history.replaceState(null,'',location.pathname);
+  setSharedRoomStatus('공유 방 링크 형식이 올바르지 않습니다. 방장에게 새 링크를 받아 주세요.','error');
+}
 if(firebaseConfigured()&&window.firebase?.auth){
   if(!firebase.apps.length)firebase.initializeApp(FIREBASE_CONFIG);
   firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(()=>{});
