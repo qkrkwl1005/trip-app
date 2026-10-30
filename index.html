@@ -3357,6 +3357,10 @@
           error = e;
           user = typeof safeAuthUser === "function" ? safeAuthUser() : null;
         }
+        if (!user && !error && hadRedirect) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          user = typeof safeAuthUser === "function" ? safeAuthUser() : null;
+        }
         logLoginEvent({
           at: "redirect-back",
           user: !!user,
@@ -3383,6 +3387,40 @@
             "error",
           );
         }
+      }
+      async function initializeFirebaseAuth(initialRoom) {
+        if (!firebaseConfigured() || !window.firebase?.auth) return;
+        if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+        const auth = firebase.auth();
+        try {
+          await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+        } catch (e) {
+          logLoginEvent({ at: "persistence-fail", code: (e && e.code) || "" });
+          setSharedUserStatus(
+            `로그인 저장소를 초기화하지 못했어요: ${googleErrText(e)}`,
+            "error",
+          );
+          return;
+        }
+        auth.onAuthStateChanged((user) => {
+          updateGoogleLoginBtn(user);
+          if (user) {
+            setSharedUserStatus(
+              `✅ 로그인됨 · ${user.email || user.uid}`,
+              "ok",
+            );
+            if (initialRoom) connectSharedRoom(initialRoom);
+          } else if (
+            initialRoom &&
+            !sessionFlag("TRIP_GOOGLE_REDIRECT_PENDING")
+          ) {
+            setSharedUserStatus(
+              "방에 참여하려면 Google 계정으로 로그인해 주세요.",
+              "error",
+            );
+          }
+        });
+        await completeGoogleRedirectLogin();
       }
       function sanitizeSharedItems(rawItems) {
         if (!Array.isArray(rawItems)) return [];
@@ -9370,30 +9408,13 @@ ${caption || rawText}
       if (appVersionChip)
         appVersionChip.textContent = `이 앱 버전: ${APP_VERSION}`;
       if (firebaseConfigured() && window.firebase?.auth) {
-        if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
-        firebase
-          .auth()
-          .setPersistence(firebase.auth.Auth.Persistence.LOCAL)
-          .catch(() => {});
-        firebase.auth().onAuthStateChanged((user) => {
-          updateGoogleLoginBtn(user);
-          if (user) {
-            setSharedUserStatus(
-              `✅ 로그인됨 · ${user.email || user.uid}`,
-              "ok",
-            );
-            if (initialRoom) connectSharedRoom(initialRoom);
-          } else if (
-            initialRoom &&
-            !sessionStorage.getItem("TRIP_GOOGLE_REDIRECT_PENDING")
-          ) {
-            setSharedUserStatus(
-              "방에 참여하려면 Google 계정으로 로그인해 주세요.",
-              "error",
-            );
-          }
+        initializeFirebaseAuth(initialRoom).catch((e) => {
+          logLoginEvent({ at: "auth-init-fail", code: (e && e.code) || "" });
+          setSharedUserStatus(
+            `Firebase 로그인 초기화 실패: ${googleErrText(e)}`,
+            "error",
+          );
         });
-        completeGoogleRedirectLogin();
       }
       if (getStorageUsedKB() > 3800) slimStorage(false);
       setTimeout(() => autoFixCoords(), 2000);
