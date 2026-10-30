@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://tse1.mm.bing.net" crossorigin>
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%231e3a8a'/%3E%3Cpath d='M256 96 L416 224 L256 208 L96 224 Z' fill='white'/%3E%3Cpath d='M256 208 L256 384 L224 416 L288 416 L256 384' fill='white'/%3E%3Cpath d='M256 208 L320 320 L288 320 L256 288 L224 320 L192 320 Z' fill='white'/%3E%3C/svg%3E">
 <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%232563eb'/%3E%3Cstop offset='100%25' stop-color='%237c3aed'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='128' height='128' rx='28' fill='url(%23g)'/%3E%3Cpolygon points='64,24 96,96 64,76 32,96' fill='white'/%3E%3C/svg%3E">
-<title>TripSync Master</title>
+<title>여행플래너</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
@@ -149,7 +149,7 @@ input[type=text],input[type=password],textarea{font-size:16px}
 <body>
 <aside id="side">
   <header>
-    <div class="brand"><div class="logo">⚡</div><div><b>TripSync Master</b><small>장소·카페·음식·쇼핑 플래너</small></div></div>
+    <div class="brand"><div class="logo">⚡</div><div><b>여행플래너</b><small>장소·카페·음식·쇼핑 플래너</small></div></div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="planCopyTopBtn" class="mb" title="일정 텍스트 복사">📋 일정복사</button>
       <button id="themeBtn" class="mb"></button>
@@ -258,7 +258,7 @@ input[type=text],input[type=password],textarea{font-size:16px}
         3. 작업 추가: "텍스트" → 위에서 복사한 주소 붙여넣기<br>
         4. 그 줄 끝에서 변수 삽입 → "받은 입력"(시트 입력) 연결<br>
         5. 작업 추가: "URL 열기" → 입력을 앞의 텍스트 결과로 지정<br>
-        6. 이름 "TripSync 저장"으로 저장
+        6. 이름 "여행플래너 저장"으로 저장
       </div>
     </details>
     <label style="margin-top:14px">KMZ / CSV 내보내기·가져오기</label>
@@ -1631,7 +1631,7 @@ function openTaxiModal(i){
 // 카카오톡·메모장 공유용 전체 일정/카테고리 텍스트 생성
 async function copyFormattedPlan(){
   if(!items.length)return toast('아직 저장된 장소가 없어요');
-  const lines=['✈️ [TripSync 여행 장소 리스트]',''];
+  const lines=['✈️ [여행플래너 여행 장소 리스트]',''];
   const withDays=items.filter(x=>Number(x.day)>0);
   if(withDays.length){
     const maxD=Math.max(...withDays.map(x=>Number(x.day)));
@@ -3574,7 +3574,7 @@ $('copyShareUrl').onclick=async()=>{
 
 $('exportKmzBtn').onclick=async()=>{
   const places=expandMapPins(items.filter(i=>isMapRegistered(i)&&hasMapCoordinates(i)));
-  const kml=`<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>TripSync Master</name>${places.map(i=>`<Placemark><name>${esc(i.name)}</name><description>${esc([i.address,i.price,i.info,i.note].filter(Boolean).join(' / '))}</description><ExtendedData><Data name="category"><value>${esc(i.category||'PLACE')}</value></Data><Data name="vid"><value>${esc(getVidUrlStr(i.vid))}</value></Data><Data name="day"><value>${esc(i.day||0)}</value></Data></ExtendedData><Point><coordinates>${Number(i.lng)},${Number(i.lat)},0</coordinates></Point></Placemark>`).join('')}</Document></kml>`;
+  const kml=`<?xml version="1.0" encoding="UTF-8"?><kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>여행플래너</name>${places.map(i=>`<Placemark><name>${esc(i.name)}</name><description>${esc([i.address,i.price,i.info,i.note].filter(Boolean).join(' / '))}</description><ExtendedData><Data name="category"><value>${esc(i.category||'PLACE')}</value></Data><Data name="vid"><value>${esc(getVidUrlStr(i.vid))}</value></Data><Data name="day"><value>${esc(i.day||0)}</value></Data></ExtendedData><Point><coordinates>${Number(i.lng)},${Number(i.lat)},0</coordinates></Point></Placemark>`).join('')}</Document></kml>`;
   const zip=new JSZip();zip.file('doc.kml',kml);
   const blob=await zip.generateAsync({type:'blob'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='tripsync.kmz';a.click();

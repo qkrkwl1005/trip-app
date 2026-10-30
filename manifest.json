@@ -1,6 +1,6 @@
 {
-  "name": "TripSync Master",
-  "short_name": "TripSync",
+  "name": "여행플래너",
+  "short_name": "여행플래너",
   "description": "여행 장소·음식·쇼핑 플래너",
   "start_url": "./index.html",
   "display": "standalone",
