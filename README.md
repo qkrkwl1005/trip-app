@@ -32,7 +32,7 @@ python3 -m http.server 8765
 
 ### 2. Firestore 보안 규칙 설정
 
-테스트 모드는 기간이 지나면 만료되므로 다음 규칙으로 바꾸세요. 저장소의 [firestore.rules](./firestore.rules)와 같은 내용입니다. Google 로그인 사용자 중 방 멤버만 접근할 수 있고, 공유 문서에는 장소 데이터만 저장되도록 필드를 제한하며, API 키는 Firestore에 저장하지 않습니다.
+테스트 모드는 기간이 지나면 만료되므로 다음 규칙으로 바꾸세요. 저장소의 [firestore.rules](./firestore.rules)와 같은 내용입니다. Google 로그인 사용자 중 방 멤버만 접근할 수 있고, 일정 데이터와 방장이 공유한 API·지도 설정만 저장되도록 필드를 제한합니다.
 
 ```text
 rules_version = '2';
@@ -44,7 +44,7 @@ service cloud.firestore {
           && data.members[request.auth.uid].role in ['owner', 'editor'];
       }
       function validRoom(data) {
-        return data.keys().hasOnly(['items', 'updatedAt', 'ownerUid', 'members'])
+        return data.keys().hasOnly(['items', 'updatedAt', 'ownerUid', 'members', 'settings', 'settingsShared'])
           && data.items is list
           && data.items.size() <= 200
           && data.ownerUid is string
@@ -92,8 +92,8 @@ firebase deploy --only firestore:rules
 2. 앱에서 **설정 → 친구들과 실시간 공유 → 공유 방 만들기**를 누릅니다.
 3. 생성된 URL을 친구들에게 보냅니다.
 4. 같은 링크를 연 친구가 장소를 추가하거나 메모·완료 상태를 바꾸면 다른 사람 화면에도 자동 반영됩니다.
-5. AI·지도 API 키는 각 기기에만 저장되며 공유 방으로 전송되지 않습니다. 친구가 AI 검색이나 유료 지도를 사용하려면 친구 기기의 설정에 별도 키를 입력해야 합니다.
+5. 방장이 입력한 AI·지도 설정은 공유 방에서 자동으로 승인 멤버에게 전달됩니다. 친구가 링크를 열고 로그인하면 별도 입력 없이 같은 설정을 사용합니다.
 
 방 소유자는 설정 화면에서 친구의 Google 사용자 ID를 승인해야 합니다. 일반 멤버는 일정 데이터를 수정할 수 있지만 다른 멤버를 승인하거나 방을 삭제할 수 없습니다.
 
-설정 화면에서 현재 참여자 이름과 역할을 확인할 수 있으며, 방 소유자는 공유 방 삭제도 할 수 있습니다. API·지도 설정 공유는 기본적으로 꺼져 있고, 방 소유자가 확인창에서 승인한 경우에만 현재 승인 멤버에게 전달됩니다. API 키를 공유하면 멤버의 브라우저에 저장되므로, Google Cloud와 각 AI 제공자에서 도메인·사용량 제한을 설정하세요.
+설정 화면에서 현재 참여자 이름과 역할을 확인할 수 있으며, 방 소유자는 공유 방 삭제도 할 수 있습니다. API·지도 설정은 공유 방에서 자동으로 승인 멤버에게 전달됩니다. API 키를 공유하면 멤버의 브라우저에 저장되므로, Google Cloud와 각 AI 제공자에서 도메인·사용량 제한을 설정하세요.

@@ -212,10 +212,9 @@ input[type=text],input[type=password],textarea{font-size:16px}
     <button id="copyRoomBtn" class="btn g" style="margin-top:8px">📋 현재 방 링크 복사</button>
     <button id="copyUserIdBtn" class="btn g" style="margin-top:8px">🪪 내 사용자 ID 복사</button>
     <button id="addMemberBtn" class="btn g" style="margin-top:8px">👤 친구 사용자 ID 승인</button>
-    <button id="shareSettingsBtn" class="btn g" style="margin-top:8px">🔑 내 API·지도 설정을 멤버에게 공유</button>
     <button id="deleteRoomBtn" class="btn g" style="margin-top:8px;color:var(--dg)">🗑️ 이 공유 방 삭제</button>
     <div id="roomMembers" class="ds" style="margin-top:8px;white-space:pre-line">참여자 정보를 불러오는 중...</div>
-    <small style="display:block;margin:4px 0 10px;color:var(--sub);font-size:11px">장소·메모·완료 상태만 공유됩니다. AI·지도 API 키는 각 기기에만 저장되며 친구에게 전송되지 않습니다.</small>
+    <small style="display:block;margin:4px 0 10px;color:var(--sub);font-size:11px">공유 방에서는 장소·메모·완료 상태와 현재 API·지도 설정이 승인된 멤버에게 자동 공유됩니다.</small>
 
     <label>AI 제공자 키 (선택 — 여러 개 가능, 위부터 순서대로 시도하고 실패하면 자동으로 다음 제공자)</label>
     <div id="aiProv"></div>
@@ -386,15 +385,7 @@ function applySharedSettings(raw){
       cfProxy:ls.get('TRIP_CF_PROXY')||'',
       myMapsUrl:ls.get('TRIP_MYMAPS_URL')||'',
       myMapsEmbed:getMyMapsEmbedUrl()||''
-    };
-  }
-  function shareSettings(){
-    const user=window.firebase?.auth?.().currentUser;
-    if(!user||sharedOwnerUid!==user.uid)return toast('방 소유자만 API 설정을 공유할 수 있어요');
-    if(!confirm('API 키가 현재 방의 모든 승인 멤버에게 전달됩니다. 계속할까요?'))return;
-    window.firestoreDb.collection('rooms').doc(sharedRoomId).update({
-      settings:collectSharedSettings(),settingsShared:true
-    }).then(()=>toast('API·지도 설정을 승인 멤버에게 공유했어요')).catch(e=>toast(`설정 공유 실패: ${e.message}`));
+    }
   }
 
 const idb={
@@ -584,6 +575,14 @@ function scheduleSharedWrite(){
     }
   },500);
 }
+function syncSharedSettings(){
+  const user=window.firebase?.auth?.().currentUser;
+  if(!user||!sharedRoomId||sharedOwnerUid!==user.uid||!window.firestoreDb)return;
+  sharedSettingsShared=true;
+  window.firestoreDb.collection('rooms').doc(sharedRoomId).update({
+    settings:collectSharedSettings(),settingsShared:true
+  }).catch(e=>setSharedRoomStatus(`API 설정 공유 실패: ${e.message}`,'error'));
+}
 async function connectSharedRoom(roomId){
   if(!roomId)return;
   if(!firebaseConfigured()){
@@ -609,6 +608,12 @@ async function connectSharedRoom(roomId){
         sharedOwnerUid=String(data.ownerUid||'');
         sharedMembers=data.members&&typeof data.members==='object'?data.members:{};
         sharedSettingsShared=data.settingsShared===true;
+        const currentUser=firebase.auth().currentUser;
+        if(currentUser?.uid===sharedOwnerUid&&!sharedSettingsShared){
+          sharedSettingsShared=true;
+          ref.update({settings:collectSharedSettings(),settingsShared:true})
+            .catch(e=>setSharedRoomStatus(`API 설정 공유 활성화 실패: ${e.message}`,'error'));
+        }
         renderRoomMembers();
         if(Array.isArray(data.items)){
           remoteApplying=true;
@@ -621,6 +626,7 @@ async function connectSharedRoom(roomId){
           render(true);draw(true);
         }
       }else{
+        sharedSettingsShared=true;
         scheduleSharedWrite();
       }
       setSharedRoomStatus(`✅ 실시간 공유 중 · 방 ${roomId}`,'ok');
@@ -1521,9 +1527,8 @@ function persistNow(){
   const now=Date.now();
   ls.set('TRIP_UPDATED_AT',String(now));
   idb.set('TRIP_MASTER_DATA',{items,updatedAt:now});
-  if(ls.set('TRIP_MASTER_ITEMS',JSON.stringify(items)))return true;
-  const light=items.map(i=>({...i,img:(i.img&&String(i.img).startsWith('data:image')&&i.img.length>25000)?'':i.img}));
-  const saved=ls.set('TRIP_MASTER_ITEMS',JSON.stringify(light));
+  const fullSaved=ls.set('TRIP_MASTER_ITEMS',JSON.stringify(items));
+  const saved=fullSaved||ls.set('TRIP_MASTER_ITEMS',JSON.stringify(items.map(i=>({...i,img:(i.img&&String(i.img).startsWith('data:image')&&i.img.length>25000)?'':i.img}))));
   scheduleSharedWrite();
   return saved;
 }
@@ -3362,7 +3367,6 @@ $('copyRoomBtn').onclick=copyRoomLink;
 $('googleLoginBtn').onclick=signInGoogle;
 $('copyUserIdBtn').onclick=copyUserId;
 $('addMemberBtn').onclick=addMember;
-$('shareSettingsBtn').onclick=shareSettings;
 $('deleteRoomBtn').onclick=deleteRoom;
 $('planCopyTopBtn').onclick=copyFormattedPlan;
 $('exportPlanBtn').onclick=copyFormattedPlan;
@@ -3453,10 +3457,11 @@ $('sheetShot').onchange=async e=>{
   if(i)await applyCaptionToItem(i,'',b64s);
 };
 
-$('aiSaveAll').onclick=()=>{saveAiProvFromUI();renderUsageBox();toast('AI 키 설정을 저장했어요')};
+$('aiSaveAll').onclick=()=>{saveAiProvFromUI();syncSharedSettings();renderUsageBox();toast('AI 키 설정을 저장했어요')};
 $('aiClearAll').onclick=()=>{
   AI_DEFS.forEach(d=>aiCfg[d.id]={key:'',model:d.defModel});
   ls.set('TRIP_AI_CFG',JSON.stringify(aiCfg));
+  syncSharedSettings();
   buildAiProvUI();
 
   toast('모든 AI 키를 지웠어요');
@@ -3476,13 +3481,14 @@ $('slimBtn').onclick=async()=>{
   renderUsageBox();
 };
 
-$('mapProvider').onchange=e=>{ls.set('TRIP_MAP_PROVIDER',e.target.value);location.reload()};
-$('savegmap').onclick=()=>{ls.set('TRAVEL_GMAP_KEY',$('gmapkey').value.trim());toast('Google Maps 키 저장됨');location.reload()};
-$('savenaver').onclick=()=>{ls.set('TRAVEL_NAVER_KEY',$('naverkey').value.trim());toast('Naver Maps 키 저장됨');};
+$('mapProvider').onchange=e=>{ls.set('TRIP_MAP_PROVIDER',e.target.value);syncSharedSettings();location.reload()};
+$('savegmap').onclick=()=>{ls.set('TRAVEL_GMAP_KEY',$('gmapkey').value.trim());syncSharedSettings();toast('Google Maps 키 저장됨');location.reload()};
+$('savenaver').onclick=()=>{ls.set('TRAVEL_NAVER_KEY',$('naverkey').value.trim());syncSharedSettings();toast('Naver Maps 키 저장됨');};
 $('savecfproxy').onclick=()=>{
   const norm=normalizeCfProxy($('cfproxy').value);
   $('cfproxy').value=norm;
   ls.set('TRIP_CF_PROXY',norm);
+  syncSharedSettings();
   toast('프록시 주소 저장됨');
 };
 
@@ -3495,6 +3501,7 @@ $('saveMyMaps').onclick=()=>{
     $('mymapsEmbed').value=em;
     ls.set(MYMAPS_EMBED_KEY,em);
   }
+  syncSharedSettings();
   toast('내 지도 URL 저장됨');
 };
 $('openMyMapsBtn').onclick=()=>{
@@ -3502,7 +3509,7 @@ $('openMyMapsBtn').onclick=()=>{
   if(!raw)return toast('내 지도 URL을 먼저 저장하세요');
   openMyMapsOverlay(raw);
 };
-$('saveMyMapsEmbed').onclick=()=>{ls.set(MYMAPS_EMBED_KEY,toEmbedMyMapsUrl($('mymapsEmbed').value.trim()));toast('임베드 URL 저장됨')};
+$('saveMyMapsEmbed').onclick=()=>{ls.set(MYMAPS_EMBED_KEY,toEmbedMyMapsUrl($('mymapsEmbed').value.trim()));syncSharedSettings();toast('임베드 URL 저장됨')};
 
 function openMyMapsOverlay(rawUrl){
   const embedUrl=toEmbedMyMapsUrl(rawUrl);
