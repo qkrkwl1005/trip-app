@@ -16,6 +16,8 @@
 <title>여행플래너</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.min.css">
 <style>
 :root{--bg:#f2f4f7;--s:#fff;--s2:#f6f7fa;--s3:#e9edf3;--bd:#e2e6ee;--bd2:#ccd3de;--tx:#111827;--sub:#5b6472;--pr:#2563eb;--dg:#ef4444;--ok:#10b981;--PLACE:#2563eb;--CAFE:#ec4899;--FOOD:#f59e0b;--SHOP:#8b5cf6;--pr-soft:rgba(59,130,246,.15);--sh-card:0 1px 2px rgba(15,23,42,.04),0 4px 14px rgba(15,23,42,.05)}
 [data-theme=dark]{--bg:#0f1115;--s:#181b20;--s2:#20242b;--s3:#2a2f38;--bd:#2e343e;--bd2:#3c434d;--tx:#f3f4f6;--sub:#9ca3af;--pr:#3b82f6;--dg:#f87171;--ok:#34d399;--PLACE:#60a5fa;--CAFE:#f472b6;--FOOD:#fbbf24;--SHOP:#a78bfa;--pr-soft:rgba(59,130,246,.18);--sh-card:0 1px 2px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.28)}
@@ -36,6 +38,8 @@ input:focus,textarea:focus{border-color:var(--pr);box-shadow:0 0 0 3px var(--pr-
 .seg{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;background:var(--s);padding:4px;border:1px solid var(--bd);border-radius:12px;margin-bottom:12px}
 .seg div{padding:8px 2px;text-align:center;font-size:12px;font-weight:700;border-radius:9px;color:var(--sub);white-space:nowrap;cursor:pointer;transition:background .15s,color .15s}.seg .on{background:var(--pr-soft);color:var(--pr);box-shadow:inset 0 0 0 1px rgba(59,130,246,.22)}
 .btn{width:100%;padding:12px;background:var(--pr);color:#fff;border:0;border-radius:12px;font:inherit;font-weight:700;cursor:pointer;touch-action:manipulation;box-shadow:0 2px 10px rgba(37,99,235,.28);transition:transform .12s,opacity .15s}.btn:active{transform:scale(.985)}.btn:disabled{opacity:.55}.btn.g{background:var(--s3);color:var(--tx);margin-bottom:8px;box-shadow:none}
+.spinner{display:inline-block;width:12px;height:12px;border:2px solid var(--bd2);border-top-color:var(--pr);border-radius:50%;animation:spin .8s linear infinite;vertical-align:-2px;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
 .item{background:var(--s2);border:1px solid var(--bd);border-radius:14px;padding:10px;display:flex;gap:11px;align-items:center;cursor:pointer;content-visibility:auto;contain-intrinsic-size:100px;transition:background .15s,border-color .15s,transform .12s}.item:active{transform:scale(.99);background:var(--s3)}.item.done{opacity:.52}
 .item.starred{border-color:rgba(251,191,36,.45)}
 .pic{position:relative;width:78px;height:78px;flex:none;border-radius:12px;background:var(--s3);display:grid;place-items:center;font-size:30px;overflow:hidden}
@@ -56,6 +60,7 @@ input:focus,textarea:focus{border-color:var(--pr);box-shadow:0 0 0 3px var(--pr-
 /* 목록 가로 필터 칩 & 상태 배지 */
 .lchips{display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-bottom:2px;margin-bottom:4px;flex:none}
 .lchips::-webkit-scrollbar{display:none}
+.lchips.sticky{position:sticky;top:0;z-index:6;background:var(--bg);padding-top:6px;padding-bottom:6px;margin-top:-4px}
 .lchip{flex:none;padding:5px 10px;border-radius:99px;border:1px solid var(--bd);background:var(--s2);color:var(--sub);font:inherit;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap;touch-action:manipulation}
 .lchip.on{background:var(--pr);color:#fff;border-color:var(--pr)}
 .bstat{display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:6px;font-size:10.5px;font-weight:800;white-space:nowrap}
@@ -142,9 +147,11 @@ details.acc[open]>summary::after{transform:rotate(225deg)}
 .tab-btn i{font-size:17px}
 .tab-btn[data-tab=map]{display:flex}.tab-content{padding-bottom:calc(88px + env(safe-area-inset-bottom))}
 #map-wrap{position:fixed;left:0;right:0;top:0;bottom:calc(72px + env(safe-area-inset-bottom));height:auto;z-index:5;visibility:hidden;opacity:0;pointer-events:none;transition:opacity .15s}
+#mapmsg{top:150px}
 body.show-map #map-wrap{visibility:visible;opacity:1;pointer-events:auto;z-index:30}
 #myMapsFloatingBack{bottom:calc(84px + env(safe-area-inset-bottom))}
 input[type=text],input[type=password],textarea{font-size:16px}
+.sh{padding-bottom:calc(84px + env(safe-area-inset-bottom))}
 #toast{bottom:calc(96px + env(safe-area-inset-bottom))}}
 </style>
 </head>
@@ -320,7 +327,9 @@ input[type=text],input[type=password],textarea{font-size:16px}
 <div id="ptr">↻ 새로고침</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script defer src="https://unpkg.com/@googlemaps/markerclusterer@2.5.3/dist/index.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -418,10 +427,13 @@ function resolveRoomConflict(id,source){
   if(!remaining.length){
     items=base;
     sharedConflict=null;
+    clearPendingConflict();
     sharedLocalDirty=true;
     sharedRevision=Number(remoteRevision||sharedRevision);
     scheduleSharedWrite();
     render(true);draw(true);
+  }else{
+    savePendingConflict();
   }
   renderRoomConflict();
 }
@@ -453,7 +465,8 @@ async function approveJoinRequest(uid,name){
 async function removeMember(uid){
   const user=window.firebase?.auth?.().currentUser;
   if(!user||user.uid!==sharedOwnerUid)return toast('방장만 멤버를 삭제할 수 있어요');
-  if(!confirm('이 멤버를 방에서 삭제할까요?'))return;
+  if(!confirm('이 멤버를 방에서 삭제할까요? (현재 일정이 JSON으로 자동 백업됩니다)'))return;
+  downloadAutoBackup('member_removed');
   try{
     await updateRoomWithRevision({[`members.${uid}`]:firebase.firestore.FieldValue.delete()});
     toast('멤버를 삭제했어요');
@@ -526,10 +539,26 @@ function applySharedSettings(raw){
   if(typeof raw.myMapsEmbed==='string'&&toEmbedMyMapsUrl(raw.myMapsEmbed))ls.set(MYMAPS_EMBED_KEY,toEmbedMyMapsUrl(raw.myMapsEmbed));
   buildAiProvUI();
 }
+// 파괴적 작업(공유 방 삭제·멤버 추방) 전에 자동으로 JSON 백업 1회 다운로드
+// 저장 형식은 [설정 → 파일 복원(.json)]에서 바로 복구 가능한 순수 배열 형식입니다.
+function downloadAutoBackup(label){
+  try{
+    const dateStr=new Date().toISOString().slice(0,10);
+    const blob=new Blob([JSON.stringify(items.filter(Boolean),null,2)],{type:'application/json'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=`tripsync_auto_${label}_${dateStr}.json`;
+    a.click();
+    setTimeout(()=>{try{URL.revokeObjectURL(a.href);}catch(_){}},30000);
+    return true;
+  }catch(e){return false;}
+}
+
   async function deleteRoom(){
     const user=window.firebase?.auth?.().currentUser;
     if(!user||sharedOwnerUid!==user.uid)return toast('방 소유자만 삭제할 수 있어요');
-    if(!confirm('이 공유 방과 모든 일정을 삭제할까요?'))return;
+    if(!confirm('이 공유 방과 모든 일정을 삭제할까요?\n(삭제 전 현재 일정이 JSON 파일로 자동 백업됩니다)'))return;
+    downloadAutoBackup('room_deleted');
     try{
       await window.firestoreDb.collection('rooms').doc(sharedRoomId).delete();
       if(sharedUnsubscribe)sharedUnsubscribe();
@@ -537,6 +566,9 @@ function applySharedSettings(raw){
       if(joinRequestsUnsubscribe)joinRequestsUnsubscribe();
       sharedRoomId='';sharedOwnerUid='';sharedMembers={};
       sharedConflict=null;
+      sharedBaseItems=[];
+      clearOfflineQueue();
+      clearPendingConflict();
       setSharedRoomStatus('공유 방이 삭제되었어요','ok');
       renderRoomMembers();
       renderRoomGuide();
@@ -555,6 +587,222 @@ function applySharedSettings(raw){
       myMapsEmbed:getMyMapsEmbedUrl()||''
     }
   }
+
+// ===== 오프라인 큐 & 자동 병합 엔진 =====
+// 네트워크 오류/오프라인 시 변경 내용을 임시 저장하고, 온라인 복구 시
+// 친구 변경과 겹치지 않는 부분은 자동 병합한 뒤 겹치는 부분만 충돌 선택 UI로 넘깁니다.
+const TRIP_OFFLINE_QUEUE_KEY='TRIP_OFFLINE_QUEUE';
+const TRIP_PENDING_CONFLICT_KEY='TRIP_PENDING_CONFLICT';
+const TRANSIENT_NET_RE=/unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
+let _offlineFlushBusy=false,_offlineFastRetries=0,_autoResolveBusy=false;
+
+function sameJsonish(a,b){return JSON.stringify(a===undefined?null:a)===JSON.stringify(b===undefined?null:b);}
+const SHARE_FIELDS=['name','localName','address','price','info','note','category','day','lat','lng','done','star','mapVisible','vid','img','useCustomImg','v','places'];
+function diffSharedFields(base,cand){
+  const out=[];
+  SHARE_FIELDS.forEach(f=>{if(!sameJsonish(base&&base[f],cand&&cand[f]))out.push(f);});
+  return out;
+}
+function autoMergeSharedItems(baseItems,localItems,remoteItems){
+  const conflictEntries=[];
+  const baseMap=new Map((baseItems||[]).map(i=>[String(i.id),i]));
+  const localMap=new Map((localItems||[]).map(i=>[String(i.id),i]));
+  const merged=[];
+  const seenRemote=new Set();
+  (remoteItems||[]).forEach(remote=>{
+    if(!remote)return;
+    const id=String(remote.id);seenRemote.add(id);
+    const base=baseMap.get(id);
+    const local=localMap.get(id);
+    const remoteChanged=base?diffSharedFields(base,remote):['*'];
+    if(!local){
+      if(!base)merged.push(remote); // 로컬에 없던 신규 원격 항목
+      else if(remoteChanged.length)merged.push(remote); // 로컬 삭제 vs 원격 수정 → 안전하게 원격 유지
+      return; // 원격 변경 없음 + 로컬 삭제 → 삭제 확정
+    }
+    if(!base){merged.push(local);return;}
+    const localChanged=diffSharedFields(base,local);
+    if(!localChanged.length){merged.push(remote);return;}
+    if(!remoteChanged.length){merged.push(local);return;}
+    const overlap=localChanged.filter(f=>remoteChanged.includes(f));
+    if(!overlap.length){
+      const next={...remote};
+      localChanged.forEach(f=>{next[f]=local[f];});
+      merged.push(next); // 서로 다른 필드를 만졌다면 필드 단위 자동 병합
+    }else{
+      conflictEntries.push({id,local:JSON.parse(JSON.stringify(local)),remote:JSON.parse(JSON.stringify(remote))});
+      merged.push(JSON.parse(JSON.stringify(remote))); // 충돌 항목은 서버엔 원격값, 선택 UI에서 결정
+    }
+  });
+  (localItems||[]).forEach(local=>{
+    if(!local)return;
+    const id=String(local.id);
+    if(seenRemote.has(id))return;
+    const base=baseMap.get(id);
+    if(base){ // 원격에서 삭제된 항목을 로컬에서 수정한 경우만 보존
+      if(diffSharedFields(base,local).length)conflictEntries.push({id,local:JSON.parse(JSON.stringify(local)),remote:null});
+      return;
+    }
+    merged.push(local); // 로컬에서 새로 추가한 항목
+  });
+  return {mergedItems:merged,conflictEntries};
+}
+function queueOfflineSnapshot(){
+  try{
+    let payload={baseRevision:sharedRevision,baseItems:sanitizeSharedItems(sharedBaseItems||[]),finalItems:sanitizeSharedItems(items)};
+    if(!ls.set(TRIP_OFFLINE_QUEUE_KEY,JSON.stringify(payload))){
+      // 용량 초과 시 큰 이미지 dataURL 제거 후 재시도
+      const strip=arr=>arr.map(i=>({...i,img:(String(i.img||'').startsWith('data:image')&&i.img.length>20000)?'':i.img}));
+      payload={...payload,baseItems:strip(payload.baseItems),finalItems:strip(payload.finalItems)};
+      if(!ls.set(TRIP_OFFLINE_QUEUE_KEY,JSON.stringify(payload)))return;
+    }
+    updateNetworkStatus();
+  }catch(_){}
+}
+function clearOfflineQueue(){try{localStorage.removeItem(TRIP_OFFLINE_QUEUE_KEY);updateNetworkStatus();}catch(_){}}
+function hasOfflineQueue(){const v=ls.get(TRIP_OFFLINE_QUEUE_KEY);return Boolean(v&&v.length>2);}
+function savePendingConflict(){try{if(sharedConflict)ls.set(TRIP_PENDING_CONFLICT_KEY,JSON.stringify({roomId:sharedRoomId,conflict:sharedConflict}));}catch(_){}}
+function clearPendingConflict(){try{localStorage.removeItem(TRIP_PENDING_CONFLICT_KEY);}catch(_){}}
+function restorePendingConflict(roomId){
+  try{
+    const raw=ls.get(TRIP_PENDING_CONFLICT_KEY);if(!raw)return;
+    const saved=JSON.parse(raw);
+    if(!saved||saved.roomId!==roomId||!saved.conflict)return;
+    if(sharedConflict)return;
+    sharedConflict=saved.conflict;
+    if(Array.isArray(saved.conflict.localItems)){ // 미해결 로컬 변경을 목록에 되살려 유실 방지
+      const localMap=new Map(saved.conflict.localItems.map(i=>[String(i.id),i]));
+      items=items.map(i=>localMap.get(String(i.id))||i);
+      saved.conflict.localItems.forEach(li=>{if(li&&!items.some(x=>String(x.id)===String(li.id)))items.push(li);});
+    }
+    renderRoomConflict();
+    setSharedRoomStatus('⚠️ 이전 세션의 미해결 수정 충돌이 있어요. 장소별로 선택해 주세요.','error');
+  }catch(_){}
+}
+function scheduleOfflineFlushRetry(ms=10000){
+  clearTimeout(sharedWriteTimer);
+  sharedWriteTimer=setTimeout(()=>{flushOfflineQueue().catch(()=>{});},ms);
+}
+async function flushOfflineQueue(){
+  if(_offlineFlushBusy)return;
+  if(!sharedRoomId||!window.firestoreDb||!firebaseConfigured())return;
+  if(navigator.onLine===false)return;
+  const raw=ls.get(TRIP_OFFLINE_QUEUE_KEY);
+  if(!raw)return;
+  let q;try{q=JSON.parse(raw);}catch(_){clearOfflineQueue();return;}
+  if(!q||!Array.isArray(q.finalItems)){clearOfflineQueue();return;}
+  _offlineFlushBusy=true;
+  try{
+    const ref=window.firestoreDb.collection('rooms').doc(sharedRoomId);
+    const snap=await ref.get().catch(()=>null);
+    if(!snap||!snap.exists){clearOfflineQueue();setSharedRoomStatus('공유 방을 찾을 수 없어요. 대기 변경을 정리했어요.','error');return;}
+    const d=snap.data()||{};
+    const remoteRevision=Number(d.revision||0);
+    const remoteItems=sanitizeSharedItems(d.items||[]);
+    const baseItems=sanitizeSharedItems(q.baseItems||[]);
+    const finalItems=sanitizeSharedItems(q.finalItems||[]);
+    if(sameJsonish(remoteItems,finalItems)){clearOfflineQueue();sharedLocalDirty=false;return;}
+    const history=Array.isArray(d.history)?d.history.slice(-9):[];
+    let mergedItems=finalItems;
+    let conflictEntries=[];
+    if(Number(q.baseRevision)!==remoteRevision){
+      const result=autoMergeSharedItems(baseItems,finalItems,remoteItems);
+      mergedItems=result.mergedItems;
+      conflictEntries=result.conflictEntries;
+    }
+    const newRevision=remoteRevision+1;
+    history.push({items:d.items||[],savedAt:Date.now(),savedBy:firebase.auth().currentUser?.uid||''});
+    await window.firestoreDb.runTransaction(async tx=>{
+      const cur=await tx.get(ref);
+      if(!cur.exists)throw new Error('ROOM_MISSING');
+      if(Number(cur.data().revision||0)!==remoteRevision)throw new Error('CONCURRENT_EDIT');
+      tx.update(ref,{items:removeUndefined(sanitizeSharedItems(mergedItems)),history,revision:newRevision,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    });
+    clearOfflineQueue();
+    sharedLocalDirty=false;
+    sharedWriteRevision=newRevision;
+    sharedRevision=newRevision;
+    sharedBaseItems=remoteItems;
+    const conflictedIds=conflictEntries.map(c=>String(c.id));
+    sharedConflict=conflictedIds.length?{
+      localItems:conflictEntries.filter(c=>c.local).map(c=>c.local),
+      remoteItems:sanitizeSharedItems(mergedItems).map(i=>({...i})),
+      remoteRevision:newRevision,
+      pending:conflictedIds
+    }:null;
+    if(sharedConflict)savePendingConflict();
+    remoteApplying=true;
+    items=sanitizeSharedItems(mergedItems);
+    persistNow();
+    remoteApplying=false;
+    render(true);draw(true);renderRoomConflict();
+    setSharedRoomStatus(`✅ 공유 중 · ${sharedRoomId}`,'ok');
+    _offlineFastRetries=0;
+    toast(conflictedIds.length
+      ?`🔄 오프라인 변경을 올렸어요 · 겹치는 ${conflictedIds.length}건은 선택 필요`
+      :'🔄 오프라인 동안의 변경을 공유 방에 올렸어요');
+  }catch(e){
+    if(e.message==='CONCURRENT_EDIT'&&_offlineFastRetries<5){
+      _offlineFastRetries++;
+      setTimeout(()=>flushOfflineQueue().catch(()=>{}),1500);
+      return;
+    }
+    _offlineFastRetries=0;
+    scheduleOfflineFlushRetry(8000);
+    setSharedRoomStatus('⏳ 오프라인 동기화 대기 중 · 변경 내용은 안전하게 임시 저장되어 있어요','error');
+    updateNetworkStatus();
+  }finally{_offlineFlushBusy=false;}
+}
+async function autoResolveSharedConflict(){
+  if(_autoResolveBusy||!sharedRoomId||!window.firestoreDb)return;
+  _autoResolveBusy=true;
+  try{
+    const ref=window.firestoreDb.collection('rooms').doc(sharedRoomId);
+    const snap=await ref.get();
+    if(!snap.exists)return;
+    const d=snap.data()||{};
+    const remoteRevision=Number(d.revision||0);
+    const remoteItems=sanitizeSharedItems(d.items||[]);
+    const baseItems=sanitizeSharedItems(sharedBaseItems||[]);
+    const result=autoMergeSharedItems(baseItems,items,remoteItems);
+    const mergedItems=result.mergedItems;
+    const conflictEntries=result.conflictEntries;
+    const newRevision=remoteRevision+1;
+    const history=Array.isArray(d.history)?d.history.slice(-9):[];
+    history.push({items:d.items||[],savedAt:Date.now(),savedBy:firebase.auth().currentUser?.uid||''});
+    await window.firestoreDb.runTransaction(async tx=>{
+      const cur=await tx.get(ref);
+      if(!cur.exists)throw new Error('ROOM_MISSING');
+      if(Number(cur.data().revision||0)!==remoteRevision)throw new Error('CONCURRENT_EDIT');
+      tx.update(ref,{items:removeUndefined(sanitizeSharedItems(mergedItems)),history,revision:newRevision,updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+    });
+    sharedWriteRevision=newRevision;
+    sharedRevision=newRevision;
+    sharedBaseItems=remoteItems;
+    const conflictedIds=conflictEntries.map(c=>String(c.id));
+    sharedConflict=conflictedIds.length?{
+      localItems:conflictEntries.filter(c=>c.local).map(c=>c.local),
+      remoteItems:sanitizeSharedItems(mergedItems).map(i=>({...i})),
+      remoteRevision:newRevision,
+      pending:conflictedIds
+    }:null;
+    if(sharedConflict)savePendingConflict();
+    remoteApplying=true;
+    items=sanitizeSharedItems(mergedItems);
+    persistNow();
+    remoteApplying=false;
+    render(true);draw(true);renderRoomConflict();
+    if(conflictedIds.length){
+      setSharedRoomStatus(`⚠️ 동시 수정 ${conflictedIds.length}건은 선택이 필요해요 (나머지는 자동 병합 완료)`,'error');
+    }else{
+      sharedLocalDirty=false;
+      setSharedRoomStatus(`✅ 공유 중 · ${sharedRoomId}`,'ok');
+      toast('⚡ 겹치지 않는 변경은 자동으로 병합했어요');
+    }
+  }catch(e){
+    setSharedRoomStatus(`충돌 자동 병합 실패: ${e.message}`,'error');
+  }finally{_autoResolveBusy=false;}
+}
 
 const idb={
   db:null,
@@ -668,9 +916,9 @@ const pic=(q,v=0)=>'https://tse1.mm.bing.net/th?w=480&h=360&c=7&rs=1&p=0&q='+enc
 
 let items=[],cat='PLACE',pend=[],res=[],lm=null,tl=null,layer=null,pins={},tt,cur=null,view='photo',tileIndex=1,tileFails=0,gmap=null,gmarkers=[],nmap=null,nmarkers=[],mapProvider='osm',editMode={},selected=new Set(),prevTab='add',activeTab='add',gpins=[],gposPts=[],GPinClass=null,mapInfoWindow=null,nMapInfoWindow=null,lastSharedVid='',_lastDrawSig='',_lastStripSig='',_mapFitted=false,_mapFallbackNotice='';
 let mapCat='ALL',mapOnlyVid=false,mapOnlyStar=false,mapOnlyTodo=false,mapDay=0,mapRouteOn=false,userPos=null,nearSortOn=false;
-let lRoute=null,gRoute=null,nRoute=null,_undoFn=null;
+let lRoute=null,gRoute=null,nRoute=null,_undoFn=null;let _clusterGroup=null,_gCluster=null;
 let listFilter={PLACE:'ALL',CAFE:'ALL',FOOD:'ALL',SHOP:'ALL'};
-let sharedRoomId='',sharedUnsubscribe=null,sharedWriteTimer=null,remoteApplying=false,sharedOwnerUid='',sharedMembers={},sharedSettingsShared=false,sharedRevision=0,sharedHistory=[],joinRequestsUnsubscribe=null,joinRequestUnsubscribe=null,sharedLocalDirty=false,sharedWriteRevision=null,sharedConflict=null,creatingSharedRoom=false;
+let sharedRoomId='',sharedUnsubscribe=null,sharedWriteTimer=null,remoteApplying=false,sharedOwnerUid='',sharedMembers={},sharedSettingsShared=false,sharedRevision=0,sharedHistory=[],joinRequestsUnsubscribe=null,joinRequestUnsubscribe=null,sharedLocalDirty=false,sharedWriteRevision=null,sharedConflict=null,creatingSharedRoom=false,sharedBaseItems=[];
 
 const FIREBASE_CONFIG=window.TRIPSYNC_FIREBASE_CONFIG||{};
 function firebaseConfigured(){
@@ -787,6 +1035,11 @@ function scheduleSharedWrite(){
   if(!sharedRoomId||remoteApplying||!window.firestoreDb)return;
   clearTimeout(sharedWriteTimer);
   sharedWriteTimer=setTimeout(async()=>{
+    if(navigator.onLine===false){
+      queueOfflineSnapshot();
+      setSharedRoomStatus('📴 오프라인 · 변경 내용을 임시 저장했어요. 네트워크가 복구되면 자동으로 반영돼요.','');
+      return;
+    }
     try{
       const ref=window.firestoreDb.collection('rooms').doc(sharedRoomId);
       await window.firestoreDb.runTransaction(async tx=>{
@@ -813,7 +1066,17 @@ function scheduleSharedWrite(){
       sharedWriteRevision=null;
       setSharedRoomStatus(`✅ 공유 중 · ${sharedRoomId}`,'ok');
     }catch(e){
-      setSharedRoomStatus(e.message==='CONCURRENT_EDIT'?'⚠️ 친구가 먼저 수정했어요. 최신 내용으로 다시 확인해 주세요.':`공유 저장 실패: ${e.message}`,'error');
+      const transient=TRANSIENT_NET_RE.test(`${e?.code||''} ${e?.message||''}`);
+      if(e.message==='CONCURRENT_EDIT'){
+        setSharedRoomStatus('⚡ 친구가 먼저 수정했어요. 겹치지 않는 변경은 자동 병합을 시도합니다.','');
+        await autoResolveSharedConflict();
+      }else if(transient||navigator.onLine===false){
+        queueOfflineSnapshot();
+        setSharedRoomStatus('📴 오프라인 · 변경 내용을 임시 저장했어요. 네트워크가 복구되면 자동으로 반영돼요.','');
+        scheduleOfflineFlushRetry(10000);
+      }else{
+        setSharedRoomStatus(`공유 저장 실패: ${e.message}`,'error');
+      }
     }
   },500);
 }
@@ -868,9 +1131,11 @@ async function connectSharedRoom(roomId){
     const user=firebase.auth().currentUser;
     if(!user)throw new Error('먼저 Google 계정으로 로그인해 주세요.');
     window.firestoreDb=firebase.firestore();
-    window.firestoreDb.settings({ignoreUndefinedProperties:true});
+    try{window.firestoreDb.settings({ignoreUndefinedProperties:true});}catch(_){}
+    try{await window.firestoreDb.enablePersistence({synchronizeTabs:true});}catch(_){}
     setSharedUserStatus(`✅ 로그인됨 · ${user.email||user.uid}`,'ok');
     sharedRoomId=roomId;
+    restorePendingConflict(roomId);
     listenOwnJoinRequest();
     if(sharedUnsubscribe)sharedUnsubscribe();
     const ref=window.firestoreDb.collection('rooms').doc(roomId);
@@ -888,8 +1153,10 @@ async function connectSharedRoom(roomId){
             return JSON.stringify(localMap.get(id)||null)!==JSON.stringify(remoteMap.get(id)||null);
           });
           sharedConflict={localItems:items.map(item=>({...item})),remoteItems,remoteRevision:incomingRevision,pending};
+          if(Array.isArray(data.items))sharedBaseItems=remoteItems;
+          savePendingConflict();
           renderRoomConflict();
-          setSharedRoomStatus('⚠️ 친구가 수정한 장소가 있어요. 장소별로 적용할 변경을 선택해 주세요.','error');
+          setSharedRoomStatus('⚠️ 친구가 수정한 장소가 있어요. 겹치는 장소는 아래에서 선택해 주세요.','error');
           return;
         }else if(sharedLocalDirty){
           return;
@@ -899,6 +1166,7 @@ async function connectSharedRoom(roomId){
         sharedSettingsShared=data.settingsShared===true;
         sharedRevision=Number(data.revision||0);
         sharedHistory=Array.isArray(data.history)?data.history:[];
+        if(Array.isArray(data.items))sharedBaseItems=sanitizeSharedItems(data.items);
         const currentUser=firebase.auth().currentUser;
         if(currentUser?.uid===sharedOwnerUid&&!Object.prototype.hasOwnProperty.call(data,'revision')){
           ref.update({revision:0,history:[]})
@@ -947,6 +1215,7 @@ async function connectSharedRoom(roomId){
       }
       setSharedRoomStatus(`실시간 연결 실패: ${e.message}`,'error');
     });
+    flushOfflineQueue().catch(()=>{});
   }catch(e){
     setSharedRoomStatus(`공유 방 연결 실패: ${e.message}`,'error');
   }
@@ -1121,9 +1390,18 @@ window.imgErr=function(el){
   el.remove();
 };
 
-// 실행 취소(Undo) 버튼을 지원하는 스마트 토스트
+// 실행 취소(Undo) 버튼을 지원하는 스마트 토스트 + 진행중(스피너) 토스트
+let _toastBusy=false;
+function toastBusy(m){
+  const t=$('toast');
+  _toastBusy=true;
+  clearTimeout(tt);
+  t.innerHTML=`<span class="spinner" aria-hidden="true"></span><span>${esc(m)}</span>`;
+  t.classList.add('show');
+}
 function toast(m,undoFn=null){
   const t=$('toast');
+  _toastBusy=false;
   _undoFn=undoFn;
   if(undoFn){
     t.innerHTML=`<span>${esc(m)}</span><button type="button" class="mb pr" data-act="undoToast" style="padding:4px 9px;font-size:11.5px;flex:none">↩ 되돌리기</button>`;
@@ -1398,7 +1676,7 @@ function fallbackToOsm(reason){
     if(isExpectedFallback)$('mapmsg').style.display='none';
     return;
   }
-  gmap=null;nmap=null;
+  gmap=null;nmap=null;_clusterGroup=null;_gCluster=null;
   if(window.L){
     $('map').innerHTML='';
     lm=L.map('map').setView([36.5,128],6);
@@ -1449,7 +1727,7 @@ async function fetchRepPhoto(q){
         <button class="mb" data-act="nearSort" data-cat="${c}" style="flex:none">⚡ 가까운순</button>
         <button class="mb" data-act="toggleEdit" data-cat="${c}" style="flex:none">✏️</button>
       </div>
-      <div class="lchips" id="lchips-${c}"></div>
+      <div class="lchips sticky" id="lchips-${c}"></div>
       <div id="bulk-${c}" style="display:none;margin-bottom:6px;gap:8px;align-items:center">
         <label style="display:flex;align-items:center;gap:4px;margin:0"><input type="checkbox" data-act="selectAll" data-cat="${c}"> 전체</label>
         <button class="mb dg" data-act="bulkDelete" data-cat="${c}">선택 삭제</button>
@@ -1515,8 +1793,15 @@ function fit(){
     return;
   }
   if(!lm||!layer)return;
-  const b=layer.getBounds();
-  if(b.isValid())lm.fitBounds(b,{padding:[50,50],maxZoom:15});
+  let b=null;
+  try{b=layer.getBounds();}catch(e){b=null;}
+  if(_clusterGroup){
+    try{
+      const cb=_clusterGroup.getBounds();
+      if(cb&&cb.isValid())b=(b&&b.isValid())?b.extend(cb):cb;
+    }catch(e){}
+  }
+  if(b&&b.isValid())lm.fitBounds(b,{padding:[50,50],maxZoom:15});
 }
 
 function pinCardHtml(i){
@@ -1567,7 +1852,11 @@ function openMapPinPopup(item,expanded=false){
   const marker=pins[item._pinKey];
   if(marker){
     marker.setPopupContent(mapPinPopupHtml(item,expanded));
-    marker.openPopup();
+    const tryOpen=()=>{try{marker.openPopup();}catch(e){}};
+    if(_clusterGroup&&lm&&lm.getZoom()<16){
+      try{lm.setView([Number(item.lat),Number(item.lng)],17,{animate:true});}catch(e){}
+      setTimeout(tryOpen,450);
+    }else tryOpen();
   }
 }
 
@@ -1681,7 +1970,16 @@ function draw(force=false){
     gmarkers.forEach(m=>m.setMap(null));gmarkers=[];
     gposPts=[];
     valid.forEach(i=>gposPts.push(new google.maps.LatLng(Number(i.lat),Number(i.lng))));
-    if(GPinClass){
+    const gClusterOn=Boolean(window.markerClusterer&&window.markerClusterer.MarkerClusterer&&valid.length>=30);
+    if(_gCluster){try{_gCluster.setMap(null);}catch(e){}_gCluster=null;}
+    if(gClusterOn){
+      const gClusterMarkers=valid.map(i=>{
+        const m=new google.maps.Marker({position:{lat:Number(i.lat),lng:Number(i.lng)},title:i.name});
+        m.addListener('click',()=>openMapPinPopup(i));
+        return m;
+      });
+      _gCluster=new window.markerClusterer.MarkerClusterer({map:gmap,markers:gClusterMarkers});
+    }else if(GPinClass){
       valid.forEach(i=>{
         const o=new GPinClass(gmap,i,()=>openMapPinPopup(i));
         gpins.push(o);
@@ -1708,10 +2006,21 @@ function draw(force=false){
     return;
   }
   if(!lm||!layer)return;layer.clearLayers();pins={};
+  // 핀 30개 이상이면 자동 클러스터링 (확대 시 자동 해산)
+  const clusterOn=Boolean(window.L&&L.markerClusterGroup&&valid.length>=30);
+  if(clusterOn){
+    if(_clusterGroup){try{lm.removeLayer(_clusterGroup);}catch(e){}}
+    _clusterGroup=L.markerClusterGroup({showCoverageOnHover:false,maxClusterRadius:62,disableClusteringAtZoom:16,spiderfyDistanceMultiplier:1.5,polygonOptions:{color:'#3b82f6',weight:2,opacity:.6}});
+    lm.addLayer(_clusterGroup);
+  }else if(_clusterGroup){
+    try{lm.removeLayer(_clusterGroup);}catch(e){}
+    _clusterGroup=null;
+  }
+  const pinTarget=clusterOn?_clusterGroup:layer;
   valid.forEach(i=>{
     const m=L.marker([Number(i.lat),Number(i.lng)],{icon:L.divIcon({className:'',html:pinCardHtml(i),iconSize:[52,66],iconAnchor:[26,66]})});
     m.bindPopup(mapPinPopupHtml(i));
-    m.addTo(layer);pins[i._pinKey]=m;
+    m.addTo(pinTarget);pins[i._pinKey]=m;
   });
   updateRouteLine(valid);
 }
@@ -1804,6 +2113,16 @@ function samePlace(a,b){
   const aAddress=norm(a.address),bAddress=norm(b.address);
   const sameAddress=Boolean(aAddress&&bAddress&&aAddress===bAddress);
   const addressCompatible=!aAddress||!bAddress||sameAddress;
+  const namePrefixOverlap=(aName&&bName&&(aName.startsWith(bName)||bName.startsWith(aName)))
+    ||(aLocal&&bLocal&&(aLocal.startsWith(bLocal)||bLocal.startsWith(aLocal)));
+  // 우편번호(+번지) 일치 & 상호 일부 일치 → 스마트 병합
+  if(namePrefixOverlap&&sharePostalBanchi(a.address,b.address))return true;
+  // 위경도 60m 이내 & 상호 일부 일치 → 같은 건물 표기 차이 병합
+  if(addressCompatible&&namePrefixOverlap&&isSameShopCoord(a.lat,a.lng,b.lat,b.lng,0.06))return true;
+  // 한국어/일본어 등 표기 차이: 우편번호 + 60m 이내지만, 한쪽 이름이 비어 있을 때만 (서로 다른 상점 오병합 방지)
+  const aNameEmpty=(!aName||isGenericSharedName(a.name))&&(!aLocal||aLocal.length<2);
+  const bNameEmpty=(!bName||isGenericSharedName(b.name))&&(!bLocal||bLocal.length<2);
+  if((aNameEmpty||bNameEmpty)&&sharePostalBanchi(a.address,b.address)&&isSameShopCoord(a.lat,a.lng,b.lat,b.lng,0.06))return true;
   return Boolean(sameAddress||(addressCompatible&&aName&&bName&&aName===bName)||(addressCompatible&&aLocal&&bLocal&&aLocal===bLocal));
 }
 function syncGroupedItem(item){
@@ -1864,7 +2183,8 @@ function renderMapChips(){
     <button type="button" class="chip sub" data-act="nearSort" style="${nearSortOn?'background:var(--pr);color:#fff;border-color:transparent':''}">⚡ 가까운순</button>
     <button type="button" class="chip sub" data-act="mapFitAll">🎯 화면맞춤</button>
   `;
-  w.innerHTML=`<div class="chip-row">${allBtn}${catBtns}</div><div class="chip-row">${subRow}</div>`;
+  const dayRow=activeDays.length?`<div class="chip-row"><button type="button" class="chip" data-act="mapDaySet" data-day="0" style="${mapDay?'':'background:var(--pr);color:#fff;border-color:transparent'}">🗓️ 전체일차</button>${activeDays.map(d=>`<button type="button" class="chip sub" data-act="mapDaySet" data-day="${d}" style="${mapDay===Number(d)?'background:var(--pr);color:#fff;border-color:transparent':''}">Day ${d}</button>`).join('')}</div>`:'';
+  w.innerHTML=`<div class="chip-row">${allBtn}${catBtns}</div><div class="chip-row">${subRow}</div>${dayRow}`;
 }
 
 // 지역 키워드 자동 추출 (목록 필터 칩용)
@@ -2011,7 +2331,9 @@ function save(){
   _drawT=setTimeout(()=>{persistNow();draw();hydrateInstagramThumbs();},200);
 }
 window.addEventListener('pagehide',()=>{try{persistNow()}catch(e){}});
-document.addEventListener('visibilitychange',()=>{try{if(document.visibilityState==='hidden')persistNow()}catch(e){}});
+document.addEventListener('visibilitychange',()=>{try{if(document.visibilityState==='hidden')persistNow();else if(navigator.onLine&&hasOfflineQueue())flushOfflineQueue().catch(()=>{});}catch(e){}});
+// 오프라인 큐 안전 재시도 (1분마다, 큐가 있을 때만)
+setInterval(()=>{try{if(navigator.onLine&&hasOfflineQueue())flushOfflineQueue().catch(()=>{});}catch(e){}},60000);
 
 function normalizeOcrAddr(s){
   return String(s||'')
@@ -2048,16 +2370,51 @@ function getGMapDirLink(i){
 }
 
 // 중복 장소 판별기 (동일 가게 중복 저장 방지 및 정보 보완용)
+// 규칙: ①상호 정규화 일치 ②우편번호 일치+상호 일부 일치 ③위경도 60m 이내+상호 일부 일치
+function normalizeNameKey(s){
+  return String(s||'')
+    .replace(/\s+/g,'')
+    .toLowerCase()
+    .replace(/[?!.,;:~+)("']/g,'');
+}
+function isSameShopCoord(aLat,aLng,bLat,bLng,tolKm=0.06){
+  const aLatN=Number(aLat),aLngN=Number(aLng),bLatN=Number(bLat),bLngN=Number(bLng);
+  if(!aLatN||!aLngN||!bLatN||!bLngN)return false;
+  try{return distKm(aLatN,aLngN,bLatN,bLngN)<=tolKm;}catch(e){return false;}
+}
+function nameKeyOverlap(a,b){
+  return Boolean(a&&b&&(a.startsWith(b)||b.startsWith(a)));
+}
+function sharePostalBanchi(aAddr,bAddr){
+  const za=(String(aAddr||'').match(/(\d{3}-\d{4})/)||[])[1]||'';
+  const zb=(String(bAddr||'').match(/(\d{3}-\d{4})/)||[])[1]||'';
+  if(!za||!zb||za!==zb)return false;
+  const ba=(String(aAddr||'').match(/(\d+\s*-\s*\d+(?:\s*-\s*\d+)?)/)||[])[1]||'';
+  if(!ba)return true; // 우편번호만 일치(매우 좁은 블록)
+  return String(bAddr||'').includes(ba.replace(/\s+/g,''));
+}
 function findExistingDuplicate(cand,excludeIds=new Set()){
-  const nm=String(cand.name||'').replace(/\s+/g,'').toLowerCase();
-  const lnm=String(cand.localName||'').replace(/\s+/g,'').toLowerCase();
+  const nm=normalizeNameKey(cand.name);
+  const lnm=normalizeNameKey(cand.localName);
   if((!nm||nm.length<2||isGenericSharedName(cand.name))&&(!lnm||lnm.length<2))return null;
+  const candAddr=normalizeOcrAddr(cand.address||'');
   return items.find(x=>{
     if(excludeIds.has(x.id))return false;
-    const xnm=String(x.name||'').replace(/\s+/g,'').toLowerCase();
-    const xlnm=String(x.localName||'').replace(/\s+/g,'').toLowerCase();
-    if(nm&&nm.length>=3&&xnm===nm)return true;
+    const xnm=normalizeNameKey(x.name);
+    const xlnm=normalizeNameKey(x.localName);
+    const xAddr=normalizeOcrAddr(x.address||'');
+    // 규칙 1: 상호명 정규화 일치
+    if(nm&&nm.length>=3&&(xnm===nm||xlnm===nm))return true;
     if(lnm&&lnm.length>=2&&(xlnm===lnm||xnm===lnm))return true;
+    const nameOverlaps=nameKeyOverlap(nm,xnm)||nameKeyOverlap(nm,xlnm)||nameKeyOverlap(lnm,xnm)||nameKeyOverlap(lnm,xlnm);
+    // 규칙 2: 우편번호(+번지) 동일 & 상호 일부 일치
+    if(nameOverlaps&&sharePostalBanchi(candAddr,xAddr))return true;
+    // 규칙 3: 위경도 60m 이내 & 상호 일부 일치 (같은 건물 오탈자 케이스)
+    if(nameOverlaps&&isSameShopCoord(cand.lat,cand.lng,x.lat,x.lng,0.06))return true;
+    // 규칙 4: 우편번호 일치 + 60m 이내 (이름 없는 후보 → 동일 가게로 병합; 명시적 상호명끼리는 병합하지 않음)
+    const candNameEmpty=(!nm||isGenericSharedName(cand.name))&&(!lnm||lnm.length<2);
+    const xNameEmpty=(!xnm||isGenericSharedName(x.name))&&(!xlnm||xlnm.length<2);
+    if((candNameEmpty||xNameEmpty)&&sharePostalBanchi(candAddr,xAddr)&&isSameShopCoord(cand.lat,cand.lng,x.lat,x.lng,0.06))return true;
     return false;
   })||null;
 }
@@ -2920,7 +3277,7 @@ async function analyzeContent({rawText='',vidUrl='',images=[],hint=''}){
     if(fetched){
       caption=(caption+'\n'+fetched).trim();
     }else{
-      capStatus='릴스 캡션을 못 가져왔어요(인스타 익명차단)';
+      capStatus='🔒 인스타 차단으로 캡션을 가져오지 못했습니다. 아래 2번 칸에 캡션·고정댓글을 직접 붙여넣어 주세요';
     }
   }
 
@@ -3073,6 +3430,7 @@ async function runAnalyzeShare(files=[]){
 
   const btn=$('analyzeShare');
   btn.disabled=true;btn.textContent='🔥 분석 중...';
+  toastBusy('🔥 캡션 분석·위경도 검색 중... (인스타 차단 시 수동 붙여넣기로 대체할 수 있어요)');
 
   try{
     const metaFromBox=parseVideoMeta(explicitLink)||parseVideoMeta(raw);
@@ -3201,7 +3559,7 @@ async function runAnalyzeShare(files=[]){
       return;
     }
 
-    const failNote=['자동 인식 실패(인스타 익명차단·AI 한도 등) — 시트에서 [📋 복사한 캡션/주소 붙여넣기]를 누르면 캡션 글자만으로 어떤 장소든 한 번에 저장돼요',aiErr?`AI: ${aiErr}`:'',capStatus].filter(Boolean).join(' · ');
+    const failNote=['🔒 인스타 차단 등으로 자동 인식 실패 — 시트에서 [📋 복사한 캡션/주소 붙여넣기]를 누르면 캡션 글자만으로 어떤 장소든 한 번에 저장돼요',aiErr?`AI: ${aiErr}`:'',capStatus].filter(Boolean).join(' · ');
     const fallbackCand={
       name:metaFromBox?.platform==='yt'?'공유 쇼츠':'공유 릴스',
       address:'',
@@ -3215,9 +3573,10 @@ async function runAnalyzeShare(files=[]){
     };
     res=[fallbackCand];
     renderCandidates();
-    toast('링크에서 캡션이 차단되었어요. 2번 칸에 캡션·고정댓글을 붙여넣거나 스샷을 첨부해 주세요.');
+    toast('🔒 인스타 차단으로 캡션을 가져오지 못했습니다. 아래 2번 칸에 캡션·고정댓글을 직접 붙여넣어 주세요 (스크린샷 첨부도 가능)');
   }finally{
     btn.disabled=false;btn.textContent='🔥 분석·저장하기';
+    if(_toastBusy){_toastBusy=false;const t=$('toast');t.classList.remove('show');clearTimeout(tt);}
   }
 }
 
@@ -3231,7 +3590,7 @@ function focusMapOnItem(i){
 
 async function reGeoItem(i){
   if(!i)return;
-  toast('위치를 찾는 중...');
+  toastBusy('📍 위치 검색 중... (우편번호·번지 주소일수록 정확해요)');
   const hint=($('hint')?.value||'').trim();
   const g=await geocodePlace(i,hint);
   if(g){
@@ -3248,7 +3607,7 @@ async function reGeoItem(i){
 
 async function applyCaptionToItem(i,rawCap,images=[]){
   if(!i)return;
-  toast('캡션에서 상호명과 위치를 추출 중...');
+  toastBusy(images.length?'📷 사진에서 장소를 읽는 중...':'📋 캡션에서 상호명과 위치를 추출 중...');
   const hint=($('hint')?.value||'').trim();
   const detectedVid=parseVideoMeta(rawCap);
   if(detectedVid&&!i.vid)i.vid=detectedVid.url;
@@ -3333,6 +3692,7 @@ async function runSearch(){
   const vidUrl=normalizeVidUrl(explicitLink)||lastSharedVid||'';
   if(!q&&!pend.length)return toast('이름·가게명·주소를 입력하거나 사진을 선택해 주세요');
   const btn=$('go');btn.disabled=true;btn.textContent='🔎 찾는 중...';
+  toastBusy('🔎 인터넷에서 장소·위경도를 찾는 중...');
   try{
     const {cands}=await analyzeContent({rawText:`${q} ${hint}`.trim(),vidUrl,images:pend,hint});
     pend=[];$('pc').textContent='📷 사진으로 찾기 (선택)';
@@ -3346,6 +3706,7 @@ async function runSearch(){
     }
   }finally{
     btn.disabled=false;btn.textContent='🔎 인터넷에서 찾기';
+    if(_toastBusy){_toastBusy=false;$('toast').classList.remove('show');clearTimeout(tt);}
   }
 }
 
@@ -3406,8 +3767,14 @@ document.addEventListener('click',async e=>{
     const it=items.find(x=>x.id===cur);
     if(it){
       const d=Number(actEl.dataset.day)||0;
+      const prevDay=Number(it.day)||0;
       it.day=d;save();showSheet();
-      toast(d?`🗓️ Day ${d} 일정에 배정했어요`:'일차 배정을 해제했어요');
+      toast(d?`🗓️ Day ${d} 일정에 배정했어요`:'일차 배정을 해제했어요',()=>{
+        it.day=prevDay;save();
+        if($('sheet').classList.contains('on'))showSheet();
+        draw(true);
+        toast('일차 배정을 되돌렸어요');
+      });
     }
     return;
   }
@@ -3582,11 +3949,17 @@ document.addEventListener('click',async e=>{
     e.stopPropagation();
     const it=items.find(x=>x.id===id);
     if(it){
+      const prevDone=it.done;
       it.done=actEl.checked;
       const row=actEl.closest('.item');
       if(row)row.classList.toggle('done',it.done);
       persist();
       if(mapOnlyTodo||listFilter[it.category]!=='ALL')save();
+      if(actEl.checked)toast(`✅ '${it.name}' 방문 완료!`,()=>{
+        it.done=prevDone;
+        persist();save();render(true);draw(true);
+        toast('완료 표시를 되돌렸어요');
+      });
     }
     return;
   }
@@ -3681,6 +4054,14 @@ document.addEventListener('click',async e=>{
     mapDay=(pos===-1)?activeDays[0]:(pos+1<activeDays.length?activeDays[pos+1]:0);
     draw(true);
     const shown=expandMapPins(mapValid());if(shown.length)fit();
+    toast(mapDay?`🗓️ Day ${mapDay} 일정 (${shown.length}곳)만 표시합니다`:'전체 일차를 지도에 표시합니다');
+    return;
+  }
+  if(act==='mapDaySet'){
+    mapDay=Number(actEl.dataset.day)||0;
+    draw(true);
+    const shown=expandMapPins(mapValid());
+    if(shown.length)fit();
     toast(mapDay?`🗓️ Day ${mapDay} 일정 (${shown.length}곳)만 표시합니다`:'전체 일차를 지도에 표시합니다');
     return;
   }
@@ -3794,7 +4175,15 @@ document.addEventListener('click',async e=>{
   if(act==='vmap'){view='google';showSheet();return;}
   if(act==='vmymap'){view='mymaps';showSheet();return;}
   if(act==='chgpic'){curItem.v=(curItem.v||0)+1;curItem.img='';curItem.useCustomImg=false;save();showSheet();toast('다른 외부 사진으로 변경했어요');return;}
-  if(act==='chcat'){curItem.category=c;save();showSheet();toast(`${CATS[c].n} 탭으로 이동했어요`);return;}
+  if(act==='chcat'){
+    const prevCat=curItem.category;
+    curItem.category=c;save();showSheet();
+    toast(`${CATS[c].n} 탭으로 이동했어요`,()=>{
+      curItem.category=prevCat;save();showSheet();
+      toast(`↩ ${CATS[prevCat]?CATS[prevCat].n:'기존'} 탭으로 되돌렸어요`);
+    });
+    return;
+  }
   if(act==='del'){
     const backup=[...items];
     const delName=curItem.name;
@@ -4211,6 +4600,7 @@ function initMap(){
         if(!window.google?.maps?.Map)throw new Error('Google Maps API가 초기화되지 않았습니다.');
         gmap=new google.maps.Map($('map'),{center:{lat:34.668,lng:135.501},zoom:12,mapTypeControl:false,fullscreenControl:false,streetViewControl:false});
         GPinClass=makeGPinClass();
+        _gCluster=null;
         initialized=true;
         _mapFallbackNotice='';
         $('mapmsg').style.display='none';
@@ -4246,12 +4636,16 @@ function initMap(){
 function updateNetworkStatus(){
   const el=$('netStatus');if(!el)return;
   const online=navigator.onLine!==false;
-  el.textContent=online?'● 온라인':'● 오프라인';
+  let pending=0;
+  if(!online){
+    try{const q=JSON.parse(ls.get(TRIP_OFFLINE_QUEUE_KEY)||'');pending=Array.isArray(q.finalItems)?q.finalItems.length:0;}catch(_){}
+  }
+  el.textContent=online?'● 온라인':`● 오프라인${pending?` (대기 ${pending}건)`:''}`;
   el.style.color=online?'var(--ok)':'var(--dg)';
-  el.title=online?'인터넷 연결됨':'인터넷이 끊겼어요. 저장된 일정은 계속 볼 수 있어요.';
+  el.title=online?'인터넷 연결됨':'오프라인 — 변경 내용이 임시 저장되며, 네트워크가 복구되면 공유 방에 자동 반영돼요.';
 }
-window.addEventListener('online',updateNetworkStatus);
-window.addEventListener('offline',updateNetworkStatus);
+window.addEventListener('online',()=>{updateNetworkStatus();if(hasOfflineQueue())flushOfflineQueue().catch(()=>{});});
+window.addEventListener('offline',()=>{updateNetworkStatus();if(sharedRoomId)queueOfflineSnapshot();});
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){
     if($('sheet').classList.contains('on'))closeSheet();
