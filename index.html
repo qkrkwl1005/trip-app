@@ -1225,6 +1225,7 @@ function itemThumbCandidates(i){
   if(!i)return [];
   const out=[];
   const add=u=>{if(u&&!out.includes(u))out.push(u)};
+  if(i.useCustomImg&&i.img)add(i.img);
   if(i.vid){
     const meta=parseVideoMeta(i.vid);
     if(meta&&meta.platform==='ig'&&meta.id&&reelThumbCache[meta.id])add(reelThumbCache[meta.id]);
@@ -1237,7 +1238,7 @@ function itemThumbCandidates(i){
     }
     return out;
   }
-  if(i.img)add(i.img);
+  if(i.img&&!i.useCustomImg)add(i.img);
   if(i.name&&!isGenericSharedName(i.name)){
     if(photoCache[i.name])add(photoCache[i.name]);
     add(pic(i.name+' '+(i.address||''),i.v||0));
