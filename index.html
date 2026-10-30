@@ -2336,6 +2336,8 @@ async function geocodePlace(cand,hint=''){
   const rawName=isGenericSharedName(cand.name)?'':String(cand.name||'').trim();
   const localName=String(cand.localName||'').trim();
   const aiLat=Number(cand.lat),aiLng=Number(cand.lng);
+  const context=`${hint||''} ${rawAddr}`.toLowerCase();
+  const isJapan=/日本|北海道|東京|大阪|京都|福岡|札幌|名古屋|沖縄|千日前|難波|梅田|道頓堀|心斎橋|丁目|番地|〒|\b\d{3}-\d{4}\b|japan|osaka|tokyo|kyoto|fukuoka/i.test(context);
 
   const cacheKey=`${localName}|${rawName}|${rawAddr}|${hint}`.trim();
   if(cacheKey.length>=3&&geoCache[cacheKey])return geoCache[cacheKey];
@@ -2357,8 +2359,8 @@ async function geocodePlace(cand,hint=''){
   }
 
   const queries=[];
-  if(localName)queries.unshift(localName);
   if(localName&&cleanAddr)queries.push(`${localName} ${cleanAddr}`);
+  if(rawName&&cleanAddr)queries.push(`${rawName} ${cleanAddr}`);
   if(jpTown&&banchi)queries.push(`${jpTown}${banchi}`);
   if(localName)queries.push(`${localName} ${jpTown||hint||''}`.trim());
   if(cleanAddr){
@@ -2371,7 +2373,10 @@ async function geocodePlace(cand,hint=''){
   if(rawName)queries.push(`${rawName} ${hint||''}`.trim());
   if(zipM)queries.push(`${zipM[1]}-${zipM[2]} Japan`);
 
-  const uniq=[...new Set(queries.map(q=>q.trim()).filter(q=>q.length>=2))].slice(0,4);
+  const uniq=[...new Set(queries.map(q=>{
+    const value=q.trim();
+    return isJapan&&!/\bJapan\b/i.test(value)?`${value} Japan`:value;
+  }).filter(q=>q.length>=2))].slice(0,6);
   if(!uniq.length){
     if(aiLat&&aiLng)return {lat:aiLat,lng:aiLng};
     return null;
@@ -2385,26 +2390,30 @@ async function geocodePlace(cand,hint=''){
     return res;
   };
 
+  const isBroadResult=(result)=>{
+    const types=result?.types||[];
+    return types.some(t=>['country','political','locality','administrative_area_level_1','administrative_area_level_2','postal_code'].includes(t));
+  };
   if(gkey){
-    try{
-      const hit=await Promise.any(uniq.slice(0,2).map(async q=>{
+    for(const q of uniq.slice(0,4)){
+      try{
         bumpCnt('gmap');
-        const r=await fetchTO(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(q)}&key=${encodeURIComponent(gkey)}&language=ko`,{},3800);
+        const params=new URLSearchParams({address:q,key:gkey,language:isJapan?'ja':'ko'});
+        if(isJapan)params.set('components','country:JP');
+        const r=await fetchTO(`https://maps.googleapis.com/maps/api/geocode/json?${params}`,{},3800);
         const d=await r.json();
-        if(d.status==='OK'&&d.results&&d.results[0]){
+        if(d.status==='OK'&&d.results&&d.results[0]&&!isBroadResult(d.results[0])){
           const loc=d.results[0].geometry.location;
           return {lat:Number(loc.lat),lng:Number(loc.lng),formatted:d.results[0].formatted_address};
         }
-        throw new Error('no gmap');
-      }));
-      if(hit)return remember(hit);
-    }catch(e){}
+      }catch(e){}
+    }
   }
 
   const raceJobs=[];
-  uniq.slice(0,3).forEach(q=>{
+  uniq.slice(0,4).forEach(q=>{
     raceJobs.push(
-      fetchTO(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=1`,{},3800).then(r=>r.json()).then(d=>{
+      fetchTO(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=3`,{},3800).then(r=>r.json()).then(d=>{
         const f=d?.features?.[0];
         const c=f?.geometry?.coordinates;
         const isBroad=/^(?:city|state|country|district)$/i.test(f?.properties?.type||'');
@@ -2414,9 +2423,9 @@ async function geocodePlace(cand,hint=''){
         }
         throw new Error('empty');
       }),
-      fetchTO(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=1&accept-language=ko,ja,en`,{},4000).then(r=>r.json()).then(d=>{
+      fetchTO(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=3&${isJapan?'countrycodes=jp&':''}accept-language=${isJapan?'ja,en,ko':'ko,ja,en'}`,{},4000).then(r=>r.json()).then(d=>{
         if(Array.isArray(d)&&d[0]){
-          const h=d[0];
+          const h=d.find(x=>!['city','town','village','state','country','administrative'].includes(String(x.type||'').toLowerCase()))||d[0];
           const isBroad=/^(?:city|administrative|state|country)$/i.test(h.type||'')||/^(?:boundary)$/i.test(h.class||'');
           if(isBroad&&aiLat&&aiLng)return {lat:aiLat,lng:aiLng};
           return {lat:Number(h.lat),lng:Number(h.lon),formatted:h.display_name};
@@ -2491,10 +2500,12 @@ ${caption||rawText}
   }
 ]
 핵심 지침:
-1. 이미지나 텍스트에 한국어 발음 상호명과 한국어 위치 설명(예: "우메다 한큐백화점 B1층", "오사카 난바역 안")만 있어도 실제 매장을 검색해 공식 현지어 상호명(localName), 전체 주소와 정확한 위경도(lat, lng)를 확인하세요.
-2. 이미 가게 이름이 주어졌다면 건물·백화점 주소에 함께 등장하는 다른 입점 브랜드 이름으로 절대 바꾸지 마세요. 가게 이름과 주소가 서로 맞지 않을 때는 입력된 가게 이름을 유지하세요.
-3. 스크린샷이 여러 장이거나 텍스트에 여러 가게가 있으면 1곳만 추출하지 말고 최대 10곳 모두 배열로 반환하세요.
-중요: 실제 존재하는 장소는 확인 가능한 공식 현지어 상호명(localName), 우편번호·번지·건물·층수를 포함한 주소, 위경도(lat, lng)를 채우세요.`;
+1. 입력에 한국어 발음 상호명과 한국어 위치 설명(예: "우메다 한큐백화점 B1층", "오사카 난바역 안")이 있어도 원문을 그대로 버리지 말고, 공식 현지어 상호명(localName)과 일본어 주소를 함께 확인하세요.
+2. 주소·우편번호·건물명·층수가 있으면 반드시 상호명 단독 검색보다 주소를 우선해 같은 건물의 다른 매장으로 바뀌지 않게 하세요.
+3. 실제로 확인할 수 없는 경우 임의의 상호명이나 좌표를 만들지 말고, 입력된 이름과 주소를 유지하며 lat/lng는 null로 두세요.
+4. 이미 가게 이름이 주어졌다면 건물·백화점에 함께 등장하는 다른 브랜드 이름으로 절대 바꾸지 마세요.
+5. 스크린샷 여러 장이나 텍스트 여러 가게는 1곳만 추출하지 말고 최대 10곳 모두 반환하세요.
+중요: 각 결과의 name은 사용자가 입력한 이름을 최대한 유지하고, localName은 확인된 공식 현지어 이름, address는 우편번호·번지·건물·층수를 포함한 검증된 주소로 작성하세요.`;
       const txt=await askAI(prompt,images.slice(0,MAX_MULTI_PLACES),needWebSearch);
       return extractJsonArray(txt).slice(0,MAX_MULTI_PLACES);
     }catch(e){
@@ -2528,7 +2539,8 @@ ${caption||rawText}
       const base=mapLocal(m);
       if(aiMatch){
         base.localName=aiMatch.localName||base.localName;
-        if(!base.address&&aiMatch.address)base.address=normalizeOcrAddr(aiMatch.address);
+        const aiAddress=normalizeOcrAddr(aiMatch.address||'');
+        if(aiAddress&&(!base.address||/〒|丁目|番地|大阪|東京|京都|福岡|札幌|日本|Japan/i.test(aiAddress)))base.address=aiAddress;
         if(CATS[aiMatch.category]&&cat==='PLACE')base.category=aiMatch.category;
         if(Number(aiMatch.lat)&&Number(aiMatch.lng)){base.lat=Number(aiMatch.lat);base.lng=Number(aiMatch.lng);}
       }
@@ -2587,6 +2599,7 @@ function renderCandidates(headerMsg='맞는 항목을 눌러 저장하세요 · 
       <div class="mid">
         <div class="nm">${esc(r.name||'장소')}${vUrl?' 🎬':''}${r.lat&&r.lng?' 📍':''}</div>
         <div class="ds">${esc(r.address||'입력한 그대로 저장')}</div>
+        ${r.address&&!r.lat&&!r.lng?`<div class="ds" style="color:var(--warn,#f59e0b)">⚠️ 지도 위치를 확인하지 못했어요. 주소를 보완한 뒤 저장하세요.</div>`:''}
         ${r.price?`<div class="ds" style="color:var(--FOOD);font-weight:700">${esc(r.price)}</div>`:''}
         ${r.info?`<div class="ds in">${esc(r.info)}</div>`:''}
         <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">
