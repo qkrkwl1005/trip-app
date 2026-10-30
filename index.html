@@ -527,12 +527,26 @@ async function signInGoogle(){
   if(!firebaseConfigured())return setSharedUserStatus('firebase-config.js 설정이 필요합니다.','error');
   try{
     if(!firebase.apps.length)firebase.initializeApp(FIREBASE_CONFIG);
-    const result=await firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider());
+    const provider=new firebase.auth.GoogleAuthProvider();
+    const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||window.matchMedia?.('(max-width: 700px)').matches;
+    if(isMobile){
+      setSharedUserStatus('Google 로그인 페이지로 이동 중...','ok');
+      await firebase.auth().signInWithRedirect(provider);
+      return;
+    }
+    const result=await firebase.auth().signInWithPopup(provider);
     const user=result.user;
     setSharedUserStatus(`✅ 로그인됨 · ${user.email||user.uid}`,'ok');
     const room=new URLSearchParams(location.search).get('room');
     if(room)connectSharedRoom(room);
-  }catch(e){setSharedUserStatus(`Google 로그인 실패: ${e.message}`,'error');}
+  }catch(e){
+    const message=e?.code==='auth/unauthorized-domain'
+      ? 'Firebase 인증 도메인에 현재 사이트 주소를 추가해야 합니다.'
+      : e?.code==='auth/operation-not-allowed'
+        ? 'Firebase Console에서 Google 로그인 제공업체를 활성화해야 합니다.'
+        : e.message;
+    setSharedUserStatus(`Google 로그인 실패: ${message}`,'error');
+  }
 }
 function sanitizeSharedItems(rawItems){
   if(!Array.isArray(rawItems))return [];
@@ -3750,7 +3764,20 @@ buildAiProvUI();
 render(true);
 initMap();
 const initialRoom=new URLSearchParams(location.search).get('room');
-if(initialRoom)connectSharedRoom(initialRoom);
+if(firebaseConfigured()&&window.firebase?.auth){
+  if(!firebase.apps.length)firebase.initializeApp(FIREBASE_CONFIG);
+  firebase.auth().onAuthStateChanged(user=>{
+    if(user){
+      setSharedUserStatus(`✅ 로그인됨 · ${user.email||user.uid}`,'ok');
+      if(initialRoom)connectSharedRoom(initialRoom);
+    }else if(initialRoom){
+      setSharedUserStatus('방에 참여하려면 Google 계정으로 로그인해 주세요.','error');
+    }
+  });
+  firebase.auth().getRedirectResult().catch(e=>{
+    if(e?.code)setSharedUserStatus(`Google 로그인 실패: ${e.message}`,'error');
+  });
+}
 if(getStorageUsedKB()>3800)slimStorage(false);
 setTimeout(()=>autoFixCoords(),2000);
 
