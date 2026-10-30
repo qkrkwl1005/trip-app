@@ -73,6 +73,13 @@ Firebase CLI를 사용하는 경우 프로젝트에서 다음 명령으로 규�
 firebase deploy --only firestore:rules
 ```
 
+저장소의 **Actions → Deploy Firestore rules → Run workflow**로 규칙을 배포하려면 GitHub 저장소에 다음 Actions Secret을 추가하세요.
+
+- `FIREBASE_PROJECT_ID`: `trip-app-802b8`
+- `FIREBASE_SERVICE_ACCOUNT`: Firebase 프로젝트용 서비스 계정 JSON 전체
+
+이 워크플로는 자동 실행되지 않으며, 규칙을 변경해 게시할 때 수동으로 실행합니다.
+
 ### 3. 배포 및 사용
 
 1. `index.html`, `manifest.json`, `sw.js`, `firebase-config.js`를 함께 정적 호스팅에 올립니다. 로컬 파일(`file://`)로는 Firebase가 정상 동작하지 않으므로 GitHub Pages, Netlify, Vercel 중 하나를 사용하세요.
