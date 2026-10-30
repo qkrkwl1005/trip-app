@@ -666,6 +666,9 @@ function firebaseConfigured(){
 function roomUrl(roomId=sharedRoomId){
   return `${location.origin}${location.pathname}?room=${encodeURIComponent(roomId)}`;
 }
+function isValidRoomId(value){
+  return /^[A-Za-z0-9_-]{8,100}$/.test(String(value||''));
+}
 function extractRoomId(value){
   let text=String(value||'').trim();
   for(let attempt=0;attempt<3;attempt++){
@@ -675,12 +678,12 @@ function extractRoomId(value){
       if(nested&&nested!==text){text=nested;continue;}
     }catch(_){}
     try{text=decodeURIComponent(text);}catch(_){}
-    if(/^[A-Za-z0-9_-]{8,100}$/.test(text))return text;
+    if(isValidRoomId(text))return text;
     const match=text.match(/[?&]room=([^&#]+)/);
     if(match){text=match[1];continue;}
     break;
   }
-  return /^[A-Za-z0-9_-]{8,100}$/.test(text)?text:'';
+  return isValidRoomId(text)?text:'';
 }
 function setSharedRoomStatus(message,kind=''){
   const el=$('sharedRoomStatus');
@@ -954,8 +957,10 @@ async function addMember(){
   }catch(e){toast(`멤버 승인 실패: ${e.message}`);}
 }
 async function copyRoomLink(){
-  if(!sharedRoomId)return toast('먼저 공유 방을 만들어 주세요');
-  const url=roomUrl();
+  const roomId=extractRoomId(sharedRoomId)||extractRoomId(new URLSearchParams(location.search).get('room'));
+  if(!roomId)return toast('아직 유효한 공유 방이 없습니다. 먼저 공유 방을 만들어 주세요.');
+  sharedRoomId=roomId;
+  const url=roomUrl(roomId);
   try{await navigator.clipboard.writeText(url);toast('공유 방 링크를 복사했어요');}
   catch(e){prompt('이 링크를 친구들에게 보내세요:',url);}
 }
