@@ -1097,9 +1097,9 @@ async function slimStorage(showMsg=false){
 window.imgErr=function(el){
   if(!el)return;
   const s=el.getAttribute('src')||'';
-  if(s&&!el.dataset.wsrv&&/(cdninstagram\.com|fbcdn\.net|scontent|tiktokcdn|instagram\.com)/.test(s)){
+  if(s&&!el.dataset.wsrv&&/(cdninstagram\.com|fbcdn\.net|scontent|tiktokcdn|instagram\.com|tse\d*\.mm\.bing\.net)/.test(s)){
     el.dataset.wsrv='1';
-    el.src='https://wsrv.nl/?url='+encodeURIComponent(s)+'&w=480&output=jpg';
+    el.src='https://wsrv.nl/?url='+encodeURIComponent(s)+'&w=480&h=360&fit=cover&output=jpg';
     return;
   }
   if(!el.dataset.fb2&&el.dataset.fbsrc){el.dataset.fb2='1';el.src=el.dataset.fbsrc;return}
@@ -1389,7 +1389,7 @@ function pinCardHtml(i){
   const dayBadge=i.day?`<em>D${i.day}</em>`:'';
   const starBadge=i.star?`<span class="pstar">⭐</span>`:'';
   const placeNumber=i._pinNumber?`<em class="pinNum">${i._pinNumber}</em>`:'';
-  return `<div class="pinCard c-${CATS[i.category]?i.category:'PLACE'}${i.star?' starred':''}">${dayBadge}${starBadge}${placeNumber}<i>${ic}</i>${thumb?`<img loading="lazy" decoding="async" referrerpolicy="no-referrer" src="${esc(thumb)}"${fb} onerror="imgErr(this)">`:''}${getVidUrlStr(i.vid)?'<b>🎬</b>':''}</div>`;
+  return `<div class="pinCard c-${CATS[i.category]?i.category:'PLACE'}${i.star?' starred':''}">${dayBadge}${starBadge}${placeNumber}<i>${ic}</i>${thumb?`<img loading="eager" fetchpriority="high" decoding="async" referrerpolicy="no-referrer" src="${esc(thumb)}"${fb} onerror="imgErr(this)">`:''}${getVidUrlStr(i.vid)?'<b>🎬</b>':''}</div>`;
 }
 
 function mapPinPlaceHtml(item,place,index){
@@ -1784,7 +1784,8 @@ const card=i=>{
 function ph(e,src,c='',fb='',day=0){
   const fba=(fb&&fb!==src)?` data-fbsrc="${esc(fb)}"`:'';
   const dTag=(day&&!c.includes('big'))?`<span class="dayTag">D${day}</span>`:'';
-  return `<div class="pic ${c}">${dTag}${e}${src?`<img loading="lazy" decoding="async" referrerpolicy="no-referrer" src="${esc(src)}"${fba} onerror="imgErr(this)">`:''}</div>`;
+  const priority=c.includes('big')?' fetchpriority="high"':'';
+  return `<div class="pic ${c}">${dTag}${e}${src?`<img loading="${c.includes('big')?'eager':'lazy'}"${priority} decoding="async" referrerpolicy="no-referrer" src="${esc(src)}"${fba} onerror="imgErr(this)">`:''}</div>`;
 }
 
 function renderCat(c){
