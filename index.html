@@ -481,6 +481,13 @@ function renderRoomMembers(){
     return `<div>${role==='owner'?'👑':'👤'} ${esc(memberName(member,uid))} · ${role==='owner'?'방장':'멤버'}${remove}</div>`;
   });
   el.innerHTML=rows.length?`현재 참여자 (${rows.length}명)${rows.join('')}`:'참여자 없음';
+  const user=window.firebase?.auth?.().currentUser;
+  const requestButton=$('requestJoinBtn');
+  if(requestButton){
+    const isOwner=user&&user.uid===sharedOwnerUid;
+    requestButton.disabled=Boolean(isOwner||user&&sharedMembers[user.uid]);
+    requestButton.textContent=isOwner?'✅ 방장으로 참여 중':user&&sharedMembers[user.uid]?'✅ 이미 참여 중':'🙋 방장에게 참여 요청';
+  }
 }
 function renderRoomGuide(){
   const el=$('roomGuide');if(!el)return;
@@ -697,24 +704,25 @@ async function signInGoogle(){
         : e.message;
     setSharedUserStatus(`Google 로그인 실패: ${message}`,'error');
   }
-  async function completeGoogleRedirectLogin(){
-    if(!firebaseConfigured()||!window.firebase?.auth)return;
-    try{
-      const result=await firebase.auth().getRedirectResult();
-      const user=result?.user||firebase.auth().currentUser;
-      sessionStorage.removeItem('TRIP_GOOGLE_REDIRECT_PENDING');
-      if(!user)return;
-      setSharedUserStatus(`✅ 로그인됨 · ${user.email||user.uid}`,'ok');
-      if(initialRoom)connectSharedRoom(initialRoom);
-    }catch(e){
-      sessionStorage.removeItem('TRIP_GOOGLE_REDIRECT_PENDING');
-      const message=e?.code==='auth/unauthorized-domain'
-        ? `Firebase 인증 도메인에 ${location.hostname}을(를) 추가해야 합니다.`
-        : e?.code==='auth/operation-not-allowed'
-          ? 'Firebase Console에서 Google 로그인 제공업체를 활성화해야 합니다.'
-          : e.message;
-      setSharedUserStatus(`Google 로그인 실패: ${message}`,'error');
-    }
+}
+async function completeGoogleRedirectLogin(){
+  if(!firebaseConfigured()||!window.firebase?.auth)return;
+  try{
+    const result=await firebase.auth().getRedirectResult();
+    const user=result?.user||firebase.auth().currentUser;
+    sessionStorage.removeItem('TRIP_GOOGLE_REDIRECT_PENDING');
+    if(!user)return;
+    setSharedUserStatus(`✅ 로그인됨 · ${user.email||user.uid}`,'ok');
+    const room=new URLSearchParams(location.search).get('room');
+    if(room)connectSharedRoom(room);
+  }catch(e){
+    sessionStorage.removeItem('TRIP_GOOGLE_REDIRECT_PENDING');
+    const message=e?.code==='auth/unauthorized-domain'
+      ? `Firebase 인증 도메인에 ${location.hostname}을(를) 추가해야 합니다.`
+      : e?.code==='auth/operation-not-allowed'
+        ? 'Firebase Console에서 Google 로그인 제공업체를 활성화해야 합니다.'
+        : e.message;
+    setSharedUserStatus(`Google 로그인 실패: ${message}`,'error');
   }
 }
 function sanitizeSharedItems(rawItems){
