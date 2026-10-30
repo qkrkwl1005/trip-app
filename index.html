@@ -208,8 +208,7 @@ input[type=text],input[type=password],textarea{font-size:16px}
       <button id="joinRoomBtn" class="btn g">🔗 방 링크 열기</button>
     </div>
     <button id="copyRoomBtn" class="btn g" style="margin-top:8px">📋 현재 방 링크 복사</button>
-    <button id="syncSettingsBtn" class="btn g" style="margin-top:8px">⚙️ 현재 API·지도 설정 공유</button>
-    <small style="display:block;margin:4px 0 10px;color:var(--sub);font-size:11px">장소뿐 아니라 AI·지도 설정도 공유할 수 있습니다. API 키는 방 참여자에게 공개되므로 신뢰할 수 있는 친구와만 공유하고, 사용 후 Firebase·AI 제공자 콘솔에서 키를 교체하거나 제한하세요.</small>
+    <small style="display:block;margin:4px 0 10px;color:var(--sub);font-size:11px">장소·메모·완료 상태만 공유됩니다. AI·지도 API 키는 각 기기에만 저장되며 친구에게 전송되지 않습니다.</small>
 
     <label>AI 제공자 키 (선택 — 여러 개 가능, 위부터 순서대로 시도하고 실패하면 자동으로 다음 제공자)</label>
     <div id="aiProv"></div>
@@ -398,9 +397,14 @@ function normalizeCfProxy(raw){
 function toEmbedMyMapsUrl(raw){
   const s=String(raw||'').trim();
   if(!s)return '';
-  const m=s.match(/[?&]mid=([A-Za-z0-9_-]+)/);
-  if(m)return `https://www.google.com/maps/d/embed?mid=${m[1]}`;
-  return s;
+  let url;
+  try{url=new URL(s);}catch(e){return '';}
+  if(url.protocol!=='https:'||!['www.google.com','google.com'].includes(url.hostname))return '';
+  if(!url.pathname.startsWith('/maps/d/'))return '';
+  const m=url.searchParams.get('mid');
+  return m&&/^[A-Za-z0-9_-]+$/.test(m)
+    ?`https://www.google.com/maps/d/embed?mid=${encodeURIComponent(m)}`
+    :url.href;
 }
 const MYMAPS_EMBED_KEY='TRIP_MYMAPS_EMBED';
 const LEGACY_MYMAPS_EMBED_KEY='TRIP_MYMMaps_EMBED';
@@ -477,62 +481,6 @@ function sanitizeSharedItems(rawItems){
     return item;
   });
 }
-function collectSharedSettings(){
-  return {
-    aiCfg,
-    mapProvider:ls.get('TRIP_MAP_PROVIDER')||'osm',
-    googleMapsKey:ls.get('TRAVEL_GMAP_KEY')||'',
-    naverMapsKey:ls.get('TRAVEL_NAVER_KEY')||'',
-    cfProxy:ls.get('TRIP_CF_PROXY')||'',
-    myMapsUrl:ls.get('TRIP_MYMAPS_URL')||'',
-    myMapsEmbed:getMyMapsEmbedUrl()||''
-  };
-}
-function applySharedSettings(raw){
-  if(!raw||typeof raw!=='object')return false;
-  let changed=false;
-  if(raw.aiCfg&&typeof raw.aiCfg==='object'){
-    const next={};
-    AI_DEFS.forEach(d=>{
-      const source=raw.aiCfg[d.id];
-      next[d.id]={
-        key:typeof source?.key==='string'?source.key.slice(0,500):'',
-        model:typeof source?.model==='string'?source.model.slice(0,200):d.defModel
-      };
-    });
-    aiCfg=next;
-    ls.set('TRIP_AI_CFG',JSON.stringify(aiCfg));
-    changed=true;
-  }
-  const values={
-    TRIP_MAP_PROVIDER:['osm','google','naver'].includes(raw.mapProvider)?raw.mapProvider:'osm',
-    TRAVEL_GMAP_KEY:typeof raw.googleMapsKey==='string'?raw.googleMapsKey.slice(0,500):'',
-    TRAVEL_NAVER_KEY:typeof raw.naverMapsKey==='string'?raw.naverMapsKey.slice(0,500):'',
-    TRIP_CF_PROXY:typeof raw.cfProxy==='string'?raw.cfProxy.slice(0,1000):'',
-    TRIP_MYMAPS_URL:typeof raw.myMapsUrl==='string'?raw.myMapsUrl.slice(0,2000):''
-  };
-  Object.entries(values).forEach(([key,value])=>{
-    if(ls.get(key)!==value){ls.set(key,value);changed=true;}
-  });
-  if(typeof raw.myMapsEmbed==='string'){
-    if(getMyMapsEmbedUrl()!==raw.myMapsEmbed){ls.set(MYMAPS_EMBED_KEY,raw.myMapsEmbed.slice(0,2000));changed=true;}
-  }
-  return changed;
-}
-function scheduleSharedSettingsWrite(){
-  if(!sharedRoomId||remoteApplying||!window.firestoreDb)return;
-  clearTimeout(sharedWriteTimer);
-  sharedWriteTimer=setTimeout(async()=>{
-    try{
-      await window.firestoreDb.collection('rooms').doc(sharedRoomId).set({
-        items,
-        settings:collectSharedSettings(),
-        updatedAt:firebase.firestore.FieldValue.serverTimestamp()
-      },{merge:true});
-      setSharedRoomStatus(`✅ 공유 중 · ${sharedRoomId}`,'ok');
-    }catch(e){setSharedRoomStatus(`공유 설정 저장 실패: ${e.message}`,'error');}
-  },500);
-}
 function scheduleSharedWrite(){
   if(!sharedRoomId||remoteApplying||!window.firestoreDb)return;
   clearTimeout(sharedWriteTimer);
@@ -540,7 +488,7 @@ function scheduleSharedWrite(){
     try{
       await window.firestoreDb.collection('rooms').doc(sharedRoomId).set({
         items,
-        settings:collectSharedSettings(),
+        settings:firebase.firestore.FieldValue.delete(),
         updatedAt:firebase.firestore.FieldValue.serverTimestamp()
       },{merge:true});
       setSharedRoomStatus(`✅ 공유 중 · ${sharedRoomId}`,'ok');
@@ -570,16 +518,13 @@ async function connectSharedRoom(roomId){
     sharedUnsubscribe=ref.onSnapshot(snapshot=>{
       if(snapshot.exists){
         const data=snapshot.data();
-        let settingsChanged=false;
         if(Array.isArray(data.items)){
           remoteApplying=true;
           items=sanitizeSharedItems(data.items);
-          settingsChanged=applySharedSettings(data.settings);
           persistNow();
           remoteApplying=false;
           render(true);draw(true);
         }
-        if(settingsChanged){buildAiProvUI();renderUsageBox();}
       }else{
         scheduleSharedWrite();
       }
@@ -590,9 +535,9 @@ async function connectSharedRoom(roomId){
   }
 }
 function makeRoomId(){
-  const bytes=new Uint8Array(6);
+  const bytes=new Uint8Array(16);
   crypto.getRandomValues(bytes);
-  return [...bytes].map(x=>x.toString(36).padStart(2,'0')).join('').slice(0,8);
+  return [...bytes].map(x=>x.toString(16).padStart(2,'0')).join('');
 }
 async function copyRoomLink(){
   if(!sharedRoomId)return toast('먼저 공유 방을 만들어 주세요');
@@ -1886,7 +1831,6 @@ function saveAiProvFromUI(){
   ls.set('TRIP_AI_CFG',JSON.stringify(aiCfg));
   if(aiCfg.gemini?.key)ls.set('TRAVEL_GEMINI_KEY',aiCfg.gemini.key);
   updateAiChainText();
-  scheduleSharedWrite();
 }
 
 function updateAiChainText(){
@@ -3300,11 +3244,6 @@ $('joinRoomBtn').onclick=()=>{
   location.href=roomUrl(match?decodeURIComponent(match[1]):String(id).trim());
 };
 $('copyRoomBtn').onclick=copyRoomLink;
-$('syncSettingsBtn').onclick=()=>{
-  if(!sharedRoomId)return toast('먼저 공유 방을 만들어 주세요');
-  scheduleSharedSettingsWrite();
-  toast('현재 API·지도 설정을 공유 방에 저장하는 중이에요');
-};
 $('planCopyTopBtn').onclick=copyFormattedPlan;
 $('exportPlanBtn').onclick=copyFormattedPlan;
 $('sheet').onclick=e=>{if(e.target===$('sheet')){save();closeSheet();}};
@@ -3399,7 +3338,7 @@ $('aiClearAll').onclick=()=>{
   AI_DEFS.forEach(d=>aiCfg[d.id]={key:'',model:d.defModel});
   ls.set('TRIP_AI_CFG',JSON.stringify(aiCfg));
   buildAiProvUI();
-  scheduleSharedWrite();
+
   toast('모든 AI 키를 지웠어요');
 };
 $('diagBtn').onclick=async()=>{
@@ -3417,26 +3356,25 @@ $('slimBtn').onclick=async()=>{
   renderUsageBox();
 };
 
-$('mapProvider').onchange=e=>{ls.set('TRIP_MAP_PROVIDER',e.target.value);scheduleSharedWrite();location.reload()};
-$('savegmap').onclick=()=>{ls.set('TRAVEL_GMAP_KEY',$('gmapkey').value.trim());scheduleSharedWrite();toast('Google Maps 키 저장됨');location.reload()};
-$('savenaver').onclick=()=>{ls.set('TRAVEL_NAVER_KEY',$('naverkey').value.trim());scheduleSharedWrite();toast('Naver Maps 키 저장됨');location.reload()};
+$('mapProvider').onchange=e=>{ls.set('TRIP_MAP_PROVIDER',e.target.value);location.reload()};
+$('savegmap').onclick=()=>{ls.set('TRAVEL_GMAP_KEY',$('gmapkey').value.trim());toast('Google Maps 키 저장됨');location.reload()};
+$('savenaver').onclick=()=>{ls.set('TRAVEL_NAVER_KEY',$('naverkey').value.trim());toast('Naver Maps 키 저장됨');};
 $('savecfproxy').onclick=()=>{
   const norm=normalizeCfProxy($('cfproxy').value);
   $('cfproxy').value=norm;
   ls.set('TRIP_CF_PROXY',norm);
-  scheduleSharedWrite();
   toast('프록시 주소 저장됨');
 };
 
 $('saveMyMaps').onclick=()=>{
   const u=$('mymapsUrl').value.trim();
-  ls.set('TRIP_MYMAPS_URL',u);
   const em=toEmbedMyMapsUrl(u);
+  if(u&&!em)return toast('Google My Maps 주소만 사용할 수 있어요');
+  ls.set('TRIP_MYMAPS_URL',u);
   if(em&&!$('mymapsEmbed').value.trim()){
     $('mymapsEmbed').value=em;
     ls.set(MYMAPS_EMBED_KEY,em);
   }
-  scheduleSharedWrite();
   toast('내 지도 URL 저장됨');
 };
 $('openMyMapsBtn').onclick=()=>{
@@ -3444,10 +3382,11 @@ $('openMyMapsBtn').onclick=()=>{
   if(!raw)return toast('내 지도 URL을 먼저 저장하세요');
   openMyMapsOverlay(raw);
 };
-$('saveMyMapsEmbed').onclick=()=>{ls.set(MYMAPS_EMBED_KEY,$('mymapsEmbed').value.trim());scheduleSharedWrite();toast('임베드 URL 저장됨')};
+$('saveMyMapsEmbed').onclick=()=>{ls.set(MYMAPS_EMBED_KEY,toEmbedMyMapsUrl($('mymapsEmbed').value.trim()));toast('임베드 URL 저장됨')};
 
 function openMyMapsOverlay(rawUrl){
   const embedUrl=toEmbedMyMapsUrl(rawUrl);
+  if(!embedUrl)return toast('허용되지 않은 Google My Maps 주소예요');
   const origUrl=ls.get('TRIP_MYMAPS_URL')||rawUrl;
   $('myMapsFrame').src=embedUrl;
   $('myMapsExtLink').href=origUrl;

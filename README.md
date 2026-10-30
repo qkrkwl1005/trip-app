@@ -32,17 +32,28 @@ python3 -m http.server 8765
 
 ### 2. Firestore 보안 규칙 설정
 
-테스트 모드는 기간이 지나면 만료되므로 다음 규칙으로 바꾸는 것을 권장합니다. 이 앱은 익명 로그인 사용자만 방 데이터를 읽고 쓸 수 있게 합니다.
+테스트 모드는 기간이 지나면 만료되므로 다음 규칙으로 바꾸세요. 저장소의 [firestore.rules](./firestore.rules)와 같은 내용입니다. 공유 문서에는 장소 데이터만 저장되도록 필드를 제한하며, API 키는 Firestore에 저장하지 않습니다.
 
 ```text
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /rooms/{roomId} {
-      allow read, write: if request.auth != null;
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null
+        && request.resource.data.keys().hasOnly(['items', 'updatedAt'])
+        && request.resource.data.items is list
+        && request.resource.data.items.size() <= 200;
+      allow delete: if request.auth != null;
     }
   }
 }
+```
+
+Firebase CLI를 사용하는 경우 프로젝트에서 다음 명령으로 규칙을 게시할 수 있습니다.
+
+```bash
+firebase deploy --only firestore:rules
 ```
 
 ### 3. 배포 및 사용
@@ -51,8 +62,8 @@ service cloud.firestore {
 2. 앱에서 **설정 → 친구들과 실시간 공유 → 공유 방 만들기**를 누릅니다.
 3. 생성된 URL을 친구들에게 보냅니다.
 4. 같은 링크를 연 친구가 장소를 추가하거나 메모·완료 상태를 바꾸면 다른 사람 화면에도 자동 반영됩니다.
-5. AI 키와 지도 키도 함께 쓰려면 방을 만든 기기에서 **현재 API·지도 설정 공유**를 한 번 누릅니다. 공유된 키는 방 참여자에게 공개되므로 개인 키 대신 제한된 키를 사용하세요.
+5. AI·지도 API 키는 각 기기에만 저장되며 공유 방으로 전송되지 않습니다. 친구가 AI 검색이나 유료 지도를 사용하려면 친구 기기의 설정에 별도 키를 입력해야 합니다.
 
-방 링크를 가진 사람은 편집할 수 있으므로 신뢰할 수 있는 친구에게만 공유하세요. 현재 구현은 익명 로그인 기반이며, 방별 초대/읽기 전용 권한이 필요하면 Firebase 계정 로그인과 별도 권한 모델을 추가해야 합니다.
+방 링크는 편집 권한을 가진 비밀 링크처럼 취급하세요. 링크를 가진 사람은 익명 로그인 후 해당 방을 읽고 수정할 수 있으므로 신뢰할 수 있는 친구에게만 보내고, 유출되면 새 공유 방을 만들어 링크를 교체하세요. 현재 구현은 익명 로그인 기반이며, 방별 초대/읽기 전용 권한이 필요하면 Firebase 계정 로그인과 별도 권한 모델을 추가해야 합니다.
 
-공유 방에는 장소 데이터와 함께 AI 제공자 키, 지도 API 키, 지도/프록시 설정이 저장될 수 있습니다. 키를 공유한 뒤에는 사용량·결제 한도를 제공자 콘솔에서 제한하고, 더 이상 사용하지 않을 때 키를 폐기하거나 교체하세요.
+공유 방에는 장소 데이터만 저장됩니다. API 키는 각 기기의 브라우저에만 저장되므로, 키가 필요한 기능은 각 사용자가 자신의 제한된 키를 입력해야 합니다.
