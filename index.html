@@ -217,7 +217,9 @@ input[type=text],input[type=password],textarea{font-size:16px}
     <button id="deleteRoomBtn" class="btn g" style="margin-top:8px;color:var(--dg)">🗑️ 이 공유 방 삭제</button>
     <div id="roomMembers" class="ds" style="margin-top:8px;white-space:pre-line">참여자 정보를 불러오는 중...</div>
     <div id="joinRequests" class="ds" style="margin-top:8px;white-space:pre-line"></div>
+    <div id="joinBadge" class="ds" style="margin-top:8px;display:none"></div>
     <div id="roomGuide" class="ds" style="margin-top:8px;display:none"></div>
+    <div id="roomConflict" class="ds" style="margin-top:8px;display:none"></div>
     <small style="display:block;margin:4px 0 10px;color:var(--sub);font-size:11px">공유 방에서는 장소·메모·완료 상태와 현재 API·지도 설정이 승인된 멤버에게 자동 공유됩니다.</small>
 
     <label>AI 제공자 키 (선택 — 여러 개 가능, 위부터 순서대로 시도하고 실패하면 자동으로 다음 제공자)</label>
@@ -353,12 +355,76 @@ function listenJoinRequests(){
         const data=doc.data()||{};
         return `<div style="margin-top:5px">${esc(String(data.name||doc.id))} <button class="mb" data-room-action="approve-request" data-uid="${esc(doc.id)}" data-name="${esc(String(data.name||'친구'))}" style="padding:2px 6px;font-size:11px">승인</button></div>`;
       });
-      el.innerHTML=rows.length?`<b>참여 요청</b>${rows.join('')}`:'';
+      el.innerHTML=rows.length?`<b>참여 요청 <span class="badge">${rows.length}</span></b>${rows.join('')}`:'';
+      renderJoinBadge(rows.length?`🙋 참여 요청 ${rows.length}건 · 승인 대기 중`:'');
     },()=>{el.innerHTML='';});
+}
+function renderJoinBadge(message){
+  const el=$('joinBadge');if(!el)return;
+  el.innerHTML=message?`<span class="badge">${esc(message)}</span>`:'';
+  el.style.display=message?'block':'none';
+}
+function listenOwnJoinRequest(){
+  if(joinRequestUnsubscribe)joinRequestUnsubscribe();
+  const user=window.firebase?.auth?.().currentUser;
+  if(!user||!sharedRoomId||user.uid===sharedOwnerUid||!window.firestoreDb){
+    renderJoinBadge('');
+    return;
+  }
+  joinRequestUnsubscribe=window.firestoreDb.collection('rooms').doc(sharedRoomId).collection('joinRequests').doc(user.uid)
+    .onSnapshot(snapshot=>{
+      renderJoinBadge(snapshot.exists?'🙋 승인 대기 중 · 방장이 요청을 확인하면 참여할 수 있어요':'');
+    },()=>renderJoinBadge(''));
+}
+function itemLabel(item,id){
+  return String(item?.name||item?.address||id||'이름 없는 장소').slice(0,80);
+}
+function renderRoomConflict(){
+  const el=$('roomConflict');if(!el)return;
+  if(!sharedConflict){el.innerHTML='';el.style.display='none';return;}
+  const {localItems,remoteItems}=sharedConflict;
+  const localMap=new Map(localItems.map(item=>[String(item.id),item]));
+  const remoteMap=new Map(remoteItems.map(item=>[String(item.id),item]));
+  const ids=[...new Set([...localMap.keys(),...remoteMap.keys()])].filter(id=>{
+    return JSON.stringify(localMap.get(id)||null)!==JSON.stringify(remoteMap.get(id)||null);
+  });
+  el.innerHTML=`<b>⚠️ 장소별 수정 충돌 ${ids.length}건</b><br><small>각 장소에서 내 변경 또는 친구 변경을 선택하세요.</small>`+
+    ids.map(id=>{
+      const local=localMap.get(id),remote=remoteMap.get(id);
+      return `<div style="margin-top:8px;padding:8px;border:1px solid var(--bd);border-radius:8px">
+        <b>${esc(itemLabel(local||remote,id))}</b>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:5px">
+          ${local?`<button class="mb" data-room-action="conflict-local" data-id="${esc(id)}">내 변경 적용</button>`:''}
+          ${remote?`<button class="mb" data-room-action="conflict-remote" data-id="${esc(id)}">친구 변경 유지</button>`:''}
+        </div>
+      </div>`;
+    }).join('');
+  el.style.display='block';
+}
+function resolveRoomConflict(id,source){
+  if(!sharedConflict)return;
+  const localMap=new Map(sharedConflict.localItems.map(item=>[String(item.id),item]));
+  const remoteMap=new Map(sharedConflict.remoteItems.map(item=>[String(item.id),item]));
+  const selected=source==='local'?localMap.get(id):remoteMap.get(id);
+  const remaining=sharedConflict.pending.filter(conflict=>conflict!==id);
+  const base=sharedConflict.remoteItems.filter(item=>!selected||String(item.id)!==id);
+  const remoteRevision=sharedConflict.remoteRevision;
+  if(selected)base.push(selected);
+  sharedConflict={...sharedConflict,remoteItems:base,pending:remaining};
+  if(!remaining.length){
+    items=base;
+    sharedConflict=null;
+    sharedLocalDirty=true;
+    sharedRevision=Number(remoteRevision||sharedRevision);
+    scheduleSharedWrite();
+    render(true);draw(true);
+  }
+  renderRoomConflict();
 }
 async function requestJoin(){
   const user=window.firebase?.auth?.().currentUser;
   if(!user||!sharedRoomId)return toast('먼저 Google 로그인 후 방 링크를 열어 주세요');
+  if(sharedMembers[user.uid])return toast('이미 이 방의 멤버예요');
   try{
     await window.firestoreDb.collection('rooms').doc(sharedRoomId).collection('joinRequests').doc(user.uid).set({
       uid:user.uid,name:user.displayName||user.email||'친구',createdAt:firebase.firestore.FieldValue.serverTimestamp()
@@ -447,11 +513,15 @@ function applySharedSettings(raw){
     try{
       await window.firestoreDb.collection('rooms').doc(sharedRoomId).delete();
       if(sharedUnsubscribe)sharedUnsubscribe();
+      if(joinRequestUnsubscribe)joinRequestUnsubscribe();
+      if(joinRequestsUnsubscribe)joinRequestsUnsubscribe();
       sharedRoomId='';sharedOwnerUid='';sharedMembers={};
+      sharedConflict=null;
       setSharedRoomStatus('공유 방이 삭제되었어요','ok');
       renderRoomMembers();
       renderRoomGuide();
       listenJoinRequests();
+      renderRoomConflict();
     }catch(e){toast(`방 삭제 실패: ${e.message}`);}
   }
   function collectSharedSettings(){
@@ -580,7 +650,7 @@ let items=[],cat='PLACE',pend=[],res=[],lm=null,tl=null,layer=null,pins={},tt,cu
 let mapCat='ALL',mapOnlyVid=false,mapOnlyStar=false,mapOnlyTodo=false,mapDay=0,mapRouteOn=false,userPos=null,nearSortOn=false;
 let lRoute=null,gRoute=null,nRoute=null,_undoFn=null;
 let listFilter={PLACE:'ALL',CAFE:'ALL',FOOD:'ALL',SHOP:'ALL'};
-let sharedRoomId='',sharedUnsubscribe=null,sharedWriteTimer=null,remoteApplying=false,sharedOwnerUid='',sharedMembers={},sharedSettingsShared=false,sharedRevision=0,sharedHistory=[],joinRequestsUnsubscribe=null,sharedLocalDirty=false,sharedWriteRevision=null;
+let sharedRoomId='',sharedUnsubscribe=null,sharedWriteTimer=null,remoteApplying=false,sharedOwnerUid='',sharedMembers={},sharedSettingsShared=false,sharedRevision=0,sharedHistory=[],joinRequestsUnsubscribe=null,joinRequestUnsubscribe=null,sharedLocalDirty=false,sharedWriteRevision=null,sharedConflict=null;
 
 const FIREBASE_CONFIG=window.TRIPSYNC_FIREBASE_CONFIG||{};
 function firebaseConfigured(){
@@ -695,7 +765,7 @@ async function updateRoomWithRevision(fields){
     const snap=await tx.get(ref);
     const data=snap.data()||{};
     const revision=Number(data.revision||0);
-    tx.update(ref,{...fields,revision:revision+1});
+    tx.update(ref,{...fields,history:Array.isArray(data.history)?data.history:[],revision:revision+1});
     sharedRevision=revision+1;
   });
 }
@@ -716,6 +786,7 @@ async function connectSharedRoom(roomId){
     window.firestoreDb=firebase.firestore();
     setSharedUserStatus(`✅ 로그인됨 · ${user.email||user.uid}`,'ok');
     sharedRoomId=roomId;
+    listenOwnJoinRequest();
     if(sharedUnsubscribe)sharedUnsubscribe();
     const ref=window.firestoreDb.collection('rooms').doc(roomId);
     sharedUnsubscribe=ref.onSnapshot(snapshot=>{
@@ -725,7 +796,15 @@ async function connectSharedRoom(roomId){
         if(sharedLocalDirty&&sharedWriteRevision===incomingRevision){
           sharedLocalDirty=false;
         }else if(sharedLocalDirty&&incomingRevision!==sharedRevision){
-          setSharedRoomStatus('⚠️ 친구가 먼저 수정했어요. 내 변경은 보존되지 않았으니 최신 내용을 확인해 주세요.','error');
+          const remoteItems=sanitizeSharedItems(data.items);
+          const localMap=new Map(items.map(item=>[String(item.id),item]));
+          const remoteMap=new Map(remoteItems.map(item=>[String(item.id),item]));
+          const pending=[...new Set([...localMap.keys(),...remoteMap.keys()])].filter(id=>{
+            return JSON.stringify(localMap.get(id)||null)!==JSON.stringify(remoteMap.get(id)||null);
+          });
+          sharedConflict={localItems:items.map(item=>({...item})),remoteItems,remoteRevision:incomingRevision,pending};
+          renderRoomConflict();
+          setSharedRoomStatus('⚠️ 친구가 수정한 장소가 있어요. 장소별로 적용할 변경을 선택해 주세요.','error');
           return;
         }else if(sharedLocalDirty){
           return;
@@ -746,6 +825,7 @@ async function connectSharedRoom(roomId){
             .catch(e=>setSharedRoomStatus(`API 설정 공유 활성화 실패: ${e.message}`,'error'));
         }
         renderRoomMembers();
+        listenOwnJoinRequest();
         if(Array.isArray(data.items)){
           remoteApplying=true;
           items=sanitizeSharedItems(data.items);
@@ -3522,6 +3602,8 @@ document.addEventListener('click',e=>{
   if(!action)return;
   if(action.dataset.roomAction==='remove-member')removeMember(action.dataset.uid);
   if(action.dataset.roomAction==='approve-request')approveJoinRequest(action.dataset.uid,action.dataset.name);
+  if(action.dataset.roomAction==='conflict-local')resolveRoomConflict(action.dataset.id,'local');
+  if(action.dataset.roomAction==='conflict-remote')resolveRoomConflict(action.dataset.id,'remote');
 });
 $('sheet').onclick=e=>{if(e.target===$('sheet')){save();closeSheet();}};
 $('taxiModal').onclick=e=>{if(e.target===$('taxiModal'))$('taxiModal').classList.remove('show');};

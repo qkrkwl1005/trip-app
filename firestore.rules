@@ -48,7 +48,10 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['uid', 'name', 'createdAt'])
           && request.resource.data.uid == uid;
         allow read, delete: if request.auth != null
-          && get(/databases/$(database)/documents/rooms/$(roomId)).data.ownerUid == request.auth.uid;
+          && (
+            request.auth.uid == uid
+            || get(/databases/$(database)/documents/rooms/$(roomId)).data.ownerUid == request.auth.uid
+          );
       }
     }
   }
