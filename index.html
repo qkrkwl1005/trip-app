@@ -747,6 +747,13 @@ function sanitizeSharedItems(rawItems){
     return item;
   });
 }
+function removeUndefined(value){
+  if(Array.isArray(value))return value.map(removeUndefined);
+  if(value&&typeof value==='object'){
+    return Object.fromEntries(Object.entries(value).filter(([,entry])=>entry!==undefined).map(([key,entry])=>[key,removeUndefined(entry)]));
+  }
+  return value;
+}
 function scheduleSharedWrite(){
   if(!sharedRoomId||remoteApplying||!window.firestoreDb)return;
   clearTimeout(sharedWriteTimer);
@@ -762,7 +769,7 @@ function scheduleSharedWrite(){
         if(snap.exists)history.push({items:current.items||[],savedAt:Date.now(),savedBy:firebase.auth().currentUser.uid});
         sharedWriteRevision=revision+1;
         tx.set(ref,{
-          items,
+          items:removeUndefined(sanitizeSharedItems(items)),
           ownerUid:sharedOwnerUid||firebase.auth().currentUser.uid,
           members:Object.keys(sharedMembers).length?sharedMembers:{[firebase.auth().currentUser.uid]:{role:'owner',name:firebase.auth().currentUser.displayName||firebase.auth().currentUser.email||'방장'}},
           settingsShared:sharedSettingsShared,
@@ -791,7 +798,7 @@ function syncSharedSettings(){
 async function createSharedRoomDocument(ref,user){
   const member={role:'owner',name:user.displayName||user.email||'방장'};
   const room={
-    items:sanitizeSharedItems(items),
+    items:removeUndefined(sanitizeSharedItems(items)),
     ownerUid:user.uid,
     members:{[user.uid]:member},
     settingsShared:true,
@@ -832,6 +839,7 @@ async function connectSharedRoom(roomId){
     const user=firebase.auth().currentUser;
     if(!user)throw new Error('먼저 Google 계정으로 로그인해 주세요.');
     window.firestoreDb=firebase.firestore();
+    window.firestoreDb.settings({ignoreUndefinedProperties:true});
     setSharedUserStatus(`✅ 로그인됨 · ${user.email||user.uid}`,'ok');
     sharedRoomId=roomId;
     listenOwnJoinRequest();
