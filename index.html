@@ -1028,11 +1028,16 @@ try{items=JSON.parse(ls.get('TRIP_MASTER_ITEMS')||'[]')}catch(e){items=[]}
 })();
 
 let photoCache={};try{photoCache=JSON.parse(ls.get('TRIP_PHOTO_CACHE')||'{}')}catch(e){photoCache={}}
-const reelThumbCache={};
+let reelThumbCache={};try{reelThumbCache=JSON.parse(ls.get('TRIP_REEL_THUMB_CACHE')||'{}')}catch(e){reelThumbCache={}}
 function savePhotoCache(){
   const keys=Object.keys(photoCache);
   if(keys.length>100){keys.slice(0,keys.length-100).forEach(k=>delete photoCache[k]);}
   ls.set('TRIP_PHOTO_CACHE',JSON.stringify(photoCache));
+}
+function saveReelThumbCache(){
+  const keys=Object.keys(reelThumbCache);
+  if(keys.length>150)keys.slice(0,keys.length-150).forEach(k=>delete reelThumbCache[k]);
+  ls.set('TRIP_REEL_THUMB_CACHE',JSON.stringify(reelThumbCache));
 }
 
 let geoCache={};try{geoCache=JSON.parse(ls.get('TRIP_GEO_CACHE')||'{}')}catch(e){geoCache={}}
@@ -1231,48 +1236,75 @@ function itemThumbCandidates(i){
   if(i.useCustomImg&&i.img)add(i.img);
   if(i.vid){
     const meta=parseVideoMeta(i.vid);
-    if(meta&&meta.platform==='ig'&&meta.id&&reelThumbCache[meta.id])add(reelThumbCache[meta.id]);
-    if(meta&&meta.platform==='yt'&&meta.id)add(`https://i.ytimg.com/vi/${meta.id}/hqdefault.jpg`);
+    if(meta&&meta.platform==='yt'&&meta.id){
+      add(`https://i.ytimg.com/vi/${meta.id}/oar2.jpg`);
+      add(`https://i.ytimg.com/vi/${meta.id}/maxresdefault.jpg`);
+      add(`https://i.ytimg.com/vi/${meta.id}/hqdefault.jpg`);
+    }
     if(meta&&meta.platform==='ig'&&meta.id){
+      if(reelThumbCache[meta.id])add(reelThumbCache[meta.id]);
       const direct=`https://www.instagram.com/p/${meta.id}/media/?size=l`;
+      add(`https://wsrv.nl/?url=${encodeURIComponent(direct)}&w=480&h=640&fit=cover&output=jpg`);
       add(direct);
-      add(`https://wsrv.nl/?url=${encodeURIComponent(direct)}&w=480&h=360&fit=cover&output=jpg`);
-      add(`https://www.instagram.com/reel/${meta.id}/media/?size=l`);
+    }
+    if(meta&&meta.platform==='tt'){
+      const key=meta.id||meta.url;
+      if(reelThumbCache[key])add(reelThumbCache[key]);
     }
     return out;
-  }
-  if(i.img&&!i.useCustomImg)add(i.img);
-  if(i.name&&!isGenericSharedName(i.name)){
-    if(photoCache[i.name])add(photoCache[i.name]);
-    add(pic(i.name+' '+(i.address||''),i.v||0));
   }
   return out;
 }
 
 async function hydrateInstagramThumb(item){
   const meta=parseVideoMeta(item?.vid);
-  if(!meta||meta.platform!=='ig'||!meta.id||reelThumbCache[meta.id])return false;
-  const target=`https://www.instagram.com/reel/${meta.id}/`;
+  if(!meta)return false;
+
+  if(meta.platform==='tt'){
+    const key=meta.id||meta.url;
+    if(reelThumbCache[key])return false;
+    try{
+      const r=await fetchTO(`https://www.tiktok.com/oembed?url=${encodeURIComponent(meta.url)}`,{},4500);
+      if(r.ok){
+        const d=await r.json();
+        if(d?.thumbnail_url){
+          reelThumbCache[key]=`https://wsrv.nl/?url=${encodeURIComponent(d.thumbnail_url)}&w=480&h=640&fit=cover&output=jpg`;
+          saveReelThumbCache();
+          return true;
+        }
+      }
+    }catch(_){}
+    return false;
+  }
+
+  if(meta.platform!=='ig'||!meta.id||reelThumbCache[meta.id])return false;
+  const embedUrl=`https://www.instagram.com/p/${meta.id}/embed/`;
+  const cfBase=normalizeCfProxy(ls.get('TRIP_CF_PROXY')||ls.get('TRIP_WORKER_URL')||'');
   const sources=[
-    `https://r.jina.ai/http://www.instagram.com/reel/${meta.id}/`,
-    `https://r.jina.ai/https://www.instagram.com/reel/${meta.id}/`
+    ...(cfBase?[cfBase+encodeURIComponent(embedUrl)]:[]),
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(embedUrl)}`,
+    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(embedUrl)}`,
+    `https://corsproxy.io/?url=${encodeURIComponent(embedUrl)}`
   ];
   for(const source of sources){
     try{
-      const r=await fetchTO(source,{},5500);
+      const r=await fetchTO(source,{},5000);
       if(!r.ok)continue;
-      const text=await r.text();
-      const match=text.match(/property=["']og:image["'][^>]+content=["']([^"']+)/i)
-        ||text.match(/content=["']([^"']+)["'][^>]+property=["']og:image["']/i)
-        ||text.match(/!\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/i);
-      const url=match&&match[1]?decodeHtml(match[1]).replace(/&amp;/g,'&'):'';
-      if(/^https?:\/\//i.test(url)){
-        reelThumbCache[meta.id]=url;
-        return true;
+      const html=await r.text();
+      const m=html.match(/class=["'][^"']*EmbeddedMediaImage[^"']*["'][^>]+src=["']([^"']+)["']/i)
+        ||html.match(/src=["']([^"']+)["'][^>]+class=["'][^"']*EmbeddedMediaImage[^"']*["']/i)
+        ||html.match(/"display_url"\s*:\s*"([^"]+)"/i)
+        ||html.match(/\\"display_url\\"\s*:\s*\\"([^\\"]+)\\"/i);
+      if(m&&m[1]){
+        const rawUrl=decodeHtml(m[1]).replace(/\\u0026/g,'&').replace(/\\\//g,'/').replace(/&amp;/g,'&');
+        if(/^https?:\/\//i.test(rawUrl)&&!/static\.cdninstagram\.com|rsrc\.php/i.test(rawUrl)){
+          reelThumbCache[meta.id]=`https://wsrv.nl/?url=${encodeURIComponent(rawUrl)}&w=480&h=640&fit=cover&output=jpg`;
+          saveReelThumbCache();
+          return true;
+        }
       }
     }catch(_){}
   }
-  reelThumbCache[meta.id]='';
   return false;
 }
 
@@ -1281,7 +1313,7 @@ async function hydrateInstagramThumbs(){
   if(_reelThumbHydrating)return;
   _reelThumbHydrating=true;
   try{
-    const targets=items.filter(i=>!i.useCustomImg&&parseVideoMeta(i.vid)?.platform==='ig');
+    const targets=items.filter(i=>!i.useCustomImg&&['ig','tt'].includes(parseVideoMeta(i.vid)?.platform));
     const changed=(await Promise.all(targets.map(hydrateInstagramThumb))).some(Boolean);
     if(changed){render(true);draw(true);}
   }finally{_reelThumbHydrating=false;}
@@ -2959,9 +2991,6 @@ ${caption||rawText}
       }
     }
     if(!c.name&&c.address)c.name=c.address.split(',')[0].trim();
-    if(c.name&&!isGenericSharedName(c.name)){
-      fetchRepPhoto(c.name).then(u=>{if(u){render();draw();}});
-    }
   }));
 
   return {cands,caption,aiErr,capStatus};
