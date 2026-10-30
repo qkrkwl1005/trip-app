@@ -675,9 +675,11 @@ async function signInGoogle(){
   if(!firebaseConfigured())return setSharedUserStatus('firebase-config.js 설정이 필요합니다.','error');
   try{
     if(!firebase.apps.length)firebase.initializeApp(FIREBASE_CONFIG);
+    await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
     const provider=new firebase.auth.GoogleAuthProvider();
     const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||window.matchMedia?.('(max-width: 700px)').matches;
     if(isMobile){
+      sessionStorage.setItem('TRIP_GOOGLE_REDIRECT_PENDING','1');
       setSharedUserStatus('Google 로그인 페이지로 이동 중...','ok');
       await firebase.auth().signInWithRedirect(provider);
       return;
@@ -694,6 +696,25 @@ async function signInGoogle(){
         ? 'Firebase Console에서 Google 로그인 제공업체를 활성화해야 합니다.'
         : e.message;
     setSharedUserStatus(`Google 로그인 실패: ${message}`,'error');
+  }
+  async function completeGoogleRedirectLogin(){
+    if(!firebaseConfigured()||!window.firebase?.auth)return;
+    try{
+      const result=await firebase.auth().getRedirectResult();
+      const user=result?.user||firebase.auth().currentUser;
+      sessionStorage.removeItem('TRIP_GOOGLE_REDIRECT_PENDING');
+      if(!user)return;
+      setSharedUserStatus(`✅ 로그인됨 · ${user.email||user.uid}`,'ok');
+      if(initialRoom)connectSharedRoom(initialRoom);
+    }catch(e){
+      sessionStorage.removeItem('TRIP_GOOGLE_REDIRECT_PENDING');
+      const message=e?.code==='auth/unauthorized-domain'
+        ? `Firebase 인증 도메인에 ${location.hostname}을(를) 추가해야 합니다.`
+        : e?.code==='auth/operation-not-allowed'
+          ? 'Firebase Console에서 Google 로그인 제공업체를 활성화해야 합니다.'
+          : e.message;
+      setSharedUserStatus(`Google 로그인 실패: ${message}`,'error');
+    }
   }
 }
 function sanitizeSharedItems(rawItems){
@@ -3987,17 +4008,16 @@ initMap();
 const initialRoom=new URLSearchParams(location.search).get('room');
 if(firebaseConfigured()&&window.firebase?.auth){
   if(!firebase.apps.length)firebase.initializeApp(FIREBASE_CONFIG);
+  firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(()=>{});
   firebase.auth().onAuthStateChanged(user=>{
     if(user){
       setSharedUserStatus(`✅ 로그인됨 · ${user.email||user.uid}`,'ok');
       if(initialRoom)connectSharedRoom(initialRoom);
-    }else if(initialRoom){
+    }else if(initialRoom&&!sessionStorage.getItem('TRIP_GOOGLE_REDIRECT_PENDING')){
       setSharedUserStatus('방에 참여하려면 Google 계정으로 로그인해 주세요.','error');
     }
   });
-  firebase.auth().getRedirectResult().catch(e=>{
-    if(e?.code)setSharedUserStatus(`Google 로그인 실패: ${e.message}`,'error');
-  });
+  completeGoogleRedirectLogin();
 }
 if(getStorageUsedKB()>3800)slimStorage(false);
 setTimeout(()=>autoFixCoords(),2000);
