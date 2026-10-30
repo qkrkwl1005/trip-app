@@ -504,10 +504,14 @@ function renderRoomGuide(){
 }
 function applySharedSettings(raw){
   if(!raw||typeof raw!=='object')return;
-  const next={};
+  const next={...aiCfg};
   AI_DEFS.forEach(d=>{
     const source=raw.aiCfg?.[d.id];
-    next[d.id]={key:typeof source?.key==='string'?source.key.slice(0,500):'',model:typeof source?.model==='string'?source.model.slice(0,200):d.defModel};
+    const current=aiCfg[d.id]||{};
+    next[d.id]={
+      key:typeof source?.key==='string'&&source.key.trim()?source.key.slice(0,500):String(current.key||''),
+      model:typeof source?.model==='string'&&source.model.trim()?source.model.slice(0,200):String(current.model||d.defModel||'')
+    };
   });
   aiCfg=next;
   ls.set('TRIP_AI_CFG',JSON.stringify(aiCfg));
@@ -517,6 +521,7 @@ function applySharedSettings(raw){
   if(typeof raw.cfProxy==='string')ls.set('TRIP_CF_PROXY',raw.cfProxy.slice(0,1000));
   if(typeof raw.myMapsUrl==='string'&&toEmbedMyMapsUrl(raw.myMapsUrl))ls.set('TRIP_MYMAPS_URL',raw.myMapsUrl.slice(0,2000));
   if(typeof raw.myMapsEmbed==='string'&&toEmbedMyMapsUrl(raw.myMapsEmbed))ls.set(MYMAPS_EMBED_KEY,toEmbedMyMapsUrl(raw.myMapsEmbed));
+  buildAiProvUI();
 }
   async function deleteRoom(){
     const user=window.firebase?.auth?.().currentUser;
@@ -2719,43 +2724,44 @@ async function geocodePlace(cand,hint=''){
     }
   }
 
+  const normalizeSearchText=value=>String(value||'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
+  const searchTerms=normalizeSearchText(`${localName} ${rawName} ${cleanAddr} ${jpTown} ${hint}`);
+  const scoreResult=(result,source)=>{
+    const lat=Number(result?.lat),lng=Number(result?.lng);
+    if(!Number.isFinite(lat)||!Number.isFinite(lng)||Math.abs(lat)>90||Math.abs(lng)>180)return null;
+    const type=String(result?.type||result?.class||'').toLowerCase();
+    if(/^(country|city|town|village|state|county|administrative|locality|postal_code|political|district)$/.test(type))return null;
+    const label=normalizeSearchText(result?.formatted||result?.display_name||result?.name);
+    const tokens=searchTerms.split(' ').filter(token=>token.length>=2);
+    const hits=tokens.reduce((count,token)=>count+(label.includes(token)?1:0),0);
+    const addressBoost=cleanAddr&&label.includes(normalizeSearchText(cleanAddr))?5:0;
+    const nameBoost=(localName||rawName)&&label.includes(normalizeSearchText(localName||rawName))?4:0;
+    return {...result,lat,lng,score:hits+addressBoost+nameBoost+(source==='google'?2:0)};
+  };
+  const candidates=[];
   const raceJobs=[];
   uniq.slice(0,4).forEach(q=>{
     raceJobs.push(
-      fetchTO(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=3`,{},3800).then(r=>r.json()).then(d=>{
-        const f=d?.features?.[0];
-        const c=f?.geometry?.coordinates;
-        const isBroad=/^(?:city|state|country|district)$/i.test(f?.properties?.type||'');
-        if(c&&c.length>=2){
-          if(isBroad&&aiLat&&aiLng)return {lat:aiLat,lng:aiLng};
-          return {lat:Number(c[1]),lng:Number(c[0])};
-        }
-        throw new Error('empty');
-      }),
-      fetchTO(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=3&${isJapan?'countrycodes=jp&':''}accept-language=${isJapan?'ja,en,ko':'ko,ja,en'}`,{},4000).then(r=>r.json()).then(d=>{
-        if(Array.isArray(d)&&d[0]){
-          const h=d.find(x=>!['city','town','village','state','country','administrative'].includes(String(x.type||'').toLowerCase()))||d[0];
-          const isBroad=/^(?:city|administrative|state|country)$/i.test(h.type||'')||/^(?:boundary)$/i.test(h.class||'');
-          if(isBroad&&aiLat&&aiLng)return {lat:aiLat,lng:aiLng};
-          return {lat:Number(h.lat),lng:Number(h.lon),formatted:h.display_name};
-        }
-        throw new Error('empty');
-      })
+      fetchTO(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=5`,{},3800).then(r=>r.json()).then(d=>{
+        (d?.features||[]).forEach(f=>{
+          const c=f?.geometry?.coordinates;
+          if(c&&c.length>=2)candidates.push(scoreResult({lat:c[1],lng:c[0],formatted:f?.properties?.name||f?.properties?.street||'',type:f?.properties?.type},'photon'));
+        });
+      }).catch(()=>{}),
+      fetchTO(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=5&${isJapan?'countrycodes=jp&':''}accept-language=${isJapan?'ja,en,ko':'ko,ja,en'}`,{},4000).then(r=>r.json()).then(d=>{
+        (Array.isArray(d)?d:[]).forEach(x=>candidates.push(scoreResult({lat:x.lat,lng:x.lon,formatted:x.display_name,type:x.type,class:x.class},'nominatim')));
+      }).catch(()=>{})
     );
   });
   if(zipM){
-    raceJobs.push(
-      fetchTO(`https://nominatim.openstreetmap.org/search?format=json&postalcode=${zipM[1]}-${zipM[2]}&countrycodes=jp&limit=1`,{},4000).then(r=>r.json()).then(d=>{
-        if(Array.isArray(d)&&d[0])return {lat:Number(d[0].lat),lng:Number(d[0].lon)};
-        throw new Error('empty');
-      })
-    );
+    raceJobs.push(fetchTO(`https://nominatim.openstreetmap.org/search?format=json&postalcode=${zipM[1]}-${zipM[2]}&countrycodes=jp&limit=5`,{},4000).then(r=>r.json()).then(d=>{
+      (Array.isArray(d)?d:[]).forEach(x=>candidates.push(scoreResult({lat:x.lat,lng:x.lon,formatted:x.display_name,type:x.type,class:x.class},'postal')));
+    }).catch(()=>{}));
   }
 
-  try{
-    const fastHit=await Promise.any(raceJobs);
-    if(fastHit)return remember(fastHit);
-  }catch(e){}
+  await Promise.allSettled(raceJobs);
+  const best=candidates.filter(Boolean).sort((a,b)=>b.score-a.score)[0];
+  if(best)return remember(best);
 
   if(aiLat&&aiLng&&Math.abs(aiLat)<=90&&Math.abs(aiLng)<=180){
     return remember({lat:aiLat,lng:aiLng});
