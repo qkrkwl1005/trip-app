@@ -1841,28 +1841,21 @@ function parseVideoMeta(v){
   // 2) 일반 및 프로필 포함(/username/reel/ID) 릴스·게시물 링크에서 정확한 shortcode 추출
   m=s.match(/(?:instagram\.com|instagr\.am)\/(?:[A-Za-z0-9_.]+\/)?(?:reel|reels|p|tv)\/([A-Za-z0-9_-]{5,25})/i);
   if(m)return {platform:'ig',id:m[1],url:`https://www.instagram.com/reel/${m[1]}/`};
-  // 3) 기타 인스타 링크 (대괄호·괄호 등 마크다운 기호 제외)
-  m=s.match(/https?:\/\/(?:www\.)?(?:instagram\.com|instagr\.am)\/[^\s"'<>\[\]()]+/i);
-  if(m)return {platform:'ig',id:'',url:m[0]};
   // 유튜브 쇼츠
   m=s.match(/(?:youtube\.com\/shorts\/|youtu\.be\/|youtube\.com\/watch\?v=)([A-Za-z0-9_-]{11})/i);
   if(m)return {platform:'yt',id:m[1],url:`https://www.youtube.com/shorts/${m[1]}`};
   // 틱톡
   m=s.match(/https?:\/\/(?:www\.|vm\.|vt\.)?tiktok\.com\/[^\s"'<>\[\]()]+/i);
   if(m){
-    const vm=m[0].match(/\/video\/(\d+)/);
-    return {platform:'tt',id:vm?vm[1]:'',url:m[0]};
+    const clean=m[0].replace(/[,.;:!?]+$/,'');
+    const vm=clean.match(/\/video\/(\d+)/);
+    return {platform:'tt',id:vm?vm[1]:'',url:clean};
   }
-  m=s.match(/https?:\/\/[^\s"'<>\[\]()]+/i);
-  if(m&&/(instagram|instagr\.am|youtu|tiktok)/i.test(m[0]))return {platform:'etc',id:'',url:m[0]};
   return null;
 }
 function normalizeVidUrl(raw){
   const m=parseVideoMeta(raw);
-  if(m)return m.url;
-  const s=String(raw||'').trim();
-  const u=s.match(/https?:\/\/[^\s"'<>\[\]()]+/i);
-  return u?u[0]:'';
+  return m?m.url:'';
 }
 function getVidBtnLabel(v){
   const u=getVidUrlStr(v);
@@ -3332,8 +3325,9 @@ async function fetchVideoCaption(vUrl){
     const jobs=[];
     if(cfBase){
       jobs.push(
-        ()=>fetchTO(cfBase+encodeURIComponent(embedUrl),{},3800).then(r=>r.text()),
-        ()=>fetchTO(cfBase+encodeURIComponent(reelEmbedUrl),{},3800).then(r=>r.text())
+        ()=>fetchTO(cfBase+encodeURIComponent(embedUrl),{},4800).then(r=>r.text()),
+        ()=>fetchTO(cfBase+encodeURIComponent(reelEmbedUrl),{},4800).then(r=>r.text()),
+        ()=>fetchTO(cfBase+encodeURIComponent(postUrl),{},4800).then(r=>r.text())
       );
     }
     jobs.push(
@@ -3357,6 +3351,14 @@ async function fetchVideoCaption(vUrl){
         throw new Error('no caption');
       }));
     }catch(e){return '';}
+  }
+  if(meta.platform==='ig'&&meta.shareId&&cfBase){
+    const shareUrl=`https://www.instagram.com/share/reel/${meta.shareId}/`;
+    try{
+      const txt=await fetchTO(cfBase+encodeURIComponent(shareUrl),{},5000).then(r=>r.text());
+      const cap=parseIgEmbedHtml(txt);
+      if(cap&&cap.length>=8)return cap;
+    }catch(e){}
   }
   if(meta.platform==='yt'&&meta.id){
     const wUrl=`https://www.youtube.com/watch?v=${meta.id}`;
@@ -3650,9 +3652,9 @@ async function analyzeContent({rawText='',vidUrl='',images=[],hint=''}){
 
   let aiCands=[],aiErr='';
   const aiTask=(async()=>{
-    if(!hasAi||!(caption.length>=2||images.length>0||!vidUrl))return [];
+    if(!hasAi||!(caption.length>=2||images.length>0||vidUrl))return [];
     try{
-      const needWebSearch=Boolean(images.length>0||caption.length<200||!/\d{3}-\d{4}/.test(caption));
+      const needWebSearch=Boolean(images.length>0||caption.length<200||!/\d{3}-\d{4}/.test(caption)||vidUrl);
       const prompt=`다음 여행 관련 입력(릴스/쇼츠 캡션, 다중 맛집·카페 리스트, 또는 최대 10장의 이미지)에서 장소·카페·음식·쇼핑 항목을 모두 추출해(최대 10곳) JSON 배열로만 출력하세요.
 입력 텍스트:
 """
@@ -3785,8 +3787,10 @@ async function runAnalyzeShare(files=[]){
   toastBusy('🔥 캡션 분석·위경도 검색 중... (인스타 차단 시 수동 붙여넣기로 대체할 수 있어요)');
 
   try{
-    const metaFromBox=parseVideoMeta(explicitLink)||parseVideoMeta(raw);
-    let vidUrl=metaFromBox?metaFromBox.url:(normalizeVidUrl(explicitLink)||'');
+    const metaExplicit=parseVideoMeta(explicitLink);
+    const metaRaw=parseVideoMeta(raw);
+    const metaFromBox=(metaExplicit?.id?metaExplicit:(metaRaw?.id?metaRaw:(metaExplicit||metaRaw)));
+    let vidUrl=metaFromBox?metaFromBox.url:'';
     if(vidUrl){
       lastSharedVid=vidUrl;
       $('reelLinkBox').value=vidUrl;
@@ -3909,7 +3913,7 @@ async function runAnalyzeShare(files=[]){
       return;
     }
 
-    const failNote=['🔒 인스타 차단 등으로 자동 인식 실패 — 시트에서 [📋 복사한 캡션/주소 붙여넣기]를 누르면 캡션 글자만으로 어떤 장소든 한 번에 저장돼요',aiErr?`AI: ${aiErr}`:'',capStatus].filter(Boolean).join(' · ');
+    const failNote=['🔒 인스타 차단 등으로 자동 인식 실패 — 캡션·댓글을 직접 붙여넣거나 스크린샷을 첨부해 주세요',aiErr?`AI: ${aiErr}`:''].filter(Boolean).join(' · ');
     const fallbackCand={
       name:metaFromBox?.platform==='yt'?'공유 쇼츠':'공유 릴스',
       address:'',
@@ -3918,7 +3922,7 @@ async function runAnalyzeShare(files=[]){
       category:cat,
       lat:null,
       lng:null,
-      vid:vidUrl||(metaFromBox?raw:''),
+      vid:vidUrl||'',
       v:0
     };
     res=[fallbackCand];
@@ -4651,7 +4655,7 @@ $('shareBox').oninput=()=>{
   const m=parseVideoMeta($('shareBox').value);
   if(m){
     lastSharedVid=m.url;
-    if(!$('reelLinkBox').value.trim())$('reelLinkBox').value=m.url;
+    if(!parseVideoMeta($('reelLinkBox').value))$('reelLinkBox').value=m.url;
   }
 };
 
@@ -4662,7 +4666,7 @@ $('pasteShare').onclick=async()=>{
       const m=parseVideoMeta(t);
       if(m){
         lastSharedVid=m.url;
-        if(!$('reelLinkBox').value.trim())$('reelLinkBox').value=m.url;
+        if(!parseVideoMeta($('reelLinkBox').value))$('reelLinkBox').value=m.url;
       }
       $('shareBox').value=t;
       toast('붙여넣기 완료! 바로 분석합니다.');
