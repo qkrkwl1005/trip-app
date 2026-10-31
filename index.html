@@ -1835,18 +1835,25 @@ function getVidUrlStr(v){
 function parseVideoMeta(v){
   const s=getVidUrlStr(v);
   if(!s)return null;
-  let m=s.match(/(?:instagram\.com|instagr\.am)\/(?:share\/)?(?:reel|reels|p|tv)\/([A-Za-z0-9_-]+)/i);
+  // 1) instagram.com/share/... 리다이렉트 링크는 별도 표시 (shortcode가 아님)
+  let m=s.match(/(?:instagram\.com|instagr\.am)\/share\/(?:reel|reels|p|tv)\/([A-Za-z0-9_-]+)/i);
+  if(m)return {platform:'ig',id:'',shareId:m[1],url:`https://www.instagram.com/share/reel/${m[1]}/`};
+  // 2) 일반 및 프로필 포함(/username/reel/ID) 릴스·게시물 링크에서 정확한 shortcode 추출
+  m=s.match(/(?:instagram\.com|instagr\.am)\/(?:[A-Za-z0-9_.]+\/)?(?:reel|reels|p|tv)\/([A-Za-z0-9_-]{5,25})/i);
   if(m)return {platform:'ig',id:m[1],url:`https://www.instagram.com/reel/${m[1]}/`};
-  m=s.match(/https?:\/\/(?:www\.)?(?:instagram\.com|instagr\.am)\/[^\s"'<>]+/i);
+  // 3) 기타 인스타 링크 (대괄호·괄호 등 마크다운 기호 제외)
+  m=s.match(/https?:\/\/(?:www\.)?(?:instagram\.com|instagr\.am)\/[^\s"'<>\[\]()]+/i);
   if(m)return {platform:'ig',id:'',url:m[0]};
+  // 유튜브 쇼츠
   m=s.match(/(?:youtube\.com\/shorts\/|youtu\.be\/|youtube\.com\/watch\?v=)([A-Za-z0-9_-]{11})/i);
   if(m)return {platform:'yt',id:m[1],url:`https://www.youtube.com/shorts/${m[1]}`};
-  m=s.match(/https?:\/\/(?:www\.|vm\.|vt\.)?tiktok\.com\/[^\s"'<>]+/i);
+  // 틱톡
+  m=s.match(/https?:\/\/(?:www\.|vm\.|vt\.)?tiktok\.com\/[^\s"'<>\[\]()]+/i);
   if(m){
     const vm=m[0].match(/\/video\/(\d+)/);
     return {platform:'tt',id:vm?vm[1]:'',url:m[0]};
   }
-  m=s.match(/https?:\/\/[^\s"'<>]+/i);
+  m=s.match(/https?:\/\/[^\s"'<>\[\]()]+/i);
   if(m&&/(instagram|instagr\.am|youtu|tiktok)/i.test(m[0]))return {platform:'etc',id:'',url:m[0]};
   return null;
 }
@@ -1854,7 +1861,7 @@ function normalizeVidUrl(raw){
   const m=parseVideoMeta(raw);
   if(m)return m.url;
   const s=String(raw||'').trim();
-  const u=s.match(/https?:\/\/[^\s"'<>]+/i);
+  const u=s.match(/https?:\/\/[^\s"'<>\[\]()]+/i);
   return u?u[0]:'';
 }
 function getVidBtnLabel(v){
@@ -1878,11 +1885,11 @@ function openExternalVideo(url){
 }
 function vidEmbedUrl(v,captioned=false){
   const meta=parseVideoMeta(v);
-  if(!meta)return getVidUrlStr(v);
-  if(meta.platform==='ig'&&meta.id)return `https://www.instagram.com/p/${meta.id}/embed/${captioned?'captioned/':''}`;
+  if(!meta)return '';
+  if(meta.platform==='ig')return meta.id?`https://www.instagram.com/p/${meta.id}/embed/${captioned?'captioned/':''}`:'';
   if(meta.platform==='yt'&&meta.id)return `https://www.youtube.com/embed/${meta.id}`;
   if(meta.platform==='tt'&&meta.id)return `https://www.tiktok.com/embed/v2/${meta.id}`;
-  return meta.url;
+  return '';
 }
 function itemThumb(i){
   return itemThumbCandidates(i)[0]||'';
@@ -3278,6 +3285,9 @@ function decodeHtml(str){
 
 function parseIgEmbedHtml(html){
   if(!html||typeof html!=='string')return '';
+  // 자기 자신의 소스코드(index.html)나 스크립트가 반환된 경우 즉시 차단
+  if(html.includes('function parseIgEmbedHtml')||html.includes('TRIP_MASTER_ITEMS'))return '';
+
   const cm=html.match(/<div class="Caption"[^>]*>([\s\S]*?)<div class="CaptionComments"/i)
          ||html.match(/<div class="Caption"[^>]*>([\s\S]*?)<\/div>/i);
   if(cm){
@@ -3286,14 +3296,16 @@ function parseIgEmbedHtml(html){
       .replace(/<br\s*\/?>/gi,'\n')
       .replace(/<[^>]+>/g,' ');
     s=decodeHtml(s).replace(/[ \t]+/g,' ').replace(/\n\s+/g,'\n').trim();
-    if(s.length>=6)return s;
+    // 정규식 코드 조각이나 의미 없는 특수문자열 차단
+    if(s.length>=6 && !s.includes('[\\s\\S]') && /[가-힣a-zA-Z0-9一-龯ぁ-んァ-ン]/.test(s))return s;
   }
   const jm=html.match(/"edge_media_to_caption"\s*:\s*\{\s*"edges"\s*:\s*\[\s*\{\s*"node"\s*:\s*\{\s*"text"\s*:\s*"((?:[^"\\]|\\.)*)"/i)
          ||html.match(/\\"edge_media_to_caption\\"\s*:\s*\{\s*\\"edges\\"\s*:\s*\[\s*\{\s*\\"node\\"\s*:\s*\{\s*\\"text\\"\s*:\s*\\"((?:[^"\\]|\\.)*)\\"/i);
   if(jm){
     try{
-      const raw=jm[1].replace(/\\"/g,'"').replace(/\\\\/g,'\\');
-      const dec=JSON.parse('"'+raw.replace(/"/g,'\\"')+'"');
+      let raw=jm[1];
+      if(html.includes('\\"edge_media_to_caption\\"'))raw=raw.replace(/\\"/g,'"').replace(/\\\\/g,'\\');
+      const dec=JSON.parse('"'+raw+'"');
       if(dec&&dec.trim().length>=6)return dec.trim();
     }catch(e){}
   }
@@ -3490,8 +3502,9 @@ async function geocodePlace(cand,hint=''){
   const gkey=(ls.get('TRAVEL_GMAP_KEY')||'').trim();
   const rawAddr=normalizeOcrAddr(cand.address||'');
   const stripFloorNoise=s=>String(s||'')
-    .replace(/(?:^|\s)B?\d+\s*(?:F|층)(?=\s|$)/gi,' ')
+    .replace(/(?:^|\s)B?\d+\s*(?:F|층|階)(?=\s|$)/gi,' ')
     .replace(/지하\s*\d+\s*층/g,' ')
+    .replace(/[^\s,]+(?:ビル|ビルディング|タワー|プラザ|百貨店|マルイ|パルコ)\s*(?:B?\d+[F階층]?)?/g,' ')
     .replace(/(?:안에\s*있음|역\s*안|구내|내부|근처)/g,' ')
     .replace(/\s+/g,' ').trim();
   const cleanAddr=stripFloorNoise(rawAddr);
@@ -3521,15 +3534,15 @@ async function geocodePlace(cand,hint=''){
   }
 
   const queries=[];
+  if(cleanAddr){
+    const cleaned=cleanAddr.replace(/(?:〒|T)?\d{3}-\d{4}/g,'').replace(/^일본\s*/,'').trim();
+    if(cleaned)queries.push(cleaned);
+    if(cleanAddr!==cleaned)queries.push(cleanAddr);
+  }
   if(localName&&cleanAddr)queries.push(`${localName} ${cleanAddr}`);
   if(rawName&&cleanAddr)queries.push(`${rawName} ${cleanAddr}`);
   if(jpTown&&banchi)queries.push(`${jpTown}${banchi}`);
   if(localName)queries.push(`${localName} ${jpTown||hint||''}`.trim());
-  if(cleanAddr){
-    const cleaned=cleanAddr.replace(/(?:〒|T)?\d{3}-\d{4}/g,'').replace(/^일본\s*/,'').trim();
-    if(cleaned)queries.push(cleaned);
-    queries.push(cleanAddr);
-  }
   if(rawAddr&&rawAddr!==cleanAddr)queries.push(rawAddr);
   if(jpTown)queries.push(jpTown);
   if(rawName)queries.push(`${rawName} ${hint||''}`.trim());
@@ -3582,7 +3595,7 @@ async function geocodePlace(cand,hint=''){
     const label=normalizeSearchText(result?.formatted||result?.display_name||result?.name);
     const tokens=searchTerms.split(' ').filter(token=>token.length>=2);
     const hits=tokens.reduce((count,token)=>count+(label.includes(token)?1:0),0);
-    const addressBoost=cleanAddr&&label.includes(normalizeSearchText(cleanAddr))?5:0;
+    const addressBoost=cleanAddr&&label.includes(normalizeSearchText(cleanAddr))?10:0;
     const nameBoost=(localName||rawName)&&label.includes(normalizeSearchText(localName||rawName))?4:0;
     return {...result,lat,lng,score:hits+addressBoost+nameBoost+(source==='google'?2:0)};
   };
@@ -3696,19 +3709,8 @@ ${caption||rawText}
   });
 
   let cands=[];
-  if(aiCands.length<multiLocal.length&&multiLocal.length>1){
-    cands=multiLocal.slice(0,MAX_MULTI_PLACES).map((m,idx)=>{
-      const aiMatch=aiCands[idx];
-      const base=mapLocal(m);
-      if(aiMatch){
-        base.localName=aiMatch.localName||base.localName;
-        const aiAddress=normalizeOcrAddr(aiMatch.address||'');
-        if(aiAddress&&(!base.address||/〒|丁目|番地|大阪|東京|京都|福岡|札幌|日本|Japan/i.test(aiAddress)))base.address=aiAddress;
-        if(CATS[aiMatch.category]&&cat==='PLACE')base.category=aiMatch.category;
-        if(Number(aiMatch.lat)&&Number(aiMatch.lng)){base.lat=Number(aiMatch.lat);base.lng=Number(aiMatch.lng);}
-      }
-      return base;
-    });
+  if(!aiCands.length&&multiLocal.length>1){
+    cands=multiLocal.slice(0,MAX_MULTI_PLACES).map(m=>mapLocal(m));
   }else if(aiCands.length){
     cands=aiCands.slice(0,MAX_MULTI_PLACES).map(c=>({
       name:c.name||localParsed.name||'',
@@ -3788,8 +3790,6 @@ async function runAnalyzeShare(files=[]){
     if(vidUrl){
       lastSharedVid=vidUrl;
       $('reelLinkBox').value=vidUrl;
-    }else if(lastSharedVid){
-      vidUrl=lastSharedVid;
     }
 
     const quickLocal=(!files.length&&raw)?parseCaptionMultiText(raw,hint):[];
