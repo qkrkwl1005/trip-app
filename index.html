@@ -1048,7 +1048,7 @@ async function geminiModels(key){
       if(flash.length)out=flash.slice(0,5);
     }
   }catch(e){}
-  if(!out||!out.length)out=['gemini-2.5-flash-lite','gemini-2.5-flash','gemini-2.0-flash','gemini-2.0-flash-lite','gemini-1.5-flash'];
+  if(!out||!out.length)out=['gemini-2.0-flash','gemini-1.5-flash','gemini-2.0-flash-lite','gemini-1.5-pro'];
   _gmodels=out;_gmodelsAt=now;
   return out;
 }
@@ -3177,12 +3177,12 @@ async function callGeminiSmart(prompt,images=[],allowGrounding=false){
   const t0=Date.now(),DEADLINE=24000;
   let lastErr='';
   const modelOrder=allowGrounding
-    ?['gemini-2.5-flash',userModel,'gemini-2.0-flash','gemini-2.5-flash-lite','gemini-2.0-flash-lite']
-    :[userModel,'gemini-2.5-flash-lite','gemini-2.5-flash','gemini-2.0-flash','gemini-2.0-flash-lite'];
+    ?['gemini-2.0-flash',userModel,'gemini-1.5-flash','gemini-2.0-flash-lite','gemini-1.5-pro']
+    :[userModel,'gemini-2.0-flash','gemini-1.5-flash','gemini-2.0-flash-lite','gemini-1.5-pro'];
   const fixed=[...new Set(modelOrder.filter(Boolean))];
   for(const m of fixed){
     if(Date.now()-t0>DEADLINE)break;
-    const tries=(allowGrounding&&m==='gemini-2.5-flash')?[true,false]:[false];
+    const tries=allowGrounding?[true,false]:[false];
     for(const useGround of tries){
       const body={contents:[{parts}],generationConfig:{temperature:0.1}};
       if(useGround)body.tools=[{google_search:{}}];
@@ -3410,7 +3410,8 @@ function parseCaptionLocally(rawText,hint=''){
       const v=cl.replace(/^(?:📍|📌|☕)\s*/u,'').trim();
       if(v){
         if(isLikelyAddressLine(v)&&!address)addrParts.push(v);
-        else if(!name)name=v;
+        else if(!name&&!isLikelyAddressLine(v))name=v;
+        else if(isLikelyAddressLine(v))addrParts.push(v);
       }
       continue;
     }
@@ -3439,6 +3440,13 @@ function parseCaptionLocally(rawText,hint=''){
   }
 
   if(addrParts.length)address=normalizeOcrAddr(addrParts.join(', '));
+
+  if(!name){
+    const qM=String(rawText||'').match(/['"「『]([^'"」』\r\n]{2,30})['"」』]/);
+    if(qM && !isLikelyAddressLine(qM[1]) && !/^(?:광고|협찬|추천|맛집|일본여행|오사카|도쿄|교토|후쿠오카|삿포로)$/.test(qM[1].trim())){
+      name=qM[1].trim();
+    }
+  }
 
   if(!name&&lines.length===1&&!lines[0].startsWith('http')&&!isLikelyAddressLine(lines[0])&&lines[0].length<=35){
     name=lines[0];
@@ -3469,7 +3477,22 @@ function parseCaptionLocally(rawText,hint=''){
 }
 
 function parseCaptionMultiText(txt,hint=''){
-  const t=String(txt||'');
+  const t=String(txt||'').trim();
+  const circ=t.split(/(?=[\u2460-\u2469])/).map(s=>s.trim()).filter(s=>/^[\u2460-\u2469]/.test(s)&&s.length>=5);
+  const numLines=t.split(/\n(?=\s*(?:[1-9]|10)[\.\)]\s+[^\d])/).map(s=>s.trim()).filter(s=>/^\s*(?:[1-9]|10)[\.\)]\s+/.test(s)&&s.length>=5);
+
+  if(circ.length>1){
+    return circ.map(c=>parseCaptionLocally(c,hint)).filter(p=>p.name||p.address);
+  }
+  if(numLines.length>1){
+    return numLines.map(c=>parseCaptionLocally('📍 '+c.replace(/^\s*(?:[1-9]|10)[\.\)]\s*/,''),hint)).filter(p=>p.name||p.address);
+  }
+
+  const single=parseCaptionLocally(t,hint);
+  if(single.name&&single.address){
+    return [single];
+  }
+
   const parts=t.split(/(📍|📌)/);
   const chunks=[];
   for(let i=0;i<parts.length;i++){
@@ -3478,26 +3501,15 @@ function parseCaptionMultiText(txt,hint=''){
       i++;
     }
   }
-  const circ=t.split(/(?=[\u2460-\u2469])/).map(s=>s.trim()).filter(s=>s.length>=6);
-  const numLines=t.split(/\n(?=\s*(?:[1-9]|10)[\.\)]\s+[^\d])/).map(s=>s.trim()).filter(s=>/^\s*(?:[1-9]|10)[\.\)]\s+/.test(s)&&s.length>=5);
-
-  const useChunks=chunks.length>=1;
-  const useCirc=!useChunks&&circ.length>1;
-  const useNum=!useChunks&&!useCirc&&numLines.length>1;
-  const pool=useChunks?chunks:(useCirc?circ:(useNum?numLines:[t]));
-  const out=[];
-  for(const c of pool){
-    if(out.length>=MAX_MULTI_PLACES)break;
-    let s=c.replace(/^[•·\-\*]\s*/,'').replace(/^[\u2460-\u2469]\s*/,'').trim();
-    if(useNum)s='📍 '+s.replace(/^\s*(?:[1-9]|10)[\.\)]\s*/,'');
-    const p=parseCaptionLocally(s,hint);
-    if(useChunks||useCirc||useNum){
-      if(p.name&&p.name.length>=2)out.push(p);
-    }else{
-      if(p.name||p.address)out.push(p);
+  if(chunks.length>1){
+    const list=chunks.map(c=>parseCaptionLocally(c,hint));
+    const validNamed=list.filter(p=>p.name&&!isLikelyAddressLine(p.name));
+    if(validNamed.length<=1){
+      return (single.name||single.address)?[single]:[];
     }
+    return validNamed;
   }
-  return out;
+  return (single.name||single.address)?[single]:[];
 }
 
 async function geocodePlace(cand,hint=''){
