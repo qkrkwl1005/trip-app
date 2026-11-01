@@ -7,7 +7,7 @@ import { Alert, FlatList, Pressable, SafeAreaView, StyleSheet, Text, TextInput, 
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
-import { auth, googleWebClientId } from './firebaseConfig';
+import { auth, googleIosClientId, googleWebClientId } from './firebaseConfig';
 import { DetailModal } from './src/components/DetailModal';
 import { DayFilterPill } from './src/components/DayFilterPill';
 import { InviteSheet } from './src/components/InviteSheet';
@@ -33,6 +33,7 @@ export default function App() {
   const [inviteSignal, setInviteSignal] = useState(0);
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
     webClientId: googleWebClientId,
+    iosClientId: googleIosClientId,
     scopes: ['openid', 'profile', 'email'],
   });
 
