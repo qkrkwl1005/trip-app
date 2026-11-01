@@ -144,6 +144,15 @@ details.acc[open]>summary::after{transform:rotate(225deg)}
 .trip-days{display:flex;gap:6px;overflow-x:auto;margin-top:12px;padding:2px}.trip-day{flex:none;border:1px solid var(--bd);border-radius:99px;background:var(--s);color:var(--sub);padding:7px 12px;font:inherit;font-size:12px;font-weight:700}.trip-day.on{background:var(--pr);border-color:var(--pr);color:#fff}
 .trip-tools{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}.trip-tools button{padding:9px;border:1px solid var(--bd);border-radius:10px;background:var(--s);color:var(--tx);font:inherit;font-size:12px;font-weight:700}
 .trip-details{display:grid;gap:7px;margin-top:9px}.trip-detail{padding:10px;border:1px solid var(--bd);border-radius:12px;background:var(--s2)}.trip-detail small{color:var(--sub)}
+.invite-sheet-backdrop{position:fixed;inset:0;z-index:1200;display:flex;align-items:flex-end;background:rgba(0,0,0,.62);opacity:0;pointer-events:none;transition:opacity .22s ease}
+.invite-sheet-backdrop.is-open{opacity:1;pointer-events:auto}
+.invite-sheet{width:100%;max-height:min(720px,92dvh);overflow:auto;padding:10px 20px calc(22px + env(safe-area-inset-bottom));border-radius:16px 16px 0 0;background:#171717;color:#f5f5f5;transform:translateY(100%);transition:transform .28s cubic-bezier(.22,1,.36,1);box-shadow:0 -12px 40px rgba(0,0,0,.45)}
+.invite-sheet-backdrop.is-open .invite-sheet{transform:translateY(0)}
+.invite-handle{width:42px;height:4px;margin:2px auto 18px;border-radius:99px;background:#555}
+.invite-sheet-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}.invite-sheet-title{font-size:20px;font-weight:800;letter-spacing:-.04em}.invite-sheet-subtitle{margin-top:4px;color:#a6a6a6;font-size:12px}
+.invite-close{width:34px;height:34px;border:0;border-radius:50%;background:#292929;color:#ddd;font-size:20px;cursor:pointer}
+.invite-search-wrap{display:flex;align-items:center;gap:9px;padding:0 13px;border:1px solid #333;border-radius:14px;background:#222;margin-bottom:14px}.invite-search-wrap svg{width:18px;height:18px;color:#999;flex:none}.invite-search{width:100%;padding:13px 0!important;margin:0!important;border:0!important;outline:0!important;background:transparent!important;color:#fff!important;box-shadow:none!important}
+.invite-link-card{padding:14px;border:1px solid #303030;border-radius:14px;background:#202020}.invite-link-label{color:#aaa;font-size:12px}.invite-link{margin-top:7px;color:#ddd;font-size:12px;line-height:1.45;word-break:break-all}.invite-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.invite-action{min-height:44px;border:0;border-radius:12px;background:#2c2c2c;color:#fff;font:inherit;font-weight:700;cursor:pointer}.invite-action.primary{background:#3b82f6}.invite-results{display:grid;gap:7px;margin:10px 0}.invite-result{padding:11px 12px;border:1px solid #303030;border-radius:12px;background:#202020;color:#ddd;text-align:left;cursor:pointer}.invite-result small{display:block;color:#999;margin-top:2px}
 @media(max-width:820px){
 #side{width:100%;min-width:0;border:0}
 #nav{position:fixed;left:8px;right:8px;bottom:calc(6px + env(safe-area-inset-bottom));z-index:210;grid-template-columns:repeat(6,1fr);border:1px solid var(--bd);border-radius:18px;padding:5px 4px;background:var(--s);box-shadow:0 10px 30px rgba(0,0,0,.25)}
@@ -165,6 +174,7 @@ input[type=text],input[type=password],textarea{font-size:16px}
     <div class="brand"><div class="logo">📌</div><div><b>트립핀</b><small>링크를 저장하면 여행지로 연결해요</small></div></div>
     <div style="display:flex;align-items:center;gap:6px">
       <button id="planCopyTopBtn" class="mb" title="일정 텍스트 복사">📋 일정복사</button>
+      <button id="inviteFriendsBtn" class="mb pr" title="친구 초대">👥 초대</button>
       <span id="netStatus" aria-live="polite">● 온라인</span>
       <button id="themeBtn" class="mb"></button>
       <button id="settingsBtn" class="mb">⚙️</button>
@@ -347,6 +357,29 @@ input[type=text],input[type=password],textarea{font-size:16px}
 <!-- 택시 기사님 보여주기용 고대비 전체화면 카드 -->
 <div id="taxiModal">
   <div class="taxi-card" id="taxiBody"></div>
+</div>
+
+<div id="inviteFriendsModal" class="invite-sheet-backdrop" aria-hidden="true">
+  <section class="invite-sheet" role="dialog" aria-modal="true" aria-labelledby="inviteSheetTitle">
+    <div class="invite-handle" aria-hidden="true"></div>
+    <div class="invite-sheet-head">
+      <div><div id="inviteSheetTitle" class="invite-sheet-title">친구 초대</div><div class="invite-sheet-subtitle">여행을 함께 만들 친구를 초대해 보세요</div></div>
+      <button id="inviteCloseBtn" class="invite-close" type="button" aria-label="닫기">×</button>
+    </div>
+    <label class="invite-search-wrap" for="inviteSearchInput">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
+      <input id="inviteSearchInput" class="invite-search" type="search" autocomplete="off" placeholder="이름 또는 이메일로 찾기">
+    </label>
+    <div id="inviteSearchResults" class="invite-results" aria-live="polite"></div>
+    <div class="invite-link-card">
+      <div class="invite-link-label">공유 방 초대 링크</div>
+      <div id="inviteLinkValue" class="invite-link"></div>
+      <div class="invite-actions">
+        <button id="inviteCopyBtn" class="invite-action primary" type="button">🔗 링크 복사</button>
+        <button id="inviteShareBtn" class="invite-action" type="button">↗️ 보내기</button>
+      </div>
+    </div>
+  </section>
 </div>
 
 <div id="sheet"><div class="sh" id="sbody"></div></div>
@@ -1691,6 +1724,97 @@ async function copyRoomLink(){
   try{await navigator.clipboard.writeText(url);toast('공유 방 링크를 복사했어요');}
   catch(e){prompt('이 링크를 친구들에게 보내세요:',url);}
 }
+
+// Independent invite sheet module. Replace inviteSearchAdapter when a user API is available.
+(function TripPinInviteSheet(){
+  const state={open:false,query:'',results:[]};
+  const modal=$('inviteFriendsModal'),search=$('inviteSearchInput'),results=$('inviteSearchResults'),link=$('inviteLinkValue');
+  if(!modal||!search||!results||!link)return;
+  const getInviteUrl=()=>sharedRoomId?roomUrl():'';
+  const inviteSearchAdapter=async query=>{
+    const normalized=String(query||'').trim().toLowerCase();
+    if(!normalized)return [];
+    return Object.entries(sharedMembers||{})
+      .map(([uid,member])=>({uid,name:String(member?.name||'친구'),email:String(member?.email||'')}))
+      .filter(person=>`${person.name} ${person.email}`.toLowerCase().includes(normalized))
+      .slice(0,8);
+  };
+  const render=()=>{
+    const inviteUrl=getInviteUrl();
+    link.textContent=inviteUrl||'먼저 공유 방을 만든 뒤 초대 링크를 만들 수 있어요.';
+    results.innerHTML=state.results.length
+      ? state.results.map(person=>`<button class="invite-result" type="button" data-invite-uid="${esc(person.uid)}"><b>${esc(person.name)}</b><small>${esc(person.email||person.uid)}</small></button>`).join('')
+      : state.query?'검색 결과가 없어요.':'현재 방 멤버를 검색할 수 있어요.';
+  };
+  const open=()=>{
+    state.open=true;
+    modal.classList.add('is-open');
+    modal.setAttribute('aria-hidden','false');
+    render();
+    requestAnimationFrame(()=>search.focus());
+  };
+  const close=()=>{
+    state.open=false;
+    modal.classList.remove('is-open');
+    modal.setAttribute('aria-hidden','true');
+    search.value='';
+    state.query='';
+    state.results=[];
+  };
+  const copyInviteLink=async()=>{
+    const inviteUrl=getInviteUrl();
+    if(!inviteUrl)return toast('먼저 공유 방을 만들어 주세요');
+    try{
+      await navigator.clipboard.writeText(inviteUrl);
+      toast('초대 링크가 복사되었습니다');
+    }catch(error){
+      prompt('이 링크를 친구들에게 보내세요:',inviteUrl);
+      toast('클립보드 복사가 제한되어 링크를 표시했어요');
+    }
+  };
+  const shareInviteLink=async()=>{
+    const inviteUrl=getInviteUrl();
+    if(!inviteUrl)return toast('먼저 공유 방을 만들어 주세요');
+    if(navigator.share){
+      try{
+        await navigator.share({title:'트립핀 여행 초대',text:'트립핀 여행에 초대할게요.',url:inviteUrl});
+        toast('초대 링크를 보낼 준비가 되었어요');
+        return;
+      }catch(error){
+        if(error?.name==='AbortError')return;
+      }
+    }
+    await copyInviteLink();
+  };
+  window.TripPinInvite={
+    open,close,getState:()=>({...state}),setSearchAdapter(adapter){
+      if(typeof adapter!=='function')throw new TypeError('invite search adapter must be a function');
+      window.TripPinInvite.searchAdapter=adapter;
+    },
+    onInviteSelected(person){ return person; }
+  };
+  window.TripPinInvite.searchAdapter=inviteSearchAdapter;
+  $('inviteFriendsBtn')?.addEventListener('click',open);
+  $('inviteCloseBtn')?.addEventListener('click',close);
+  $('inviteCopyBtn')?.addEventListener('click',copyInviteLink);
+  $('inviteShareBtn')?.addEventListener('click',shareInviteLink);
+  modal.addEventListener('click',event=>{if(event.target===modal)close();});
+  search.addEventListener('input',async event=>{
+    state.query=event.target.value;
+    state.results=await window.TripPinInvite.searchAdapter(state.query);
+    render();
+  });
+  results.addEventListener('click',event=>{
+    const button=event.target.closest('[data-invite-uid]');
+    if(!button)return;
+    const person=state.results.find(item=>item.uid===button.dataset.inviteUid);
+    if(person){
+      window.TripPinInvite.onInviteSelected(person);
+      toast(`${person.name}을(를) 선택했어요`);
+    }
+  });
+  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&state.open)close();});
+})();
 
 try{items=JSON.parse(ls.get('TRIP_MASTER_ITEMS')||'[]')}catch(e){items=[]}
 
