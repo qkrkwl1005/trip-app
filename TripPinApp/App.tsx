@@ -7,7 +7,7 @@ import { Alert, FlatList, Pressable, SafeAreaView, StyleSheet, Text, TextInput, 
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
-import { auth, googleWebClientId } from './firebaseConfig';
+import { auth, googleIosClientId, googleWebClientId } from './firebaseConfig';
 import { DetailModal } from './src/components/DetailModal';
 import { DayFilterPill } from './src/components/DayFilterPill';
 import { InviteSheet } from './src/components/InviteSheet';
@@ -33,6 +33,7 @@ export default function App() {
   const [inviteSignal, setInviteSignal] = useState(0);
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
     clientId: googleWebClientId,
+    iosClientId: googleIosClientId,
     scopes: ['openid', 'profile', 'email'],
   });
 
@@ -70,6 +71,9 @@ export default function App() {
   const login = async () => {
     if (!googleWebClientId || googleWebClientId === 'replace-me') {
       return notify('Google Web Client ID가 설정되지 않았어요.');
+    }
+    if (!googleIosClientId || googleIosClientId === 'replace-me') {
+      return notify('iOS OAuth Client ID가 필요해요. Expo Go가 아닌 Development Build에서 사용해 주세요.');
     }
     if (!request) return notify('Google 로그인을 준비 중이에요.');
     try {

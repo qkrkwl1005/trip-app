@@ -8,6 +8,7 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
+      "bundleIdentifier": "com.qkrkwl1005.trippin",
       "supportsTablet": true
     },
     "android": {

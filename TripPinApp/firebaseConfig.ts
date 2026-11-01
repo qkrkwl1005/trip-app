@@ -24,3 +24,4 @@ const auth: Auth = getAuth(app);
 export { app, auth };
 export const db = getFirestore(app);
 export const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '';
+export const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? '';
