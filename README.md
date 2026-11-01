@@ -1,10 +1,11 @@
-# 여행플래너
+# 트립핀
 
-여행 장소·음식·쇼핑을 한 곳에서 관리하는 정적 웹 앱입니다.
+인스타·쇼츠 링크에서 여행지를 찾아 지도와 일정에 저장하는 정적 웹 앱입니다.
 
 ## 기능
 - 장소/음식/쇼핑 항목 검색 및 저장
 - 릴스 하나에 여러 장소를 묶어 저장하고 지도에서 개별 핀 및 전체 장소 펼쳐보기
+- 여행명·기간·Day별 일정, 항공편·숙소·메모 관리
 - 지도(OpenStreetMap/Google Maps) 표시
 - Gemini AI 기반 인터넷 검색 (API 키 선택)
 - 대표 사진 자동 찾기 (Wikipedia/Wikimedia)
@@ -33,7 +34,7 @@ python3 -m http.server 8765
 
 ### 2. Firestore 보안 규칙 설정
 
-테스트 모드는 기간이 지나면 만료되므로 다음 규칙으로 바꾸세요. 저장소의 [firestore.rules](./firestore.rules)와 같은 내용입니다. Google 로그인 사용자 중 방 멤버만 접근할 수 있고, 일정 데이터와 방장이 공유한 API·지도 설정만 저장되도록 필드를 제한합니다.
+테스트 모드는 기간이 지나면 만료되므로 다음 규칙으로 바꾸세요. 저장소의 [firestore.rules](./firestore.rules)와 같은 내용입니다. Google 로그인 사용자 중 방 멤버만 접근할 수 있고, 장소 데이터·여행 상세와 방장이 공유한 API·지도 설정만 저장되도록 필드를 제한합니다.
 
 ```text
 rules_version = '2';
@@ -45,9 +46,10 @@ service cloud.firestore {
           && data.members[request.auth.uid].role in ['owner', 'editor'];
       }
       function validRoom(data) {
-        return data.keys().hasOnly(['items', 'updatedAt', 'ownerUid', 'members', 'settings', 'settingsShared', 'revision', 'history'])
+        return data.keys().hasOnly(['items', 'trip', 'updatedAt', 'ownerUid', 'members', 'settings', 'settingsShared', 'revision', 'history'])
           && data.items is list
           && data.items.size() <= 200
+          && (!data.keys().hasAny(['trip']) || data.trip is map)
           && data.ownerUid is string
           && data.members is map
           && data.settingsShared is bool

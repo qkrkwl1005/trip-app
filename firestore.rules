@@ -8,9 +8,23 @@ service cloud.firestore {
           && data.members[request.auth.uid].role in ['owner', 'editor'];
       }
       function validRoom(data) {
-        return data.keys().hasOnly(['items', 'updatedAt', 'ownerUid', 'members', 'settings', 'settingsShared', 'revision', 'history'])
+        return data.keys().hasOnly(['items', 'trip', 'updatedAt', 'ownerUid', 'members', 'settings', 'settingsShared', 'revision', 'history'])
           && data.items is list
           && data.items.size() <= 200
+          && (!data.keys().hasAny(['trip']) || (
+            data.trip is map
+            && data.trip.keys().hasOnly(['title', 'start', 'end', 'flights', 'stays', 'notes'])
+            && data.trip.title is string
+            && data.trip.title.size() <= 100
+            && data.trip.start is string
+            && data.trip.end is string
+            && data.trip.flights is list
+            && data.trip.flights.size() <= 20
+            && data.trip.stays is list
+            && data.trip.stays.size() <= 20
+            && data.trip.notes is list
+            && data.trip.notes.size() <= 50
+          ))
           && data.ownerUid is string
           && data.members is map
           && data.settingsShared is bool

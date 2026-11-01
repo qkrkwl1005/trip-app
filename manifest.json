@@ -1,7 +1,7 @@
 {
-  "name": "여행플래너",
-  "short_name": "여행플래너",
-  "description": "여행 장소·음식·쇼핑 플래너",
+  "name": "트립핀",
+  "short_name": "트립핀",
+  "description": "링크를 저장하면 여행지로 연결해 주는 여행 플래너",
   "start_url": "./index.html",
   "display": "standalone",
   "share_target": {
