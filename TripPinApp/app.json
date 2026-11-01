@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "TripPinApp",
-    "slug": "TripPinApp",
+    "slug": "trip",
     "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "trippin",
@@ -9,9 +9,31 @@
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "com.qkrkwl1005.trippin",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "CFBundleDisplayName": "Trip",
+        "CFBundleName": "Trip",
+        "CFBundleURLTypes": [
+          {
+            "CFBundleTypeRole": "Editor",
+            "CFBundleURLSchemes": [
+              "trippin",
+              "com.googleusercontent.apps.344102140871-314fq9k43tesa34aoane0r1qe1vsk8b0"
+            ]
+          },
+          {
+            "CFBundleTypeRole": "Editor",
+            "CFBundleURLSchemes": [
+              "trippin",
+              "com.googleusercontent.apps.344102140871-314fq9k43tesa34aoane0r1qe1vsk8b0"
+            ]
+          }
+        ],
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
+      "package": "com.qkrkwl1005.trippin",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -27,6 +49,11 @@
       "expo-sharing",
       "expo-web-browser",
       "expo-font"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "0659771c-65b8-437a-bd29-3ad94bf4a195"
+      }
+    }
   }
 }

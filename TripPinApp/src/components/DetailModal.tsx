@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { TripDetail } from '../types/trip';
 
 type Props = { visible: boolean; title: string; onClose: () => void; onSave: (detail: TripDetail) => void };
@@ -13,7 +13,7 @@ export function DetailModal({ visible, title, onClose, onSave }: Props) {
     onSave({ id: `detail_${Date.now()}`, title: name.trim(), meta: meta.trim(), note: note.trim() });
     setName(''); setMeta(''); setNote(''); onClose();
   };
-  return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}><View style={styles.backdrop}><View style={styles.card}><Text style={styles.title}>{title} 추가</Text><TextInput value={name} onChangeText={setName} placeholder="이름" placeholderTextColor="#777" style={styles.input} /><TextInput value={meta} onChangeText={setMeta} placeholder="시간 또는 주소" placeholderTextColor="#777" style={styles.input} /><TextInput value={note} onChangeText={setNote} placeholder="메모 (선택)" placeholderTextColor="#777" style={styles.input} /><View style={styles.actions}><Pressable onPress={onClose} style={styles.cancel}><Text style={styles.cancelText}>취소</Text></Pressable><Pressable onPress={save} style={styles.save}><Text style={styles.saveText}>저장</Text></Pressable></View></View></View></Modal>;
+  return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}><KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.backdrop}><View style={styles.card}><Text style={styles.title}>{title} 추가</Text><TextInput value={name} onChangeText={setName} placeholder="이름" placeholderTextColor="#777" style={styles.input} /><TextInput value={meta} onChangeText={setMeta} placeholder="시간 또는 주소" placeholderTextColor="#777" style={styles.input} /><TextInput value={note} onChangeText={setNote} placeholder="메모 (선택)" placeholderTextColor="#777" style={styles.input} /><View style={styles.actions}><Pressable onPress={onClose} style={styles.cancel}><Text style={styles.cancelText}>취소</Text></Pressable><Pressable onPress={save} style={styles.save}><Text style={styles.saveText}>저장</Text></Pressable></View></View></KeyboardAvoidingView></Modal>;
 }
 
 const styles = StyleSheet.create({

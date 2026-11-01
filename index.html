@@ -166,6 +166,29 @@ body.show-map #map-wrap{visibility:visible;opacity:1;pointer-events:auto;z-index
 input[type=text],input[type=password],textarea{font-size:16px}
 .sh{padding-bottom:calc(84px + env(safe-area-inset-bottom))}
 #toast{bottom:calc(96px + env(safe-area-inset-bottom))}}
+
+@media(max-width:820px){
+  body{display:block;background:var(--bg)}
+  #side{width:100%;min-width:0;height:100%;box-shadow:none}
+  #side>header{min-height:84px;padding:calc(14px + env(safe-area-inset-top)) 16px 12px}
+  #side>header>div:last-child{gap:4px!important}
+  #side>header #netStatus{display:none}
+  #side>header .mb{min-height:34px;padding:6px 9px;font-size:11px}
+  #nav{grid-template-columns:repeat(4,1fr)}
+  #nav .tab-btn:nth-child(n+5){display:none}
+  #nav .tab-btn[data-tab="list"],#nav .tab-btn[data-tab="friends"],#nav .tab-btn[data-tab="set"]{display:flex}
+  #tab-add{padding-top:calc(36vh + 14px)}
+  body.home-map #map-wrap{position:fixed;left:0;right:0;top:calc(140px + env(safe-area-inset-top));bottom:auto;height:32vh;z-index:4;visibility:visible;opacity:1;pointer-events:auto}
+  body.home-map #mapChips{display:flex}
+  body.home-map #map-wrap #myMapsBtn,body.home-map #map-wrap #locBtn{display:none}
+  #tab-list{display:none}
+  #tab-list.active{display:flex}
+  #tab-list .list-all-header{display:flex;gap:7px;overflow-x:auto;padding-bottom:3px}
+  #tab-list .list-all-header .mb{flex:none}
+  #tab-list .list-all{display:flex;flex-direction:column;gap:10px}
+  #tab-list .list-all .item{min-height:104px}
+  #tab-friends,#tab-set{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
+}
 </style>
 </head>
 <body>
@@ -173,11 +196,10 @@ input[type=text],input[type=password],textarea{font-size:16px}
   <header>
     <div class="brand"><div class="logo">📌</div><div><b>트립핀</b><small>링크를 저장하면 여행지로 연결해요</small></div></div>
     <div style="display:flex;align-items:center;gap:6px">
-      <button id="planCopyTopBtn" class="mb" title="일정 텍스트 복사">📋 일정복사</button>
       <button id="inviteFriendsBtn" class="mb pr" title="친구 초대">👥 초대</button>
       <span id="netStatus" aria-live="polite">● 온라인</span>
       <button id="themeBtn" class="mb"></button>
-      <button id="settingsBtn" class="mb">⚙️</button>
+      <button id="myMapsTopBtn" class="mb">🗺️ 내지도</button>
     </div>
   </header>
   <nav id="nav"></nav>
@@ -2267,8 +2289,18 @@ async function fetchRepPhoto(q){
 }
 
 (function build(){
-  const tabs=[['add','🔎','찾기'],['PLACE','📍','장소'],['CAFE','☕','카페'],['FOOD','🍙','음식'],['SHOP','🛍️','쇼핑'],['map','🗺️','지도']];
+  const tabs=[['add','⌂','홈'],['list','☷','목록'],['friends','♧','친구'],['set','⚙','설정'],['map','🗺️','지도']];
   $('nav').innerHTML=tabs.map(([k,e,n])=>`<button class="tab-btn${k==='add'?' active':''}" data-tab="${k}"><i>${e}</i><span>${n}${CATS[k]?` <span id="cnt-${k}">0</span>`:''}</span></button>`).join('');
+  const listSection=document.createElement('section');
+  listSection.id='tab-list';
+  listSection.className='tab-content';
+  listSection.innerHTML='<div class="list-all-header"><button class="mb pr" data-list-filter="ALL">전체</button><button class="mb" data-list-filter="PLACE">📍 장소</button><button class="mb" data-list-filter="CAFE">☕ 카페</button><button class="mb" data-list-filter="FOOD">🍙 음식</button><button class="mb" data-list-filter="SHOP">🛍️ 쇼핑</button></div><div class="list-all" id="list-all"></div>';
+  $('side').appendChild(listSection);
+  const friendSection=document.createElement('section');
+  friendSection.id='tab-friends';
+  friendSection.className='tab-content';
+  friendSection.innerHTML='<div class="card"><b>친구와 여행 공유</b><p class="ds" style="margin-top:8px">친구를 초대하고 장소와 일정을 함께 관리하세요.</p><button class="btn pr" data-open-friends style="margin-top:12px">👥 친구 초대 열기</button></div>';
+  $('side').appendChild(friendSection);
   Object.keys(CATS).forEach(c=>{
     const s=document.createElement('section');s.id='tab-'+c;s.className='tab-content';
     s.innerHTML=`
@@ -2295,11 +2327,22 @@ function tab(k){
   if(k==='map'&&innerWidth>820)return;
   if(activeTab===k)return;
   if(k!=='map')prevTab=activeTab;
+  if(k==='friends'){
+    activeTab=k;
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===k));
+    document.querySelectorAll('.tab-content').forEach(c=>c.classList.toggle('active',c.id==='tab-'+k));
+    document.body.classList.remove('show-map');
+    const invite=$('inviteFriendsBtn');
+    if(invite)invite.click();
+    return;
+  }
+  if(k==='list')renderAllList();
   activeTab=k;
   ls.set('TRIP_LAST_TAB',k);
   document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===k));
   document.querySelectorAll('.tab-content').forEach(c=>c.classList.toggle('active',c.id==='tab-'+k));
   document.body.classList.toggle('show-map',k==='map');
+  document.body.classList.toggle('home-map',k==='add');
   if(CATS[k])renderCat(k);
   if(k==='map'){
     renderMapChips();
@@ -2814,6 +2857,22 @@ function renderCat(c){
   const sc=$('selCount-'+c); if(sc) sc.textContent=editMode[c]?`선택 ${selected.size}개`:'';
 }
 
+let mobileListFilter='ALL';
+function renderAllList(){
+  const host=$('list-all');
+  if(!host)return;
+  const visible=items
+    .filter(item=>mobileListFilter==='ALL'||item.category===mobileListFilter)
+    .slice()
+    .sort((a,b)=>(b.star?1:0)-(a.star?1:0));
+  host.innerHTML=visible.length
+    ? visible.map(card).join('')
+    : '<div class="empty"><i>📍</i>저장된 장소가 없어요</div>';
+  document.querySelectorAll('[data-list-filter]').forEach(button=>{
+    button.classList.toggle('pr',button.dataset.listFilter===mobileListFilter);
+  });
+}
+
 let _idleRenderT=null;
 function render(immediateAll=false){
   for(const c in CATS){
@@ -2824,6 +2883,7 @@ function render(immediateAll=false){
     return;
   }
   if(CATS[activeTab])renderCat(activeTab);
+  renderAllList();
   clearTimeout(_idleRenderT);
   _idleRenderT=setTimeout(()=>{
     for(const c in CATS){if(c!==activeTab)renderCat(c);}
@@ -4263,6 +4323,17 @@ document.addEventListener('click',async e=>{
   const tb=e.target.closest('.tab-btn');
   if(tb)return tab(tb.dataset.tab);
 
+  const listFilter=e.target.closest('[data-list-filter]');
+  if(listFilter){
+    mobileListFilter=listFilter.dataset.listFilter||'ALL';
+    renderAllList();
+    return;
+  }
+  if(e.target.closest('[data-open-friends]')){
+    $('inviteFriendsBtn')?.click();
+    return;
+  }
+
   const sg=e.target.closest('#seg div');
   if(sg){
     cat=sg.dataset.cat;
@@ -4765,7 +4836,11 @@ document.addEventListener('click',async e=>{
 });
 
 $('themeBtn').onclick=()=>setTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
-$('settingsBtn').onclick=()=>{renderUsageBox();tab('set');};
+$('myMapsTopBtn').onclick=()=>{
+  const u=getMyMapsEmbedUrl()||ls.get('TRIP_MYMAPS_URL');
+  if(!u)return toast('설정 탭에서 Google My Maps URL을 먼저 등록하세요');
+  openMyMapsOverlay(u);
+};
 $('createRoomBtn').onclick=()=>{
   if(!firebaseConfigured())return setSharedRoomStatus('firebase-config.js에 Firebase 설정을 먼저 입력하세요.','error');
   const id=makeRoomId();
@@ -4795,7 +4870,7 @@ $('undoRoomBtn').onclick=undoRoomChange;
 $('deleteRoomBtn').onclick=deleteRoom;
 $('leaveRoomBtn').onclick=leaveRoom;
 $('roomAlertStrip').onclick=e=>{if(e.target&&e.target.dataset&&e.target.dataset.roomAlert)tab('set');};
-$('planCopyTopBtn').onclick=copyFormattedPlan;
+$('planCopyTopBtn')?.addEventListener('click',copyFormattedPlan);
 $('exportPlanBtn').onclick=copyFormattedPlan;
 document.addEventListener('click',e=>{
   const action=e.target.closest('[data-room-action]');
@@ -5217,8 +5292,9 @@ updateRoomAlert();
 setInterval(renderRoomSyncInfo,5000);
 render(true);
 initMap();
+document.body.classList.add('home-map');
 const savedTab=ls.get('TRIP_LAST_TAB');
-if(savedTab&&(['add','PLACE','CAFE','FOOD','SHOP','set','map'].includes(savedTab)))tab(savedTab);
+if(savedTab&&(['add','list','friends','set','map'].includes(savedTab)))tab(savedTab);
 let initialRoom=extractRoomId(new URLSearchParams(location.search).get('room'));
 if(!initialRoom){
   initialRoom=extractRoomId(ls.get(TRIP_LAST_ROOM_KEY)||'');

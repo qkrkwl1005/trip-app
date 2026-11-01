@@ -25,3 +25,6 @@ export { app, auth };
 export const db = getFirestore(app);
 export const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ?? '';
 export const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ?? '';
+export const googleIosUrlScheme = googleIosClientId
+  .replace('.apps.googleusercontent.com', '')
+  .replace(/^(\d+)-/, 'com.googleusercontent.apps.$1-');

@@ -3,9 +3,9 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 
 import { importTripLink } from '../utils/linkImport';
 import { TripItem, TripItemCategory } from '../types/trip';
 
-type Props = { onImported: (items: TripItem[]) => void };
+type Props = { onImported: (items: TripItem[]) => void; endpoint?: string; googleMapsApiKey?: string; aiProviderKey?: string; geminiApiKey?: string; openRouterApiKey?: string; groqApiKey?: string; openAiApiKey?: string };
 
-export function LinkImportCard({ onImported }: Props) {
+export function LinkImportCard({ onImported, endpoint, googleMapsApiKey, aiProviderKey, geminiApiKey, openRouterApiKey, groqApiKey, openAiApiKey }: Props) {
   const [url, setUrl] = useState('');
   const [category, setCategory] = useState<TripItemCategory>('PLACE');
   const [loading, setLoading] = useState(false);
@@ -13,7 +13,7 @@ export function LinkImportCard({ onImported }: Props) {
   const importLink = async () => {
     setError('');
     setLoading(true);
-    try { onImported(await importTripLink(url, category)); setUrl(''); }
+    try { onImported(await importTripLink(url, category, { endpoint, googleMapsApiKey, aiProviderKey, geminiApiKey, openRouterApiKey, groqApiKey, openAiApiKey })); setUrl(''); }
     catch (caught) { setError(caught instanceof Error ? caught.message : '링크 분석에 실패했어요.'); }
     finally { setLoading(false); }
   };
@@ -28,9 +28,9 @@ export function LinkImportCard({ onImported }: Props) {
 }
 
 const styles = StyleSheet.create({
-  card: { backgroundColor: '#1d1d1d', borderRadius: 18, padding: 16, gap: 10 },
+  card: { backgroundColor: 'rgba(31,33,39,0.96)', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderRadius: 22, padding: 22, gap: 14 },
   title: { color: '#fff', fontSize: 16, fontWeight: '800' }, subtitle: { color: '#999', fontSize: 12 },
-  input: { backgroundColor: '#252525', borderRadius: 12, color: '#fff', padding: 13, fontSize: 14 },
-  categories: { flexDirection: 'row', gap: 6 }, category: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 10, backgroundColor: '#282828' }, categoryActive: { backgroundColor: '#304d7d' }, categoryText: { color: '#ddd', fontSize: 11 },
-  button: { backgroundColor: '#3b82f6', borderRadius: 12, alignItems: 'center', padding: 13 }, disabled: { opacity: .45 }, buttonText: { color: '#fff', fontWeight: '800' }, error: { color: '#f87171', fontSize: 12, lineHeight: 18 },
+  input: { backgroundColor: '#25272d', borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderRadius: 999, color: '#fff', padding: 16, fontSize: 14 },
+  categories: { flexDirection: 'row', gap: 8 }, category: { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 999, backgroundColor: '#282a30' }, categoryActive: { backgroundColor: '#304d7d' }, categoryText: { color: '#ddd', fontSize: 11 },
+  button: { backgroundColor: '#3b82f6', borderRadius: 999, alignItems: 'center', padding: 16 }, disabled: { opacity: .45 }, buttonText: { color: '#fff', fontWeight: '800' }, error: { color: '#f87171', fontSize: 12, lineHeight: 18 },
 });

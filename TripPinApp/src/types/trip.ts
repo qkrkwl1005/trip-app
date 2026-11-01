@@ -11,6 +11,8 @@ export type TripItem = {
   note?: string;
   sourceUrl?: string;
   done?: boolean;
+  aliases?: string[];
+  imageUrl?: string;
 };
 
 export type TripDetail = {
@@ -41,4 +43,31 @@ export type TripRoom = {
   ownerUid: string;
   members: Record<string, RoomMember>;
   revision: number;
+  settings?: {
+    darkMode?: boolean;
+    googleMapsUrl?: string;
+    naverMapsUrl?: string;
+    myMapsUrl?: string;
+  };
+
+};
+
+export type AppSettings = {
+  linkImportEndpoint: string;
+  googleMapsApiKey: string;
+  naverMapsApiKey: string;
+  googleMyMapsUrl: string;
+  aiProviderKey: string;
+  geminiApiKey: string;
+  openRouterApiKey: string;
+  groqApiKey: string;
+  openAiApiKey: string;
+};
+
+export type RoomConflict = {
+  roomId: string;
+  baseRevision: number;
+  remoteRevision: number;
+  localItems: TripItem[];
+  remoteItems: TripItem[];
 };

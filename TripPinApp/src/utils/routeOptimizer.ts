@@ -10,20 +10,27 @@ export function distKm(lat1: number, lng1: number, lat2: number, lng2: number) {
 }
 
 export function buildOrderedRoutePoints(items: TripItem[]) {
-  const remaining = items.filter((item) => item.lat !== null && item.lng !== null);
+  const grouped = new Map<number, TripItem[]>();
+  items.filter((item) => Number.isFinite(item.lat) && Number.isFinite(item.lng)).forEach((item) => {
+    const day = item.day > 0 ? item.day : 99;
+    grouped.set(day, [...(grouped.get(day) ?? []), item]);
+  });
   const ordered: TripItem[] = [];
-  while (remaining.length) {
-    if (!ordered.length) ordered.push(remaining.shift() as TripItem);
-    else {
-      const previous = ordered[ordered.length - 1];
-      let nearestIndex = 0;
-      let nearestDistance = Infinity;
-      remaining.forEach((item, index) => {
-        const distance = distKm(previous.lat as number, previous.lng as number, item.lat as number, item.lng as number);
-        if (distance < nearestDistance) { nearestDistance = distance; nearestIndex = index; }
-      });
-      ordered.push(remaining.splice(nearestIndex, 1)[0]);
+  [...grouped.keys()].sort((a, b) => a - b).forEach((day) => {
+    const remaining = grouped.get(day) ?? [];
+    while (remaining.length) {
+      if (!ordered.length || ordered[ordered.length - 1].day !== day) ordered.push(remaining.shift() as TripItem);
+      else {
+        const previous = ordered[ordered.length - 1];
+        let nearestIndex = 0;
+        let nearestDistance = Infinity;
+        remaining.forEach((item, index) => {
+          const distance = distKm(previous.lat as number, previous.lng as number, item.lat as number, item.lng as number);
+          if (distance < nearestDistance) { nearestDistance = distance; nearestIndex = index; }
+        });
+        ordered.push(remaining.splice(nearestIndex, 1)[0]);
+      }
     }
-  }
+  });
   return ordered;
 }
