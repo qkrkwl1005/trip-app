@@ -4,6 +4,7 @@
     "slug": "TripPinApp",
     "version": "1.0.0",
     "orientation": "portrait",
+    "scheme": "trippin",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {

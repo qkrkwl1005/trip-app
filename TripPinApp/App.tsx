@@ -32,7 +32,7 @@ export default function App() {
   const [notice, setNotice] = useState('');
   const [inviteSignal, setInviteSignal] = useState(0);
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    clientId: googleWebClientId,
+    webClientId: googleWebClientId,
     scopes: ['openid', 'profile', 'email'],
   });
 
@@ -68,8 +68,16 @@ export default function App() {
     updateRoom(roomId, room.revision, { trip: { ...trip, [detailKind]: [...trip[detailKind], detail] } });
   };
   const login = async () => {
+    if (!googleWebClientId || googleWebClientId === 'replace-me') {
+      return notify('Google Web Client ID가 설정되지 않았어요.');
+    }
     if (!request) return notify('Google 로그인을 준비 중이에요.');
-    await promptAsync();
+    try {
+      const result = await promptAsync();
+      if (result.type === 'error') notify(`Google 로그인 실패: ${result.error?.message ?? 'OAuth 요청을 확인해 주세요.'}`);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Google 로그인에 실패했어요.');
+    }
   };
   const joinRoom = () => { if (roomInput.trim()) setRoomId(roomInput.trim()); };
 
