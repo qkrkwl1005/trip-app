@@ -24,6 +24,7 @@ body{font:500 14px/1.5 "Pretendard Variable",Pretendard,-apple-system,system-ui,
 #side{width:440px;min-width:440px;background:var(--s);border-right:1px solid var(--bd);display:flex;flex-direction:column;height:100%;z-index:20;box-shadow:2px 0 24px rgba(15,23,42,.04)}
 header{padding:calc(12px + env(safe-area-inset-top)) 16px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--bd)}
 .brand{display:flex;gap:10px;align-items:center}.brand b{display:block;font-size:17px;font-weight:800}.brand small{font-size:11px;color:var(--sub)}
+#mobileTripSummary,#mobileTripTags{display:none}
 .logo{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#2563eb,#ec4899,#f59e0b);display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(59,130,246,.35)}
 #nav{display:grid;grid-template-columns:repeat(5,1fr);padding:4px 6px;border-bottom:1px solid var(--bd);background:var(--s)}
 .tab-btn{display:flex;flex-direction:column;align-items:center;padding:6px 2px;background:none;border:0;border-radius:10px;color:var(--sub);font-family:inherit;font-size:11px;font-weight:700;line-height:1.3;white-space:nowrap;cursor:pointer;touch-action:manipulation;transition:background .15s,color .15s}
@@ -171,13 +172,21 @@ input[type=text],input[type=password],textarea{font-size:16px}
   body{display:block;background:var(--bg)}
   #side{width:100%;min-width:0;height:100%;box-shadow:none}
   #side>header{min-height:84px;padding:calc(14px + env(safe-area-inset-top)) 16px 12px}
-  #side>header>div:last-child{gap:4px!important}
+  #side>header{flex-wrap:wrap}
+  #topActions{gap:4px!important}
+  #side>header .brand{display:none}
+  #mobileTripSummary{display:flex;flex-direction:column;flex:1;min-width:0;margin-right:6px}
+  #mobileTripSummary b{font-size:21px;line-height:1.2}
+  #mobileTripSummary small{color:var(--sub);font-size:11px;margin-top:4px}
+  #mobileTripTags{display:flex;flex-basis:100%;gap:8px;margin-top:10px}
+  #mobileTripTags span{padding:8px 12px;border:1px solid var(--bd);border-radius:999px;background:var(--s2);color:var(--sub);font-size:11px}
   #side>header #netStatus{display:none}
   #side>header .mb{min-height:34px;padding:6px 9px;font-size:11px}
   #nav{grid-template-columns:repeat(4,1fr)}
-  #nav .tab-btn:nth-child(n+5){display:none}
-  #nav .tab-btn[data-tab="list"],#nav .tab-btn[data-tab="friends"],#nav .tab-btn[data-tab="set"]{display:flex}
+  #nav .tab-btn[data-tab="list"],#nav .tab-btn[data-tab="map"],#nav .tab-btn[data-tab="set"]{display:flex}
+  #nav .tab-btn[data-tab="friends"]{display:none}
   #tab-add{padding-top:calc(36vh + 14px)}
+  #tab-add .trip-hero,#tab-add>.card:first-of-type{display:none}
   body.home-map #map-wrap{position:fixed;left:0;right:0;top:calc(140px + env(safe-area-inset-top));bottom:auto;height:32vh;z-index:4;visibility:visible;opacity:1;pointer-events:auto}
   body.home-map #mapChips{display:flex}
   body.home-map #map-wrap #myMapsBtn,body.home-map #map-wrap #locBtn{display:none}
@@ -187,7 +196,7 @@ input[type=text],input[type=password],textarea{font-size:16px}
   #tab-list .list-all-header .mb{flex:none}
   #tab-list .list-all{display:flex;flex-direction:column;gap:10px}
   #tab-list .list-all .item{min-height:104px}
-  #tab-friends,#tab-set{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
+  #tab-set{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
 }
 </style>
 </head>
@@ -195,11 +204,17 @@ input[type=text],input[type=password],textarea{font-size:16px}
 <aside id="side">
   <header>
     <div class="brand"><div class="logo">📌</div><div><b>트립핀</b><small>링크를 저장하면 여행지로 연결해요</small></div></div>
-    <div style="display:flex;align-items:center;gap:6px">
+    <div id="mobileTripSummary"><b id="mobileTripTitle">새로운 여행</b><small id="mobileTripDate">여행 기간을 설정해 보세요</small></div>
+    <div id="topActions" style="display:flex;align-items:center;gap:6px">
       <button id="inviteFriendsBtn" class="mb pr" title="친구 초대">👥 초대</button>
       <span id="netStatus" aria-live="polite">● 온라인</span>
       <button id="themeBtn" class="mb"></button>
       <button id="myMapsTopBtn" class="mb">🗺️ 내지도</button>
+    </div>
+    <div id="mobileTripTags">
+      <span>✈️ 항공편 <b id="mobileFlightsCount">0</b></span>
+      <span>🏨 숙소 <b id="mobileStaysCount">0</b></span>
+      <span>📝 메모 <b id="mobileNotesCount">0</b></span>
     </div>
   </header>
   <nav id="nav"></nav>
@@ -1074,6 +1089,11 @@ function renderTripPlanner(){
   if(t)t.value=tripData.title;if(s)s.value=tripData.start;if(e)e.value=tripData.end;
   $('tripTitlePreview').textContent=tripData.title||'새로운 여행';
   $('tripDatePreview').textContent=tripData.start&&tripData.end?`${tripData.start} – ${tripData.end}`:'여행 기간을 설정해 보세요';
+  $('mobileTripTitle').textContent=tripData.title||'새로운 여행';
+  $('mobileTripDate').textContent=tripData.start&&tripData.end?`${tripData.start} – ${tripData.end}`:'여행 기간을 설정해 보세요';
+  $('mobileFlightsCount').textContent=tripData.flights.length;
+  $('mobileStaysCount').textContent=tripData.stays.length;
+  $('mobileNotesCount').textContent=tripData.notes.length;
   const days=$('tripDays');if(days){const n=tripData.start&&tripData.end?Math.max(1,Math.min(31,Math.floor((new Date(tripData.end)-new Date(tripData.start))/86400000)+1)):7;days.innerHTML=[`<button class="trip-day${tripDay===0?' on':''}" data-trip-day="0">전체</button>`,...Array.from({length:n},(_,i)=>`<button class="trip-day${tripDay===i+1?' on':''}" data-trip-day="${i+1}">Day ${i+1}</button>`)].join('');}
   const out=$('tripDetails');if(out){const groups=[['flights','✈️'],['stays','🏨'],['notes','📝']];const html=groups.flatMap(([k,icon])=>tripData[k].map(x=>`<div class="trip-detail"><b>${icon} ${esc(x.title)}</b><small>${esc([x.meta,x.note].filter(Boolean).join(' · '))}</small></div>`)).join('');out.innerHTML=html||'<small style="color:var(--sub)">항공편·숙소·메모를 추가해 보세요.</small>';}
 }
@@ -2289,7 +2309,7 @@ async function fetchRepPhoto(q){
 }
 
 (function build(){
-  const tabs=[['add','⌂','홈'],['list','☷','목록'],['friends','♧','친구'],['set','⚙','설정'],['map','🗺️','지도']];
+  const tabs=[['add','⌂','홈'],['list','☷','목록'],['map','🗺️','지도'],['set','⚙','설정']];
   $('nav').innerHTML=tabs.map(([k,e,n])=>`<button class="tab-btn${k==='add'?' active':''}" data-tab="${k}"><i>${e}</i><span>${n}${CATS[k]?` <span id="cnt-${k}">0</span>`:''}</span></button>`).join('');
   const listSection=document.createElement('section');
   listSection.id='tab-list';
@@ -5195,7 +5215,7 @@ $('bkIn').onclick=()=>{
 })();
 
 function initMap(){
-  mapProvider=ls.get('TRIP_MAP_PROVIDER')||'osm';
+  mapProvider=ls.get('TRIP_MAP_PROVIDER')||'google';
   $('mapProvider').value=mapProvider;
   const gkey=(ls.get('TRAVEL_GMAP_KEY')||'').trim();
   const nkey=(ls.get('TRAVEL_NAVER_KEY')||'').trim();
