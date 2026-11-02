@@ -1639,6 +1639,7 @@
         #homeMapCard .leaflet-bottom {
           z-index: 1;
         }
+        /* 지도 표시 시 #side의 자식들을 조절하여 탭바(#nav)는 유지 */
         #map-wrap {
           position: fixed;
           left: 0;
@@ -1663,9 +1664,13 @@
           pointer-events: auto;
           z-index: 150;
         }
-        body.show-map #side {
+        body.show-map #side > header {
           display: none;
         }
+        body.show-map .tab-content {
+          display: none !important;
+        }
+
         #mapChips {
           padding-top: calc(10px + env(safe-area-inset-top));
         }
@@ -3048,2644 +3053,107 @@
         };
       }
 
-      // ===== 오프라인 큐 & 자동 병합 엔진 =====
-      const TRIP_OFFLINE_QUEUE_KEY = "TRIP_OFFLINE_QUEUE";
-      const TRIP_PENDING_CONFLICT_KEY = "TRIP_PENDING_CONFLICT";
-      const TRIP_LAST_ROOM_KEY = "TRIP_LAST_ROOM";
-      const TRIP_CREATING_ROOM_KEY = "TRIP_CREATING_ROOM";
-      const APP_VERSION = "v58";
-      const TRANSIENT_NET_RE =
-        /unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
-      let _offlineFlushBusy = false,
-        _offlineFastRetries = 0,
-        _autoResolveBusy = false;
-      let _ownJoinReqHadPending = false,
-        _roomListenRetryTimer = null;
-      function scheduleRoomListenRetry(roomId, ms = 15000) {
-        if (_roomListenRetries >= 5) {
-          setSharedRoomStatus(
-            "⚠️ 방 연결에 여러 번 실패했어요. 네트워크를 확인한 뒤 방 링크를 다시 열거나 새로고침해 주세요.",
-            "error",
-          );
-          return;
-        }
-        _roomListenRetries++;
-        clearTimeout(_roomListenRetryTimer);
-        _roomListenRetryTimer = setTimeout(() => {
-          _roomListenRetryTimer = null;
-          connectSharedRoom(roomId).catch(() => {});
-        }, ms);
-      }
-
-      function sameJsonish(a, b) {
-        return (
-          JSON.stringify(a === undefined ? null : a) ===
-          JSON.stringify(b === undefined ? null : b)
-        );
-      }
-      const SHARE_FIELDS = [
-        "name",
-        "localName",
-        "address",
-        "price",
-        "info",
-        "note",
-        "category",
-        "day",
-        "lat",
-        "lng",
-        "done",
-        "star",
-        "mapVisible",
-        "vid",
-        "img",
-        "useCustomImg",
-        "v",
-        "places",
-      ];
-      function diffSharedFields(base, cand) {
-        const out = [];
-        SHARE_FIELDS.forEach((f) => {
-          if (!sameJsonish(base && base[f], cand && cand[f])) out.push(f);
-        });
-        return out;
-      }
-      function autoMergeSharedItems(baseItems, localItems, remoteItems) {
-        const conflictEntries = [];
-        const baseMap = new Map(
-          (baseItems || []).map((i) => [String(i.id), i]),
-        );
-        const localMap = new Map(
-          (localItems || []).map((i) => [String(i.id), i]),
-        );
-        const merged = [];
-        const seenRemote = new Set();
-        (remoteItems || []).forEach((remote) => {
-          if (!remote) return;
-          const id = String(remote.id);
-          seenRemote.add(id);
-          const base = baseMap.get(id);
-          const local = localMap.get(id);
-          const remoteChanged = base ? diffSharedFields(base, remote) : ["*"];
-          if (!local) {
-            if (!base) merged.push(remote);
-            else if (remoteChanged.length) merged.push(remote);
-            return;
-          }
-          if (!base) {
-            merged.push(local);
-            return;
-          }
-          const localChanged = diffSharedFields(base, local);
-          if (!localChanged.length) {
-            merged.push(remote);
-            return;
-          }
-          if (!remoteChanged.length) {
-            merged.push(local);
-            return;
-          }
-          const overlap = localChanged.filter((f) => remoteChanged.includes(f));
-          if (!overlap.length) {
-            const next = { ...remote };
-            localChanged.forEach((f) => {
-              next[f] = local[f];
-            });
-            merged.push(next);
-          } else {
-            conflictEntries.push({
-              id,
-              local: JSON.parse(JSON.stringify(local)),
-              remote: JSON.parse(JSON.stringify(remote)),
-            });
-            merged.push(JSON.parse(JSON.stringify(remote)));
-          }
-        });
-        (localItems || []).forEach((local) => {
-          if (!local) return;
-          const id = String(local.id);
-          if (seenRemote.has(id)) return;
-          const base = baseMap.get(id);
-          if (base) {
-            if (diffSharedFields(base, local).length)
-              conflictEntries.push({
-                id,
-                local: JSON.parse(JSON.stringify(local)),
-                remote: null,
-              });
-            return;
-          }
-          merged.push(local);
-        });
-        return { mergedItems: merged, conflictEntries };
-      }
-      function queueOfflineSnapshot() {
-        try {
-          let payload = {
-            baseRevision: sharedRevision,
-            baseItems: sanitizeSharedItems(sharedBaseItems || []),
-            finalItems: sanitizeSharedItems(items),
-          };
-          if (!ls.set(TRIP_OFFLINE_QUEUE_KEY, JSON.stringify(payload))) {
-            const strip = (arr) =>
-              arr.map((i) => ({
-                ...i,
-                img:
-                  String(i.img || "").startsWith("data:image") &&
-                  i.img.length > 20000
-                    ? ""
-                    : i.img,
-              }));
-            payload = {
-              ...payload,
-              baseItems: strip(payload.baseItems),
-              finalItems: strip(payload.finalItems),
-            };
-            if (!ls.set(TRIP_OFFLINE_QUEUE_KEY, JSON.stringify(payload)))
-              return;
-          }
-          updateNetworkStatus();
-        } catch (_) {}
-      }
-      function clearOfflineQueue() {
-        try {
-          localStorage.removeItem(TRIP_OFFLINE_QUEUE_KEY);
-          updateNetworkStatus();
-        } catch (_) {}
-      }
-      function hasOfflineQueue() {
-        const v = ls.get(TRIP_OFFLINE_QUEUE_KEY);
-        return Boolean(v && v.length > 2);
-      }
-      function savePendingConflict() {
-        try {
-          if (sharedConflict)
-            ls.set(
-              TRIP_PENDING_CONFLICT_KEY,
-              JSON.stringify({
-                roomId: sharedRoomId,
-                conflict: sharedConflict,
-              }),
-            );
-        } catch (_) {}
-      }
-      function clearPendingConflict() {
-        try {
-          localStorage.removeItem(TRIP_PENDING_CONFLICT_KEY);
-        } catch (_) {}
-      }
-      function restorePendingConflict(roomId) {
-        try {
-          const raw = ls.get(TRIP_PENDING_CONFLICT_KEY);
-          if (!raw) return;
-          const saved = JSON.parse(raw);
-          if (!saved || saved.roomId !== roomId || !saved.conflict) return;
-          if (sharedConflict) return;
-          sharedConflict = saved.conflict;
-          if (Array.isArray(saved.conflict.localItems)) {
-            const localMap = new Map(
-              saved.conflict.localItems.map((i) => [String(i.id), i]),
-            );
-            items = items.map((i) => localMap.get(String(i.id)) || i);
-            saved.conflict.localItems.forEach((li) => {
-              if (li && !items.some((x) => String(x.id) === String(li.id)))
-                items.push(li);
-            });
-          }
-          renderRoomConflict();
-          setSharedRoomStatus(
-            "⚠️ 이전 세션의 미해결 수정 충돌이 있어요. 장소별로 선택해 주세요.",
-            "error",
-          );
-        } catch (_) {}
-      }
-      function scheduleOfflineFlushRetry(ms = 10000) {
-        clearTimeout(sharedWriteTimer);
-        sharedWriteTimer = setTimeout(() => {
-          flushOfflineQueue().catch(() => {});
-        }, ms);
-      }
-      async function flushOfflineQueue() {
-        if (_offlineFlushBusy) return;
-        if (!sharedRoomId || !window.firestoreDb || !firebaseConfigured())
-          return;
-        if (navigator.onLine === false) return;
-        const raw = ls.get(TRIP_OFFLINE_QUEUE_KEY);
-        if (!raw) return;
-        let q;
-        try {
-          q = JSON.parse(raw);
-        } catch (_) {
-          clearOfflineQueue();
-          return;
-        }
-        if (!q || !Array.isArray(q.finalItems)) {
-          clearOfflineQueue();
-          return;
-        }
-        _offlineFlushBusy = true;
-        try {
-          const ref = window.firestoreDb.collection("rooms").doc(sharedRoomId);
-          const snap = await ref.get().catch(() => null);
-          if (!snap || !snap.exists) {
-            clearOfflineQueue();
-            setSharedRoomStatus(
-              "공유 방을 찾을 수 없어요. 대기 변경을 정리했어요.",
-              "error",
-            );
-            return;
-          }
-          const d = snap.data() || {};
-          const remoteRevision = Number(d.revision || 0);
-          const remoteItems = sanitizeSharedItems(d.items || []);
-          const baseItems = sanitizeSharedItems(q.baseItems || []);
-          const finalItems = sanitizeSharedItems(q.finalItems || []);
-          if (sameJsonish(remoteItems, finalItems)) {
-            clearOfflineQueue();
-            sharedLocalDirty = false;
-            return;
-          }
-          const history = Array.isArray(d.history) ? d.history.slice(-9) : [];
-          let mergedItems = finalItems;
-          let conflictEntries = [];
-          if (Number(q.baseRevision) !== remoteRevision) {
-            const result = autoMergeSharedItems(
-              baseItems,
-              finalItems,
-              remoteItems,
-            );
-            mergedItems = result.mergedItems;
-            conflictEntries = result.conflictEntries;
-          }
-          const newRevision = remoteRevision + 1;
-          history.push({
-            items: d.items || [],
-            savedAt: Date.now(),
-            savedBy: firebase.auth().currentUser?.uid || "",
-          });
-          await window.firestoreDb.runTransaction(async (tx) => {
-            const cur = await tx.get(ref);
-            if (!cur.exists) throw new Error("ROOM_MISSING");
-            if (Number(cur.data().revision || 0) !== remoteRevision)
-              throw new Error("CONCURRENT_EDIT");
-            tx.update(ref, {
-              items: removeUndefined(sanitizeSharedItems(mergedItems)),
-              history,
-              revision: newRevision,
-              updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            });
-          });
-          clearOfflineQueue();
-          sharedLocalDirty = false;
-          sharedWriteRevision = newRevision;
-          sharedRevision = newRevision;
-          sharedBaseItems = remoteItems;
-          const conflictedIds = conflictEntries.map((c) => String(c.id));
-          sharedConflict = conflictedIds.length
-            ? {
-                localItems: conflictEntries
-                  .filter((c) => c.local)
-                  .map((c) => c.local),
-                remoteItems: sanitizeSharedItems(mergedItems).map((i) => ({
-                  ...i,
-                })),
-                remoteRevision: newRevision,
-                pending: conflictedIds,
-              }
-            : null;
-          if (sharedConflict) savePendingConflict();
-          remoteApplying = true;
-          items = sanitizeSharedItems(mergedItems);
-          persistNow();
-          remoteApplying = false;
-          render(true);
-          draw(true);
-          renderRoomConflict();
-          setSharedRoomStatus(`✅ 공유 중 · ${sharedRoomId}`, "ok");
-          _offlineFastRetries = 0;
-          toast(
-            conflictedIds.length
-              ? `🔄 오프라인 변경을 올렸어요 · 겹치는 ${conflictedIds.length}건은 선택 필요`
-              : "🔄 오프라인 동안의 변경을 공유 방에 올렸어요",
-          );
-        } catch (e) {
-          if (e.message === "CONCURRENT_EDIT" && _offlineFastRetries < 5) {
-            _offlineFastRetries++;
-            setTimeout(() => flushOfflineQueue().catch(() => {}), 1500);
-            return;
-          }
-          _offlineFastRetries = 0;
-          scheduleOfflineFlushRetry(8000);
-          setSharedRoomStatus(
-            "⏳ 오프라인 동기화 대기 중 · 변경 내용은 안전하게 임시 저장되어 있어요",
-            "error",
-          );
-          updateNetworkStatus();
-        } finally {
-          _offlineFlushBusy = false;
-        }
-      }
-      async function autoResolveSharedConflict() {
-        if (_autoResolveBusy || !sharedRoomId || !window.firestoreDb) return;
-        _autoResolveBusy = true;
-        try {
-          const ref = window.firestoreDb.collection("rooms").doc(sharedRoomId);
-          const snap = await ref.get();
-          if (!snap.exists) return;
-          const d = snap.data() || {};
-          const remoteRevision = Number(d.revision || 0);
-          const remoteItems = sanitizeSharedItems(d.items || []);
-          const baseItems = sanitizeSharedItems(sharedBaseItems || []);
-          const result = autoMergeSharedItems(baseItems, items, remoteItems);
-          const mergedItems = result.mergedItems;
-          const conflictEntries = result.conflictEntries;
-          const newRevision = remoteRevision + 1;
-          const history = Array.isArray(d.history) ? d.history.slice(-9) : [];
-          history.push({
-            items: d.items || [],
-            savedAt: Date.now(),
-            savedBy: firebase.auth().currentUser?.uid || "",
-          });
-          await window.firestoreDb.runTransaction(async (tx) => {
-            const cur = await tx.get(ref);
-            if (!cur.exists) throw new Error("ROOM_MISSING");
-            if (Number(cur.data().revision || 0) !== remoteRevision)
-              throw new Error("CONCURRENT_EDIT");
-            tx.update(ref, {
-              items: removeUndefined(sanitizeSharedItems(mergedItems)),
-              history,
-              revision: newRevision,
-              updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            });
-          });
-          sharedWriteRevision = newRevision;
-          sharedRevision = newRevision;
-          sharedBaseItems = remoteItems;
-          const conflictedIds = conflictEntries.map((c) => String(c.id));
-          sharedConflict = conflictedIds.length
-            ? {
-                localItems: conflictEntries
-                  .filter((c) => c.local)
-                  .map((c) => c.local),
-                remoteItems: sanitizeSharedItems(mergedItems).map((i) => ({
-                  ...i,
-                })),
-                remoteRevision: newRevision,
-                pending: conflictedIds,
-              }
-            : null;
-          if (sharedConflict) savePendingConflict();
-          remoteApplying = true;
-          items = sanitizeSharedItems(mergedItems);
-          persistNow();
-          remoteApplying = false;
-          render(true);
-          draw(true);
-          renderRoomConflict();
-          if (conflictedIds.length) {
-            setSharedRoomStatus(
-              `⚠️ 동시 수정 ${conflictedIds.length}건은 선택이 필요해요 (나머지는 자동 병합 완료)`,
-              "error",
-            );
-          } else {
-            sharedLocalDirty = false;
-            setSharedRoomStatus(`✅ 공유 중 · ${sharedRoomId}`, "ok");
-            toast("⚡ 겹치지 않는 변경은 자동으로 병합했어요");
-          }
-        } catch (e) {
-          setSharedRoomStatus(`충돌 자동 병합 실패: ${e.message}`, "error");
-        } finally {
-          _autoResolveBusy = false;
-        }
-      }
-
-      const idb = {
-        db: null,
-        init() {
-          return new Promise((resolve) => {
-            if (this.db) return resolve(this.db);
-            if (!window.indexedDB) return resolve(null);
-            const req = indexedDB.open("TripSyncMasterDB", 1);
-            req.onupgradeneeded = (e) => {
-              const db = e.target.result;
-              if (!db.objectStoreNames.contains("kv"))
-                db.createObjectStore("kv");
-            };
-            req.onsuccess = (e) => {
-              this.db = e.target.result;
-              resolve(this.db);
-            };
-            req.onerror = () => resolve(null);
-          });
-        },
-        async get(key) {
-          const db = await this.init();
-          if (!db) return null;
-          return new Promise((resolve) => {
-            try {
-              const tx = db.transaction("kv", "readonly");
-              const req = tx.objectStore("kv").get(key);
-              req.onsuccess = () => resolve(req.result ?? null);
-              req.onerror = () => resolve(null);
-            } catch (e) {
-              resolve(null);
-            }
-          });
-        },
-        async set(key, val) {
-          const db = await this.init();
-          if (!db) return false;
-          return new Promise((resolve) => {
-            try {
-              const tx = db.transaction("kv", "readwrite");
-              tx.objectStore("kv").put(val, key);
-              tx.oncomplete = () => resolve(true);
-              tx.onerror = () => resolve(false);
-            } catch (e) {
-              resolve(false);
-            }
-          });
-        },
-      };
-
-      const CATS = {
-        PLACE: { n: "장소", e: "📍", b: "여행 장소/식당" },
-        CAFE: { n: "카페", e: "☕", b: "카페/디저트" },
-        FOOD: { n: "음식", e: "🍙", b: "식당/간식" },
-        SHOP: { n: "쇼핑", e: "🛍️", b: "구매 물건" },
-      };
-      const MAX_MULTI_PLACES = 10;
-      let tripData = {
-          title: "",
-          start: "",
-          end: "",
-          flights: [],
-          stays: [],
-          notes: [],
-        },
-        tripDay = 0;
-      function sanitizeTripData(raw) {
-        const src = raw && typeof raw === "object" ? raw : {};
-        const list = (v) =>
-          Array.isArray(v)
-            ? v
-                .slice(0, 20)
-                .filter((x) => x && typeof x === "object")
-                .map((x) => ({
-                  id: String(x.id || Date.now() + Math.random()).slice(0, 100),
-                  title: String(x.title || "").slice(0, 160),
-                  meta: String(x.meta || "").slice(0, 500),
-                  note: String(x.note || "").slice(0, 1000),
-                }))
-            : [];
-        return {
-          title: String(src.title || "").slice(0, 100),
-          start: String(src.start || "").slice(0, 10),
-          end: String(src.end || "").slice(0, 10),
-          flights: list(src.flights),
-          stays: list(src.stays),
-          notes: list(src.notes),
-        };
-      }
-      function renderTripPlanner() {
-        const t = $("tripTitleInput"),
-          s = $("tripStartInput"),
-          e = $("tripEndInput");
-        if (t) t.value = tripData.title;
-        if (s) s.value = tripData.start;
-        if (e) e.value = tripData.end;
-        $("tripTitlePreview").textContent = tripData.title || "새로운 여행";
-        $("tripDatePreview").textContent =
-          tripData.start && tripData.end
-            ? `${tripData.start} – ${tripData.end}`
-            : "여행 기간을 설정해 보세요";
-        $("mobileTripTitle").textContent = tripData.title || "새로운 여행";
-        $("mobileTripDate").textContent =
-          tripData.start && tripData.end
-            ? `${tripData.start} – ${tripData.end}`
-            : "여행 기간을 설정해 보세요";
-        $("mobileFlightsCount").textContent = tripData.flights.length;
-        $("mobileStaysCount").textContent = tripData.stays.length;
-        $("mobileNotesCount").textContent = tripData.notes.length;
-        const days = $("tripDays");
-        if (days) {
-          const n =
-            tripData.start && tripData.end
-              ? Math.max(
-                  1,
-                  Math.min(
-                    31,
-                    Math.floor(
-                      (new Date(tripData.end) - new Date(tripData.start)) /
-                        86400000,
-                    ) + 1,
-                  ),
-                )
-              : 7;
-          days.innerHTML = [
-            `<button type="button" class="trip-day${tripDay === 0 ? " on" : ""}" data-trip-day="0">전체</button>`,
-            ...Array.from(
-              { length: n },
-              (_, i) =>
-                `<button type="button" class="trip-day${tripDay === i + 1 ? " on" : ""}" data-trip-day="${i + 1}">Day ${i + 1}</button>`,
-            ),
-          ].join("");
-        }
-        const out = $("tripDetails");
-        if (out) {
-          const groups = [
-            ["flights", "✈️"],
-            ["stays", "🏨"],
-            ["notes", "📝"],
-          ];
-          const html = groups
-            .flatMap(([k, icon]) =>
-              tripData[k].map(
-                (x) =>
-                  `<div class="trip-detail" style="display:flex;justify-content:space-between;align-items:center;gap:8px"><div style="min-width:0"><b>${icon} ${esc(x.title)}</b><small style="display:block">${esc([x.meta, x.note].filter(Boolean).join(" · "))}</small></div><button type="button" class="mb dg" data-del-detail="${k}" data-detail-id="${esc(x.id)}" style="padding:4px 8px;font-size:11px;flex:none">삭제</button></div>`,
-              ),
-            )
-            .join("");
-          out.innerHTML =
-            html ||
-            '<small style="color:var(--sub)">항공편·숙소·메모를 추가해 보세요.</small>';
-        }
-      }
-      function persistTripData(next) {
-        tripData = sanitizeTripData(next);
-        ls.set("TRIP_DETAILS", JSON.stringify(tripData));
-        ls.set("TRIP_TITLE", tripData.title);
-        ls.set("TRIP_START", tripData.start);
-        ls.set("TRIP_END", tripData.end);
-        renderTripPlanner();
-        if (sharedRoomId && !remoteApplying) {
-          sharedLocalDirty = true;
-          scheduleSharedWrite();
-        }
-      }
-      function addTripDetail(kind) {
-        const key = { flight: "flights", stay: "stays", note: "notes" }[kind],
-          label = { flight: "항공편", stay: "숙소", note: "메모" }[kind];
-        if (!key) return;
-        const title = prompt(`${label} 이름`, "");
-        if (!title?.trim()) return;
-        const meta = prompt("일정 또는 주소", ""),
-          note = prompt("추가 메모 (선택)", "");
-        persistTripData({
-          ...tripData,
-          [key]: [
-            ...tripData[key],
-            {
-              id: `detail_${Date.now()}`,
-              title: title.trim(),
-              meta: meta || "",
-              note: note || "",
-            },
-          ],
-        });
-        toast(`${label}을(를) 추가했어요`);
-      }
-      function initTripPlanner() {
-        try {
-          tripData = sanitizeTripData(
-            JSON.parse(ls.get("TRIP_DETAILS") || "{}"),
-          );
-        } catch (_) {
-          tripData = sanitizeTripData({});
-        }
-        tripData.title ||= ls.get("TRIP_TITLE") || "";
-        tripData.start ||= ls.get("TRIP_START") || "";
-        tripData.end ||= ls.get("TRIP_END") || "";
-        [
-          ["tripTitleInput", "title"],
-          ["tripStartInput", "start"],
-          ["tripEndInput", "end"],
-        ].forEach(([id, key]) =>
-          $(id)?.addEventListener("change", (e) =>
-            persistTripData({ ...tripData, [key]: e.target.value }),
-          ),
-        );
-        $("tripDays")?.addEventListener("click", (e) => {
-          const b = e.target.closest("[data-trip-day]");
-          if (b) {
-            tripDay = Number(b.dataset.tripDay) || 0;
-            mapDay = tripDay;
-            renderTripPlanner();
-            renderAllList();
-            draw(true);
-            toast(
-              tripDay
-                ? `🗓️ Day ${tripDay} 일정을 선택했어요`
-                : "전체 일차를 표시합니다",
-            );
-          }
-        });
-        $("tripDetails")?.addEventListener("click", (e) => {
-          const delBtn = e.target.closest("[data-del-detail]");
-          if (!delBtn) return;
-          const k = delBtn.dataset.delDetail,
-            id = delBtn.dataset.detailId;
-          if (tripData[k])
-            persistTripData({
-              ...tripData,
-              [k]: tripData[k].filter((x) => x.id !== id),
-            });
-          toast("항목을 삭제했어요");
-        });
-        $("mobileTripSummary")?.addEventListener("click", () => {
-          tab("add");
-          setTimeout(() => $("tripTitleInput")?.focus(), 120);
-        });
-        document
-          .querySelectorAll("[data-trip-detail]")
-          .forEach((b) =>
-            b.addEventListener("click", () =>
-              addTripDetail(b.dataset.tripDetail),
-            ),
-          );
-        renderTripPlanner();
-      }
-
-      function fetchTO(url, opt = {}, ms = 7500) {
-        const ctrl = new AbortController();
-        const tid = setTimeout(() => ctrl.abort(), ms);
-        return fetch(url, { ...opt, signal: ctrl.signal }).finally(() =>
-          clearTimeout(tid),
-        );
-      }
-
-      function normalizeCfProxy(raw) {
-        let s = String(raw || "").trim();
-        if (!s) return "";
-        if (!/^https?:\/\//i.test(s)) s = "https://" + s;
-        if (!s.includes("?")) s = s.replace(/\/+$/, "") + "/?url=";
-        else if (!s.endsWith("=") && !s.endsWith("?")) s += "&url=";
-        return s;
-      }
-
-      function toEmbedMyMapsUrl(raw) {
-        const s = String(raw || "").trim();
-        if (!s) return "";
-        let url;
-        try {
-          url = new URL(s);
-        } catch (e) {
-          return "";
-        }
-        if (
-          url.protocol !== "https:" ||
-          !["www.google.com", "google.com"].includes(url.hostname)
-        )
-          return "";
-        if (!url.pathname.startsWith("/maps/d/")) return "";
-        const m = url.searchParams.get("mid");
-        return m && /^[A-Za-z0-9_-]+$/.test(m)
-          ? `https://www.google.com/maps/d/embed?mid=${encodeURIComponent(m)}`
-          : url.href;
-      }
-      const MYMAPS_EMBED_KEY = "TRIP_MYMAPS_EMBED";
-      const LEGACY_MYMAPS_EMBED_KEY = "TRIP_MYMMaps_EMBED";
-      function getMyMapsEmbedUrl() {
-        const saved = ls.get(MYMAPS_EMBED_KEY);
-        if (saved) return saved;
-        const legacy = ls.get(LEGACY_MYMAPS_EMBED_KEY) || "";
-        if (legacy) ls.set(MYMAPS_EMBED_KEY, legacy);
-        return legacy;
-      }
-
-      let _gmodels = null,
-        _gmodelsAt = 0;
-      async function geminiModels(key) {
-        const now = Date.now();
-        if (_gmodels && now - _gmodelsAt < 3600e3) return _gmodels;
-        let out = null;
-        try {
-          const r = await fetchTO(
-            "https://generativelanguage.googleapis.com/v1beta/models?key=" +
-              encodeURIComponent(key) +
-              "&pageSize=200",
-            { method: "GET" },
-            6000,
-          );
-          if (r.ok) {
-            const d = await r.json();
-            const ids = (d.models || []).map((x) =>
-              String(x.name || "").replace("models/", ""),
-            );
-            const flash = ids
-              .filter((x) => /^gemini-[\d.]+-flash(-lite)?$/.test(x))
-              .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
-            if (flash.length) out = flash.slice(0, 5);
-          }
-        } catch (e) {}
-        if (!out || !out.length)
-          out = [
-            "gemini-2.0-flash",
-            "gemini-1.5-flash",
-            "gemini-2.0-flash-lite",
-            "gemini-1.5-pro",
-          ];
-        _gmodels = out;
-        _gmodelsAt = now;
-        return out;
-      }
-
-      const SUF = ["", " photo", " review", " menu", " exterior"];
-      const esc = (s) =>
-        String(s ?? "").replace(
-          /[&<>"']/g,
-          (c) =>
-            ({
-              "&": "&amp;",
-              "<": "&lt;",
-              ">": "&gt;",
-              '"': "&quot;",
-              "'": "&#39;",
-            })[c],
-        );
-      const pic = (q, v = 0) =>
-        "https://tse1.mm.bing.net/th?w=480&h=360&c=7&rs=1&p=0&q=" +
-        encodeURIComponent(String(q || "").trim() + SUF[v % 5]);
-
-      let items = [],
-        cat = "PLACE",
-        pend = [],
-        res = [],
-        lm = null,
-        tl = null,
-        layer = null,
-        pins = {},
-        tt,
-        cur = null,
-        view = "photo",
-        tileIndex = 1,
-        tileFails = 0,
-        gmap = null,
-        gmarkers = [],
-        nmap = null,
-        nmarkers = [],
-        mapProvider = "osm",
-        editMode = {},
-        selected = new Set(),
-        prevTab = "add",
-        activeTab = "add",
-        gpins = [],
-        gposPts = [],
-        GPinClass = null,
-        mapInfoWindow = null,
-        nMapInfoWindow = null,
-        lastSharedVid = "",
-        _lastDrawSig = "",
-        _lastStripSig = "",
-        _mapFitted = false,
-        _mapFallbackNotice = "",
-        hm = null,
+      let hm = null,
         hlayer = null,
-        htiles = null,
         _homeMapSig = "";
-      let mapCat = "ALL",
-        mapOnlyVid = false,
-        mapOnlyStar = false,
-        mapOnlyTodo = false,
-        mapDay = 0,
-        mapRouteOn = false,
-        userPos = null,
-        nearSortOn = false,
-        _mapMsgTimer = null;
-      let lRoute = null,
-        gRoute = null,
-        nRoute = null,
-        _undoFn = null;
-      let listFilter = { PLACE: "ALL", CAFE: "ALL", FOOD: "ALL", SHOP: "ALL" };
-      let sharedRoomId = "",
-        sharedUnsubscribe = null,
-        sharedWriteTimer = null,
-        remoteApplying = false,
-        sharedOwnerUid = "",
-        sharedMembers = {},
-        sharedSettingsShared = false,
-        sharedRevision = 0,
-        sharedHistory = [],
-        joinRequestsUnsubscribe = null,
-        joinRequestUnsubscribe = null,
-        sharedLocalDirty = false,
-        sharedWriteRevision = null,
-        sharedConflict = null,
-        creatingSharedRoom = false,
-        sharedBaseItems = [];
-      let _joinBadgeText = "",
-        _lastRoomSyncAt = null,
-        _roomListenRetries = 0;
 
-      const FIREBASE_CONFIG = window.TRIPSYNC_FIREBASE_CONFIG || {};
-      function firebaseConfigured() {
-        return Boolean(
-          FIREBASE_CONFIG.apiKey &&
-          FIREBASE_CONFIG.authDomain &&
-          FIREBASE_CONFIG.projectId &&
-          FIREBASE_CONFIG.appId,
-        );
-      }
-      function roomUrl(roomId = sharedRoomId) {
-        return `${location.origin}${location.pathname}?room=${encodeURIComponent(roomId)}`;
-      }
-      function extractRoomId(value) {
-        let text = String(value || "").trim();
-        for (let attempt = 0; attempt < 3; attempt++) {
-          try {
-            const parsed = new URL(text, location.origin);
-            const nested = parsed.searchParams.get("room");
-            if (nested && nested !== text) {
-              text = nested;
-              continue;
-            }
-          } catch (_) {}
-          try {
-            text = decodeURIComponent(text);
-          } catch (_) {}
-          if (/^[A-Za-z0-9_-]{8,100}$/.test(text)) return text;
-          const match = text.match(/[?&]room=([^&#]+)/);
-          if (match) {
-            text = match[1];
-            continue;
-          }
-          break;
-        }
-        return /^[A-Za-z0-9_-]{8,100}$/.test(text) ? text : "";
-      }
-      function setSharedRoomStatus(message, kind = "") {
-        const el = $("sharedRoomStatus");
-        if (!el) return;
-        el.textContent = message;
-        el.style.color =
-          kind === "ok"
-            ? "var(--ok)"
-            : kind === "error"
-              ? "var(--dg)"
-              : "var(--sub)";
-        if (typeof updateRoomAlert === "function") updateRoomAlert();
-      }
-      function setSharedUserStatus(message, kind = "") {
-        const el = $("sharedUserStatus");
-        if (!el) return;
-        el.textContent = message;
-        el.style.color =
-          kind === "ok"
-            ? "var(--ok)"
-            : kind === "error"
-              ? "var(--dg)"
-              : "var(--sub)";
-      }
-      function updateGoogleLoginBtn(user) {
-        const btn = $("googleLoginBtn");
-        if (!btn) return;
-        if (user) {
-          const label =
-            user.displayName && user.email
-              ? `${user.displayName} (${user.email})`
-              : user.displayName || user.email || `계정 ${maskUid(user.uid)}`;
-          btn.textContent = `✅ ${label} 로그인됨`;
-        } else {
-          btn.textContent = "🔐 Google 계정으로 로그인";
-        }
-      }
-      async function handleGoogleLoginBtn() {
-        let user = null;
-        try {
-          user =
-            firebaseConfigured() && firebase.apps?.length
-              ? firebase.auth().currentUser
-              : null;
-        } catch (e) {
-          user = null;
-        }
-        if (!user) return signInGoogle();
-        if (
-          !confirm(
-            "Google 계정에서 로그아웃할까요? 공유 방을 다시 쓰려면 다시 로그인이 필요해요.",
-          )
-        )
-          return;
-        try {
-          await firebase.auth().signOut();
-          updateGoogleLoginBtn(null);
-          setSharedUserStatus(
-            "Google 계정에서 로그아웃했어요. 공유 방 사용 시 다시 로그인해 주세요.",
-            "",
-          );
-          const room = new URLSearchParams(location.search).get("room");
-          if (room)
-            setSharedRoomStatus(
-              "공유 방에 참여하려면 다시 Google 계정으로 로그인해 주세요.",
-              "error",
-            );
-        } catch (e) {
-          setSharedUserStatus(`로그아웃 실패: ${e.message}`, "error");
-        }
-      }
-      let _ggFallbackUsed = false;
-      function logLoginEvent(ev) {
-        try {
-          const arr = JSON.parse(
-            localStorage.getItem("TRIP_LOGIN_LOG") || "[]",
-          );
-          arr.push({
-            t: new Date().toISOString().slice(11, 19),
-            v: APP_VERSION,
-            ...ev,
-          });
-          while (arr.length > 10) arr.shift();
-          localStorage.setItem("TRIP_LOGIN_LOG", JSON.stringify(arr));
-        } catch (_) {}
-      }
-      function buildLoginDiagnostics() {
-        const out = [];
-        out.push("앱 버전: " + APP_VERSION);
-        out.push("사이트: " + location.host + location.pathname);
-        let authDomain = "";
-        try {
-          authDomain =
-            (typeof FIREBASE_CONFIG !== "undefined" &&
-              FIREBASE_CONFIG.authDomain) ||
-            "";
-        } catch (_) {}
-        out.push("authDomain: " + authDomain);
-        out.push(
-          "googleClientId: " +
-            (FIREBASE_CONFIG.googleClientId
-              ? "설정됨"
-              : "없음 — 모바일은 기존 팝업/리다이렉트 방식 사용"),
-        );
-        out.push("OAuth redirect_uri: " + location.origin + location.pathname);
-        let lsOk = "",
-          pending = "";
-        try {
-          localStorage.setItem("trip_diag", "1");
-          lsOk = localStorage.getItem("trip_diag") === "1" ? "정상" : "이상";
-          localStorage.removeItem("trip_diag");
-          const key =
-            "firebase:pendingRedirect:" +
-            ((FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey) || "") +
-            ":[DEFAULT]";
-          pending = localStorage.getItem(key) ? "대기 표식 있음" : "없음";
-        } catch (e) {
-          lsOk = "접근 불가(" + e.name + ")";
-        }
-        out.push("로컬 저장소: " + lsOk + " / 로그인 대기 표식: " + pending);
-        out.push(
-          "IndexedDB: " + (window.indexedDB ? "사용 가능" : "사용 불가"),
-        );
-        try {
-          const arr = JSON.parse(
-            localStorage.getItem("TRIP_LOGIN_LOG") || "[]",
-          );
-          out.push("최근 로그인 기록 (최대 10건):");
-          if (!arr.length) out.push(" · 기록 없음");
-          arr.forEach((r) => {
-            out.push(
-              ` · ${r.t} [${r.v}] ${r.at}${r.code ? " " + r.code : ""}${r.user !== undefined ? " user:" + r.user : ""}${r.hadRedirect !== undefined ? " flag:" + r.hadRedirect : ""}${r.uri ? " uri:" + r.uri : ""}${r.hash ? " url:" + r.hash : ""}`,
-            );
-          });
-        } catch (_) {}
-        out.push("※ 추적 방지(사파리 설정)는 스크린샷상 꺼짐 확인됨.");
-        return out.join("\n");
-      }
-      function iphoneIpadLike() {
-        const ua = navigator.userAgent || "";
-        return (
-          /iPad|iPhone|iPod/i.test(ua) ||
-          (/Macintosh/i.test(ua) && Number(navigator.maxTouchPoints || 0) > 1)
-        );
-      }
-      function mobileLike() {
-        return iphoneIpadLike() || /Android/i.test(navigator.userAgent || "");
-      }
-      function googleErrText(e) {
-        const code = (e && e.code) || "";
-        if (code === "auth/unauthorized-domain")
-          return "앱 개발자의 Firebase Console → Authentication → 설정 → 승인된 도메인에 이 사이트 도메인을 등록해야 로그인할 수 있어요.";
-        if (code === "auth/operation-not-allowed")
-          return "Firebase Console에서 Google 로그인 제공업체가 꺼져 있어요. 콘솔에서 켜 주세요.";
-        if (code === "auth/popup-blocked")
-          return "브라우저가 로그인 팝업을 차단했어요.";
-        return `${(e && e.message) || String(e || "알 수 없는 오류")}${code ? ` (${code})` : ""}`;
-      }
-      function clearGoogleLoginFlags() {
-        try {
-          sessionStorage.removeItem("TRIP_GOOGLE_REDIRECT_PENDING");
-        } catch (_) {}
-        try {
-          sessionStorage.removeItem("TRIP_GOOGLE_REDIRECT_FALLBACK");
-        } catch (_) {}
-        try {
-          sessionStorage.removeItem("TRIP_OAUTH_RETURN_SEARCH");
-        } catch (_) {}
-        _ggFallbackUsed = false;
-      }
-      function googleAcceptUser(user) {
-        updateGoogleLoginBtn(user);
-        setSharedUserStatus(`✅ 로그인됨 · ${user.email || user.uid}`, "ok");
-        const room = new URLSearchParams(location.search).get("room");
-        if (room) connectSharedRoom(room);
-      }
-      function googleRedirectStart(provider, msg) {
-        try {
-          sessionStorage.setItem("TRIP_GOOGLE_REDIRECT_PENDING", "1");
-        } catch (_) {}
-        setSharedUserStatus(msg || "Google 로그인 페이지로 이동 중...", "ok");
-        logLoginEvent({ at: "redirect-start" });
-        try {
-          Promise.resolve(firebase.auth().signInWithRedirect(provider)).catch(
-            (e) => {
-              logLoginEvent({ at: "redirect-fail", code: (e && e.code) || "" });
-              setSharedUserStatus(
-                `Google 로그인 페이지 이동 실패: ${googleErrText(e)} · 앱 ${typeof APP_VERSION !== "undefined" ? APP_VERSION : ""}`,
-                "error",
-              );
-            },
-          );
-        } catch (e) {
-          logLoginEvent({ at: "redirect-fail", code: (e && e.code) || "" });
-          setSharedUserStatus(
-            `Google 로그인 페이지 이동 실패: ${googleErrText(e)} · 앱 ${typeof APP_VERSION !== "undefined" ? APP_VERSION : ""}`,
-            "error",
-          );
-        }
-      }
-      function googleDirectOAuthStart(msg) {
-        const clientId =
-          (FIREBASE_CONFIG && FIREBASE_CONFIG.googleClientId) || "";
-        if (!clientId) {
-          setSharedUserStatus(
-            "firebase-config.js에 googleClientId(웹 클라이언트 ID)를 추가하면 모바일 직접 로그인 방식이 켜져요.",
-            "error",
-          );
-          return false;
-        }
-        try {
-          sessionStorage.setItem("TRIP_GOOGLE_REDIRECT_PENDING", "1");
-        } catch (_) {}
-        try {
-          sessionStorage.setItem(
-            "TRIP_OAUTH_RETURN_SEARCH",
-            location.search || "",
-          );
-        } catch (_) {}
-        setSharedUserStatus(msg || "Google 로그인 페이지로 이동 중...", "ok");
-        const redirectUri = location.origin + location.pathname;
-        logLoginEvent({ at: "direct-oauth-start", uri: redirectUri });
-        const params = new URLSearchParams({
-          client_id: clientId,
-          redirect_uri: redirectUri,
-          response_type: "id_token",
-          scope: "openid email profile",
-          prompt: "select_account",
-          nonce: Math.random().toString(36).slice(2) + Date.now().toString(36),
-        });
-        try {
-          location.assign(
-            "https://accounts.google.com/o/oauth2/v2/auth?" + params.toString(),
-          );
-        } catch (e) {
-          logLoginEvent({ at: "direct-oauth-fail", code: (e && e.name) || "" });
-          setSharedUserStatus(
-            `Google 로그인 페이지 이동 실패: ${e.message} · 앱 ${typeof APP_VERSION !== "undefined" ? APP_VERSION : ""}`,
-            "error",
-          );
-        }
-        return true;
-      }
-      async function signInGoogle() {
-        if (!firebaseConfigured())
-          return setSharedUserStatus(
-            "firebase-config.js 설정이 필요합니다.",
-            "error",
-          );
-        const btn = $("googleLoginBtn");
-        if (btn) {
-          btn.disabled = true;
-          setTimeout(() => {
-            btn.disabled = false;
-          }, 4000);
-        }
-        try {
-          if (!window.firebase || !window.firebase.auth)
-            return setSharedUserStatus(
-              "Firebase가 아직 준비되지 않았어요. 잠시 후 다시 눌러 주세요.",
-              "error",
-            );
-          if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
-          const provider = new firebase.auth.GoogleAuthProvider();
-          try {
-            provider.setCustomParameters({ prompt: "select_account" });
-          } catch (_) {}
-          const clientId =
-            (FIREBASE_CONFIG && FIREBASE_CONFIG.googleClientId) || "";
-          if (mobileLike() && clientId) {
-            googleDirectOAuthStart("Google 로그인 페이지로 이동 중...");
-            return;
-          }
-          setSharedUserStatus("Google 로그인 창을 여는 중...", "ok");
-          logLoginEvent({ at: "tap" });
-          let result = null;
-          try {
-            result = await firebase.auth().signInWithPopup(provider);
-            logLoginEvent({ at: "popup-ok", user: !!(result && result.user) });
-          } catch (pe) {
-            const code = (pe && pe.code) || "";
-            logLoginEvent({ at: "popup-fail", code });
-            const userNow =
-              typeof safeAuthUser === "function" ? safeAuthUser() : null;
-            if (userNow) {
-              clearGoogleLoginFlags();
-              googleAcceptUser(userNow);
-              return;
-            }
-            if (
-              code === "auth/popup-blocked" ||
-              code === "auth/operation-not-supported-in-this-environment"
-            ) {
-              _ggFallbackUsed = true;
-              try {
-                sessionStorage.setItem("TRIP_GOOGLE_REDIRECT_FALLBACK", "1");
-              } catch (_) {}
-              if (clientId)
-                googleDirectOAuthStart(
-                  "팝업이 차단되어 Google 로그인 페이지로 이동 중...",
-                );
-              else
-                googleRedirectStart(
-                  provider,
-                  "팝업이 차단되어 로그인 페이지로 이동 중...",
-                );
-              return;
-            }
-            if (
-              code === "auth/popup-closed-by-user" ||
-              code === "auth/cancelled-popup-request"
-            ) {
-              if (
-                iphoneIpadLike() &&
-                !_ggFallbackUsed &&
-                !sessionStorage.getItem("TRIP_GOOGLE_REDIRECT_FALLBACK")
-              ) {
-                _ggFallbackUsed = true;
-                try {
-                  sessionStorage.setItem("TRIP_GOOGLE_REDIRECT_FALLBACK", "1");
-                } catch (_) {}
-                if (clientId)
-                  googleDirectOAuthStart("Google 로그인 페이지로 이동 중...");
-                else
-                  googleRedirectStart(
-                    provider,
-                    "Google 로그인 페이지로 이동 중...",
-                  );
-                return;
-              }
-              setSharedUserStatus(
-                "Google 로그인 창이 닫혔어요. 로그인 버튼을 다시 눌러 주세요.",
-                "",
-              );
-              return;
-            }
-            throw pe;
-          }
-          clearGoogleLoginFlags();
-          googleAcceptUser(result.user);
-        } catch (e) {
-          const user =
-            typeof safeAuthUser === "function" ? safeAuthUser() : null;
-          logLoginEvent({ at: "fail", code: (e && e.code) || "" });
-          if (user) {
-            clearGoogleLoginFlags();
-            googleAcceptUser(user);
-            return;
-          }
-          const hint = iphoneIpadLike()
-            ? " · (아이폰/아이패드) 계속 막히면 설정 → 사파리 → 사이트 간 추적 방지·모든 쿠키 차단을 확인하세요"
-            : "";
-          setSharedUserStatus(
-            `Google 로그인 실패: ${googleErrText(e)}${hint} · 앱 ${typeof APP_VERSION !== "undefined" ? APP_VERSION : ""}`,
-            "error",
-          );
-        }
-      }
-      async function completeGoogleRedirectLogin() {
-        if (!firebaseConfigured() || !window.firebase || !window.firebase.auth)
-          return;
-        if (!firebase.apps || !firebase.apps.length) return;
-        if (
-          location.hash &&
-          /(?:^|#|&)(?:id_token|access_token|error)=/.test(location.hash)
-        ) {
-          const hp = new URLSearchParams(location.hash.replace(/^#/, ""));
-          const idToken = hp.get("id_token") || "";
-          const accessToken = hp.get("access_token") || "";
-          const oauthErr = hp.get("error") || "";
-          let savedSearch = "";
-          try {
-            savedSearch =
-              sessionStorage.getItem("TRIP_OAUTH_RETURN_SEARCH") || "";
-          } catch (_) {}
-          try {
-            sessionStorage.removeItem("TRIP_OAUTH_RETURN_SEARCH");
-          } catch (_) {}
-          try {
-            history.replaceState(
-              null,
-              "",
-              location.pathname + (savedSearch || ""),
-            );
-          } catch (_) {}
-          if (oauthErr) {
-            logLoginEvent({ at: "direct-oauth-err", code: oauthErr });
-            const reason =
-              oauthErr === "redirect_uri_mismatch"
-                ? '구글 콘솔 "승인된 리디렉션 URI"에 이 앱의 정확한 주소가 등록되어야 해요 (진단 내용의 redirect_uri 값을 보내 주세요)'
-                : oauthErr === "unauthorized_client"
-                  ? "이 웹 클라이언트에서 로그인 방식이 허용되지 않았어요 (웹 클라이언트 ID 확인 필요)"
-                  : `Google 로그인이 중단됐어요 (구글 응답: ${oauthErr})`;
-            setSharedUserStatus(
-              `${reason} · 앱 ${typeof APP_VERSION !== "undefined" ? APP_VERSION : ""}`,
-              "error",
-            );
-            return;
-          }
-          if (idToken || accessToken) {
-            try {
-              const cred = firebase.auth.GoogleAuthProvider.credential(
-                idToken,
-                accessToken,
-              );
-              const res = await firebase.auth().signInWithCredential(cred);
-              logLoginEvent({ at: "credential-ok", user: !!(res && res.user) });
-              clearGoogleLoginFlags();
-              if (res && res.user) return googleAcceptUser(res.user);
-            } catch (e) {
-              logLoginEvent({
-                at: "credential-fail",
-                code: (e && e.code) || "",
-              });
-              clearGoogleLoginFlags();
-              setSharedUserStatus(
-                `토큰 로그인 처리 실패: ${googleErrText(e)} · 앱 ${typeof APP_VERSION !== "undefined" ? APP_VERSION : ""}`,
-                "error",
-              );
-              return;
-            }
-          }
-        }
-        let hadRedirect = false;
-        try {
-          hadRedirect =
-            sessionStorage.getItem("TRIP_GOOGLE_REDIRECT_PENDING") === "1";
-        } catch (_) {}
-        let user = null,
-          error = null;
-        try {
-          const result = await firebase.auth().getRedirectResult();
-          user =
-            (result && result.user) ||
-            (typeof safeAuthUser === "function" ? safeAuthUser() : null);
-        } catch (e) {
-          error = e;
-          user = typeof safeAuthUser === "function" ? safeAuthUser() : null;
-        }
-        logLoginEvent({
-          at: "redirect-back",
-          user: !!user,
-          error: (error && error.code) || "",
-          hadRedirect,
-        });
-        clearGoogleLoginFlags();
-        if (user) return googleAcceptUser(user);
-        if (error) {
-          setSharedUserStatus(
-            `로그인 복귀 처리 실패: ${googleErrText(error)} · 로그인 버튼을 다시 눌러 주세요.`,
-            "error",
-          );
-          return;
-        }
-        if (hadRedirect) {
-          const iosHint = iphoneIpadLike()
-            ? " · (아이폰/아이패드) 설정 → 사파리 → 사이트 간 추적 방지·모든 쿠키 차단을 확인해 보세요"
-            : "";
-          setSharedUserStatus(
-            `Google 로그인이 완료되지 않았어요. 로그인 버튼을 다시 눌러 주세요.${iosHint} · 앱 ${typeof APP_VERSION !== "undefined" ? APP_VERSION : ""}`,
-            "error",
-          );
-        }
-      }
-      function sanitizeSharedItems(rawItems) {
-        if (!Array.isArray(rawItems)) return [];
-        return rawItems
-          .slice(0, 200)
-          .filter((item) => item && typeof item === "object")
-          .map((raw, index) => {
-            const item = { ...raw };
-            item.id = /^[A-Za-z0-9_-]{1,100}$/.test(String(raw.id || ""))
-              ? String(raw.id)
-              : `shared_${Date.now()}_${index}`;
-            item.category = CATS[raw.category] ? raw.category : "PLACE";
-            item.done = raw.done === true;
-            item.star = raw.star === true;
-            item.mapVisible =
-              raw.mapVisible === true
-                ? true
-                : raw.mapVisible === false
-                  ? false
-                  : undefined;
-            item.lat = Number.isFinite(Number(raw.lat))
-              ? Number(raw.lat)
-              : null;
-            item.lng = Number.isFinite(Number(raw.lng))
-              ? Number(raw.lng)
-              : null;
-            item.places = Array.isArray(raw.places)
-              ? raw.places
-                  .slice(0, 20)
-                  .filter((place) => place && typeof place === "object")
-                  .map((place) => ({
-                    ...place,
-                    name: String(place.name || "").slice(0, 500),
-                    localName: String(place.localName || "").slice(0, 500),
-                    address: String(place.address || "").slice(0, 1000),
-                    lat: Number.isFinite(Number(place.lat))
-                      ? Number(place.lat)
-                      : null,
-                    lng: Number.isFinite(Number(place.lng))
-                      ? Number(place.lng)
-                      : null,
-                  }))
-              : undefined;
-            return item;
-          });
-      }
-      function removeUndefined(value) {
-        if (Array.isArray(value)) return value.map(removeUndefined);
-        if (value && typeof value === "object") {
-          return Object.fromEntries(
-            Object.entries(value)
-              .filter(([, entry]) => entry !== undefined)
-              .map(([key, entry]) => [key, removeUndefined(entry)]),
-          );
-        }
-        return value;
-      }
-      function collectTripData() {
-        return removeUndefined(sanitizeTripData(tripData));
-      }
-      function scheduleSharedWrite() {
-        if (!sharedRoomId || remoteApplying || !window.firestoreDb) return;
-        clearTimeout(sharedWriteTimer);
-        sharedWriteTimer = setTimeout(async () => {
-          if (navigator.onLine === false) {
-            queueOfflineSnapshot();
-            setSharedRoomStatus(
-              "📴 오프라인 · 변경 내용을 임시 저장했어요. 네트워크가 복구되면 자동으로 반영돼요.",
-              "",
-            );
-            return;
-          }
-          try {
-            const ref = window.firestoreDb
-              .collection("rooms")
-              .doc(sharedRoomId);
-            await window.firestoreDb.runTransaction(async (tx) => {
-              const snap = await tx.get(ref);
-              const current = snap.exists ? snap.data() : {};
-              const revision = Number(current.revision || 0);
-              if (snap.exists && revision !== sharedRevision)
-                throw new Error("CONCURRENT_EDIT");
-              const history = Array.isArray(current.history)
-                ? current.history.slice(-9)
-                : [];
-              if (snap.exists)
-                history.push({
-                  items: current.items || [],
-                  savedAt: Date.now(),
-                  savedBy: firebase.auth().currentUser.uid,
-                });
-              sharedWriteRevision = revision + 1;
-              tx.set(
-                ref,
-                {
-                  items: removeUndefined(sanitizeSharedItems(items)),
-                  trip: collectTripData(),
-                  ownerUid: sharedOwnerUid || firebase.auth().currentUser.uid,
-                  members: Object.keys(sharedMembers).length
-                    ? sharedMembers
-                    : {
-                        [firebase.auth().currentUser.uid]: {
-                          role: "owner",
-                          name:
-                            firebase.auth().currentUser.displayName ||
-                            firebase.auth().currentUser.email ||
-                            "방장",
-                        },
-                      },
-                  settingsShared: sharedSettingsShared,
-                  ...((firebase.auth().currentUser?.uid || "") ===
-                    sharedOwnerUid &&
-                  sharedSettingsShared &&
-                  sharedOwnerUid
-                    ? { settings: collectSharedSettings() }
-                    : {}),
-                  history,
-                  revision: revision + 1,
-                  updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-                },
-                { merge: true },
-              );
-              sharedRevision = revision + 1;
-            });
-            sharedLocalDirty = false;
-            sharedWriteRevision = null;
-            setSharedRoomStatus(`✅ 공유 중 · ${sharedRoomId}`, "ok");
-          } catch (e) {
-            const transient = TRANSIENT_NET_RE.test(
-              `${e?.code || ""} ${e?.message || ""}`,
-            );
-            if (e.message === "CONCURRENT_EDIT") {
-              setSharedRoomStatus(
-                "⚡ 친구가 먼저 수정했어요. 겹치지 않는 변경은 자동 병합을 시도합니다.",
-                "",
-              );
-              await autoResolveSharedConflict();
-            } else if (transient || navigator.onLine === false) {
-              queueOfflineSnapshot();
-              setSharedRoomStatus(
-                "📴 오프라인 · 변경 내용을 임시 저장했어요. 네트워크가 복구되면 자동으로 반영돼요.",
-                "",
-              );
-              scheduleOfflineFlushRetry(10000);
-            } else {
-              setSharedRoomStatus(`공유 저장 실패: ${e.message}`, "error");
-            }
-          }
-        }, 500);
-      }
-      function syncSharedSettings() {
-        const user = window.firebase?.auth?.().currentUser;
-        if (
-          !user ||
-          !sharedRoomId ||
-          sharedOwnerUid !== user.uid ||
-          !window.firestoreDb
-        )
-          return;
-        sharedSettingsShared = true;
-        updateRoomWithRevision({
-          settings: collectSharedSettings(),
-          settingsShared: true,
-        }).catch((e) =>
-          setSharedRoomStatus(`API 설정 공유 실패: ${e.message}`, "error"),
-        );
-      }
-      async function createSharedRoomDocument(ref, user) {
-        const member = {
-          role: "owner",
-          name: user.displayName || user.email || "방장",
-        };
-        const room = {
-          items: removeUndefined(sanitizeSharedItems(items)),
-          trip: collectTripData(),
-          ownerUid: user.uid,
-          members: { [user.uid]: member },
-          settingsShared: true,
-          settings: collectSharedSettings(),
-          history: [],
-          revision: 0,
-          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        };
-        await ref.set(room);
-        sharedOwnerUid = user.uid;
-        sharedMembers = room.members;
-        sharedSettingsShared = true;
-        sharedRevision = 0;
-        sharedLocalDirty = false;
-      }
-      async function updateRoomWithRevision(fields) {
-        const ref = window.firestoreDb.collection("rooms").doc(sharedRoomId);
-        await window.firestoreDb.runTransaction(async (tx) => {
-          const snap = await tx.get(ref);
-          const data = snap.data() || {};
-          const revision = Number(data.revision || 0);
-          tx.update(ref, {
-            ...fields,
-            history: Array.isArray(data.history) ? data.history : [],
-            revision: revision + 1,
-          });
-          sharedRevision = revision + 1;
-        });
-      }
-      async function connectSharedRoom(roomId) {
-        if (!roomId) return;
-        if (!firebaseConfigured()) {
-          setSharedRoomStatus(
-            "firebase-config.js에 Firebase 설정을 먼저 입력하세요.",
-            "error",
-          );
-          return;
-        }
-        if (!window.firebase || !window.firebase.firestore) {
-          setSharedRoomStatus(
-            "Firebase 라이브러리를 불러오지 못했어요. 네트워크를 확인하세요.",
-            "error",
-          );
-          return;
-        }
-        try {
-          if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
-          const user = firebase.auth().currentUser;
-          if (!user) throw new Error("먼저 Google 계정으로 로그인해 주세요.");
-          window.firestoreDb = firebase.firestore();
-          try {
-            window.firestoreDb.settings({ ignoreUndefinedProperties: true });
-          } catch (_) {}
-          try {
-            await window.firestoreDb.enablePersistence({
-              synchronizeTabs: true,
-            });
-          } catch (_) {}
-          setSharedUserStatus(`✅ 로그인됨 · ${user.email || user.uid}`, "ok");
-          sharedRoomId = roomId;
-          try {
-            ls.set(TRIP_LAST_ROOM_KEY, roomId);
-          } catch (_) {}
-          restorePendingConflict(roomId);
-          listenOwnJoinRequest();
-          if (sharedUnsubscribe) sharedUnsubscribe();
-          const ref = window.firestoreDb.collection("rooms").doc(roomId);
-          sharedUnsubscribe = ref.onSnapshot(
-            (snapshot) => {
-              clearTimeout(_roomListenRetryTimer);
-              _roomListenRetryTimer = null;
-              _roomListenRetries = 0;
-              if (snapshot.exists) {
-                _lastRoomSyncAt = Date.now();
-                if (String(ls.get(TRIP_CREATING_ROOM_KEY) || "") === roomId) {
-                  try {
-                    localStorage.removeItem(TRIP_CREATING_ROOM_KEY);
-                  } catch (_) {}
-                }
-                renderRoomSyncInfo();
-                const data = snapshot.data();
-                const incomingRevision = Number(data.revision || 0);
-                if (
-                  sharedLocalDirty &&
-                  sharedWriteRevision === incomingRevision
-                ) {
-                  sharedLocalDirty = false;
-                } else if (
-                  sharedLocalDirty &&
-                  incomingRevision !== sharedRevision
-                ) {
-                  if (_autoResolveBusy) return;
-                  setSharedRoomStatus(
-                    "🔄 친구의 변경과 내 변경을 자동으로 합치는 중이에요…",
-                    "",
-                  );
-                  autoResolveSharedConflict();
-                  return;
-                } else if (sharedLocalDirty) {
-                  return;
-                }
-                sharedOwnerUid = String(data.ownerUid || "");
-                sharedMembers =
-                  data.members && typeof data.members === "object"
-                    ? data.members
-                    : {};
-                sharedSettingsShared = data.settingsShared === true;
-                sharedRevision = Number(data.revision || 0);
-                sharedHistory = Array.isArray(data.history) ? data.history : [];
-                if (Array.isArray(data.items))
-                  sharedBaseItems = sanitizeSharedItems(data.items);
-                const currentUser = firebase.auth().currentUser;
-                if (
-                  currentUser?.uid === sharedOwnerUid &&
-                  !Object.prototype.hasOwnProperty.call(data, "revision")
-                ) {
-                  ref
-                    .update({ revision: 0, history: [] })
-                    .catch((e) =>
-                      setSharedRoomStatus(
-                        `방 업데이트 준비 실패: ${e.message}`,
-                        "error",
-                      ),
-                    );
-                }
-                if (
-                  currentUser?.uid === sharedOwnerUid &&
-                  !sharedSettingsShared
-                ) {
-                  sharedSettingsShared = true;
-                  ref
-                    .update({
-                      settings: collectSharedSettings(),
-                      settingsShared: true,
-                    })
-                    .catch((e) =>
-                      setSharedRoomStatus(
-                        `API 설정 공유 활성화 실패: ${e.message}`,
-                        "error",
-                      ),
-                    );
-                } else if (
-                  currentUser?.uid === sharedOwnerUid &&
-                  sharedSettingsShared &&
-                  data.settings &&
-                  sharedOwnerUid
-                ) {
-                  const roomG = String(
-                      data.settings.googleMapsKey || "",
-                    ).trim(),
-                    roomN = String(data.settings.naverMapsKey || "").trim();
-                  const locG = String(ls.get("TRAVEL_GMAP_KEY") || "").trim(),
-                    locN = String(ls.get("TRAVEL_NAVER_KEY") || "").trim();
-                  if ((!roomG && locG) || (!roomN && locN)) {
-                    setSharedRoomStatus(
-                      "🔑 공유 설정의 맵 키가 비어 있어서 방장 키로 복구하는 중…",
-                      "",
-                    );
-                    ref
-                      .update({ settings: collectSharedSettings() })
-                      .then(() =>
-                        setSharedRoomStatus(
-                          "✅ 맵 API 키를 방 설정에 되살렸어요",
-                          "ok",
-                        ),
-                      )
-                      .catch((e) =>
-                        setSharedRoomStatus(
-                          `맵 키 자동 복구 실패: ${e.message}`,
-                          "error",
-                        ),
-                      );
-                  }
-                }
-                renderRoomMembers();
-                if (!joinRequestsUnsubscribe) listenJoinRequests();
-                renderRoomGuide();
-                listenOwnJoinRequest();
-                if (Array.isArray(data.items)) {
-                  remoteApplying = true;
-                  items = sanitizeSharedItems(data.items);
-                  if (data.trip && typeof data.trip === "object") {
-                    tripData = sanitizeTripData(data.trip);
-                    ls.set("TRIP_DETAILS", JSON.stringify(tripData));
-                    renderTripPlanner();
-                  }
-                  if (sharedSettingsShared && data.settings && sharedOwnerUid) {
-                    applySharedSettings(data.settings);
-                  }
-                  persistNow();
-                  remoteApplying = false;
-                  render(true);
-                  draw(true);
-                }
-              } else {
-                const currentUser = firebase.auth().currentUser;
-                if (!currentUser) {
-                  setSharedRoomStatus(
-                    "Google 로그인 확인 중이에요. 잠시 후 다시 시도해 주세요.",
-                    "error",
-                  );
-                  return;
-                }
-                const creatingIntent =
-                  String(ls.get(TRIP_CREATING_ROOM_KEY) || "") === roomId;
-                if (creatingIntent && !creatingSharedRoom) {
-                  creatingSharedRoom = true;
-                  createSharedRoomDocument(ref, currentUser)
-                    .then(() => {
-                      try {
-                        localStorage.removeItem(TRIP_CREATING_ROOM_KEY);
-                      } catch (_) {}
-                      setSharedRoomStatus(
-                        `✅ 새 공유 방 생성 완료 · 방 ${roomId}`,
-                        "ok",
-                      );
-                    })
-                    .catch((e) =>
-                      setSharedRoomStatus(
-                        `공유 방 생성 실패: ${e.message}`,
-                        "error",
-                      ),
-                    )
-                    .finally(() => {
-                      creatingSharedRoom = false;
-                    });
-                } else if (!creatingIntent) {
-                  setSharedRoomStatus(
-                    '이 링크의 공유 방이 없어졌어요(삭제됨). 새 방을 만들려면 상단 "공유 방 만들기"를 눌러 주세요.',
-                    "error",
-                  );
-                  sharedOwnerUid = "";
-                  sharedMembers = {};
-                  sharedRevision = 0;
-                  sharedHistory = [];
-                  sharedBaseItems = [];
-                  if (joinRequestUnsubscribe) {
-                    joinRequestUnsubscribe();
-                    joinRequestUnsubscribe = null;
-                  }
-                  if (String(ls.get(TRIP_LAST_ROOM_KEY) || "") === roomId) {
-                    try {
-                      localStorage.removeItem(TRIP_LAST_ROOM_KEY);
-                    } catch (_) {}
-                  }
-                  clearOfflineQueue();
-                  renderRoomMembers();
-                  return;
-                }
-                return;
-              }
-            },
-            (e) => {
-              if (
-                e?.code === "permission-denied" ||
-                /insufficient permissions/i.test(e?.message || "")
-              ) {
-                sharedOwnerUid = "";
-                sharedMembers = {};
-                _lastRoomSyncAt = null;
-                renderRoomSyncInfo();
-                listenOwnJoinRequest();
-                renderRoomMembers();
-                setSharedRoomStatus(
-                  "🔒 아직 이 방의 멤버가 아니에요. 아래 참여 요청을 눌러 방장에게 승인을 요청하세요. 승인되면 자동으로 연결돼요.",
-                  "",
-                );
-                renderRoomSyncInfo();
-                scheduleRoomListenRetry(roomId, 30000);
-                return;
-              }
-              setSharedRoomStatus(`실시간 연결 실패: ${e.message}`, "error");
-              scheduleRoomListenRetry(roomId);
-            },
-          );
-          flushOfflineQueue().catch(() => {});
-        } catch (e) {
-          setSharedRoomStatus(`공유 방 연결 실패: ${e.message}`, "error");
-        }
-      }
-      function makeRoomId() {
-        const bytes = new Uint8Array(16);
-        crypto.getRandomValues(bytes);
-        return [...bytes].map((x) => x.toString(16).padStart(2, "0")).join("");
-      }
-      async function copyUserId() {
-        const user = window.firebase?.auth?.().currentUser;
-        if (!user) return toast("먼저 Google 계정으로 로그인해 주세요");
-        try {
-          await navigator.clipboard.writeText(user.uid);
-          toast("내 사용자 ID를 복사했어요");
-        } catch (e) {
-          prompt("이 사용자 ID를 친구에게 보내세요:", user.uid);
-        }
-      }
-      async function addMember() {
-        const user = window.firebase?.auth?.().currentUser;
-        if (!user || !sharedRoomId)
-          return toast("공유 방에 로그인한 뒤 사용해 주세요");
-        if (sharedOwnerUid !== user.uid)
-          return toast("방 소유자만 친구를 승인할 수 있어요");
-        const input = prompt(
-          "친구의 Google 이메일 또는 사용자 ID를 입력하세요:",
-          "",
-        );
-        if (!input) return;
-        const value = input.trim();
-        let uid = value;
-        let requestedName = "";
-        if (value.includes("@")) {
-          const snapshot = await window.firestoreDb
-            .collection("rooms")
-            .doc(sharedRoomId)
-            .collection("joinRequests")
-            .where("email", "==", value.toLowerCase())
-            .limit(2)
-            .get();
-          if (snapshot.empty)
-            return toast(
-              "이 이메일로 온 참여 요청이 없어요. 친구가 먼저 참여 요청을 보내야 합니다.",
-            );
-          if (snapshot.size > 1)
-            return toast(
-              "같은 이메일의 참여 요청이 여러 개예요. 참여 요청 목록에서 승인해 주세요.",
-            );
-          const request = snapshot.docs[0];
-          uid = request.id;
-          requestedName = String(request.data()?.name || "친구");
-        }
-        if (!/^[A-Za-z0-9_-]{20,200}$/.test(uid))
-          return toast("올바른 사용자 ID 또는 Google 이메일이 아니에요");
-        try {
-          const name = prompt(
-            "친구 이름을 입력하세요 (예: 민수):",
-            requestedName || uid,
-          );
-          await updateRoomWithRevision({
-            [`members.${uid}`]: {
-              role: "editor",
-              name: String(name || uid).slice(0, 80),
-            },
-          });
-          await window.firestoreDb
-            .collection("rooms")
-            .doc(sharedRoomId)
-            .collection("joinRequests")
-            .doc(uid)
-            .delete()
-            .catch(() => {});
-          toast("친구를 방 멤버로 승인했어요");
-        } catch (e) {
-          toast(`멤버 승인 실패: ${e.message}`);
-        }
-      }
-      async function copyRoomLink() {
-        if (!sharedRoomId) return toast("먼저 공유 방을 만들어 주세요");
-        const url = roomUrl();
-        try {
-          await navigator.clipboard.writeText(url);
-          toast("공유 방 링크를 복사했어요");
-        } catch (e) {
-          prompt("이 링크를 친구들에게 보내세요:", url);
-        }
-      }
-
-      (function TripPinInviteSheet() {
-        const state = { open: false, query: "", results: [] };
-        const modal = $("inviteFriendsModal"),
-          search = $("inviteSearchInput"),
-          results = $("inviteSearchResults"),
-          link = $("inviteLinkValue");
-        if (!modal || !search || !results || !link) return;
-        const getInviteUrl = () => (sharedRoomId ? roomUrl() : "");
-        const inviteSearchAdapter = async (query) => {
-          const normalized = String(query || "")
-            .trim()
-            .toLowerCase();
-          if (!normalized) return [];
-          return Object.entries(sharedMembers || {})
-            .map(([uid, member]) => ({
-              uid,
-              name: String(member?.name || "친구"),
-              email: String(member?.email || ""),
-            }))
-            .filter((person) =>
-              `${person.name} ${person.email}`
-                .toLowerCase()
-                .includes(normalized),
-            )
-            .slice(0, 8);
-        };
-        const render = () => {
-          const inviteUrl = getInviteUrl();
-          link.textContent =
-            inviteUrl || "먼저 공유 방을 만든 뒤 초대 링크를 만들 수 있어요.";
-          results.innerHTML = state.results.length
-            ? state.results
-                .map(
-                  (person) =>
-                    `<button class="invite-result" type="button" data-invite-uid="${esc(person.uid)}"><b>${esc(person.name)}</b><small>${esc(person.email || person.uid)}</small></button>`,
-                )
-                .join("")
-            : state.query
-              ? "검색 결과가 없어요."
-              : "현재 방 멤버를 검색할 수 있어요.";
-        };
-        const open = () => {
-          state.open = true;
-          modal.classList.add("is-open");
-          modal.setAttribute("aria-hidden", "false");
-          render();
-          requestAnimationFrame(() => search.focus());
-        };
-        const close = () => {
-          state.open = false;
-          modal.classList.remove("is-open");
-          modal.setAttribute("aria-hidden", "true");
-          search.value = "";
-          state.query = "";
-          state.results = [];
-        };
-        const copyInviteLink = async () => {
-          const inviteUrl = getInviteUrl();
-          if (!inviteUrl) return toast("먼저 공유 방을 만들어 주세요");
-          try {
-            await navigator.clipboard.writeText(inviteUrl);
-            toast("초대 링크가 복사되었습니다");
-          } catch (error) {
-            prompt("이 링크를 친구들에게 보내세요:", inviteUrl);
-            toast("클립보드 복사가 제한되어 링크를 표시했어요");
-          }
-        };
-        const shareInviteLink = async () => {
-          const inviteUrl = getInviteUrl();
-          if (!inviteUrl) return toast("먼저 공유 방을 만들어 주세요");
-          if (navigator.share) {
-            try {
-              await navigator.share({
-                title: "트립핀 여행 초대",
-                text: "트립핀 여행에 초대할게요.",
-                url: inviteUrl,
-              });
-              toast("초대 링크를 보낼 준비가 되었어요");
-              return;
-            } catch (error) {
-              if (error?.name === "AbortError") return;
-            }
-          }
-          await copyInviteLink();
-        };
-        window.TripPinInvite = {
-          open,
-          close,
-          getState: () => ({ ...state }),
-          setSearchAdapter(adapter) {
-            if (typeof adapter !== "function")
-              throw new TypeError("invite search adapter must be a function");
-            window.TripPinInvite.searchAdapter = adapter;
-          },
-          onInviteSelected(person) {
-            return person;
-          },
-        };
-        window.TripPinInvite.searchAdapter = inviteSearchAdapter;
-        $("inviteFriendsBtn")?.addEventListener("click", open);
-        $("inviteCloseBtn")?.addEventListener("click", close);
-        $("inviteCopyBtn")?.addEventListener("click", copyInviteLink);
-        $("inviteShareBtn")?.addEventListener("click", shareInviteLink);
-        modal.addEventListener("click", (event) => {
-          if (event.target === modal) close();
-        });
-        search.addEventListener("input", async (event) => {
-          state.query = event.target.value;
-          state.results = await window.TripPinInvite.searchAdapter(state.query);
-          render();
-        });
-        results.addEventListener("click", (event) => {
-          const button = event.target.closest("[data-invite-uid]");
-          if (!button) return;
-          const person = state.results.find(
-            (item) => item.uid === button.dataset.inviteUid,
-          );
-          if (person) {
-            window.TripPinInvite.onInviteSelected(person);
-            toast(`${person.name}을(를) 선택했어요`);
-          }
-        });
-        document.addEventListener("keydown", (event) => {
-          if (event.key === "Escape" && state.open) close();
-        });
-      })();
-
-      try {
-        items = JSON.parse(ls.get("TRIP_MASTER_ITEMS") || "[]");
-      } catch (e) {
-        items = [];
-      }
-
-      (function immediateQuotaRescue() {
-        let changed = false;
-        try {
-          localStorage.removeItem("TRIP_PHOTO_CACHE");
-        } catch (e) {}
-        items.forEach((i) => {
-          if (i.lat != null) i.lat = Number(i.lat) || null;
-          if (i.lng != null) i.lng = Number(i.lng) || null;
-          if (!CATS[i.category]) i.category = "PLACE";
-          if (
-            i.img &&
-            String(i.img).startsWith("data:image") &&
-            i.img.length > 60000
-          ) {
-            i.img = "";
-            i.useCustomImg = false;
-            changed = true;
-          }
-        });
-        if (changed) ls.set("TRIP_MASTER_ITEMS", JSON.stringify(items));
-      })();
-
-      (async function syncIndexedDB() {
-        const dbData = await idb.get("TRIP_MASTER_DATA");
-        const lsTime = Number(ls.get("TRIP_UPDATED_AT") || 0);
-        if (
-          dbData &&
-          Array.isArray(dbData.items) &&
-          (dbData.updatedAt >= lsTime || !items.length)
-        ) {
-          items = dbData.items;
-          items.forEach((i) => {
-            if (!CATS[i.category]) i.category = "PLACE";
-          });
-          render(true);
-          draw(true);
-        } else if (items.length) {
-          idb.set("TRIP_MASTER_DATA", {
-            items,
-            updatedAt: lsTime || Date.now(),
-          });
-        }
-      })();
-
-      let photoCache = {};
-      try {
-        photoCache = JSON.parse(ls.get("TRIP_PHOTO_CACHE") || "{}");
-      } catch (e) {
-        photoCache = {};
-      }
-      let reelThumbCache = {};
-      try {
-        reelThumbCache = JSON.parse(ls.get("TRIP_REEL_THUMB_CACHE") || "{}");
-      } catch (e) {
-        reelThumbCache = {};
-      }
-      function savePhotoCache() {
-        const keys = Object.keys(photoCache);
-        if (keys.length > 100) {
-          keys.slice(0, keys.length - 100).forEach((k) => delete photoCache[k]);
-        }
-        ls.set("TRIP_PHOTO_CACHE", JSON.stringify(photoCache));
-      }
-      function saveReelThumbCache() {
-        const keys = Object.keys(reelThumbCache);
-        if (keys.length > 150)
-          keys
-            .slice(0, keys.length - 150)
-            .forEach((k) => delete reelThumbCache[k]);
-        ls.set("TRIP_REEL_THUMB_CACHE", JSON.stringify(reelThumbCache));
-      }
-
-      let geoCache = {};
-      try {
-        geoCache = JSON.parse(ls.get("TRIP_GEO_CACHE") || "{}");
-      } catch (e) {
-        geoCache = {};
-      }
-      function saveGeoCache() {
-        const keys = Object.keys(geoCache);
-        if (keys.length > 250) {
-          keys.slice(0, keys.length - 250).forEach((k) => delete geoCache[k]);
-        }
-        ls.set("TRIP_GEO_CACHE", JSON.stringify(geoCache));
-      }
-
-      function compressDataUrl(dataUrl, maxW = 320, quality = 0.55) {
-        return new Promise((resolve) => {
-          if (!dataUrl || !String(dataUrl).startsWith("data:image"))
-            return resolve(dataUrl || "");
-          const img = new Image();
-          img.onload = () => {
-            let w = img.width || 320,
-              h = img.height || 320;
-            if (w > maxW) {
-              h = Math.round(h * (maxW / w));
-              w = maxW;
-            }
-            const cv = document.createElement("canvas");
-            cv.width = w;
-            cv.height = h;
-            const ctx = cv.getContext("2d");
-            ctx.drawImage(img, 0, 0, w, h);
-            resolve(cv.toDataURL("image/jpeg", quality));
-          };
-          img.onerror = () => resolve("");
-          img.src = dataUrl;
-        });
-      }
-
-      function fileToBase64(file, maxW = 860, quality = 0.72) {
-        return new Promise((res, rej) => {
-          const r = new FileReader();
-          r.onload = async () => {
-            const raw = String(r.result || "");
-            const comp = await compressDataUrl(raw, maxW, quality);
-            const target = comp || raw;
-            const mime =
-              (target.match(/^data:([^;]+);/) || [])[1] || "image/jpeg";
-            res({ mime, data: target.split(",")[1] || "" });
-          };
-          r.onerror = rej;
-          r.readAsDataURL(file);
-        });
-      }
-
-      async function slimStorage(showMsg = false) {
-        let freed = 0;
-        try {
-          localStorage.removeItem("TRIP_PHOTO_CACHE");
-          photoCache = {};
-        } catch (e) {}
-        for (const i of items) {
-          if (i.img && String(i.img).startsWith("data:image")) {
-            const before = i.img.length;
-            if (before >= 25000 && (!i.useCustomImg || before > 35000)) {
-              const comp = i.useCustomImg
-                ? await compressDataUrl(i.img, 280, 0.5)
-                : "";
-              if (comp && comp.length < 30000) {
-                i.img = comp;
-                freed += before - comp.length;
-              } else {
-                i.img = "";
-                i.useCustomImg = false;
-                freed += before;
-              }
-            }
-          }
-        }
-        persistNow();
-        render(true);
-        draw(true);
-        if (showMsg)
-          toast(
-            `⚡ 저장 공간 정리 완료! (${Math.round(freed / 1024)}KB 확보됨)`,
-          );
-      }
-
-      window.imgErr = function (el) {
-        if (!el) return;
-        const s = el.getAttribute("src") || "";
-        const alternatives = (el.dataset.imgalts || "")
-          .split("|")
-          .filter(Boolean);
-        if (alternatives.length) {
-          el.dataset.imgalts = alternatives.slice(1).join("|");
-          el.src = alternatives[0];
-          return;
-        }
-        if (
-          s &&
-          !el.dataset.wsrv &&
-          /(cdninstagram\.com|fbcdn\.net|scontent|tiktokcdn|instagram\.com|tse\d*\.mm\.bing\.net)/.test(
-            s,
-          )
-        ) {
-          el.dataset.wsrv = "1";
-          el.src =
-            "https://wsrv.nl/?url=" +
-            encodeURIComponent(s) +
-            "&w=480&h=360&fit=cover&output=jpg";
-          return;
-        }
-        if (!el.dataset.fb2 && el.dataset.fbsrc) {
-          el.dataset.fb2 = "1";
-          el.src = el.dataset.fbsrc;
-          return;
-        }
-        el.remove();
-      };
-
-      let _toastBusy = false;
-      function toastBusy(m) {
-        const t = $("toast");
-        _toastBusy = true;
-        clearTimeout(tt);
-        t.innerHTML = `<span class="spinner" aria-hidden="true"></span><span>${esc(m)}</span>`;
-        t.classList.add("show");
-      }
-      function toast(m, undoFn = null) {
-        const t = $("toast");
-        _toastBusy = false;
-        _undoFn = undoFn;
-        if (undoFn) {
-          t.innerHTML = `<span>${esc(m)}</span><button type="button" class="mb pr" data-act="undoToast" style="padding:4px 9px;font-size:11.5px;flex:none">↩ 되돌리기</button>`;
-        } else {
-          t.textContent = m;
-        }
-        t.classList.add("show");
-        clearTimeout(tt);
-        tt = setTimeout(
-          () => {
-            t.classList.remove("show");
-            _undoFn = null;
-          },
-          undoFn ? 5500 : 4000,
-        );
-      }
-      window.addEventListener("error", (e) => {
-        const msg = String(e?.message || "");
-        if (!msg || /^script error\.?$/i.test(msg)) return;
-        const src = String(e?.filename || e?.target?.src || "");
-        if (
-          /maps\.googleapis|maps\.gstatic|gstatic\.com|jsdelivr|cdnjs|firebaseio|googleapis\.com|instagram\.com|tiktok\.com/i.test(
-            src,
-          )
-        )
-          return;
-        try {
-          console.error("[트립핀]", msg, src);
-          toast("오류: " + msg);
-        } catch (_) {}
-      });
-      window.addEventListener("unhandledrejection", (e) => {
-        const msg = String(e?.reason?.message || e?.reason || "");
-        if (!msg || /^script error\.?$/i.test(msg)) return;
-        try {
-          console.error("[트립핀] 처리되지 않은 오류", e.reason);
-        } catch (_) {}
-      });
-
-      const KOR_DAYS = ["일", "월", "화", "수", "목", "금", "토"];
-      function getBizStatus(i) {
-        const txt = ((i.info || "") + " " + (i.note || "")).trim();
-        if (!txt) return null;
-        const now = new Date();
-        const todayKor = KOR_DAYS[now.getDay()];
-        const closedRe = new RegExp(
-          `(?:^|[\\s,·/(])${todayKor}(?:요일)?(?:\\s*[·,/]\\s*[월화수목금토일](?:요일)?)*\\s*(?:정기\\s*)?휴무`,
-        );
-        if (closedRe.test(txt)) return { lbl: "오늘 휴무 주의", cls: "closed" };
-
-        const ranges = [
-          ...txt.matchAll(/(\d{1,2}):(\d{2})\s*[~∼\-–]\s*(\d{1,2}):(\d{2})/g),
-        ];
-        if (!ranges.length) return null;
-        const curMin = now.getHours() * 60 + now.getMinutes();
-        let isOpen = false,
-          inBreak = false;
-        const parsed = ranges.map((m) => ({
-          s: Number(m[1]) * 60 + Number(m[2]),
-          e: Number(m[3]) * 60 + Number(m[4]),
-        }));
-        for (const r of parsed) {
-          if (r.e >= r.s) {
-            if (curMin >= r.s && curMin <= r.e) isOpen = true;
-          } else {
-            if (curMin >= r.s || curMin <= r.e) isOpen = true;
-          }
-        }
-        if (!isOpen && parsed.length >= 2) {
-          const sorted = [...parsed].sort((a, b) => a.s - b.s);
-          if (curMin > sorted[0].e && curMin < sorted[sorted.length - 1].s)
-            inBreak = true;
-        }
-        if (isOpen) return { lbl: "영업중", cls: "open" };
-        if (inBreak) return { lbl: "브레이크타임", cls: "break" };
-        return { lbl: "영업종료", cls: "closed" };
-      }
-
-      function getVidUrlStr(v) {
-        if (!v) return "";
-        if (typeof v === "string") return v.trim();
-        return String(v.url || "").trim();
-      }
-      function parseVideoMeta(v) {
-        const s = getVidUrlStr(v);
-        if (!s) return null;
-        let m = s.match(
-          /(?:instagram\.com|instagr\.am)\/share\/(?:reel|reels|p|tv)\/([A-Za-z0-9_-]+)/i,
-        );
-        if (m)
-          return {
-            platform: "ig",
-            id: "",
-            shareId: m[1],
-            url: `https://www.instagram.com/share/reel/${m[1]}/`,
-          };
-        m = s.match(
-          /(?:instagram\.com|instagr\.am)\/(?:[A-Za-z0-9_.]+\/)?(?:reel|reels|p|tv)\/([A-Za-z0-9_-]{5,25})/i,
-        );
-        if (m)
-          return {
-            platform: "ig",
-            id: m[1],
-            url: `https://www.instagram.com/reel/${m[1]}/`,
-          };
-        m = s.match(
-          /(?:youtube\.com\/shorts\/|youtu\.be\/|youtube\.com\/watch\?v=)([A-Za-z0-9_-]{11})/i,
-        );
-        if (m)
-          return {
-            platform: "yt",
-            id: m[1],
-            url: `https://www.youtube.com/shorts/${m[1]}`,
-          };
-        m = s.match(
-          /https?:\/\/(?:www\.|vm\.|vt\.)?tiktok\.com\/[^\s"'<>\[\]()]+/i,
-        );
-        if (m) {
-          const clean = m[0].replace(/[,.;:!?]+$/, "");
-          const vm = clean.match(/\/video\/(\d+)/);
-          return { platform: "tt", id: vm ? vm[1] : "", url: clean };
-        }
-        return null;
-      }
-      function normalizeVidUrl(raw) {
-        const m = parseVideoMeta(raw);
-        return m ? m.url : "";
-      }
-      function getVidBtnLabel(v) {
-        const u = getVidUrlStr(v);
-        if (!u) return "🎬 릴스 ↗";
-        if (/instagram\.com|instagr\.am/i.test(u)) return "🎬 릴스 ↗";
-        if (/youtu\.?be|youtube\.com/i.test(u)) return "🎬 쇼츠 ↗";
-        if (/tiktok\.com/i.test(u)) return "🎬 틱톡 ↗";
-        return "🎬 영상 ↗";
-      }
-      function openExternalVideo(url) {
-        const u = normalizeVidUrl(url) || String(url || "").trim();
-        if (!u) return toast("연결된 릴스/쇼츠 링크가 없어요");
-        const a = document.createElement("a");
-        a.href = u;
-        a.target = "_blank";
-        a.rel = "noopener noreferrer";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-      }
-      function vidEmbedUrl(v, captioned = false) {
-        const meta = parseVideoMeta(v);
-        if (!meta) return "";
-        if (meta.platform === "ig")
-          return meta.id
-            ? `https://www.instagram.com/p/${meta.id}/embed/${captioned ? "captioned/" : ""}`
-            : "";
-        if (meta.platform === "yt" && meta.id)
-          return `https://www.youtube.com/embed/${meta.id}`;
-        if (meta.platform === "tt" && meta.id)
-          return `https://www.tiktok.com/embed/v2/${meta.id}`;
-        return "";
-      }
-      function itemThumb(i) {
-        return itemThumbCandidates(i)[0] || "";
-      }
-      function itemThumbCandidates(i) {
-        if (!i) return [];
-        const out = [];
-        const add = (u) => {
-          if (u && !out.includes(u)) out.push(u);
-        };
-        if (i.useCustomImg && i.img) add(i.img);
-        if (i.vid) {
-          const meta = parseVideoMeta(i.vid);
-          if (meta && meta.platform === "yt" && meta.id) {
-            add(`https://i.ytimg.com/vi/${meta.id}/oar2.jpg`);
-            add(`https://i.ytimg.com/vi/${meta.id}/maxresdefault.jpg`);
-            add(`https://i.ytimg.com/vi/${meta.id}/hqdefault.jpg`);
-          }
-          if (meta && meta.platform === "ig" && meta.id) {
-            const cached = reelThumbCache[meta.id];
-            if (cached) {
-              const raw = cached.startsWith("https://wsrv.nl/?url=")
-                ? decodeURIComponent(
-                    (cached.match(/[?&]url=([^&]+)/) || [])[1] || "",
-                  )
-                : cached;
-              if (raw) {
-                add(
-                  `https://wsrv.nl/?url=${encodeURIComponent(raw)}&w=480&h=640&fit=cover&output=jpg`,
-                );
-                add(raw);
-                add(`https://corsproxy.io/?url=${encodeURIComponent(raw)}`);
-              }
-            }
-          }
-          if (meta && meta.platform === "tt") {
-            const key = meta.id || meta.url;
-            if (reelThumbCache[key]) add(reelThumbCache[key]);
-          }
-          return out;
-        }
-        return out;
-      }
-
-      function extractIgThumbFromHtml(html) {
-        if (!html || typeof html !== "string") return "";
-        const patterns = [
-          /class=["'][^"']*EmbeddedMediaImage[^"']*["'][^>]*src=["']([^"']+)["']/i,
-          /src=["']([^"']+)["'][^>]*class=["'][^"']*EmbeddedMediaImage[^"']*["']/i,
-          /\\"display_url\\"\s*:\s*\\"(https?:(?:[^"\\]|\\.)*)\\"/i,
-          /\\"thumbnail_src\\"\s*:\s*\\"(https?:(?:[^"\\]|\\.)*)\\"/i,
-          /"display_url"\s*:\s*"(https?:(?:[^"\\]|\\.)*)"/i,
-          /"thumbnail_src"\s*:\s*"(https?:(?:[^"\\]|\\.)*)"/i,
-        ];
-        for (const re of patterns) {
-          const m = html.match(re);
-          if (m && m[1]) {
-            const url = decodeHtml(m[1])
-              .replace(/\\+/g, "\\")
-              .replace(/\\u0026/gi, "&")
-              .replace(/\\\//g, "/")
-              .replace(/&amp;/g, "&")
-              .trim();
-            if (
-              /^https?:\/\//i.test(url) &&
-              !/static\.cdninstagram\.com|rsrc\.php/i.test(url)
-            ) {
-              return url;
-            }
-          }
-        }
-        return "";
-      }
-
-      async function hydrateInstagramThumb(item) {
-        const meta = parseVideoMeta(item?.vid);
-        if (!meta) return false;
-
-        if (meta.platform === "tt") {
-          const key = meta.id || meta.url;
-          if (reelThumbCache[key]) return false;
-          try {
-            const r = await fetchTO(
-              `https://www.tiktok.com/oembed?url=${encodeURIComponent(meta.url)}`,
-              {},
-              4500,
-            );
-            if (r.ok) {
-              const d = await r.json();
-              if (d?.thumbnail_url) {
-                reelThumbCache[key] =
-                  `https://wsrv.nl/?url=${encodeURIComponent(d.thumbnail_url)}&w=480&h=640&fit=cover&output=jpg`;
-                saveReelThumbCache();
-                return true;
-              }
-            }
-          } catch (_) {}
-          return false;
-        }
-
-        if (meta.platform !== "ig" || !meta.id || reelThumbCache[meta.id])
-          return false;
-        const reelUrl = `https://www.instagram.com/reel/${meta.id}/`;
-        const embedUrl = `https://www.instagram.com/p/${meta.id}/embed/captioned/`;
-        const cfBase = normalizeCfProxy(
-          ls.get("TRIP_CF_PROXY") || ls.get("TRIP_WORKER_URL") || "",
-        );
-
-        try {
-          const mr = await fetchTO(
-            `https://api.microlink.io/?url=${encodeURIComponent(reelUrl)}`,
-            {},
-            5000,
-          );
-          if (mr.ok) {
-            const md = await mr.json();
-            const imgUrl = md?.data?.image?.url || "";
-            if (
-              /^https?:\/\//i.test(imgUrl) &&
-              !/static\.cdninstagram\.com|rsrc\.php/i.test(imgUrl)
-            ) {
-              reelThumbCache[meta.id] = imgUrl;
-              saveReelThumbCache();
-              return true;
-            }
-          }
-        } catch (_) {}
-
-        const sources = [
-          ...(cfBase ? [cfBase + encodeURIComponent(embedUrl)] : []),
-          `https://api.allorigins.win/raw?url=${encodeURIComponent(embedUrl)}`,
-          `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(embedUrl)}`,
-          `https://corsproxy.io/?url=${encodeURIComponent(embedUrl)}`,
-        ];
-        for (const source of sources) {
-          try {
-            const r = await fetchTO(source, {}, 5000);
-            if (!r.ok) continue;
-            const html = await r.text();
-            const rawUrl = extractIgThumbFromHtml(html);
-            if (rawUrl) {
-              reelThumbCache[meta.id] = rawUrl;
-              saveReelThumbCache();
-              return true;
-            }
-          } catch (_) {}
-        }
-        return false;
-      }
-
-      let _reelThumbHydrating = false;
-      async function hydrateInstagramThumbs() {
-        if (_reelThumbHydrating) return;
-        _reelThumbHydrating = true;
-        try {
-          const targets = items.filter(
-            (i) =>
-              !i.useCustomImg &&
-              ["ig", "tt"].includes(parseVideoMeta(i.vid)?.platform),
-          );
-          for (let idx = 0; idx < targets.length; idx += 3) {
-            const batch = targets.slice(idx, idx + 3);
-            const changed = (
-              await Promise.all(batch.map(hydrateInstagramThumb))
-            ).some(Boolean);
-            if (changed) {
-              render(true);
-              draw(true);
-            }
-          }
-        } finally {
-          _reelThumbHydrating = false;
-        }
-      }
-
-      function currentTileUrl() {
-        return "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
-      }
-      function rebuildTiles() {
-        if (!lm) return;
-        if (tl) lm.removeLayer(tl);
-        tl = L.tileLayer(currentTileUrl(), {
-          maxZoom: 19,
-          subdomains: "abc",
-          attribution: "© OpenStreetMap",
-        }).addTo(lm);
-        tl.on("tileerror", onTileError);
-        tl.on("tileload", onTileLoad);
-      }
-      function onTileError() {
-        tileFails++;
-        if (tileIndex === 0 && tileFails > 3) {
-          tileIndex = 1;
-          tileFails = 0;
-          rebuildTiles();
-          toast("지도 타일을 전환했어요");
-        } else if (tileIndex === 1 && !_mapFallbackNotice) {
-          $("mapmsg").textContent =
-            "지도 타일을 불러오지 못했어요. 인터넷 연결을 확인해 주세요.";
-          $("mapmsg").style.display = "block";
-        }
-      }
-      function onTileLoad() {
-        tileFails = 0;
-        if (!_mapFallbackNotice) $("mapmsg").style.display = "none";
-      }
-      function homeTileUrl() {
-        return "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
-      }
-      function homeMapValid() {
-        return expandMapPins(
-          items.filter((i) => isMapRegistered(i) && hasMapCoordinates(i)),
-        );
-      }
       function ensureHomeMap() {
         if (innerWidth > 820) return;
         const el = $("homeMapPreview");
         if (!el) return;
-        if (!window.L) {
-          const count = $("homeMapCount");
-          if (count) count.textContent = "📍 지도를 불러오지 못했어요";
-          return;
+
+        if (mapProvider === "google" && window.google?.maps) {
+          if (!hm || hm._type !== "google") {
+            el.innerHTML = "";
+            hm = new google.maps.Map(el, {
+              center: { lat: 34.668, lng: 135.501 },
+              zoom: 11,
+              disableDefaultUI: true,
+              gestureHandling: "none",
+              keyboardShortcuts: false,
+            });
+            hm._type = "google";
+            hlayer = [];
+          }
+        } else if (mapProvider === "naver" && window.naver?.maps) {
+          if (!hm || hm._type !== "naver") {
+            el.innerHTML = "";
+            hm = new naver.maps.Map(el, {
+              center: new naver.maps.LatLng(34.668, 135.501),
+              zoom: 11,
+              draggable: false,
+              pinchZoom: false,
+              scrollWheel: false,
+              keyboardShortcuts: false,
+              disableDoubleTapZoom: true,
+              disableDoubleClickZoom: true,
+              disableTwoFingerTapZoom: true,
+              logoControl: false,
+              mapDataControl: false,
+              scaleControl: false,
+            });
+            hm._type = "naver";
+            hlayer = [];
+          }
+        } else if (window.L) {
+          if (!hm || hm._type !== "osm") {
+            el.innerHTML = "";
+            hm = L.map(el, {
+              zoomControl: false,
+              attributionControl: false,
+              dragging: false,
+              touchZoom: false,
+              doubleClickZoom: false,
+              scrollWheelZoom: false,
+              boxZoom: false,
+              keyboard: false,
+              tap: false,
+            }).setView([34.668, 135.501], 11);
+            L.tileLayer(homeTileUrl(), {
+              maxZoom: 19,
+              subdomains: "abc",
+              crossOrigin: true,
+            }).addTo(hm);
+            hlayer = L.featureGroup().addTo(hm);
+            hm._type = "osm";
+          }
         }
-        if (!hm) {
-          el.innerHTML = "";
-          hm = L.map(el, {
-            zoomControl: false,
-            attributionControl: false,
-            dragging: false,
-            touchZoom: false,
-            doubleClickZoom: false,
-            scrollWheelZoom: false,
-            boxZoom: false,
-            keyboard: false,
-            tap: false,
-          }).setView([34.668, 135.501], 11);
-          hlayer = L.featureGroup().addTo(hm);
-          htiles = L.tileLayer(homeTileUrl(), {
-            maxZoom: 19,
-            subdomains: "abc",
-            crossOrigin: true,
-          }).addTo(hm);
-        }
+
         setTimeout(() => {
           try {
-            hm.invalidateSize();
+            if (hm && hm._type === "osm") hm.invalidateSize();
+            else if (hm && hm._type === "google")
+              google.maps.event.trigger(hm, "resize");
+            else if (hm && hm._type === "naver")
+              window.naver.maps.Event.trigger(hm, "resize");
             drawHomeMap(true);
           } catch (_) {}
         }, 150);
       }
+
       function drawHomeMap(force = false) {
         if (!hm || innerWidth > 820) return;
         const valid = homeMapValid();
-        const sig = valid
-          .map(
-            (i) =>
-              `${i._pinKey}:${i.lat}:${i.lng}:${i.category}:${i.star ? 1 : 0}`,
-          )
-          .join("|");
+        const sig =
+          mapProvider +
+          "|" +
+          valid
+            .map((i) => `${i._pinKey}:${i.lat}:${i.lng}:${i.category}`)
+            .join("|");
         if (!force && sig === _homeMapSig) return;
         _homeMapSig = sig;
+
         try {
-          hlayer.clearLayers();
+          if (hm._type === "osm" && hlayer) hlayer.clearLayers();
+          else if (
+            (hm._type === "google" || hm._type === "naver") &&
+            Array.isArray(hlayer)
+          ) {
+            hlayer.forEach((m) => m.setMap(null));
+            hlayer = [];
+          }
         } catch (_) {}
-        valid.forEach((i) => {
-          try {
-            L.circleMarker([Number(i.lat), Number(i.lng)], {
-              radius: 5.5,
-              color: "#fff",
-              weight: 1.5,
-              fillColor: catColor(i.category),
-              fillOpacity: 1,
-              interactive: false,
-            }).addTo(hlayer);
-          } catch (_) {}
-        });
+
         const count = $("homeMapCount");
         if (count) {
           count.textContent = valid.length
@@ -5694,109 +3162,123 @@
               ? "📍 지도에 표시할 위치가 없어요"
               : "📍 장소를 저장하면 지도에 표시돼요";
         }
+
+        if (!valid.length) {
+          try {
+            if (hm._type === "osm")
+              hm.setView([34.668, 135.501], 11, { animate: false });
+            else if (hm._type === "google") {
+              hm.setCenter({ lat: 34.668, lng: 135.501 });
+              hm.setZoom(11);
+            } else if (hm._type === "naver") {
+              hm.setCenter(new naver.maps.LatLng(34.668, 135.501));
+              hm.setZoom(11);
+            }
+          } catch (_) {}
+          return;
+        }
+
+        valid.forEach((i) => {
+          try {
+            if (hm._type === "osm") {
+              L.circleMarker([Number(i.lat), Number(i.lng)], {
+                radius: 5.5,
+                color: "#fff",
+                weight: 1.5,
+                fillColor: catColor(i.category),
+                fillOpacity: 1,
+                interactive: false,
+              }).addTo(hlayer);
+            } else if (hm._type === "google") {
+              const marker = new google.maps.Marker({
+                position: { lat: Number(i.lat), lng: Number(i.lng) },
+                map: hm,
+                icon: {
+                  path: google.maps.SymbolPath.CIRCLE,
+                  scale: 5.5,
+                  fillColor: catColor(i.category),
+                  fillOpacity: 1,
+                  strokeColor: "#ffffff",
+                  strokeWeight: 1.5,
+                },
+                clickable: false,
+              });
+              hlayer.push(marker);
+            } else if (hm._type === "naver") {
+              const marker = new naver.maps.Marker({
+                position: new naver.maps.LatLng(Number(i.lat), Number(i.lng)),
+                map: hm,
+                icon: {
+                  content: `<div style="width:11px;height:11px;border-radius:50%;background:${catColor(i.category)};border:1.5px solid #fff;box-sizing:border-box;"></div>`,
+                  anchor: new naver.maps.Point(6, 6),
+                },
+                clickable: false,
+              });
+              hlayer.push(marker);
+            }
+          } catch (_) {}
+        });
+
         try {
           if (valid.length === 1) {
-            hm.setView([Number(valid[0].lat), Number(valid[0].lng)], 14, {
-              animate: false,
-            });
-          } else if (valid.length > 1) {
-            hm.fitBounds(
-              L.latLngBounds(valid.map((i) => [Number(i.lat), Number(i.lng)])),
-              { padding: [26, 26], maxZoom: 14, animate: false },
-            );
+            if (hm._type === "osm")
+              hm.setView([Number(valid[0].lat), Number(valid[0].lng)], 14, {
+                animate: false,
+              });
+            else if (hm._type === "google") {
+              hm.setCenter({
+                lat: Number(valid[0].lat),
+                lng: Number(valid[0].lng),
+              });
+              hm.setZoom(14);
+            } else if (hm._type === "naver") {
+              hm.setCenter(
+                new naver.maps.LatLng(
+                  Number(valid[0].lat),
+                  Number(valid[0].lng),
+                ),
+              );
+              hm.setZoom(14);
+            }
           } else {
-            hm.setView([34.668, 135.501], 11, { animate: false });
+            if (hm._type === "osm") {
+              hm.fitBounds(
+                L.latLngBounds(
+                  valid.map((i) => [Number(i.lat), Number(i.lng)]),
+                ),
+                { padding: [26, 26], maxZoom: 14, animate: false },
+              );
+            } else if (hm._type === "google") {
+              const bounds = new google.maps.LatLngBounds();
+              valid.forEach((i) =>
+                bounds.extend({ lat: Number(i.lat), lng: Number(i.lng) }),
+              );
+              hm.fitBounds(bounds, 26);
+            } else if (hm._type === "naver") {
+              const bounds = new naver.maps.LatLngBounds(
+                new naver.maps.LatLng(
+                  Number(valid[0].lat),
+                  Number(valid[0].lng),
+                ),
+                new naver.maps.LatLng(
+                  Number(valid[0].lat),
+                  Number(valid[0].lng),
+                ),
+              );
+              valid.forEach((i) =>
+                bounds.extend(
+                  new naver.maps.LatLng(Number(i.lat), Number(i.lng)),
+                ),
+              );
+              hm.fitBounds(bounds, {
+                top: 26,
+                right: 26,
+                bottom: 26,
+                left: 26,
+              });
+            }
           }
         } catch (_) {}
-      }
-      function setTheme(t) {
-        document.documentElement.dataset.theme = t;
-        ls.set("TRIP_THEME", t);
-        $("themeBtn").textContent = t === "dark" ? "☀️" : "🌙";
-        if (lm) rebuildTiles();
-        if (hm && htiles) {
-          try {
-            hm.removeLayer(htiles);
-          } catch (_) {}
-          htiles = L.tileLayer(homeTileUrl(), {
-            maxZoom: 19,
-            subdomains: "abc",
-            crossOrigin: true,
-          }).addTo(hm);
-        }
-        renderMapChips();
-        drawHomeMap(true);
-      }
-      function destroyLeafletMap() {
-        if (lm) {
-          try {
-            lm.remove();
-          } catch (_) {}
-        }
-        lm = null;
-        tl = null;
-        layer = null;
-        pins = {};
-      }
-      function destroyGoogleMap() {
-        gmap = null;
-        gpins = [];
-        gmarkers = [];
-        gposPts = [];
-        GPinClass = null;
-        mapInfoWindow = null;
-      }
-      function ensureOsmMap() {
-        if (lm) {
-          refreshMapSize(true);
-          return;
-        }
-        if (!window.L) {
-          $("mapmsg").textContent =
-            "지도 라이브러리를 불러오지 못했어요. 네트워크를 확인한 뒤 새로고침해 주세요.";
-          $("mapmsg").style.display = "block";
-          return;
-        }
-        destroyGoogleMap();
-        nmap = null;
-        nmarkers = [];
-        const el = $("map");
-        if (!el) return;
-        el.innerHTML = "";
-        lm = L.map(el, { zoomControl: true }).setView([34.668, 135.501], 12);
-        layer = L.featureGroup().addTo(lm);
-        tileIndex = 1;
-        tileFails = 0;
-        rebuildTiles();
-        draw(true);
-        refreshMapSize(true);
-      }
-      function fallbackToOsm(reason) {
-        const isExpectedFallback = reason === "default osm";
-        _mapFallbackNotice = isExpectedFallback
-          ? ""
-          : String(reason || "지도 제공자를 사용할 수 없습니다.");
-        if (_mapFallbackNotice) {
-          const providerName =
-            mapProvider === "naver"
-              ? "Naver Maps"
-              : mapProvider === "google"
-                ? "Google Maps"
-                : "지도 제공자";
-          $("mapmsg").textContent =
-            `${_mapFallbackNotice} OpenStreetMap으로 전환했습니다. ${providerName}를 사용하려면 설정에서 유효한 API 키를 저장해 주세요.`;
-          $("mapmsg").style.display = "block";
-          clearTimeout(_mapMsgTimer);
-          _mapMsgTimer = setTimeout(() => {
-            $("mapmsg").style.display = "none";
-          }, 9000);
-        } else {
-          $("mapmsg").style.display = "none";
-        }
-        if (gmap) destroyGoogleMap();
-        nmap = null;
-        nmarkers = [];
-        ensureOsmMap();
       }
       async function fetchRepPhoto(q) {
         q = (q || "").trim();
@@ -8756,7 +6238,7 @@ ${caption || rawText}
             ) {
               c.lat = preGeo.lat;
               c.lng = preGeo.lng;
-              if (!c.address && preGeo.formatted) c.address = geo.formatted;
+              if (!c.address && preGeo.formatted) c.address = preGeo.formatted;
             } else {
               const geo = await geocodePlace(c, hint);
               if (geo) {
@@ -10381,7 +7863,11 @@ ${caption || rawText}
       window.addEventListener("resize", () => {
         if (hm) {
           try {
-            hm.invalidateSize();
+            if (hm._type === "osm") hm.invalidateSize();
+            else if (hm._type === "google")
+              google.maps.event.trigger(hm, "resize");
+            else if (hm._type === "naver")
+              window.naver.maps.Event.trigger(hm, "resize");
             drawHomeMap(true);
           } catch (_) {}
         }
@@ -10766,6 +8252,7 @@ ${caption || rawText}
                 googleReady = true;
                 if (googleTimer) clearTimeout(googleTimer);
                 $("mapmsg").style.display = "none";
+                if (activeTab === "add") ensureHomeMap();
               });
               if (googleTimer) clearTimeout(googleTimer);
               googleTimer = setTimeout(() => {
@@ -10793,24 +8280,24 @@ ${caption || rawText}
           fallbackToOsm("Naver Maps API 키가 설정되지 않았습니다.");
           return;
         }
-        let state = "loading",
+        let stateN = "loading",
           naverReady = false,
           naverTimer = null,
           naverProbe = null;
         const failNaver = (message) => {
-          if (naverReady || state === "failed") return;
-          state = "failed";
+          if (naverReady || stateN === "failed") return;
+          stateN = "failed";
           if (naverTimer) clearTimeout(naverTimer);
           if (naverProbe) clearInterval(naverProbe);
           nmap = null;
           nmarkers = [];
           fallbackToOsm(message);
         };
-        const s = document.createElement("script");
-        s.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${encodeURIComponent(nkey)}`;
-        s.async = true;
-        s.onload = () => {
-          if (state !== "loading") return;
+        const sn = document.createElement("script");
+        sn.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${encodeURIComponent(nkey)}`;
+        sn.async = true;
+        sn.onload = () => {
+          if (stateN !== "loading") return;
           try {
             if (!window.naver?.maps?.Map)
               throw new Error("Naver Maps API가 초기화되지 않았습니다.");
@@ -10821,7 +8308,7 @@ ${caption || rawText}
               center: new naver.maps.LatLng(34.668, 135.501),
               zoom: 11,
             });
-            state = "naver";
+            stateN = "naver";
             _mapFallbackNotice = "";
             $("mapmsg").style.display = "none";
             draw(true);
@@ -10829,7 +8316,7 @@ ${caption || rawText}
             refreshMapSize(true);
             let probeCount = 0;
             naverProbe = setInterval(() => {
-              if (naverReady || state !== "naver") {
+              if (naverReady || stateN !== "naver") {
                 clearInterval(naverProbe);
                 return;
               }
@@ -10839,6 +8326,7 @@ ${caption || rawText}
                 naverReady = true;
                 clearInterval(naverProbe);
                 if (naverTimer) clearTimeout(naverTimer);
+                if (activeTab === "add") ensureHomeMap();
                 return;
               }
               if (probeCount >= 5)
@@ -10856,13 +8344,13 @@ ${caption || rawText}
             failNaver(`Naver Maps 초기화 오류: ${e.message}`);
           }
         };
-        s.onerror = () =>
+        sn.onerror = () =>
           failNaver(
             "Naver Maps JavaScript API를 불러오지 못했습니다. 네트워크와 API 키를 확인하세요.",
           );
-        document.head.appendChild(s);
+        document.head.appendChild(sn);
         naverTimer = setTimeout(() => {
-          if (state === "loading")
+          if (stateN === "loading")
             failNaver(
               "Naver Maps 응답 시간이 초과되었습니다. API 키와 네트워크를 확인하세요.",
             );
