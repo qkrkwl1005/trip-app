@@ -24,10 +24,6 @@
       rel="apple-touch-icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%231e3a8a'/%3E%3Cpath d='M256 96 L416 224 L256 208 L96 224 Z' fill='white'/%3E%3Cpath d='M256 208 L256 384 L224 416 L288 416 L256 384' fill='white'/%3E%3Cpath d='M256 208 L320 320 L288 320 L256 288 L224 320 L192 320 Z' fill='white'/%3E%3C/svg%3E"
     />
-    <link
-      rel="apple-touch-icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' stop-color='%232563eb'/%3E%3Cstop offset='100%25' stop-color='%237c3aed'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='128' height='128' rx='28' fill='url(%23g)'/%3E%3Cpolygon points='64,24 96,96 64,76 32,96' fill='white'/%3E%3C/svg%3E"
-    />
     <title>여행플래너</title>
     <link
       rel="stylesheet"
@@ -610,6 +606,7 @@
         position: relative;
         height: 100%;
         z-index: 0;
+        background: #0b1220;
       }
       #map {
         width: 100%;
@@ -1237,14 +1234,19 @@
           visibility: hidden;
           opacity: 0;
           pointer-events: none;
-          display: none;
           transition: opacity 0.15s;
+        }
+        body:not(.show-map) #map-wrap,
+        body:not(.show-map) #mapChips,
+        body:not(.show-map) #mapStrip {
+          visibility: hidden !important;
+          opacity: 0 !important;
+          pointer-events: none !important;
         }
         #mapmsg {
           top: 150px;
         }
         body.show-map #map-wrap {
-          display: block;
           visibility: visible;
           opacity: 1;
           pointer-events: auto;
@@ -1341,6 +1343,7 @@
           <button class="btn g" id="pcShare" style="margin-bottom: 0">
             📷 캡션/영상 스크린샷 여러 장 첨부해서 분석 (최대 10곳)
           </button>
+          <input type="hidden" id="hint" value="" />
           <input type="file" id="shareFile" accept="image/*" multiple hidden />
           <small
             style="
@@ -1357,7 +1360,7 @@
         <div id="rs"></div>
       </section>
 
-      <!-- ⚙ 설정 탭 -->
+      <!-- ⚙️ 설정 탭 -->
       <section id="tab-set" class="tab-content">
         <div class="card">
           <label>📋 동행자 공유용 일정·장소 리스트 내보내기</label>
@@ -2279,7 +2282,6 @@
           return false;
         }
       }
-
       async function deleteRoom() {
         const user = window.firebase?.auth?.().currentUser;
         if (!user || sharedOwnerUid !== user.uid)
@@ -2846,7 +2848,6 @@
           });
         },
       };
-
       const CATS = {
         PLACE: { n: "장소", e: "📍", b: "여행 장소/식당" },
         CAFE: { n: "카페", e: "☕", b: "카페/디저트" },
@@ -3003,6 +3004,7 @@
         _undoFn = null;
       let listFilter = {
         ALL: "ALL",
+        LIST: "ALL",
         PLACE: "ALL",
         CAFE: "ALL",
         FOOD: "ALL",
@@ -3198,7 +3200,6 @@
             );
           });
         } catch (_) {}
-        out.push("※ 추적 방지(사파리 설정)는 스크린샷상 꺼짐 확인됨.");
         return out.join("\n");
       }
       function iphoneIpadLike() {
@@ -3250,7 +3251,7 @@
             (e) => {
               logLoginEvent({ at: "redirect-fail", code: (e && e.code) || "" });
               setSharedUserStatus(
-                `Google 로그인 페이지 이동 실패: ${googleErrText(e)} · 앱 ${typeof APP_VERSION !== "undefined" ? APP_VERSION : ""}`,
+                `Google 로그인 페이지 이동 실패: ${googleErrText(e)} · 앱 ${APP_VERSION}`,
                 "error",
               );
             },
@@ -3258,7 +3259,7 @@
         } catch (e) {
           logLoginEvent({ at: "redirect-fail", code: (e && e.code) || "" });
           setSharedUserStatus(
-            `Google 로그인 페이지 이동 실패: ${googleErrText(e)} · 앱 ${typeof APP_VERSION !== "undefined" ? APP_VERSION : ""}`,
+            `Google 로그인 페이지 이동 실패: ${googleErrText(e)} · 앱 ${APP_VERSION}`,
             "error",
           );
         }
@@ -3268,7 +3269,7 @@
           (FIREBASE_CONFIG && FIREBASE_CONFIG.googleClientId) || "";
         if (!clientId) {
           setSharedUserStatus(
-            "firebase-config.js에 googleClientId(웹 클라이언트 ID)를 추가하면 모바일 직접 로그인 방식이 켜져요.",
+            "firebase-config.js에 googleClientId를 추가하면 모바일 직접 로그인 방식이 켜져요.",
             "error",
           );
           return false;
@@ -3300,7 +3301,7 @@
         } catch (e) {
           logLoginEvent({ at: "direct-oauth-fail", code: (e && e.name) || "" });
           setSharedUserStatus(
-            `Google 로그인 페이지 이동 실패: ${e.message} · 앱 ${typeof APP_VERSION !== "undefined" ? APP_VERSION : ""}`,
+            `Google 로그인 페이지 이동 실패: ${e.message} · 앱 ${APP_VERSION}`,
             "error",
           );
         }
@@ -3412,11 +3413,8 @@
             googleAcceptUser(user);
             return;
           }
-          const hint = iphoneIpadLike()
-            ? " · (아이폰/아이패드) 계속 막히면 설정 → 사파리 → 사이트 간 추적 방지·모든 쿠키 차단을 확인하세요"
-            : "";
           setSharedUserStatus(
-            `Google 로그인 실패: ${googleErrText(e)}${hint} · 앱 ${typeof APP_VERSION !== "undefined" ? APP_VERSION : ""}`,
+            `Google 로그인 실패: ${googleErrText(e)} · 앱 ${APP_VERSION}`,
             "error",
           );
         }
@@ -3450,14 +3448,8 @@
           } catch (_) {}
           if (oauthErr) {
             logLoginEvent({ at: "direct-oauth-err", code: oauthErr });
-            const reason =
-              oauthErr === "redirect_uri_mismatch"
-                ? '구글 콘솔 "승인된 리디렉션 URI"에 이 앱의 정확한 주소가 등록되어야 해요 (진단 내용의 redirect_uri 값을 보내 주세요)'
-                : oauthErr === "unauthorized_client"
-                  ? "이 웹 클라이언트에서 로그인 방식이 허용되지 않았어요 (웹 클라이언트 ID 확인 필요)"
-                  : `Google 로그인이 중단됐어요 (구글 응답: ${oauthErr})`;
             setSharedUserStatus(
-              `${reason} · 앱 ${typeof APP_VERSION !== "undefined" ? APP_VERSION : ""}`,
+              `Google 로그인이 중단됐어요 (${oauthErr}) · 앱 ${APP_VERSION}`,
               "error",
             );
             return;
@@ -3479,7 +3471,7 @@
               });
               clearGoogleLoginFlags();
               setSharedUserStatus(
-                `토큰 로그인 처리 실패: ${googleErrText(e)} · 앱 ${typeof APP_VERSION !== "undefined" ? APP_VERSION : ""}`,
+                `토큰 로그인 처리 실패: ${googleErrText(e)} · 앱 ${APP_VERSION}`,
                 "error",
               );
               return;
@@ -3512,17 +3504,14 @@
         if (user) return googleAcceptUser(user);
         if (error) {
           setSharedUserStatus(
-            `로그인 복귀 처리 실패: ${googleErrText(error)} · 로그인 버튼을 다시 눌러 주세요.`,
+            `로그인 복귀 처리 실패: ${googleErrText(error)}`,
             "error",
           );
           return;
         }
         if (hadRedirect) {
-          const iosHint = iphoneIpadLike()
-            ? " · (아이폰/아이패드) 설정 → 사파리 → 사이트 간 추적 방지·모든 쿠키 차단을 확인해 보세요"
-            : "";
           setSharedUserStatus(
-            `Google 로그인이 완료되지 않았어요. 로그인 버튼을 다시 눌러 주세요.${iosHint} · 앱 ${typeof APP_VERSION !== "undefined" ? APP_VERSION : ""}`,
+            `Google 로그인이 완료되지 않았어요. 로그인 버튼을 다시 눌러 주세요.`,
             "error",
           );
         }
@@ -3837,38 +3826,6 @@
                         "error",
                       ),
                     );
-                } else if (
-                  currentUser?.uid === sharedOwnerUid &&
-                  sharedSettingsShared &&
-                  data.settings &&
-                  sharedOwnerUid
-                ) {
-                  const roomG = String(
-                      data.settings.googleMapsKey || "",
-                    ).trim(),
-                    roomN = String(data.settings.naverMapsKey || "").trim();
-                  const locG = String(ls.get("TRAVEL_GMAP_KEY") || "").trim(),
-                    locN = String(ls.get("TRAVEL_NAVER_KEY") || "").trim();
-                  if ((!roomG && locG) || (!roomN && locN)) {
-                    setSharedRoomStatus(
-                      "🔑 공유 설정의 맵 키가 비어 있어서 방장 키로 복구하는 중…",
-                      "",
-                    );
-                    ref
-                      .update({ settings: collectSharedSettings() })
-                      .then(() =>
-                        setSharedRoomStatus(
-                          "✅ 맵 API 키를 방 설정에 되살렸어요",
-                          "ok",
-                        ),
-                      )
-                      .catch((e) =>
-                        setSharedRoomStatus(
-                          `맵 키 자동 복구 실패: ${e.message}`,
-                          "error",
-                        ),
-                      );
-                  }
                 }
                 renderRoomMembers();
                 if (!joinRequestsUnsubscribe) listenJoinRequests();
@@ -3938,9 +3895,7 @@
                   }
                   clearOfflineQueue();
                   renderRoomMembers();
-                  return;
                 }
-                return;
               }
             },
             (e) => {
@@ -3955,10 +3910,9 @@
                 listenOwnJoinRequest();
                 renderRoomMembers();
                 setSharedRoomStatus(
-                  "🔒 아직 이 방의 멤버가 아니에요. 아래 참여 요청을 눌러 방장에게 승인을 요청하세요. 승인되면 자동으로 연결돼요.",
+                  "🔒 아직 이 방의 멤버가 아니에요. 아래 참여 요청을 눌러 방장에게 승인을 요청하세요.",
                   "",
                 );
-                renderRoomSyncInfo();
                 scheduleRoomListenRetry(roomId, 30000);
                 return;
               }
@@ -4643,7 +4597,7 @@
         nmap = null;
         if (window.L) {
           $("map").innerHTML = "";
-          lm = L.map("map").setView([36.5, 128], 6);
+          lm = L.map("map").setView([34.668, 135.501], 12);
           layer = L.featureGroup().addTo(lm);
           rebuildTiles();
           render();
@@ -4652,56 +4606,6 @@
         } else {
           $("mapmsg").style.display = "block";
         }
-      }
-
-      async function fetchRepPhoto(q) {
-        q = (q || "").trim();
-        if (!q) return null;
-        if (photoCache[q]) return photoCache[q];
-        const tryWiki = async (lang) => {
-          try {
-            const s = await fetch(
-              `https://${lang}.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(q)}&limit=1&namespace=0&format=json&origin=*`,
-            );
-            const arr = await s.json();
-            const title = Array.isArray(arr) && arr[1] && arr[1][0];
-            if (!title) return null;
-            const r = await fetch(
-              `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`,
-            );
-            const d = await r.json();
-            if (d && d.thumbnail && d.thumbnail.source)
-              return d.thumbnail.source;
-          } catch (e) {}
-          return null;
-        };
-        for (const lang of ["ko", "en", "ja"]) {
-          const u = await tryWiki(lang);
-          if (u) {
-            photoCache[q] = u;
-            savePhotoCache();
-            return u;
-          }
-        }
-        try {
-          const r = await fetch(
-            `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(q)}&gsrlimit=1&prop=imageinfo&iiprop=url&iiurlwidth=480&format=json&origin=*`,
-          );
-          const d = await r.json();
-          const pages = d && d.query && d.query.pages;
-          if (pages) {
-            for (const p in pages) {
-              const ii = pages[p].imageinfo && pages[p].imageinfo[0];
-              if (ii && (ii.thumburl || ii.url)) {
-                const u = ii.thumburl || ii.url;
-                photoCache[q] = u;
-                savePhotoCache();
-                return u;
-              }
-            }
-          }
-        } catch (e) {}
-        return null;
       }
 
       /* 하단 4탭(⌂ 홈 / ☷ 목록 / 🗺️ 지도 / ⚙️ 설정) 및 통합 카테고리 목록 구성 */
@@ -4771,15 +4675,12 @@
         if (k === "set") renderUsageBox();
         if (k === "map") {
           renderMapChips();
-          renderMapStrip();
+          renderMapStrip(true);
           requestAnimationFrame(() => {
             if (gmap) google.maps.event.trigger(gmap, "resize");
             else if (nmap) naver.maps.Event.trigger(nmap, "resize");
             else if (lm) lm.invalidateSize();
-            if (!_mapFitted) {
-              _mapFitted = true;
-              fit();
-            }
+            fit();
           });
           const cnt = expandMapPins(mapValid()).length;
           if (!cnt && items.some(hasMapCoordinates)) {
@@ -4799,6 +4700,7 @@
           }
         }
       }
+
       function fit() {
         if (gmap) {
           if (!gposPts.length) return;
@@ -5116,7 +5018,6 @@
         _mapFitted = false;
         renderMapChips();
         renderMapStrip(force);
-        drawHomeMap();
 
         if (gmap) {
           gpins.forEach((o) => o.setMap(null));
@@ -5219,257 +5120,2426 @@
         s.classList.add("on");
       }
 
-      function homeTileUrl() {
-        return "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
-      }
-      function homeMapValid() {
-        return expandMapPins(
-          items.filter((i) => isMapRegistered(i) && hasMapCoordinates(i)),
+      function mapBaseValid() {
+        return items.filter(
+          (i) =>
+            isMapRegistered(i) &&
+            hasMapCoordinates(i) &&
+            (!mapOnlyVid || Boolean(getVidUrlStr(i.vid))) &&
+            (!mapOnlyStar || i.star) &&
+            (!mapOnlyTodo || !i.done) &&
+            (!mapDay || Number(i.day) === mapDay),
         );
       }
-      function ensureHomeMap() {
-        if (innerWidth > 820) return;
-        const el = $("homeMapPreview");
-        if (!el) return;
-
-        if (mapProvider === "google" && window.google?.maps) {
-          if (!hm || hm._type !== "google") {
-            el.innerHTML = "";
-            hm = new google.maps.Map(el, {
-              center: { lat: 34.668, lng: 135.501 },
-              zoom: 11,
-              disableDefaultUI: true,
-              gestureHandling: "none",
-              keyboardShortcuts: false,
+      function mapValid() {
+        return mapBaseValid().filter(
+          (i) => mapCat === "ALL" || i.category === mapCat,
+        );
+      }
+      function hasMapAddress(item) {
+        return Boolean(
+          String(item?.address || "").trim() ||
+          (Array.isArray(item?.places) &&
+            item.places.some((p) => String(p.address || "").trim())),
+        );
+      }
+      function isMapRegistered(item) {
+        if (item?.mapVisible === true) return true;
+        if (item?.mapVisible === false) return false;
+        return hasMapAddress(item);
+      }
+      function hasMapCoordinates(item) {
+        return Boolean(
+          (Number(item?.lat) && Number(item?.lng)) ||
+          (Array.isArray(item?.places) &&
+            item.places.some((p) => Number(p.lat) && Number(p.lng))),
+        );
+      }
+      function expandMapPins(validItems) {
+        const pinsOut = [];
+        validItems.forEach((i) => {
+          const explicitlyRegistered = i.mapVisible === true;
+          const places = Array.isArray(i.places) ? i.places : [];
+          const subPlaces = places
+            .map((place, placeIndex) => ({ place, placeIndex }))
+            .filter(
+              ({ place }) =>
+                Number(place.lat) &&
+                Number(place.lng) &&
+                (explicitlyRegistered || hasMapAddress(place)),
+            );
+          const parentHasPin =
+            Number(i.lat) &&
+            Number(i.lng) &&
+            (!places.length ||
+              (!explicitlyRegistered &&
+                !subPlaces.length &&
+                hasMapAddress(i)) ||
+              explicitlyRegistered);
+          const subs = subPlaces.length
+            ? subPlaces.map(({ place, placeIndex }) => ({ place, placeIndex }))
+            : parentHasPin
+              ? [{ place: i, placeIndex: -1 }]
+              : [];
+          subs.forEach(({ place: p, placeIndex }) => {
+            pinsOut.push({
+              ...i,
+              _pinKey: `${i.id}_${placeIndex < 0 ? "parent" : placeIndex}`,
+              _placeIndex: placeIndex,
+              _placeCount: places.length,
+              _pinNumber:
+                places.length > 1 && placeIndex >= 0 ? placeIndex + 1 : null,
+              name: p.name || i.name,
+              localName: p.localName || i.localName,
+              address: p.address || i.address,
+              lat: Number(p.lat),
+              lng: Number(p.lng),
             });
-            hm._type = "google";
-            hlayer = [];
-          }
-        } else if (mapProvider === "naver" && window.naver?.maps) {
-          if (!hm || hm._type !== "naver") {
-            el.innerHTML = "";
-            hm = new naver.maps.Map(el, {
-              center: new naver.maps.LatLng(34.668, 135.501),
-              zoom: 11,
-              draggable: false,
-              pinchZoom: false,
-              scrollWheel: false,
-              keyboardShortcuts: false,
-              disableDoubleTapZoom: true,
-              disableDoubleClickZoom: true,
-              disableTwoFingerTapZoom: true,
-              logoControl: false,
-              mapDataControl: false,
-              scaleControl: false,
-            });
-            hm._type = "naver";
-            hlayer = [];
-          }
-        } else if (window.L) {
-          if (!hm || hm._type !== "osm") {
-            el.innerHTML = "";
-            hm = L.map(el, {
-              zoomControl: false,
-              attributionControl: false,
-              dragging: false,
-              touchZoom: false,
-              doubleClickZoom: false,
-              scrollWheelZoom: false,
-              boxZoom: false,
-              keyboard: false,
-              tap: false,
-            }).setView([34.668, 135.501], 11);
-            L.tileLayer(homeTileUrl(), {
-              maxZoom: 19,
-              subdomains: "abc",
-              crossOrigin: true,
-            }).addTo(hm);
-            hlayer = L.featureGroup().addTo(hm);
-            hm._type = "osm";
-          }
+          });
+        });
+        return pinsOut;
+      }
+      function toPlace(c) {
+        return {
+          name: c.name || (c.address || "").split(",")[0].trim() || "장소",
+          localName: c.localName || "",
+          address: c.address || "",
+          price: c.price || "",
+          info: c.info || "",
+          lat: Number(c.lat) || null,
+          lng: Number(c.lng) || null,
+        };
+      }
+      function ensureEditablePlaces(item) {
+        if (Array.isArray(item.places) && item.places.length)
+          return item.places;
+        const primary = {
+          ...item,
+          name: isGenericSharedName(item.name) ? "" : item.name,
+        };
+        item.places = [toPlace(primary)];
+        return item.places;
+      }
+      function samePlace(a, b) {
+        const norm = (s) =>
+          String(s || "")
+            .replace(/\s+/g, "")
+            .toLowerCase();
+        const placeName = (s) => {
+          const value = norm(s);
+          return /^(?:장소|저장된장소|공유릴스|공유쇼츠|공유틱톡)$/.test(value)
+            ? ""
+            : value;
+        };
+        const aName = placeName(a.name),
+          bName = placeName(b.name);
+        const aLocal = norm(a.localName),
+          bLocal = norm(b.localName);
+        const aAddress = norm(a.address),
+          bAddress = norm(b.address);
+        const sameAddress = Boolean(
+          aAddress && bAddress && aAddress === bAddress,
+        );
+        const addressCompatible = !aAddress || !bAddress || sameAddress;
+        const namePrefixOverlap =
+          (aName &&
+            bName &&
+            (aName.startsWith(bName) || bName.startsWith(aName))) ||
+          (aLocal &&
+            bLocal &&
+            (aLocal.startsWith(bLocal) || bLocal.startsWith(aLocal)));
+        if (namePrefixOverlap && sharePostalBanchi(a.address, b.address))
+          return true;
+        if (
+          addressCompatible &&
+          namePrefixOverlap &&
+          isSameShopCoord(a.lat, a.lng, b.lat, b.lng, 0.06)
+        )
+          return true;
+        const aNameEmpty =
+          (!aName || isGenericSharedName(a.name)) &&
+          (!aLocal || aLocal.length < 2);
+        const bNameEmpty =
+          (!bName || isGenericSharedName(b.name)) &&
+          (!bLocal || bLocal.length < 2);
+        if (
+          (aNameEmpty || bNameEmpty) &&
+          sharePostalBanchi(a.address, b.address) &&
+          isSameShopCoord(a.lat, a.lng, b.lat, b.lng, 0.06)
+        )
+          return true;
+        return Boolean(
+          sameAddress ||
+          (addressCompatible && aName && bName && aName === bName) ||
+          (addressCompatible && aLocal && bLocal && aLocal === bLocal),
+        );
+      }
+      function syncGroupedItem(item) {
+        if (!Array.isArray(item.places) || !item.places.length) return;
+        const first = item.places[0];
+        const firstName = first.name || item.name || "저장된 장소";
+        item.name =
+          item.places.length > 1
+            ? `${firstName.replace(/\s*외\s*\d+곳$/, "")} 외 ${item.places.length - 1}곳`
+            : firstName;
+        item.localName = first.localName || item.localName || "";
+        item.address = first.address || item.address || "";
+        item.price = first.price || item.price || "";
+        item.info = first.info || item.info || "";
+        const located = item.places.find((p) => Number(p.lat) && Number(p.lng));
+        if (located) {
+          item.lat = Number(located.lat);
+          item.lng = Number(located.lng);
         }
-
-        setTimeout(() => {
-          try {
-            if (hm && hm._type === "osm") hm.invalidateSize();
-            else if (hm && hm._type === "google")
-              google.maps.event.trigger(hm, "resize");
-            else if (hm && hm._type === "naver")
-              window.naver.maps.Event.trigger(hm, "resize");
-            drawHomeMap(true);
-          } catch (_) {}
-        }, 150);
       }
 
-      function drawHomeMap(force = false) {
-        if (!hm || innerWidth > 820) return;
-        const valid = homeMapValid();
-        const sig =
-          mapProvider +
-          "|" +
-          valid
-            .map((i) => `${i._pinKey}:${i.lat}:${i.lng}:${i.category}`)
-            .join("|");
-        if (!force && sig === _homeMapSig) return;
-        _homeMapSig = sig;
-
+      function distKm(la1, lo1, la2, lo2) {
+        const R = 6371,
+          toR = (x) => (x * Math.PI) / 180;
+        const dL = toR(la2 - la1),
+          dO = toR(lo2 - lo1);
+        const a =
+          Math.sin(dL / 2) * Math.sin(dL / 2) +
+          Math.cos(toR(la1)) *
+            Math.cos(toR(la2)) *
+            Math.sin(dO / 2) *
+            Math.sin(dO / 2);
+        return 2 * R * Math.asin(Math.sqrt(a));
+      }
+      function fmtDist(d) {
+        return d == null
+          ? ""
+          : d < 1
+            ? Math.round(d * 1000) + "m"
+            : (d < 10 ? d.toFixed(1) : Math.round(d)) + "km";
+      }
+      function itemDist(i) {
+        if (!nearSortOn || !userPos || !Number(i.lat) || !Number(i.lng))
+          return null;
+        return distKm(userPos.lat, userPos.lng, Number(i.lat), Number(i.lng));
+      }
+      function sortNear(arr) {
+        if (nearSortOn && userPos)
+          arr.sort((a, b) => (itemDist(a) ?? 1e9) - (itemDist(b) ?? 1e9));
+        return arr;
+      }
+      function catColor(c) {
         try {
-          if (hm._type === "osm" && hlayer) hlayer.clearLayers();
-          else if (
-            (hm._type === "google" || hm._type === "naver") &&
-            Array.isArray(hlayer)
-          ) {
-            hlayer.forEach((m) => m.setMap(null));
-            hlayer = [];
-          }
-        } catch (_) {}
+          const v = getComputedStyle(document.documentElement).getPropertyValue(
+            "--" + c,
+          );
+          if (v && v.trim()) return v.trim();
+        } catch (e) {}
+        return "#2563eb";
+      }
 
-        const count = $("homeMapCount");
-        if (count) {
-          count.textContent = valid.length
-            ? `📍 지도에 ${valid.length}곳`
-            : items.length
-              ? "📍 지도에 표시할 위치가 없어요"
-              : "📍 장소를 저장하면 지도에 표시돼요";
+      function renderMapChips() {
+        const w = $("mapChips");
+        if (!w) return;
+        const base = mapBaseValid();
+        const expanded = expandMapPins(base);
+        const cnt = {
+          ALL: expanded.length,
+          PLACE: 0,
+          CAFE: 0,
+          FOOD: 0,
+          SHOP: 0,
+        };
+        expanded.forEach((i) => {
+          if (cnt[i.category] !== undefined) cnt[i.category]++;
+        });
+        const totalVid = expandMapPins(
+          items.filter(
+            (i) =>
+              isMapRegistered(i) &&
+              hasMapCoordinates(i) &&
+              Boolean(getVidUrlStr(i.vid)),
+          ),
+        ).length;
+        const activeDays = [
+          ...new Set(
+            items
+              .filter(
+                (i) =>
+                  isMapRegistered(i) &&
+                  hasMapCoordinates(i) &&
+                  Number(i.day) > 0,
+              )
+              .map((i) => Number(i.day)),
+          ),
+        ].sort((a, b) => a - b);
+
+        w.classList.add("on");
+        const allOn = mapCat === "ALL";
+        const allBtn = `<button type="button" class="chip" data-act="mapcat" data-cat="ALL" style="${allOn ? "background:var(--pr);color:#fff;border-color:transparent" : ""}">🗺️ 전체 ${cnt.ALL}</button>`;
+        const catBtns = Object.keys(CATS)
+          .map((c) => {
+            const on = mapCat === c;
+            const st = on
+              ? `background:${catColor(c)};color:#fff;border-color:transparent`
+              : "";
+            return `<button type="button" class="chip" data-act="mapcat" data-cat="${c}" style="${st}"><i>${CATS[c].e}</i>${esc(CATS[c].n)} ${cnt[c]}</button>`;
+          })
+          .join("");
+
+        const dayLabel = mapDay ? `🗓️ Day ${mapDay}` : "🗓️ 전체일차";
+        const subRow = `
+    <button type="button" class="chip sub${mapOnlyVid ? " reel-on" : ""}" data-act="mapVidToggle">🎬 릴스·쇼츠만 ${totalVid}</button>
+    <button type="button" class="chip sub" data-act="mapStarToggle" style="${mapOnlyStar ? "background:#f59e0b;color:#fff;border-color:transparent" : ""}">⭐ 중요만</button>
+    ${activeDays.length ? `<button type="button" class="chip sub" data-act="mapDayCycle" style="${mapDay ? "background:var(--pr);color:#fff;border-color:transparent" : ""}">${dayLabel}</button>` : ""}
+    <button type="button" class="chip sub" data-act="mapRouteToggle" style="${mapRouteOn ? "background:#2563eb;color:#fff;border-color:transparent" : ""}">🔗 동선선</button>
+    <button type="button" class="chip sub" data-act="mapTodoToggle" style="${mapOnlyTodo ? "background:#10b981;color:#fff;border-color:transparent" : ""}">👁️ 미방문만</button>
+    <button type="button" class="chip sub" data-act="nearSort" style="${nearSortOn ? "background:var(--pr);color:#fff;border-color:transparent" : ""}">⚡ 가까운순</button>
+    <button type="button" class="chip sub" data-act="mapFitAll">🎯 화면맞춤</button>
+  `;
+        const dayRow = activeDays.length
+          ? `<div class="chip-row"><button type="button" class="chip" data-act="mapDaySet" data-day="0" style="${mapDay ? "" : "background:var(--pr);color:#fff;border-color:transparent"}">🗓️ 전체일차</button>${activeDays.map((d) => `<button type="button" class="chip sub" data-act="mapDaySet" data-day="${d}" style="${mapDay === Number(d) ? "background:var(--pr);color:#fff;border-color:transparent" : ""}">Day ${d}</button>`).join("")}</div>`
+          : "";
+        w.innerHTML = `<div class="chip-row">${allBtn}${catBtns}</div><div class="chip-row">${subRow}</div>${dayRow}`;
+      }
+
+      const REGION_TAGS = [
+        ["오사카", /오사카|osaka|大阪/i],
+        [
+          "난바·도톤보리",
+          /난바|도톤보리|신사이바시|namba|dotonbori|shinsaibashi|難波|道頓堀|心斎橋/i,
+        ],
+        ["우메다", /우메다|umeda|梅田/i],
+        ["교토", /교토|kyoto|京都/i],
+        [
+          "도쿄",
+          /도쿄|신주쿠|시부야|긴자|tokyo|shinjuku|shibuya|ginza|東京|新宿|渋谷/i,
+        ],
+        ["후쿠오카", /후쿠오카|하카타|텐진|fukuoka|hakata|福岡|博多/i],
+        ["삿포로", /삿포로|홋카이도|sapporo|札幌/i],
+        ["시드니", /시드니|sydney/i],
+        ["서울", /서울|홍대|성수|강남|연남/i],
+        ["강릉·강원", /강릉|속초|양양|삼척|원주|태백/i],
+        ["부산·제주", /부산|해운대|광안리|제주/i],
+      ];
+      function matchRegionTag(item, tagLabel) {
+        const found = REGION_TAGS.find((x) => x[0] === tagLabel);
+        if (!found) return false;
+        const hay = `${item.name || ""} ${item.address || ""} ${item.note || ""}`;
+        return found[1].test(hay);
+      }
+
+      const card = (i) => {
+        const vUrl = getVidUrlStr(i.vid);
+        const dirHref = getGMapDirLink(i);
+        const biz = getBizStatus(i);
+        const isEdit = Boolean(editMode.LIST || editMode[i.category]);
+        const vAction = vUrl
+          ? `<button class="mb reel-jump" data-act="openVid" data-id="${i.id}" style="padding:4px 9px;font-size:11px">${esc(getVidBtnLabel(vUrl))}</button>`
+          : `<button class="mb" data-act="quickAddVid" data-id="${i.id}" style="padding:4px 8px;font-size:11px;color:var(--pr);border-color:var(--pr)">+🔗 릴스링크</button>`;
+        return `<div class="item${i.done ? " done" : ""}${i.star ? " starred" : ""}${selected.has(i.id) ? " selected" : ""}" data-act="${isEdit ? "toggleSel" : "open"}" data-id="${i.id}" data-cat="LIST" style="${selected.has(i.id) ? "outline:2px solid var(--pr)" : ""}">
+    ${isEdit ? `<input type="checkbox" data-act="sel" data-id="${i.id}" data-cat="LIST"${selected.has(i.id) ? " checked" : ""} style="margin-right:4px">` : ""}
+    ${ph(CATS[i.category] ? CATS[i.category].e : "📍", itemThumb(i), "", i.img, i.day, itemThumbCandidates(i).slice(1).join("|"))}
+    <div class="mid">
+      <div class="nm">
+        <span style="flex:1;min-width:0">${esc(i.name)}</span>
+        <button type="button" class="star-btn${i.star ? " on" : ""}" data-act="toggleStar" data-id="${i.id}" title="중요 표시">${i.star ? "⭐" : "☆"}</button>
+      </div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;margin:2px 0">
+        ${(() => {
+          const d = itemDist(i);
+          return d != null
+            ? `<span class="bstat day">📍 ${fmtDist(d)}</span>`
+            : "";
+        })()}
+        ${i.day ? `<span class="bstat day">🗓️ Day ${i.day}</span>` : ""}
+        ${biz ? `<span class="bstat ${biz.cls}">${esc(biz.lbl)}</span>` : ""}
+      </div>
+      <div class="ds">${esc(i.address || i.note || "")}</div>
+      ${i.price ? `<div class="ds" style="color:var(--FOOD);font-weight:700">${esc(i.price)}</div>` : ""}
+      ${i.info ? `<div class="ds in">${esc(i.info)}</div>` : ""}
+      <div style="margin-top:6px;display:flex;gap:5px;flex-wrap:wrap">
+        ${vAction}
+        <a class="mb" href="${esc(dirHref)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="padding:4px 8px;font-size:11px">🧭 길찾기</a>
+      </div>
+    </div>
+    <input type="checkbox" data-act="done" data-id="${i.id}"${i.done ? " checked" : ""} style="flex:none">
+  </div>`;
+      };
+
+      function ph(e, src, c = "", fb = "", day = 0, alts = "") {
+        const fba = fb && fb !== src ? ` data-fbsrc="${esc(fb)}"` : "";
+        const altAttr = alts ? ` data-imgalts="${esc(alts)}"` : "";
+        const dTag =
+          day && !c.includes("big")
+            ? `<span class="dayTag">D${day}</span>`
+            : "";
+        const priority = c.includes("big") ? ' fetchpriority="high"' : "";
+        return `<div class="pic ${c}">${dTag}${e}${src ? `<img loading="${c.includes("big") ? "eager" : "lazy"}"${priority} decoding="async" referrerpolicy="no-referrer" src="${esc(src)}"${fba}${altAttr} onerror="imgErr(this)">` : ""}</div>`;
+      }
+
+      /* 통합 목록 탭 렌더링 (전체 / 장소 / 카페 / 음식 / 쇼핑 카테고리별 표시) */
+      function renderListTab() {
+        const cntAll = $("cnt-ALL");
+        if (cntAll) cntAll.textContent = items.length;
+        for (const k in CATS) {
+          const el = $("cnt-" + k);
+          if (el) el.textContent = items.filter((i) => i.category === k).length;
         }
-
-        if (!valid.length) {
-          try {
-            if (hm._type === "osm")
-              hm.setView([34.668, 135.501], 11, { animate: false });
-            else if (hm._type === "google") {
-              hm.setCenter({ lat: 34.668, lng: 135.501 });
-              hm.setZoom(11);
-            } else if (hm._type === "naver") {
-              hm.setCenter(new naver.maps.LatLng(34.668, 135.501));
-              hm.setZoom(11);
-            }
-          } catch (_) {}
-          return;
-        }
-
-        valid.forEach((i) => {
-          try {
-            if (hm._type === "osm") {
-              L.circleMarker([Number(i.lat), Number(i.lng)], {
-                radius: 5.5,
-                color: "#fff",
-                weight: 1.5,
-                fillColor: catColor(i.category),
-                fillOpacity: 1,
-                interactive: false,
-              }).addTo(hlayer);
-            } else if (hm._type === "google") {
-              const marker = new google.maps.Marker({
-                position: { lat: Number(i.lat), lng: Number(i.lng) },
-                map: hm,
-                icon: {
-                  path: google.maps.SymbolPath.CIRCLE,
-                  scale: 5.5,
-                  fillColor: catColor(i.category),
-                  fillOpacity: 1,
-                  strokeColor: "#ffffff",
-                  strokeWeight: 1.5,
-                },
-                clickable: false,
-              });
-              hlayer.push(marker);
-            } else if (hm._type === "naver") {
-              const marker = new naver.maps.Marker({
-                position: new naver.maps.LatLng(Number(i.lat), Number(i.lng)),
-                map: hm,
-                icon: {
-                  content: `<div style="width:11px;height:11px;border-radius:50%;background:${catColor(i.category)};border:1.5px solid #fff;box-sizing:border-box;"></div>`,
-                  anchor: new naver.maps.Point(6, 6),
-                },
-                clickable: false,
-              });
-              hlayer.push(marker);
-            }
-          } catch (_) {}
+        document.querySelectorAll("#listCatSeg div").forEach((d) => {
+          d.classList.toggle("on", d.dataset.lcat === listCat);
         });
 
+        const kw = ($("q-LIST")?.value || "").trim().toLowerCase();
+        const all =
+          listCat === "ALL"
+            ? items
+            : items.filter((i) => i.category === listCat);
+        const curF = listFilter[listCat] || "ALL";
+        const chipEl = $("lchips-LIST");
+        if (chipEl) {
+          const chips = [
+            ["ALL", `전체 ${all.length}`],
+            ["TODO", `미방문 ${all.filter((x) => !x.done).length}`],
+            ["STAR", `⭐ 중요 ${all.filter((x) => x.star).length}`],
+            ["VID", `🎬 영상 ${all.filter((x) => getVidUrlStr(x.vid)).length}`],
+          ];
+          const days = [
+            ...new Set(
+              all.filter((x) => Number(x.day) > 0).map((x) => Number(x.day)),
+            ),
+          ].sort((a, b) => a - b);
+          days.forEach((d) => chips.push(["DAY:" + d, `🗓️ D${d}`]));
+          REGION_TAGS.forEach(([lbl, re]) => {
+            const cnt = all.filter((x) =>
+              re.test(`${x.name || ""} ${x.address || ""} ${x.note || ""}`),
+            ).length;
+            if (cnt > 0) chips.push(["REG:" + lbl, `📍 ${lbl} ${cnt}`]);
+          });
+          if (all.some((x) => x.done))
+            chips.push(["DONE", `완료 ${all.filter((x) => x.done).length}`]);
+          chipEl.innerHTML = chips
+            .map(
+              ([fk, fl]) =>
+                `<button type="button" class="lchip${curF === fk ? " on" : ""}" data-act="setListFilter" data-cat="${listCat}" data-f="${esc(fk)}">${esc(fl)}</button>`,
+            )
+            .join("");
+        }
+
+        const l = all.filter((i) => {
+          if (
+            kw &&
+            !(
+              (i.name || "") +
+              (i.address || "") +
+              (i.note || "") +
+              (i.price || "") +
+              (i.info || "")
+            )
+              .toLowerCase()
+              .includes(kw)
+          )
+            return false;
+          if (curF === "TODO" && i.done) return false;
+          if (curF === "DONE" && !i.done) return false;
+          if (curF === "STAR" && !i.star) return false;
+          if (curF === "VID" && !getVidUrlStr(i.vid)) return false;
+          if (
+            curF.startsWith("DAY:") &&
+            Number(i.day) !== Number(curF.slice(4))
+          )
+            return false;
+          if (curF.startsWith("REG:") && !matchRegionTag(i, curF.slice(4)))
+            return false;
+          return true;
+        });
+
+        if (nearSortOn && userPos) sortNear(l);
+        else l.sort((a, b) => (b.star ? 1 : 0) - (a.star ? 1 : 0));
+
+        const listEl = $("list-LIST");
+        if (listEl) {
+          const emptyIcon = CATS[listCat] ? CATS[listCat].e : "📍";
+          listEl.innerHTML = l.length
+            ? l.map(card).join("")
+            : `<div class="empty"><i>${emptyIcon}</i>${all.length ? "선택한 필터 조건에 맞는 항목이 없어요" : "홈 탭에서 장소를 추가해 보세요"}</div>`;
+        }
+        const bulk = $("bulk-LIST");
+        if (bulk) bulk.style.display = editMode.LIST ? "flex" : "none";
+        const sc = $("selCount-LIST");
+        if (sc) sc.textContent = editMode.LIST ? `선택 ${selected.size}개` : "";
+      }
+
+      function renderCat(c) {
+        if (c && (c === "ALL" || CATS[c])) listCat = c;
+        renderListTab();
+      }
+      function renderAllList() {
+        renderListTab();
+      }
+      function render() {
+        renderListTab();
+      }
+
+      let _persistT = null,
+        _drawT = null;
+      function persistNow() {
+        const now = Date.now();
+        ls.set("TRIP_UPDATED_AT", String(now));
+        idb.set("TRIP_MASTER_DATA", { items, updatedAt: now });
+        if (!remoteApplying && sharedRoomId) sharedLocalDirty = true;
+        const fullSaved = ls.set("TRIP_MASTER_ITEMS", JSON.stringify(items));
+        const saved =
+          fullSaved ||
+          ls.set(
+            "TRIP_MASTER_ITEMS",
+            JSON.stringify(
+              items.map((i) => ({
+                ...i,
+                img:
+                  i.img &&
+                  String(i.img).startsWith("data:image") &&
+                  i.img.length > 25000
+                    ? ""
+                    : i.img,
+              })),
+            ),
+          );
+        scheduleSharedWrite();
+        return saved;
+      }
+      function persist() {
+        clearTimeout(_persistT);
+        _persistT = setTimeout(persistNow, 400);
+      }
+      function save() {
+        render();
+        clearTimeout(_drawT);
+        _drawT = setTimeout(() => {
+          persistNow();
+          draw();
+          hydrateInstagramThumbs();
+        }, 200);
+      }
+      window.addEventListener("pagehide", () => {
         try {
-          if (valid.length === 1) {
-            if (hm._type === "osm")
-              hm.setView([Number(valid[0].lat), Number(valid[0].lng)], 14, {
-                animate: false,
-              });
-            else if (hm._type === "google") {
-              hm.setCenter({
-                lat: Number(valid[0].lat),
-                lng: Number(valid[0].lng),
-              });
-              hm.setZoom(14);
-            } else if (hm._type === "naver") {
-              hm.setCenter(
-                new naver.maps.LatLng(
-                  Number(valid[0].lat),
-                  Number(valid[0].lng),
-                ),
+          persistNow();
+        } catch (e) {}
+      });
+      document.addEventListener("visibilitychange", () => {
+        try {
+          if (document.visibilityState === "hidden") persistNow();
+          else if (navigator.onLine && hasOfflineQueue())
+            flushOfflineQueue().catch(() => {});
+        } catch (e) {}
+      });
+      setInterval(() => {
+        try {
+          if (navigator.onLine && hasOfflineQueue())
+            flushOfflineQueue().catch(() => {});
+        } catch (e) {}
+      }, 60000);
+      function normalizeOcrAddr(s) {
+        return String(s || "")
+          .replace(/(^|[\s,])T(\d{3}-\d{4})\b/g, "$1〒$2")
+          .replace(/\s+/g, " ")
+          .trim();
+      }
+      function isGenericSharedName(nm) {
+        return /^(?:공유\s*(?:릴스|쇼츠|틱톡|링크)|저장된\s*장소|장소|⏳\s*장소\s*분석\s*중\.\.\.)$/.test(
+          String(nm || "").trim(),
+        );
+      }
+      function getValidSearchQuery(i) {
+        const nm = isGenericSharedName(i.name)
+          ? ""
+          : String(i.name || "").trim();
+        const lnm = String(i.localName || "").trim();
+        const ad = normalizeOcrAddr(i.address || "");
+        if (nm && ad && nm === ad) return ad;
+        const mainName = lnm && nm && lnm !== nm ? `${nm} ${lnm}` : lnm || nm;
+        return [mainName, ad].filter(Boolean).join(" ").trim();
+      }
+      function getGMapLink(i) {
+        if (!i) return "https://www.google.com/maps";
+        const qStr = getValidSearchQuery(i);
+        if (qStr)
+          return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(qStr)}`;
+        const lat = Number(i.lat) || 0,
+          lng = Number(i.lng) || 0;
+        if (lat && lng)
+          return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+        return "https://www.google.com/maps";
+      }
+      function getGMapDirLink(i) {
+        if (!i) return "https://www.google.com/maps";
+        const qStr = getValidSearchQuery(i);
+        if (qStr)
+          return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(qStr)}`;
+        const lat = Number(i.lat) || 0,
+          lng = Number(i.lng) || 0;
+        if (lat && lng)
+          return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+        return "https://www.google.com/maps";
+      }
+
+      function normalizeNameKey(s) {
+        return String(s || "")
+          .replace(/\s+/g, "")
+          .toLowerCase()
+          .replace(/[?!.,;:~+)("']/g, "");
+      }
+      function isSameShopCoord(aLat, aLng, bLat, bLng, tolKm = 0.06) {
+        const aLatN = Number(aLat),
+          aLngN = Number(aLng),
+          bLatN = Number(bLat),
+          bLngN = Number(bLng);
+        if (!aLatN || !aLngN || !bLatN || !bLngN) return false;
+        try {
+          return distKm(aLatN, aLngN, bLatN, bLngN) <= tolKm;
+        } catch (e) {
+          return false;
+        }
+      }
+      function nameKeyOverlap(a, b) {
+        return Boolean(a && b && (a.startsWith(b) || b.startsWith(a)));
+      }
+      function sharePostalBanchi(aAddr, bAddr) {
+        const za = (String(aAddr || "").match(/(\d{3}-\d{4})/) || [])[1] || "";
+        const zb = (String(bAddr || "").match(/(\d{3}-\d{4})/) || [])[1] || "";
+        if (!za || !zb || za !== zb) return false;
+        const ba =
+          (String(aAddr || "").match(/(\d+\s*-\s*\d+(?:\s*-\s*\d+)?)/) ||
+            [])[1] || "";
+        if (!ba) return true;
+        return String(bAddr || "").includes(ba.replace(/\s+/g, ""));
+      }
+      function findExistingDuplicate(cand, excludeIds = new Set()) {
+        const nm = normalizeNameKey(cand.name);
+        const lnm = normalizeNameKey(cand.localName);
+        if (
+          (!nm || nm.length < 2 || isGenericSharedName(cand.name)) &&
+          (!lnm || lnm.length < 2)
+        )
+          return null;
+        const candAddr = normalizeOcrAddr(cand.address || "");
+        return (
+          items.find((x) => {
+            if (excludeIds.has(x.id)) return false;
+            const xnm = normalizeNameKey(x.name);
+            const xlnm = normalizeNameKey(x.localName);
+            const xAddr = normalizeOcrAddr(x.address || "");
+            if (nm && nm.length >= 3 && (xnm === nm || xlnm === nm))
+              return true;
+            if (lnm && lnm.length >= 2 && (xlnm === lnm || xnm === lnm))
+              return true;
+            const nameOverlaps =
+              nameKeyOverlap(nm, xnm) ||
+              nameKeyOverlap(nm, xlnm) ||
+              nameKeyOverlap(lnm, xnm) ||
+              nameKeyOverlap(lnm, xlnm);
+            if (nameOverlaps && sharePostalBanchi(candAddr, xAddr)) return true;
+            if (
+              nameOverlaps &&
+              isSameShopCoord(cand.lat, cand.lng, x.lat, x.lng, 0.06)
+            )
+              return true;
+            const candNameEmpty =
+              (!nm || isGenericSharedName(cand.name)) &&
+              (!lnm || lnm.length < 2);
+            const xNameEmpty =
+              (!xnm || isGenericSharedName(x.name)) &&
+              (!xlnm || xlnm.length < 2);
+            if (
+              (candNameEmpty || xNameEmpty) &&
+              sharePostalBanchi(candAddr, xAddr) &&
+              isSameShopCoord(cand.lat, cand.lng, x.lat, x.lng, 0.06)
+            )
+              return true;
+            return false;
+          }) || null
+        );
+      }
+
+      function openTaxiModal(i) {
+        if (!i) return;
+        const mainTitle = i.localName || i.name || "목적지";
+        const subTitle =
+          i.localName && i.name && i.localName !== i.name ? i.name : "";
+        const addr = i.address || "주소 정보가 없습니다";
+        const isJp =
+          /〒|\bOsaka\b|\bTokyo\b|\bKyoto\b|\bFukuoka\b|\bSapporo\b|[ぁ-んァ-ン一-龯]/i.test(
+            addr + " " + mainTitle,
+          );
+        const phrase = isJp
+          ? "🚕 運転手さん、こちらの場所までお願いします。"
+          : "🚕 Please take me to this address.";
+        $("taxiBody").innerHTML = `
+    <div class="t-ph">${esc(phrase)}</div>
+    <div class="t-nm">${esc(mainTitle)}</div>
+    ${subTitle ? `<div class="t-sub">${esc(subTitle)}</div>` : ""}
+    <div class="t-ad">${esc(addr)}</div>
+    <div style="display:flex;gap:8px;justify-content:center">
+      <a class="btn" href="${esc(getGMapDirLink(i))}" target="_blank" rel="noopener" style="text-decoration:none;flex:1">🧭 구글 길찾기 열기</a>
+      <button type="button" class="btn g" onclick="$('taxiModal').classList.remove('show')" style="margin:0;flex:1;background:#e5e7eb;color:#111827">✕ 화면 닫기</button>
+    </div>
+  `;
+        $("taxiModal").classList.add("show");
+      }
+
+      async function copyFormattedPlan() {
+        if (!items.length) return toast("아직 저장된 장소가 없어요");
+        const lines = ["✈️ [여행플래너 여행 장소 리스트]", ""];
+        const withDays = items.filter((x) => Number(x.day) > 0);
+        if (withDays.length) {
+          const maxD = Math.max(...withDays.map((x) => Number(x.day)));
+          for (let d = 1; d <= maxD; d++) {
+            const dList = withDays.filter((x) => Number(x.day) === d);
+            if (!dList.length) continue;
+            lines.push(`🗓️ Day ${d}`);
+            dList.forEach((x, idx) => {
+              lines.push(
+                `${idx + 1}. ${CATS[x.category]?.e || "📍"} ${x.name}${x.star ? " ⭐" : ""}${x.done ? " (방문완료)" : ""}`,
               );
-              hm.setZoom(14);
+              if (x.address) lines.push(`   📍 ${x.address}`);
+              if (x.price || x.info)
+                lines.push(
+                  `   💡 ${[x.price, x.info].filter(Boolean).join(" · ")}`,
+                );
+              lines.push(`   🗺️ ${getGMapLink(x)}`);
+            });
+            lines.push("");
+          }
+        }
+        const unscheduled = items.filter((x) => !Number(x.day));
+        for (const k of Object.keys(CATS)) {
+          const cList = unscheduled.filter((x) => x.category === k);
+          if (!cList.length) continue;
+          lines.push(`${CATS[k].e} [${CATS[k].n}] (${cList.length}곳)`);
+          cList.forEach((x, idx) => {
+            lines.push(
+              `${idx + 1}. ${x.name}${x.star ? " ⭐" : ""}${x.done ? " (완료)" : ""}`,
+            );
+            if (x.address) lines.push(`   📍 ${x.address}`);
+            if (x.price || x.info)
+              lines.push(
+                `   💡 ${[x.price, x.info].filter(Boolean).join(" · ")}`,
+              );
+          });
+          lines.push("");
+        }
+        const out = lines.join("\n").trim();
+        try {
+          await navigator.clipboard.writeText(out);
+          toast(
+            `📋 총 ${items.length}곳의 여행 리스트가 깔끔하게 복사되었어요! 카톡에 붙여넣으세요.`,
+          );
+        } catch (e) {
+          $("bk").value = out;
+          tab("set");
+          toast("설정 탭 하단 텍스트 상자에 리스트를 생성했어요");
+        }
+      }
+
+      function closeSheet() {
+        $("sheet").classList.remove("on");
+        cur = null;
+      }
+
+      function groupedPlacesSummaryHtml(item) {
+        if (!Array.isArray(item.places) || item.places.length < 2) return "";
+        return `
+    <div id="groupedPlacesSummary" style="margin-top:10px;padding:10px;border-radius:12px;background:var(--s2);border:1px solid var(--bd)">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
+        <label style="margin:0">📍 이 릴스에 통합된 장소 (${item.places.length}곳)</label>
+        <button type="button" class="mb pr" data-act="addSubPlace" style="padding:4px 8px;font-size:11px">＋ 장소 추가</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${item.places
+          .map(
+            (p, idx) => `
+          <div id="sub-place-${idx}" style="padding:8px;border-radius:10px;background:var(--s);border:1px solid var(--bd)">
+            <div style="font-weight:700;font-size:13.5px">${idx + 1}. ${esc(p.name)} ${p.lat && p.lng ? "🟢" : "🔴"}</div>
+            <div class="ds" style="margin-top:2px">${esc(p.address || "주소 미입력")}</div>
+            ${p.price || p.info ? `<div class="ds in" style="margin-top:2px">${esc([p.price, p.info].filter(Boolean).join(" · "))}</div>` : ""}
+            <div style="display:flex;gap:5px;margin-top:6px;flex-wrap:wrap">
+              <a class="mb pr" href="${esc(getGMapDirLink(p))}" target="_blank" rel="noopener" style="padding:3px 8px;font-size:11px">🧭 길찾기</a>
+              ${p.address ? `<button type="button" class="mb" data-act="copySubAddr" data-idx="${idx}" style="padding:3px 8px;font-size:11px">📋 주소복사</button>` : ""}
+              <button type="button" class="mb" data-act="focusSubPin" data-idx="${idx}" style="padding:3px 8px;font-size:11px">🎯 지도위치</button>
+              <button type="button" class="mb" data-act="taxiSub" data-idx="${idx}" style="padding:3px 8px;font-size:11px">🚕 택시화면</button>
+              <button type="button" class="mb dg" data-act="delSubPlace" data-idx="${idx}" style="padding:3px 8px;font-size:11px">삭제</button>
+            </div>
+          </div>
+        `,
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+      }
+      function refreshGroupedPlacesSummary(item) {
+        const summary = $("groupedPlacesSummary");
+        if (summary) summary.outerHTML = groupedPlacesSummaryHtml(item);
+      }
+
+      function showSheet() {
+        const i = items.find((x) => x.id === cur);
+        if (!i) return closeSheet();
+        const searchTarget = getValidSearchQuery(i);
+        const q = encodeURIComponent(searchTarget || i.name || "");
+        const gmapHref = getGMapLink(i);
+        const dirHref = getGMapDirLink(i);
+        const biz = getBizStatus(i);
+        const gkey = (ls.get("TRAVEL_GMAP_KEY") || "").trim();
+        const myEmbed = toEmbedMyMapsUrl(
+          getMyMapsEmbedUrl() || ls.get("TRIP_MYMAPS_URL") || "",
+        );
+        const v = i.vid;
+        const vUrl = getVidUrlStr(v);
+        const vLabel = getVidBtnLabel(vUrl);
+        const vEmbed =
+          vUrl && (view === "video" || view === "caption")
+            ? vidEmbedUrl(vUrl, view === "caption")
+            : "";
+        const isMap =
+          (view === "mymaps" || view === "google") &&
+          view !== "video" &&
+          view !== "caption";
+        const lat = Number(i.lat) || 0,
+          lng = Number(i.lng) || 0;
+        let media = "";
+        if (vEmbed) {
+          const mh = view === "caption" ? 440 : 300;
+          media = `<iframe class="big" src="${esc(vEmbed)}" allow="autoplay; fullscreen; picture-in-picture; clipboard-write; web-share" allowfullscreen loading="lazy" style="min-height:${mh}px;background:#000"></iframe>`;
+        } else if (isMap) {
+          if (view === "mymaps" && myEmbed)
+            media = `<iframe class="big" src="${esc(myEmbed)}" allowfullscreen loading="lazy" style="min-height:300px"></iframe>`;
+          else if (searchTarget && gkey)
+            media = `<iframe class="big" src="https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(gkey)}&q=${q}&zoom=16" allowfullscreen loading="lazy" style="min-height:300px"></iframe>`;
+          else if (lat && lng && gkey)
+            media = `<iframe class="big" src="https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(gkey)}&q=${lat},${lng}&zoom=16" allowfullscreen loading="lazy" style="min-height:300px"></iframe>`;
+          else if (lat && lng)
+            media = `<iframe class="big" src="https://www.openstreetmap.org/export/embed.html?bbox=${lng - 0.005},${lat - 0.005},${lng + 0.005},${lat + 0.005}&layer=mapnik&marker=${lat},${lng}" style="min-height:300px"></iframe>`;
+          else
+            media = `<div class="empty"><i>🗺️</i>위치를 찾으려면 아래에 이름이나 주소를 입력 후 [📍 위치 다시 찾기]를 눌러주세요</div>`;
+        } else {
+          media = ph(
+            CATS[i.category] ? CATS[i.category].e : "📍",
+            itemThumb(i),
+            "big",
+            i.img,
+            0,
+            itemThumbCandidates(i).slice(1).join("|"),
+          );
+        }
+        const prior = $("sheet").classList.contains("on");
+        const prevAcc = prior
+          ? [...$("sbody").querySelectorAll("details.acc")].map((d) => d.open)
+          : [];
+
+        const curDay = Number(i.day) || 0;
+        const dayChips = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+          .map(
+            (d) =>
+              `<button type="button" class="lchip${curDay === d ? " on" : ""}" data-act="setDay" data-day="${d}">${d === 0 ? "일차 미정" : "Day " + d}</button>`,
+          )
+          .join("");
+        const editPlaces =
+          Array.isArray(i.places) && i.places.length ? i.places : [toPlace(i)];
+        const addressFields = editPlaces
+          .map(
+            (p, idx) => `
+    <div style="padding:9px;border:1px solid var(--bd);border-radius:11px;background:var(--s)">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:5px">
+        <label style="margin:0">${idx === 0 ? "대표 장소" : "추가 장소 " + (idx + 1)}</label>
+        ${idx > 0 ? `<button type="button" class="mb dg" data-act="removeEditAddress" data-idx="${idx}" style="padding:3px 8px;font-size:11px">주소칸 삭제</button>` : ""}
+      </div>
+      <input type="text" class="edit-place-name" data-idx="${idx}" value="${esc(idx === 0 && isGenericSharedName(p.name) ? "" : p.name || "")}" placeholder="장소명 (선택)" style="margin-bottom:6px">
+      <input type="text" class="edit-place-address" data-idx="${idx}" value="${esc(p.address || "")}" placeholder="주소 / 지역" style="margin-bottom:0">
+    </div>
+  `,
+          )
+          .join("");
+
+        $("sbody").innerHTML = `
+    ${media}
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+      <div class="nm" style="font-size:18px;flex:1">${esc(i.name)}${i.localName && i.localName !== i.name ? ` <span style="font-size:13px;color:var(--sub);font-weight:500">(${esc(i.localName)})</span>` : ""}</div>
+      <button type="button" class="mb${i.star ? " pr" : ""}" data-act="toggleStarSheet" style="flex:none;padding:6px 10px">${i.star ? "⭐ 중요됨" : "☆ 중요"}</button>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap">
+      <div class="ds" style="flex:1;min-width:160px">${esc(i.address || "주소 미입력")}</div>
+      ${i.address ? `<button class="mb" data-act="copyAddr" style="padding:4px 8px;font-size:11px;flex:none">📋 주소복사</button>` : ""}
+      <button class="mb" data-act="openTaxi" style="padding:4px 8px;font-size:11px;flex:none">🚕 택시화면</button>
+    </div>
+
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px">
+      ${!(lat && lng) ? `<span class="bstat closed">🔴 좌표 미설정</span>` : `<span class="bstat open">🟢 좌표 (${lat.toFixed(4)}, ${lng.toFixed(4)})</span>`}
+      <span class="bstat ${isMapRegistered(i) ? "open" : "closed"}">${isMapRegistered(i) ? "🗺️ 지도 등록됨" : "🗺️ 지도 미등록"}</span>
+      ${biz ? `<span class="bstat ${biz.cls}">⏰ ${esc(biz.lbl)}</span>` : ""}
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+      <button type="button" class="mb pr" data-act="registerMapItem">${isMapRegistered(i) ? "✓ 지도 등록됨" : "＋ 지도 등록"}</button>
+      <button type="button" class="mb dg" data-act="hideMapItem">지도에서 삭제</button>
+    </div>
+
+    ${i.price ? `<div class="ds" style="color:var(--FOOD);font-weight:700;margin-top:4px">${esc(i.price)}</div>` : ""}
+    ${i.info ? `<div class="ds in" style="margin-top:3px;line-clamp:4">${esc(i.info)}</div>` : ""}
+    ${groupedPlacesSummaryHtml(i)}
+
+    <div style="margin-top:10px">
+      <label style="margin-bottom:4px">🗓️ 여행 일차 배정</label>
+      <div class="lchips">${dayChips}</div>
+    </div>
+
+    <div style="margin:8px 0 10px;padding:10px;border-radius:12px;background:var(--s2);border:1px solid var(--bd)">
+      ${vUrl ? `<button class="btn reel-jump" data-act="openVid" data-id="${i.id}" style="margin-bottom:8px;padding:11px">${esc(vLabel)} (인스타/유튜브 앱 열기)</button>` : ""}
+      <label style="margin-bottom:4px">${vUrl ? "🔗 연결된 릴스·쇼츠 링크 (수정 가능)" : "🎬 릴스·쇼츠 링크 넣기 (넣으면 바로가기 버튼이 생겨요)"}</label>
+      <div style="display:flex;gap:6px">
+        <input type="text" id="sh-vid" value="${esc(vUrl)}" placeholder="https://www.instagram.com/reel/..." style="flex:1;margin-bottom:0">
+        <button class="mb pr" data-act="pasteVidInSheet" style="flex:none;white-space:nowrap">📋 링크 붙여넣기</button>
+      </div>
+    </div>
+
+    <details class="acc"><summary>⚙️ 상세 버튼 (사진·지도·위치·공유)</summary><div class="acc-in">
+    <div class="act">
+      ${vUrl ? `<button class="mb${view === "video" ? " pr" : ""}" data-act="vvideo">🎬 앱내영상</button><button class="mb${view === "caption" ? " pr" : ""}" data-act="vcap">📋 릴스캡션</button>` : ""}
+      <button class="mb${view === "photo" ? " pr" : ""}" data-act="vphoto">🖼️ 사진</button>
+      <button class="mb" data-act="chgpic">🔄 사진바꾸기</button>
+      <button class="mb${view === "google" ? " pr" : ""}" data-act="vmap">🗺️ 지도</button>
+      ${myEmbed ? `<button class="mb${view === "mymaps" ? " pr" : ""}" data-act="vmymap">🗺️ 내지도</button>` : ""}
+    </div>
+    <div class="act">
+      <button class="mb" onclick="$('own').click()">📷 내 사진</button>
+      <button class="mb pr" data-act="regeo">📍 위치 다시 찾기</button>
+      <button class="mb pr" data-act="recap">📋 캡션으로 다시 분석</button>
+      <button class="mb" data-act="share">🔗 공유</button>
+    </div>
+    <div class="act">
+      <button class="mb pr" data-act="pastecap">📋 복사한 캡션/주소 붙여넣기</button>
+      <button class="mb" onclick="$('sheetShot').click()">📷 캡션 스샷 자동 추출</button>
+    </div>
+    </div></details>
+    <details class="acc"><summary>✏️ 직접 수정 (카테고리·이름·주소·메모)</summary><div class="acc-in">
+    <label style="margin-top:8px">카테고리 이동</label>
+    <div class="seg">
+      ${Object.keys(CATS)
+        .map(
+          (k) =>
+            `<div data-act="chcat" data-cat="${k}" class="${i.category === k ? "on" : ""}">${CATS[k].e} ${CATS[k].n}${i.category === k ? " ✓" : ""}</div>`,
+        )
+        .join("")}
+    </div>
+    <label>장소명과 주소 (장소별로 한 칸씩 입력)</label>
+    <div id="editAddressList" style="display:flex;flex-direction:column;gap:8px">
+      ${addressFields}
+    </div>
+    <button type="button" class="mb pr" data-act="addEditAddress" style="margin:8px 0">＋ 주소 추가</button>
+    <label>메모 (가격, 영업시간, 같이 갈 사람...)</label>
+    <textarea id="sh-note" placeholder="메모 (가격, 영업시간, 같이 갈 사람...)">${esc(i.note || "")}</textarea>
+    </div></details>
+    <div class="act" style="justify-content:space-between;margin-top:8px">
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${vUrl ? `<button class="mb reel-jump" data-act="openVid" data-id="${i.id}">${esc(vLabel)}</button>` : ""}
+        <a class="mb pr" href="${esc(dirHref)}" target="_blank" rel="noopener">🧭 길찾기 ↗</a>
+        <a class="mb" href="${esc(gmapHref)}" target="_blank" rel="noopener">구글지도 ↗</a>
+        <a class="mb" href="https://www.google.com/search?q=${q || encodeURIComponent(i.name || "")}" target="_blank" rel="noopener">검색 ↗</a>
+        <button class="mb dg" data-act="del">삭제</button>
+      </div>
+      <button class="mb" data-act="close">닫기</button>
+    </div>
+  `;
+        [...$("sbody").querySelectorAll("details.acc")].forEach((d, ix) => {
+          if (prevAcc[ix]) d.open = true;
+        });
+        $("sheet").classList.add("on");
+
+        const vdEl = $("sh-vid"),
+          ntEl = $("sh-note");
+        const editPlaceFields = () => ensureEditablePlaces(i);
+        const syncEditedPlace = () => syncGroupedItem(i);
+        $("sbody")
+          .querySelectorAll(".edit-place-name")
+          .forEach((el) => {
+            const idx = Number(el.dataset.idx);
+            el.oninput = () => {
+              const place = editPlaceFields()[idx];
+              if (place) {
+                place.name = el.value.trim();
+                syncEditedPlace();
+                refreshGroupedPlacesSummary(i);
+                persist();
+              }
+            };
+            el.onchange = () => {
+              syncEditedPlace();
+              save();
+              refreshGroupedPlacesSummary(i);
+            };
+          });
+        $("sbody")
+          .querySelectorAll(".edit-place-address")
+          .forEach((el) => {
+            const idx = Number(el.dataset.idx);
+            el.oninput = () => {
+              const place = editPlaceFields()[idx];
+              if (place) {
+                place.address = normalizeOcrAddr(el.value);
+                syncEditedPlace();
+                refreshGroupedPlacesSummary(i);
+                persist();
+              }
+            };
+            el.onchange = async () => {
+              const place = editPlaceFields()[idx];
+              if (!place || !place.address) return;
+              const geo = await geocodePlace(
+                place,
+                ($("hint")?.value || "").trim(),
+              );
+              if (geo) {
+                place.lat = geo.lat;
+                place.lng = geo.lng;
+                if (!place.address && geo.formatted)
+                  place.address = geo.formatted;
+              }
+              syncEditedPlace();
+              save();
+              refreshGroupedPlacesSummary(i);
+              if (geo)
+                toast(
+                  `📍 ${idx === 0 ? "대표 장소" : "추가 장소"} 위치를 설정했어요`,
+                );
+              else toast("주소는 저장했지만 좌표를 찾지 못했어요");
+            };
+          });
+        if (vdEl) {
+          vdEl.oninput = () => {
+            const rawV = vdEl.value.trim();
+            i.vid = normalizeVidUrl(rawV) || rawV;
+            persist();
+          };
+          vdEl.onchange = () => {
+            const rawV = vdEl.value.trim();
+            i.vid = normalizeVidUrl(rawV) || rawV;
+            save();
+            showSheet();
+            if (i.vid) toast("🎬 릴스 링크가 저장되었어요!");
+          };
+        }
+        if (ntEl) {
+          ntEl.oninput = () => {
+            i.note = ntEl.value;
+            persist();
+          };
+          ntEl.onchange = () => save();
+        }
+      }
+
+      const AI_DEFS = [
+        {
+          id: "gemini",
+          name: "Google Gemini (무료 쿼터 있음)",
+          ph: "AIzaSy...",
+          defModel: "",
+        },
+        {
+          id: "openrouter",
+          name: "OpenRouter (무료 라우터 가능)",
+          ph: "sk-or-v1-...",
+          defModel: "openrouter/free",
+        },
+        {
+          id: "groq",
+          name: "Groq (초고속/무료 쿼터)",
+          ph: "gsk_...",
+          defModel: "llama-3.3-70b-versatile",
+        },
+        { id: "openai", name: "OpenAI", ph: "sk-...", defModel: "gpt-4o-mini" },
+      ];
+
+      let aiCfg = {},
+        usageCnt = { gemini: 0, openrouter: 0, groq: 0, openai: 0, gmap: 0 };
+      try {
+        aiCfg = JSON.parse(
+          ls.get("TRIP_AI_CFG") || ls.get("TRIP_AI_KEYS") || "{}",
+        );
+      } catch (e) {
+        aiCfg = {};
+      }
+      try {
+        usageCnt = {
+          ...usageCnt,
+          ...JSON.parse(ls.get("TRIP_USAGE_CNT") || "{}"),
+        };
+      } catch (e) {}
+
+      (function recoverExistingKeys() {
+        const gmapKey = (ls.get("TRAVEL_GMAP_KEY") || "").trim();
+        const oldW = ls.get("TRIP_WORKER_URL") || "";
+        if (oldW && !ls.get("TRIP_CF_PROXY"))
+          ls.set("TRIP_CF_PROXY", normalizeCfProxy(oldW));
+        try {
+          for (let idx = 0; idx < localStorage.length; idx++) {
+            const k = localStorage.key(idx);
+            if (!k || k === "TRIP_MASTER_ITEMS" || k === "TRIP_PHOTO_CACHE")
+              continue;
+            const raw = localStorage.getItem(k) || "";
+            const gm = raw.match(/AIzaSy[A-Za-z0-9_-]{30,40}/g);
+            if (gm) {
+              for (const cand of gm) {
+                if (
+                  !aiCfg.gemini?.key &&
+                  (cand !== gmapKey || /GEMINI|AI/i.test(k))
+                ) {
+                  aiCfg.gemini = { ...(aiCfg.gemini || {}), key: cand };
+                }
+              }
             }
-          } else {
-            if (hm._type === "osm") {
-              hm.fitBounds(
-                L.latLngBounds(
-                  valid.map((i) => [Number(i.lat), Number(i.lng)]),
-                ),
-                { padding: [26, 26], maxZoom: 14, animate: false },
+            const orm = raw.match(/sk-or-v1-[A-Za-z0-9]{40,80}/);
+            if (orm && !aiCfg.openrouter?.key)
+              aiCfg.openrouter = { ...(aiCfg.openrouter || {}), key: orm[0] };
+            const grq = raw.match(/gsk_[A-Za-z0-9]{30,70}/);
+            if (grq && !aiCfg.groq?.key)
+              aiCfg.groq = { ...(aiCfg.groq || {}), key: grq[0] };
+          }
+        } catch (e) {}
+        AI_DEFS.forEach((d) => {
+          if (typeof aiCfg[d.id] === "string")
+            aiCfg[d.id] = { key: aiCfg[d.id], model: d.defModel };
+          else if (!aiCfg[d.id]) aiCfg[d.id] = { key: "", model: d.defModel };
+        });
+      })();
+
+      function bumpCnt(k) {
+        usageCnt[k] = (usageCnt[k] || 0) + 1;
+        ls.set("TRIP_USAGE_CNT", JSON.stringify(usageCnt));
+      }
+
+      function buildAiProvUI() {
+        $("aiProv").innerHTML = AI_DEFS.map((d) => {
+          const c = aiCfg[d.id] || { key: "", model: d.defModel };
+          return `<div style="padding:10px;border:1px solid var(--bd);border-radius:12px;background:var(--s);margin-bottom:8px">
+      <label style="margin-bottom:4px;color:var(--tx)">${esc(d.name)}</label>
+      <input type="password" id="aik-${d.id}" value="${esc(c.key || "")}" placeholder="API 키 (${esc(d.ph)})" style="margin-bottom:6px">
+      <input type="text" id="aim-${d.id}" value="${esc(c.model || "")}" placeholder="모델명 (비워두면 기본값: ${esc(d.defModel || "자동")})" style="margin-bottom:0">
+    </div>`;
+        }).join("");
+        AI_DEFS.forEach((d) => {
+          $("aik-" + d.id).oninput = saveAiProvFromUI;
+          $("aim-" + d.id).oninput = saveAiProvFromUI;
+        });
+        updateAiChainText();
+        renderUsageBox();
+      }
+
+      function saveAiProvFromUI() {
+        AI_DEFS.forEach((d) => {
+          aiCfg[d.id] = {
+            key: ($("aik-" + d.id)?.value || "").trim(),
+            model: ($("aim-" + d.id)?.value || "").trim(),
+          };
+        });
+        ls.set("TRIP_AI_CFG", JSON.stringify(aiCfg));
+        if (aiCfg.gemini?.key) ls.set("TRAVEL_GEMINI_KEY", aiCfg.gemini.key);
+        updateAiChainText();
+      }
+
+      function updateAiChainText() {
+        const act = AI_DEFS.filter((d) => aiCfg[d.id]?.key).map(
+          (d) => d.name.split(" (")[0],
+        );
+        $("aiChain").textContent = act.length
+          ? act.join(" → ") + " → 내장 캡션 파서"
+          : "내장 캡션 파서 (키 미설정)";
+      }
+
+      function getStorageUsedKB() {
+        let total = 0;
+        try {
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            total += (localStorage.getItem(k) || "").length * 2;
+          }
+        } catch (e) {}
+        return Math.round(total / 1024);
+      }
+
+      async function renderUsageBox() {
+        const box = $("usageBox");
+        if (!box) return;
+        let orInfo = "키 미설정";
+        const orKey = aiCfg.openrouter?.key;
+        if (orKey)
+          orInfo = `앱 호출 ${usageCnt.openrouter || 0}회 (잔액 조회 중...)`;
+        const usedKB = getStorageUsedKB();
+        box.innerHTML = `
+    <div>• <b>저장 현황</b>: 총 ${items.length}곳 (방문완료 ${items.filter((x) => x.done).length}곳 · ⭐중요 ${items.filter((x) => x.star).length}곳)</div>
+    <div>• <b>브라우저 저장소</b>: 약 ${usedKB.toLocaleString()} KB / 5,000 KB (IndexedDB 대용량 병행 중)</div>
+    <div>• <b>Gemini</b>: ${aiCfg.gemini?.key ? "🟢 키 설정됨" : "⚪ 미설정"} (호출: ${usageCnt.gemini || 0}회)</div>
+    <div id="orUsageLine">• <b>OpenRouter</b>: ${aiCfg.openrouter?.key ? "🟢 키 설정됨" : "⚪ 미설정"} (${orInfo})</div>
+    <div>• <b>Google Maps</b>: ${(ls.get("TRAVEL_GMAP_KEY") || "").trim() ? "🟢 키 설정됨" : "⚪ 미설정"} (지오코딩: ${usageCnt.gmap || 0}회)</div>
+  `;
+        if (orKey) {
+          try {
+            const r = await fetchTO(
+              "https://openrouter.ai/api/v1/auth/key",
+              { headers: { Authorization: `Bearer ${orKey}` } },
+              4500,
+            );
+            if (r.ok) {
+              const d = await r.json();
+              const u = d?.data?.usage ?? 0,
+                lim = d?.data?.limit;
+              const el = $("orUsageLine");
+              if (el)
+                el.innerHTML = `• <b>OpenRouter</b>: 🟢 사용량 $${Number(u).toFixed(4)} / 한도 ${lim != null ? "$" + lim : "무제한(무료모델)"} (호출 ${usageCnt.openrouter || 0}회)`;
+            }
+          } catch (e) {}
+        }
+      }
+
+      async function callGeminiSmart(
+        prompt,
+        images = [],
+        allowGrounding = false,
+      ) {
+        const key = (aiCfg.gemini?.key || "").trim();
+        if (!key) throw new Error("키 미설정");
+        const userModel = (aiCfg.gemini?.model || "").trim();
+        const parts = [{ text: prompt }];
+        for (const im of images) {
+          if (im && im.data)
+            parts.push({
+              inline_data: {
+                mime_type: im.mime || "image/jpeg",
+                data: im.data,
+              },
+            });
+        }
+        const t0 = Date.now(),
+          DEADLINE = 24000;
+        let lastErr = "";
+        const modelOrder = allowGrounding
+          ? [
+              "gemini-2.0-flash",
+              userModel,
+              "gemini-1.5-flash",
+              "gemini-2.0-flash-lite",
+              "gemini-1.5-pro",
+            ]
+          : [
+              userModel,
+              "gemini-2.0-flash",
+              "gemini-1.5-flash",
+              "gemini-2.0-flash-lite",
+              "gemini-1.5-pro",
+            ];
+        const fixed = [...new Set(modelOrder.filter(Boolean))];
+        for (const m of fixed) {
+          if (Date.now() - t0 > DEADLINE) break;
+          const tries = allowGrounding ? [true, false] : [false];
+          for (const useGround of tries) {
+            const body = {
+              contents: [{ parts }],
+              generationConfig: { temperature: 0.1 },
+            };
+            if (useGround) body.tools = [{ google_search: {} }];
+            try {
+              const r = await fetchTO(
+                `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(key)}`,
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(body),
+                },
+                11000,
               );
-            } else if (hm._type === "google") {
-              const bounds = new google.maps.LatLngBounds();
-              valid.forEach((i) =>
-                bounds.extend({ lat: Number(i.lat), lng: Number(i.lng) }),
-              );
-              hm.fitBounds(bounds, 26);
-            } else if (hm._type === "naver") {
-              const bounds = new naver.maps.LatLngBounds(
-                new naver.maps.LatLng(
-                  Number(valid[0].lat),
-                  Number(valid[0].lng),
-                ),
-                new naver.maps.LatLng(
-                  Number(valid[0].lat),
-                  Number(valid[0].lng),
-                ),
-              );
-              valid.forEach((i) =>
-                bounds.extend(
-                  new naver.maps.LatLng(Number(i.lat), Number(i.lng)),
-                ),
-              );
-              hm.fitBounds(bounds, {
-                top: 26,
-                right: 26,
-                bottom: 26,
-                left: 26,
-              });
+              const d = await r.json();
+              if (!r.ok) {
+                lastErr = d?.error?.message || `HTTP ${r.status}`;
+                if (/api key not valid/i.test(lastErr))
+                  throw new Error(lastErr);
+                continue;
+              }
+              const txt =
+                d?.candidates?.[0]?.content?.parts
+                  ?.map((p) => p.text || "")
+                  .join("") || "";
+              if (txt.trim()) {
+                bumpCnt("gemini");
+                return txt;
+              }
+            } catch (e) {
+              lastErr = e.message || "네트워크 오류";
             }
           }
-        } catch (_) {}
+        }
+        throw new Error(lastErr || "Gemini 응답 지연");
+      }
+
+      async function callOpenAICompat(
+        endpoint,
+        key,
+        models,
+        prompt,
+        images = [],
+        provId = "openrouter",
+      ) {
+        let lastErr = "";
+        for (const m of models) {
+          try {
+            const content = [{ type: "text", text: prompt }];
+            for (const im of images) {
+              if (im && im.data)
+                content.push({
+                  type: "image_url",
+                  image_url: {
+                    url: `data:${im.mime || "image/jpeg"};base64,${im.data}`,
+                  },
+                });
+            }
+            const r = await fetchTO(
+              endpoint,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${key}`,
+                },
+                body: JSON.stringify({
+                  model: m,
+                  messages: [
+                    { role: "user", content: images.length ? content : prompt },
+                  ],
+                  temperature: 0.1,
+                }),
+              },
+              11000,
+            );
+            const d = await r.json();
+            if (!r.ok) {
+              lastErr = d?.error?.message || `HTTP ${r.status}`;
+              continue;
+            }
+            const txt = d?.choices?.[0]?.message?.content || "";
+            if (txt.trim()) {
+              bumpCnt(provId);
+              return txt;
+            }
+          } catch (e) {
+            lastErr = e.message || "오류";
+          }
+        }
+        throw new Error(lastErr || "호출 실패");
+      }
+
+      async function askAI(prompt, images = [], allowGrounding = false) {
+        const errs = [];
+        if (aiCfg.gemini?.key) {
+          try {
+            return await callGeminiSmart(prompt, images, allowGrounding);
+          } catch (e) {
+            errs.push(`Google Gemini: ${e.message}`);
+          }
+        }
+        if (aiCfg.openrouter?.key) {
+          const custom = aiCfg.openrouter.model;
+          const ms = [
+            ...new Set([
+              custom || "openrouter/free",
+              "openrouter/free",
+              "google/gemini-2.0-flash-exp:free",
+              "meta-llama/llama-3.3-70b-instruct:free",
+            ]),
+          ];
+          try {
+            return await callOpenAICompat(
+              "https://openrouter.ai/api/v1/chat/completions",
+              aiCfg.openrouter.key,
+              ms,
+              prompt,
+              images,
+              "openrouter",
+            );
+          } catch (e) {
+            errs.push(`OpenRouter: ${e.message}`);
+          }
+        }
+        if (aiCfg.groq?.key) {
+          const custom = aiCfg.groq.model;
+          const ms = images.length
+            ? [
+                "meta-llama/llama-4-scout-17b-16e-instruct",
+                "llama-3.3-70b-versatile",
+              ]
+            : [custom || "llama-3.3-70b-versatile"];
+          try {
+            return await callOpenAICompat(
+              "https://api.groq.com/openai/v1/chat/completions",
+              aiCfg.groq.key,
+              ms,
+              prompt,
+              images,
+              "groq",
+            );
+          } catch (e) {
+            errs.push(`Groq: ${e.message}`);
+          }
+        }
+        if (aiCfg.openai?.key) {
+          const ms = [aiCfg.openai.model || "gpt-4o-mini"];
+          try {
+            return await callOpenAICompat(
+              "https://api.openai.com/v1/chat/completions",
+              aiCfg.openai.key,
+              ms,
+              prompt,
+              images,
+              "openai",
+            );
+          } catch (e) {
+            errs.push(`OpenAI: ${e.message}`);
+          }
+        }
+        throw new Error(errs.join(" · ") || "사용 가능한 AI 제공자 없음");
+      }
+
+      function extractJsonArray(txt) {
+        const s = String(txt || "").trim();
+        const m = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
+        const body = m ? m[1].trim() : s;
+        const a = body.indexOf("["),
+          b = body.lastIndexOf("]");
+        const c = body.indexOf("{"),
+          d = body.lastIndexOf("}");
+        try {
+          if (a !== -1 && b > a && (c === -1 || a < c))
+            return JSON.parse(body.slice(a, b + 1));
+          if (c !== -1 && d > c) {
+            const o = JSON.parse(body.slice(c, d + 1));
+            return Array.isArray(o) ? o : [o];
+          }
+        } catch (e) {}
+        return [];
+      }
+
+      function decodeHtml(str) {
+        const t = document.createElement("textarea");
+        t.innerHTML = str;
+        return t.value;
+      }
+
+      function parseIgEmbedHtml(html) {
+        if (!html || typeof html !== "string") return "";
+        if (
+          html.includes("function parseIgEmbedHtml") ||
+          html.includes("TRIP_MASTER_ITEMS")
+        )
+          return "";
+
+        const cm =
+          html.match(
+            /<div class="Caption"[^>]*>([\s\S]*?)<div class="CaptionComments"/i,
+          ) || html.match(/<div class="Caption"[^>]*>([\s\S]*?)<\/div>/i);
+        if (cm) {
+          let s = cm[1]
+            .replace(/<a class="CaptionUsername"[^>]*>[\s\S]*?<\/a>/i, "")
+            .replace(/<br\s*\/?>/gi, "\n")
+            .replace(/<[^>]+>/g, " ");
+          s = decodeHtml(s)
+            .replace(/[ \t]+/g, " ")
+            .replace(/\n\s+/g, "\n")
+            .trim();
+          if (
+            s.length >= 6 &&
+            !s.includes("[\\s\\S]") &&
+            /[가-힣a-zA-Z0-9一-龯ぁ-んァ-ン]/.test(s)
+          )
+            return s;
+        }
+        const jm =
+          html.match(
+            /"edge_media_to_caption"\s*:\s*\{\s*"edges"\s*:\s*\[\s*\{\s*"node"\s*:\s*\{\s*"text"\s*:\s*"((?:[^"\\]|\\.)*)"/i,
+          ) ||
+          html.match(
+            /\\"edge_media_to_caption\\"\s*:\s*\{\s*\\"edges\\"\s*:\s*\[\s*\{\s*\\"node\\"\s*:\s*\{\s*\\"text\\"\s*:\s*\\"((?:[^"\\]|\\.)*)\\"/i,
+          );
+        if (jm) {
+          try {
+            let raw = jm[1];
+            if (html.includes('\\"edge_media_to_caption\\"'))
+              raw = raw.replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+            const dec = JSON.parse('"' + raw + '"');
+            if (dec && dec.trim().length >= 6) return dec.trim();
+          } catch (e) {}
+        }
+        const om =
+          html.match(
+            /<meta[^>]+(?:property="og:description"|name="description")[^>]+content="([^"]+)"/i,
+          ) ||
+          html.match(
+            /<meta[^>]+content="([^"]+)"[^>]+(?:property="og:description"|name="description")/i,
+          );
+        if (om) {
+          let d = decodeHtml(om[1]);
+          const qm = d.match(/:\s*["“]([\s\S]+)["”]\.?$/);
+          if (qm) d = qm[1];
+          if (
+            d &&
+            !/Create an account or log in/i.test(d) &&
+            d.trim().length >= 6
+          )
+            return d.trim();
+        }
+        return "";
+      }
+
+      async function fetchVideoCaption(vUrl) {
+        const meta = parseVideoMeta(vUrl);
+        if (!meta) return "";
+        const cfBase = normalizeCfProxy(
+          ls.get("TRIP_CF_PROXY") || ls.get("TRIP_WORKER_URL") || "",
+        );
+
+        if (meta.platform === "ig" && meta.id) {
+          const embedUrl = `https://www.instagram.com/p/${meta.id}/embed/captioned/`;
+          const reelEmbedUrl = `https://www.instagram.com/reel/${meta.id}/embed/captioned/`;
+          const postUrl = `https://www.instagram.com/p/${meta.id}/`;
+          const jobs = [];
+          if (cfBase) {
+            jobs.push(
+              () =>
+                fetchTO(cfBase + encodeURIComponent(embedUrl), {}, 4800).then(
+                  (r) => r.text(),
+                ),
+              () =>
+                fetchTO(
+                  cfBase + encodeURIComponent(reelEmbedUrl),
+                  {},
+                  4800,
+                ).then((r) => r.text()),
+              () =>
+                fetchTO(cfBase + encodeURIComponent(postUrl), {}, 4800).then(
+                  (r) => r.text(),
+                ),
+            );
+          }
+          jobs.push(
+            () =>
+              fetchTO(
+                `https://api.allorigins.win/raw?url=${encodeURIComponent(embedUrl)}`,
+                {},
+                4200,
+              ).then((r) => r.text()),
+            () =>
+              fetchTO(
+                `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(embedUrl)}`,
+                {},
+                4200,
+              ).then((r) => r.text()),
+            () =>
+              fetchTO(
+                `https://corsproxy.io/?url=${encodeURIComponent(embedUrl)}`,
+                {},
+                4200,
+              ).then((r) => r.text()),
+            () =>
+              fetchTO(`https://r.jina.ai/${embedUrl}`, {}, 4500).then((r) =>
+                r.text(),
+              ),
+          );
+          try {
+            return await Promise.any(
+              jobs.map(async (fn) => {
+                const txt = await fn();
+                const cap = parseIgEmbedHtml(txt);
+                if (cap && cap.length >= 8) return cap;
+                if (
+                  txt &&
+                  txt.includes("Markdown Content:") &&
+                  !txt.includes("Log in to Instagram")
+                ) {
+                  const md = txt.split("Markdown Content:")[1] || "";
+                  const cl = md
+                    .replace(/!\[.*?\]\(.*?\)/g, "")
+                    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+                    .trim();
+                  if (cl.length >= 12) return cl;
+                }
+                throw new Error("no caption");
+              }),
+            );
+          } catch (e) {
+            return "";
+          }
+        }
+        if (meta.platform === "yt" && meta.id) {
+          const wUrl = `https://www.youtube.com/watch?v=${meta.id}`;
+          const titleP = fetchTO(
+            `https://noembed.com/embed?url=${encodeURIComponent(wUrl)}`,
+            {},
+            3500,
+          )
+            .then((r) => (r.ok ? r.json() : {}))
+            .then((d) => d.title || "")
+            .catch(() => "");
+          const [title] = await Promise.all([titleP]);
+          return title.trim();
+        }
+        if (meta.platform === "tt") {
+          try {
+            const r = await fetchTO(
+              `https://www.tiktok.com/oembed?url=${encodeURIComponent(meta.url)}`,
+              {},
+              4000,
+            );
+            if (r.ok) {
+              const d = await r.json();
+              return d.title || "";
+            }
+          } catch (e) {}
+        }
+        return "";
+      }
+
+      function isLikelyAddressLine(s) {
+        return /(?:\b\d{3}-\d{4}\b|\b\d+\s*-\s*\d+|\bWard\b|\bChuo\b|\bKita\b|\bOsaka\b|\bTokyo\b|\bKyoto\b|\bFukuoka\b|丁目|番地?|千日前|中央区|北区|難波|梅田|[시군구]\s+\S+[동로길]\s*\d+|(?:오사카|우메다|난바|도톤보리|신사이바시|교토|도쿄|신주쿠|시부야|후쿠오카|하카타|삿포로).*(?:역|백화점|프라자|플라자|파르코|루쿠아|한큐|한신|다이마루|타카시마야|난바워크|빌딩|타워|상점가|지하|B\d|\d+층|안|내)|(?:백화점|프라자|플라자|파르코|루쿠아|난바워크|역)\s*(?:B?\d+\s*층|지하\s*\d+층|안에|내))/i.test(
+          String(s || ""),
+        );
+      }
+
+      function parseCaptionLocally(rawText) {
+        const norm = normalizeOcrAddr(String(rawText || "").replace(/\r/g, ""));
+        const lines = String(rawText || "")
+          .split(/\r?\n/)
+          .map((l) => l.trim())
+          .filter(Boolean);
+        let name = "",
+          address = "",
+          price = "",
+          info = "",
+          postal = "";
+        const addrParts = [];
+
+        const zipM = norm.match(/(?:〒|T|\b)(\d{3}-\d{4})\b/);
+        if (zipM) postal = zipM[1];
+
+        for (const line of lines) {
+          if (/^https?:\/\//i.test(line)) continue;
+          const cl = line.replace(/^[•·\-\*]\s*/, "").trim();
+
+          if (
+            cl.startsWith("📍") ||
+            cl.startsWith("📌") ||
+            cl.startsWith("☕")
+          ) {
+            const v = cl.replace(/^(?:📍|📌|☕)\s*/u, "").trim();
+            if (v) {
+              if (isLikelyAddressLine(v) && !address) addrParts.push(v);
+              else if (!name && !isLikelyAddressLine(v)) name = v;
+              else if (isLikelyAddressLine(v)) addrParts.push(v);
+            }
+            continue;
+          }
+          if (
+            cl.startsWith("🇯🇵") ||
+            cl.startsWith("🏠") ||
+            cl.startsWith("🗺") ||
+            cl.startsWith("📮") ||
+            /^(?:주소|위치|Address)\s*[:：]/i.test(cl)
+          ) {
+            let v = cl
+              .replace(/^(?:🇯🇵|🏠|🗺️?|📮)\s*/u, "")
+              .replace(/^(?:주소|위치|Address)\s*[:：]\s*/i, "")
+              .trim();
+            v = v.replace(/^일본\s+/, "");
+            if (v) addrParts.push(v);
+            continue;
+          }
+          if (
+            cl.startsWith("⏰") ||
+            cl.startsWith("🕒") ||
+            /(?:영업\s*시간|운영\s*시간|\d{1,2}:\d{2}\s*[~∼\-]\s*\d{1,2}:\d{2})/.test(
+              cl,
+            )
+          ) {
+            const v = cl.replace(/^(?:⏰|🕒)\s*/u, "").trim();
+            if (v && !info) info = v;
+            continue;
+          }
+          if (
+            cl.startsWith("🥣") ||
+            cl.startsWith("🍜") ||
+            cl.startsWith("💴") ||
+            cl.startsWith("💰") ||
+            /\d{1,3}(?:,\d{3})*\s*(?:엔|원|¥|₩)/.test(cl)
+          ) {
+            const v = cl.replace(/^(?:🥣|🍜|💴|💰)\s*/u, "").trim();
+            if (v && !price) price = v;
+            continue;
+          }
+          if (isLikelyAddressLine(cl)) {
+            addrParts.push(cl.replace(/^일본\s+/, ""));
+            continue;
+          }
+          const nmM = cl.match(
+            /^(?:상호명?|가게명?|장소|식당|카페|이름)\s*[:：]\s*(.+)$/,
+          );
+          if (nmM && !name) {
+            name = nmM[1].trim();
+            continue;
+          }
+        }
+
+        if (addrParts.length) address = normalizeOcrAddr(addrParts.join(", "));
+
+        if (!name) {
+          const qM = String(rawText || "").match(
+            /['"「『]([^'"」』\r\n]{2,30})['"」』]/,
+          );
+          if (
+            qM &&
+            !isLikelyAddressLine(qM[1]) &&
+            !/^(?:광고|협찬|추천|맛집|일본여행|오사카|도쿄|교토|후쿠오카|삿포로)$/.test(
+              qM[1].trim(),
+            )
+          ) {
+            name = qM[1].trim();
+          }
+        }
+
+        if (
+          !name &&
+          lines.length === 1 &&
+          !lines[0].startsWith("http") &&
+          !isLikelyAddressLine(lines[0]) &&
+          lines[0].length <= 35
+        ) {
+          name = lines[0];
+        }
+
+        let category = cat || "PLACE";
+        if (category === "PLACE") {
+          if (
+            /카페|커피|에스프레소|라떼|아메리카노|디저트|베이커리|케이크|브런치|말차|파르페|빙수|도넛|구움과자|로스터리|킷사텐|喫茶|カフェ|珈琲|\bcafe\b|\bcoffee\b|\bbakery\b/i.test(
+              norm,
+            )
+          )
+            category = "CAFE";
+          else if (
+            /편의점|로손|세븐일레븐|패밀리마트|길거리음식|간식/.test(norm)
+          )
+            category = "FOOD";
+          else if (
+            /돈키호테|드럭스토어|쇼핑|기념품|백화점|편집샵|소품샵/.test(norm)
+          )
+            category = "SHOP";
+        }
+
+        const note = [price, info].filter(Boolean).join(" · ");
+        return { name, address, price, info, note, postal, category };
+      }
+
+      function parseCaptionMultiText(txt, hint = "") {
+        const t = String(txt || "").trim();
+        const circ = t
+          .split(/(?=[\u2460-\u2469])/)
+          .map((s) => s.trim())
+          .filter((s) => /^[\u2460-\u2469]/.test(s) && s.length >= 5);
+        const numLines = t
+          .split(/\n(?=\s*(?:[1-9]|10)[\.\)]\s+[^\d])/)
+          .map((s) => s.trim())
+          .filter((s) => /^\s*(?:[1-9]|10)[\.\)]\s+/.test(s) && s.length >= 5);
+
+        if (circ.length > 1) {
+          return circ
+            .map((c) => parseCaptionLocally(c, hint))
+            .filter((p) => p.name || p.address);
+        }
+        if (numLines.length > 1) {
+          return numLines
+            .map((c) =>
+              parseCaptionLocally(
+                "📍 " + c.replace(/^\s*(?:[1-9]|10)[\.\)]\s*/, ""),
+                hint,
+              ),
+            )
+            .filter((p) => p.name || p.address);
+        }
+
+        const single = parseCaptionLocally(t, hint);
+        if (single.name && single.address) {
+          return [single];
+        }
+
+        const parts = t.split(/(📍|📌)/);
+        const chunks = [];
+        for (let i = 0; i < parts.length; i++) {
+          if (parts[i] === "📍" || parts[i] === "📌") {
+            chunks.push(parts[i] + " " + (parts[i + 1] || ""));
+            i++;
+          }
+        }
+        if (chunks.length > 1) {
+          const list = chunks.map((c) => parseCaptionLocally(c, hint));
+          const validNamed = list.filter(
+            (p) => p.name && !isLikelyAddressLine(p.name),
+          );
+          if (validNamed.length <= 1) {
+            return single.name || single.address ? [single] : [];
+          }
+          return validNamed;
+        }
+        return single.name || single.address ? [single] : [];
+      }
+
+      async function geocodePlace(cand, hint = "") {
+        const gkey = (ls.get("TRAVEL_GMAP_KEY") || "").trim();
+        const rawAddr = normalizeOcrAddr(cand.address || "");
+        const stripFloorNoise = (s) =>
+          String(s || "")
+            .replace(/(?:^|\s)B?\d+\s*(?:F|층|階)(?=\s|$)/gi, " ")
+            .replace(/지하\s*\d+\s*층/g, " ")
+            .replace(/(?:안에\s*있음|역\s*안|구내|내부|근처)/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+        const cleanAddr = stripFloorNoise(rawAddr);
+        const rawName = isGenericSharedName(cand.name)
+          ? ""
+          : String(cand.name || "").trim();
+        const localName = String(cand.localName || "").trim();
+        const aiLat = Number(cand.lat),
+          aiLng = Number(cand.lng);
+        const context = `${hint || ""} ${rawAddr}`.toLowerCase();
+        const isJapan =
+          /日本|北海道|東京|大阪|京都|福岡|札幌|名古屋|沖縄|千日前|難波|梅田|道頓堀|心斎橋|丁目|番地|〒|\b\d{3}-\d{4}\b|japan|osaka|tokyo|kyoto|fukuoka/i.test(
+            context,
+          );
+
+        const cacheKey = `${localName}|${rawName}|${rawAddr}|${hint}`.trim();
+        if (cacheKey.length >= 3 && geoCache[cacheKey])
+          return geoCache[cacheKey];
+
+        const zipM = (rawAddr + " " + (cand.postal || "")).match(
+          /(\d{3})-?(\d{4})/,
+        );
+        const banchiM = rawAddr.match(/(\d+\s*-\s*\d+(?:\s*-\s*\d+)?)/);
+        const banchi = banchiM ? banchiM[1].replace(/\s+/g, "") : "";
+
+        let jpTown = "";
+        if (zipM) {
+          try {
+            const zr = await fetchTO(
+              `https://zipcloud.ibsnet.co.jp/api/search?zipcode=${zipM[1]}${zipM[2]}`,
+              {},
+              2500,
+            );
+            const zd = await zr.json();
+            if (zd && zd.results && zd.results[0]) {
+              const x = zd.results[0];
+              jpTown = `${x.address1}${x.address2}${x.address3}`;
+            }
+          } catch (e) {}
+        }
+
+        const queries = [];
+        if (cleanAddr) {
+          const cleaned = cleanAddr
+            .replace(/(?:〒|T)?\d{3}-\d{4}/g, "")
+            .replace(/^일본\s*/, "")
+            .trim();
+          if (cleaned) queries.push(cleaned);
+          if (cleanAddr !== cleaned) queries.push(cleanAddr);
+        }
+        if (localName && cleanAddr) queries.push(`${localName} ${cleanAddr}`);
+        if (rawName && cleanAddr) queries.push(`${rawName} ${cleanAddr}`);
+        if (jpTown && banchi) queries.push(`${jpTown}${banchi}`);
+        if (localName)
+          queries.push(`${localName} ${jpTown || hint || ""}`.trim());
+        if (rawName) queries.push(`${rawName} ${hint || ""}`.trim());
+
+        const uniq = [
+          ...new Set(
+            queries
+              .map((q) => {
+                const value = q.trim();
+                return isJapan && !/\bJapan\b/i.test(value)
+                  ? `${value} Japan`
+                  : value;
+              })
+              .filter((q) => q.length >= 2),
+          ),
+        ].slice(0, 6);
+        if (!uniq.length) {
+          if (aiLat && aiLng) return { lat: aiLat, lng: aiLng };
+          return null;
+        }
+
+        const remember = (res) => {
+          if (res && res.lat && res.lng && cacheKey.length >= 3) {
+            geoCache[cacheKey] = res;
+            saveGeoCache();
+          }
+          return res;
+        };
+
+        if (gkey) {
+          for (const q of uniq.slice(0, 4)) {
+            try {
+              bumpCnt("gmap");
+              const params = new URLSearchParams({
+                address: q,
+                key: gkey,
+                language: isJapan ? "ja" : "ko",
+              });
+              if (isJapan) params.set("components", "country:JP");
+              const r = await fetchTO(
+                `https://maps.googleapis.com/maps/api/geocode/json?${params}`,
+                {},
+                3800,
+              );
+              const d = await r.json();
+              if (d.status === "OK" && d.results && d.results[0]) {
+                const loc = d.results[0].geometry.location;
+                return remember({
+                  lat: Number(loc.lat),
+                  lng: Number(loc.lng),
+                  formatted: d.results[0].formatted_address,
+                });
+              }
+            } catch (e) {}
+          }
+        }
+
+        for (const q of uniq.slice(0, 3)) {
+          try {
+            const r = await fetchTO(
+              `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=3`,
+              {},
+              4000,
+            );
+            const d = await r.json();
+            if (Array.isArray(d) && d[0]) {
+              return remember({
+                lat: Number(d[0].lat),
+                lng: Number(d[0].lon),
+                formatted: d[0].display_name,
+              });
+            }
+          } catch (e) {}
+        }
+
+        if (aiLat && aiLng && Math.abs(aiLat) <= 90 && Math.abs(aiLng) <= 180) {
+          return remember({ lat: aiLat, lng: aiLng });
+        }
+        return null;
+      }
+
+      async function analyzeContent({
+        rawText = "",
+        vidUrl = "",
+        images = [],
+        hint = "",
+      }) {
+        let caption = String(rawText || "")
+          .replace(/https?:\/\/[^\s]+/g, "")
+          .trim();
+        let capStatus = "";
+
+        if (vidUrl && caption.length < 8) {
+          toast("릴스/쇼츠 캡션 정보를 불러오는 중...");
+          const fetched = await fetchVideoCaption(vidUrl);
+          if (fetched) {
+            caption = (caption + "\n" + fetched).trim();
+          } else {
+            capStatus =
+              "🔒 인스타 차단으로 캡션을 가져오지 못했습니다. 캡션·고정댓글을 직접 붙여넣어 주세요";
+          }
+        }
+
+        const localParsed = parseCaptionLocally(caption || rawText, hint);
+        const multiLocal = parseCaptionMultiText(caption || rawText, hint);
+        const hasAi = AI_DEFS.some((d) => aiCfg[d.id]?.key);
+
+        let aiCands = [],
+          aiErr = "";
+        const aiTask = (async () => {
+          if (!hasAi || !(caption.length >= 2 || images.length > 0 || vidUrl))
+            return [];
+          try {
+            const needWebSearch = Boolean(
+              images.length > 0 ||
+              caption.length < 200 ||
+              !/\d{3}-\d{4}/.test(caption) ||
+              vidUrl,
+            );
+            const prompt = `다음 여행 관련 입력에서 장소·카페·음식·쇼핑 항목을 모두 추출해(최대 10곳) JSON 배열로만 출력하세요.
+입력 텍스트:
+"""
+${caption || rawText}
+"""
+원본 영상 URL: ${vidUrl || "없음"}
+사용자 현재 선택 탭: ${cat}
+반드시 아래 JSON 배열 형식으로만 답하세요:
+[
+  {
+    "name": "장소/가게 이름",
+    "localName": "현지어 공식 상호명",
+    "address": "우편번호·번지를 포함한 주소",
+    "price": "가격·대표메뉴 요약",
+    "info": "영업시간·휴무일·특징 요약",
+    "category": "PLACE 또는 CAFE 또는 FOOD 또는 SHOP",
+    "lat": 34.6653,
+    "lng": 135.5038
+  }
+]`;
+            const txt = await askAI(
+              prompt,
+              images.slice(0, MAX_MULTI_PLACES),
+              needWebSearch,
+            );
+            return extractJsonArray(txt).slice(0, MAX_MULTI_PLACES);
+          } catch (e) {
+            aiErr = e.message;
+            return [];
+          }
+        })();
+
+        const preGeoPromise =
+          localParsed.address || localParsed.name
+            ? geocodePlace(localParsed, hint)
+            : Promise.resolve(null);
+        const [aiResult, preGeo] = await Promise.all([aiTask, preGeoPromise]);
+        aiCands = aiResult || [];
+
+        const mapLocal = (m) => ({
+          name: m.name || "",
+          localName: "",
+          address: normalizeOcrAddr(m.address || ""),
+          postal: m.postal || "",
+          price: m.price || "",
+          info: m.info || "",
+          note: [m.price, m.info].filter(Boolean).join(" · "),
+          category: CATS[m.category] ? m.category : cat || "PLACE",
+          lat: null,
+          lng: null,
+          vid: vidUrl || "",
+        });
+
+        let cands = [];
+        if (!aiCands.length && multiLocal.length > 1) {
+          cands = multiLocal.slice(0, MAX_MULTI_PLACES).map((m) => mapLocal(m));
+        } else if (aiCands.length) {
+          cands = aiCands.slice(0, MAX_MULTI_PLACES).map((c) => ({
+            name: c.name || localParsed.name || "",
+            localName: c.localName || "",
+            address: normalizeOcrAddr(c.address || localParsed.address || ""),
+            price: c.price || localParsed.price || "",
+            info: c.info || localParsed.info || "",
+            note: [c.price || localParsed.price, c.info || localParsed.info]
+              .filter(Boolean)
+              .join(" · "),
+            category:
+              cat !== "PLACE"
+                ? cat
+                : CATS[c.category]
+                  ? c.category
+                  : localParsed.category || "PLACE",
+            lat: Number(c.lat) || null,
+            lng: Number(c.lng) || null,
+            vid: vidUrl || "",
+          }));
+        } else if (localParsed.name || localParsed.address) {
+          cands = [
+            {
+              ...localParsed,
+              lat: preGeo?.lat || null,
+              lng: preGeo?.lng || null,
+              vid: vidUrl || "",
+            },
+          ];
+        }
+
+        await Promise.all(
+          cands.map(async (c, idx) => {
+            if (
+              idx === 0 &&
+              preGeo &&
+              preGeo.lat &&
+              preGeo.lng &&
+              !c.localName
+            ) {
+              c.lat = preGeo.lat;
+              c.lng = preGeo.lng;
+              if (!c.address && preGeo.formatted) c.address = preGeo.formatted;
+            } else {
+              const geo = await geocodePlace(c, hint);
+              if (geo) {
+                c.lat = geo.lat;
+                c.lng = geo.lng;
+                if (!c.address && geo.formatted) c.address = geo.formatted;
+              }
+            }
+            if (!c.name && c.address) c.name = c.address.split(",")[0].trim();
+          }),
+        );
+
+        return { cands, caption, aiErr, capStatus };
+      }
+
+      function renderCandidates(
+        headerMsg = "맞는 항목을 눌러 저장하세요 · 사진이 다르면 🔄",
+      ) {
+        if (!res.length) {
+          $("rs").innerHTML = "";
+          return;
+        }
+        $("rs").innerHTML =
+          `<div class="ds" style="margin:4px 2px">${esc(headerMsg)}</div>` +
+          res
+            .map((r, idx) => {
+              const vUrl = getVidUrlStr(r.vid);
+              const dummy = {
+                name: r.name,
+                address: r.address,
+                vid: vUrl,
+                img: r.img,
+                useCustomImg: Boolean(r.img),
+                v: r.v || 0,
+                category: r.category || cat,
+              };
+              return `<div class="item" data-act="pickRes" data-idx="${idx}">
+      ${ph(CATS[dummy.category] ? CATS[dummy.category].e : "📍", itemThumb(dummy), "", r.img, 0, itemThumbCandidates(dummy).slice(1).join("|"))}
+      <div class="mid">
+        <div class="nm">${esc(r.name || "장소")}${vUrl ? " 🎬" : ""}${r.lat && r.lng ? " 📍" : ""}</div>
+        <div class="ds">${esc(r.address || "입력한 그대로 저장")}</div>
+        ${r.price ? `<div class="ds" style="color:var(--FOOD);font-weight:700">${esc(r.price)}</div>` : ""}
+        ${r.info ? `<div class="ds in">${esc(r.info)}</div>` : ""}
+        <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">
+          <button class="mb" data-act="resPic" data-idx="${idx}" style="padding:3px 8px;font-size:11px">🔄 다른 사진</button>
+          ${vUrl ? `<button class="mb reel-jump" data-act="openResVid" data-idx="${idx}" style="padding:3px 8px;font-size:11px">${esc(getVidBtnLabel(vUrl))}</button>` : ""}
+        </div>
+      </div>
+      <div class="ok">${r._merged ? "✓ 병합됨" : r._saved ? "✓ 저장됨" : "선택"}</div>
+    </div>`;
+            })
+            .join("");
+      }
+
+      async function runAnalyzeShare(files = []) {
+        const raw = ($("shareBox").value || "").trim();
+        const explicitLink = ($("reelLinkBox").value || "").trim();
+        const hint = ($("hint")?.value || "").trim();
+        if (!raw && !explicitLink && !files.length)
+          return toast(
+            "릴스 링크나 캡션을 붙여넣거나 스크린샷을 첨부해 주세요",
+          );
+
+        const btn = $("analyzeShare");
+        btn.disabled = true;
+        btn.textContent = "🔥 분석 중...";
+        toastBusy("🔥 캡션 분석·위경도 검색 중...");
+
+        try {
+          const metaExplicit = parseVideoMeta(explicitLink);
+          const metaRaw = parseVideoMeta(raw);
+          const metaFromBox = metaExplicit?.id
+            ? metaExplicit
+            : metaRaw?.id
+              ? metaRaw
+              : metaExplicit || metaRaw;
+          let vidUrl = metaFromBox ? metaFromBox.url : "";
+          if (vidUrl) {
+            lastSharedVid = vidUrl;
+            $("reelLinkBox").value = vidUrl;
+          }
+
+          const images = [];
+          for (const f of files.slice(0, MAX_MULTI_PLACES))
+            images.push(await fileToBase64(f, 860, 0.72));
+
+          const { cands, aiErr } = await analyzeContent({
+            rawText: raw || explicitLink,
+            vidUrl,
+            images,
+            hint,
+          });
+
+          if (cands.length && (cands[0].name || cands[0].address)) {
+            const limited = cands
+              .slice(0, MAX_MULTI_PLACES)
+              .filter((c) => c.name || c.address)
+              .map(toPlace);
+            const sameVideoItems = vidUrl
+              ? items.filter(
+                  (x) => normalizeVidUrl(getVidUrlStr(x.vid)) === vidUrl,
+                )
+              : [];
+            let targetItem = sameVideoItems[0] || null;
+
+            if (targetItem) {
+              if (
+                !Array.isArray(targetItem.places) ||
+                !targetItem.places.length
+              ) {
+                targetItem.places =
+                  !isGenericSharedName(targetItem.name) &&
+                  (targetItem.name ||
+                    targetItem.address ||
+                    targetItem.lat ||
+                    targetItem.lng)
+                    ? [toPlace(targetItem)]
+                    : [];
+              } else {
+                targetItem.places = targetItem.places.map(toPlace);
+              }
+            } else {
+              const primary = limited[0];
+              targetItem = {
+                id:
+                  "id_" +
+                  Date.now() +
+                  "_" +
+                  Math.random().toString(36).slice(2, 6),
+                name: primary.name,
+                localName: primary.localName,
+                address: primary.address,
+                price: primary.price,
+                info: primary.info,
+                note: limited
+                  .map(
+                    (p, idx) =>
+                      `[${idx + 1}] ${p.name}: ${p.address || ""} ${p.price || ""}`,
+                  )
+                  .join("\n")
+                  .trim(),
+                category: CATS[cands[0].category] ? cands[0].category : cat,
+                lat: primary.lat,
+                lng: primary.lng,
+                places: [],
+                vid: vidUrl || "",
+                img: "",
+                useCustomImg: false,
+                v: 0,
+                done: false,
+              };
+              items.unshift(targetItem);
+            }
+
+            const savedPlaces = [];
+            for (const place of limited) {
+              const existing = targetItem.places.find((p) =>
+                samePlace(p, place),
+              );
+              if (existing) {
+                if (!existing.localName) existing.localName = place.localName;
+                if (!existing.address) existing.address = place.address;
+                if (!existing.price) existing.price = place.price;
+                if (!existing.info) existing.info = place.info;
+                if (
+                  (!existing.lat || !existing.lng) &&
+                  place.lat &&
+                  place.lng
+                ) {
+                  existing.lat = place.lat;
+                  existing.lng = place.lng;
+                }
+                savedPlaces.push(place);
+              } else if (targetItem.places.length < MAX_MULTI_PLACES) {
+                targetItem.places.push(place);
+                savedPlaces.push(place);
+              }
+            }
+            targetItem.vid = targetItem.vid || vidUrl || "";
+            syncGroupedItem(targetItem);
+            save();
+            res = savedPlaces.map((p) => ({
+              ...p,
+              vid: vidUrl,
+              _saved: true,
+              _itemId: targetItem.id,
+            }));
+            renderCandidates(
+              `✅ 릴스 1개에 총 ${targetItem.places.length}곳의 장소가 통합 저장되었습니다!`,
+            );
+            $("shareBox").value = "";
+            $("reelLinkBox").value = "";
+            lastSharedVid = "";
+            if (targetItem.lat && targetItem.lng) {
+              draw(true);
+              fit();
+            }
+            toast(
+              `✅ '${targetItem.name}' (총 ${targetItem.places.length}곳) 저장 완료!`,
+            );
+            return;
+          }
+
+          const failNote = [
+            "🔒 자동 인식 실패 — 캡션·댓글을 직접 붙여넣거나 스크린샷을 첨부해 주세요",
+            aiErr ? `AI: ${aiErr}` : "",
+          ]
+            .filter(Boolean)
+            .join(" · ");
+          res = [
+            {
+              name: metaFromBox?.platform === "yt" ? "공유 쇼츠" : "공유 릴스",
+              address: "",
+              info: failNote,
+              note: "",
+              category: cat,
+              lat: null,
+              lng: null,
+              vid: vidUrl || "",
+              v: 0,
+            },
+          ];
+          renderCandidates();
+          toast(
+            "🔒 인스타 차단으로 캡션을 가져오지 못했습니다. 2번 칸에 캡션을 직접 붙여넣어 주세요",
+          );
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "🔥 분석·저장하기";
+          if (_toastBusy) {
+            _toastBusy = false;
+            $("toast").classList.remove("show");
+            clearTimeout(tt);
+          }
+        }
+      }
+
+      function focusMapOnItem(i) {
+        const lat = Number(i?.lat),
+          lng = Number(i?.lng);
+        if (!lat || !lng) return;
+        if (gmap) {
+          gmap.panTo({ lat, lng });
+          gmap.setZoom(16);
+        } else if (nmap) {
+          nmap.setCenter(new naver.maps.LatLng(lat, lng));
+          nmap.setZoom(16);
+        } else if (lm) {
+          lm.setView([lat, lng], 16);
+        }
+      }
+
+      async function reGeoItem(i) {
+        if (!i) return;
+        toastBusy("📍 위치 검색 중...");
+        const hint = ($("hint")?.value || "").trim();
+        const g = await geocodePlace(i, hint);
+        if (g) {
+          i.lat = g.lat;
+          i.lng = g.lng;
+          if (Array.isArray(i.places) && i.places[0]) {
+            i.places[0].lat = g.lat;
+            i.places[0].lng = g.lng;
+          }
+          if (isGenericSharedName(i.name) && i.address)
+            i.name = i.address.split(",")[0].trim();
+          save();
+          focusMapOnItem(i);
+          if (cur === i.id) showSheet();
+          toast(
+            `📍 위치 설정 완료! (${g.lat.toFixed(4)}, ${g.lng.toFixed(4)})`,
+          );
+        } else {
+          save();
+          if (cur === i.id) showSheet();
+          toast("위치를 찾지 못했어요. 주소를 보완해 주세요.");
+        }
+      }
+
+      async function applyCaptionToItem(i, rawCap, images = []) {
+        if (!i) return;
+        toastBusy("📋 캡션에서 상호명과 위치를 추출 중...");
+        const hint = ($("hint")?.value || "").trim();
+        const detectedVid = parseVideoMeta(rawCap);
+        if (detectedVid && !i.vid) i.vid = detectedVid.url;
+
+        const { cands } = await analyzeContent({
+          rawText: rawCap,
+          vidUrl: getVidUrlStr(i.vid),
+          images,
+          hint,
+        });
+        let array = (cands || []).filter((c) => c.name || c.address);
+        let added = 0;
+        if (!array.length) {
+          array = parseCaptionMultiText(rawCap, hint);
+        }
+        if (array.length) {
+          if (!Array.isArray(i.places) || !i.places.length) {
+            i.places =
+              !isGenericSharedName(i.name) &&
+              (i.name || i.address || i.lat || i.lng)
+                ? [toPlace(i)]
+                : [];
+          } else {
+            i.places = i.places.map(toPlace);
+          }
+          for (const candidate of array.slice(0, MAX_MULTI_PLACES)) {
+            if (!candidate.name && !candidate.address) continue;
+            const place = toPlace(candidate);
+            if (!place.lat || !place.lng) {
+              const g = await geocodePlace(candidate, hint);
+              if (g) {
+                place.lat = g.lat;
+                place.lng = g.lng;
+                if (!place.address && g.formatted) place.address = g.formatted;
+              }
+            }
+            const existing = i.places.find((p) => samePlace(p, place));
+            if (existing) {
+              if (!existing.localName) existing.localName = place.localName;
+              if (!existing.address) existing.address = place.address;
+              if (!existing.price) existing.price = place.price;
+              if (!existing.info) existing.info = place.info;
+              if ((!existing.lat || !existing.lng) && place.lat && place.lng) {
+                existing.lat = place.lat;
+                existing.lng = place.lng;
+              }
+            } else if (i.places.length < MAX_MULTI_PLACES) {
+              i.places.push(place);
+              added++;
+            }
+          }
+          syncGroupedItem(i);
+        }
+        save();
+        showSheet();
+        toast(added ? `✅ ${added}곳을 추가했어요` : "✅ 정보를 반영했어요");
+      }
+
+      async function autoFixCoords() {
+        const missing = items.filter(
+          (i) =>
+            (!Number(i.lat) || !Number(i.lng)) &&
+            (i.address || (!isGenericSharedName(i.name) && i.name)),
+        );
+        if (!missing.length) return false;
+        let fixed = 0;
+        for (const i of missing.slice(0, 5)) {
+          const g = await geocodePlace(i);
+          if (g) {
+            i.lat = g.lat;
+            i.lng = g.lng;
+            fixed++;
+          }
+        }
+        if (fixed) {
+          save();
+          fit();
+        }
+        return fixed > 0;
       }
 
       document.addEventListener("click", async (e) => {
         const tb = e.target.closest(".tab-btn");
         if (tb) return tab(tb.dataset.tab);
 
-        const listCatSeg = e.target.closest("#listCatSeg div");
-        if (listCatSeg) {
-          listCat = listCatSeg.dataset.lcat || "ALL";
-          mobileListFilter = listCat;
-          document
-            .querySelectorAll("#listCatSeg div")
-            .forEach((d) => d.classList.toggle("on", d === listCatSeg));
-          renderAllList();
-          return;
-        }
-
-        const listFilterBtn = e.target.closest("[data-list-filter]");
-        if (listFilterBtn) {
-          mobileListFilter = listFilterBtn.dataset.listFilter || "ALL";
-          renderAllList();
+        const lcatEl = e.target.closest("#listCatSeg div");
+        if (lcatEl) {
+          listCat = lcatEl.dataset.lcat || "ALL";
+          renderListTab();
           return;
         }
 
@@ -5499,17 +7569,16 @@
           return;
         }
         if (act === "setListFilter") {
-          listFilter[c] = actEl.dataset.f || "ALL";
-          renderCat(c);
+          listFilter[c || listCat] = actEl.dataset.f || "ALL";
+          renderListTab();
           return;
         }
         if (act === "clearSearch") {
-          const input = $(`q-${c}`);
+          const input = $("q-LIST") || $(`q-${c}`);
           if (input) {
             input.value = "";
             input.focus();
-            if (c === "LIST") renderAllList();
-            else renderCat(c);
+            renderListTab();
           }
           return;
         }
@@ -5572,9 +7641,7 @@
             const hint = ($("hint")?.value || "").trim();
             const geo = await geocodePlace(it, hint);
             if (!geo) {
-              toast(
-                "지도 등록에 필요한 위치를 찾지 못했어요. 주소를 입력한 뒤 다시 시도해 주세요.",
-              );
+              toast("지도 등록에 필요한 위치를 찾지 못했어요.");
               return;
             }
             it.lat = geo.lat;
@@ -5652,7 +7719,8 @@
           const place = it?.places?.[Number(actEl.dataset.idx)];
           if (place && Number(place.lat) && Number(place.lng)) {
             closeSheet();
-            focusMapOnItem(place, true);
+            tab("map");
+            focusMapOnItem(place);
           } else {
             toast("이 장소의 지도 좌표가 아직 없어요");
           }
@@ -5769,7 +7837,7 @@
             const row = actEl.closest(".item");
             if (row) row.classList.toggle("done", it.done);
             persist();
-            if (mapOnlyTodo || listFilter[it.category] !== "ALL") save();
+            save();
             if (actEl.checked)
               toast(`✅ '${it.name}' 방문 완료!`, () => {
                 it.done = prevDone;
@@ -5845,7 +7913,9 @@
           save();
           renderCandidates();
           if (ni.lat && ni.lng) focusMapOnItem(ni);
-          toast(`저장했어요 · 목록 탭에서 볼 수 있어요`);
+          toast(
+            `저장했어요 · 목록 탭(${CATS[ni.category].n})에서 볼 수 있어요`,
+          );
           return;
         }
 
@@ -6021,7 +8091,7 @@
             (x) => x._pinKey === actEl.dataset.pinKey,
           );
           if (pin) {
-            focusMapOnItem(pin, true);
+            focusMapOnItem(pin);
             openMapPinPopup(pin);
           }
           return;
@@ -6047,42 +8117,41 @@
             showSheet();
             const idx = Number(actEl.dataset.placeIdx);
             if (Number.isInteger(idx) && idx >= 0) {
-              const card = $(`sub-place-${idx}`);
-              if (card) {
-                card.classList.add("selectedMapPlace");
-                card.scrollIntoView({ block: "center", behavior: "smooth" });
+              const cardEl = $(`sub-place-${idx}`);
+              if (cardEl) {
+                cardEl.classList.add("selectedMapPlace");
+                cardEl.scrollIntoView({ block: "center", behavior: "smooth" });
               }
             }
           }
           return;
         }
         if (act === "toggleEdit") {
-          editMode[c] = !editMode[c];
+          editMode.LIST = !editMode.LIST;
           selected.clear();
-          const allCb = $("bulk-" + c)?.querySelector(
+          const allCb = $("bulk-LIST")?.querySelector(
             "input[data-act=selectAll]",
           );
           if (allCb) allCb.checked = false;
-          if (c === "LIST") renderAllList();
-          else renderCat(c);
+          renderListTab();
           return;
         }
         if (act === "toggleSel" || act === "sel") {
           e.stopPropagation();
           if (selected.has(id)) selected.delete(id);
           else selected.add(id);
-          if (c === "LIST") renderAllList();
-          else renderCat(c || activeTab);
+          renderListTab();
           return;
         }
         if (act === "selectAll") {
-          const ids = items
-            .filter((x) => c === "LIST" || x.category === c)
-            .map((x) => x.id);
+          const ids = (
+            listCat === "ALL"
+              ? items
+              : items.filter((x) => x.category === listCat)
+          ).map((x) => x.id);
           if (actEl.checked) ids.forEach((x) => selected.add(x));
           else selected.clear();
-          if (c === "LIST") renderAllList();
-          else renderCat(c);
+          renderListTab();
           return;
         }
         if (act === "bulkDelete") {
@@ -6091,8 +8160,8 @@
           const delCnt = selected.size;
           items = items.filter((x) => !selected.has(x.id));
           selected.clear();
-          editMode[c] = false;
-          const allCb = $("bulk-" + c)?.querySelector(
+          editMode.LIST = false;
+          const allCb = $("bulk-LIST")?.querySelector(
             "input[data-act=selectAll]",
           );
           if (allCb) allCb.checked = false;
@@ -6162,13 +8231,11 @@
           curItem.category = c;
           save();
           showSheet();
-          toast(`${CATS[c].n} 탭으로 이동했어요`, () => {
+          toast(`${CATS[c].n} 카테고리로 이동했어요`, () => {
             curItem.category = prevCat;
             save();
             showSheet();
-            toast(
-              `↩ ${CATS[prevCat] ? CATS[prevCat].n : "기존"} 탭으로 되돌렸어요`,
-            );
+            toast("카테고리 이동을 되돌렸어요");
           });
           return;
         }
@@ -6259,8 +8326,80 @@
         setTheme(
           document.documentElement.dataset.theme === "dark" ? "light" : "dark",
         );
+      $("createRoomBtn").onclick = () => {
+        if (!firebaseConfigured())
+          return setSharedRoomStatus(
+            "firebase-config.js에 Firebase 설정을 먼저 입력하세요.",
+            "error",
+          );
+        const id = makeRoomId();
+        try {
+          ls.set(TRIP_CREATING_ROOM_KEY, id);
+        } catch (_) {}
+        location.href = roomUrl(id);
+      };
+      $("joinRoomBtn").onclick = () => {
+        const id = prompt(
+          "친구에게 받은 방 링크 또는 방 코드를 입력하세요:",
+          "",
+        );
+        if (!id) return;
+        const roomId = extractRoomId(id);
+        if (!roomId)
+          return toast("올바른 공유 방 링크나 방 코드를 입력해 주세요.");
+        location.href = roomUrl(roomId);
+      };
+      $("copyRoomBtn").onclick = copyRoomLink;
+      $("googleLoginBtn").onclick = handleGoogleLoginBtn;
+      $("loginDiagCopyBtn").onclick = async () => {
+        const text = buildLoginDiagnostics();
+        const out = $("loginDiagOut");
+        if (out) out.textContent = text;
+        try {
+          await navigator.clipboard.writeText(text);
+          toast("진단 내용이 복사됐어요");
+        } catch (e) {
+          toast("복사 실패 — 보이는 진단 텍스트를 직접 선택해 복사해 주세요");
+        }
+      };
+      $("copyUserIdBtn").onclick = copyUserId;
+      $("requestJoinBtn").onclick = requestJoin;
+      $("addMemberBtn").onclick = addMember;
+      $("undoRoomBtn").onclick = undoRoomChange;
+      $("deleteRoomBtn").onclick = deleteRoom;
+      $("leaveRoomBtn").onclick = leaveRoom;
+      $("roomAlertStrip").onclick = (e) => {
+        if (e.target && e.target.dataset && e.target.dataset.roomAlert)
+          tab("set");
+      };
       $("planCopyTopBtn").onclick = copyFormattedPlan;
       $("exportPlanBtn").onclick = copyFormattedPlan;
+      document.addEventListener("click", (e) => {
+        const action = e.target.closest("[data-room-action]");
+        if (!action) return;
+        if (action.dataset.roomAction === "remove-member")
+          removeMember(action.dataset.uid);
+        if (action.dataset.roomAction === "approve-request")
+          approveJoinRequest(action.dataset.uid, action.dataset.name);
+        if (action.dataset.roomAction === "conflict-local")
+          resolveRoomConflict(action.dataset.id, "local");
+        if (action.dataset.roomAction === "conflict-remote")
+          resolveRoomConflict(action.dataset.id, "remote");
+        if (action.dataset.roomAction === "conflict-all-local")
+          resolveRoomConflictAll("local");
+        if (action.dataset.roomAction === "conflict-all-remote")
+          resolveRoomConflictAll("remote");
+      });
+      $("sheet").onclick = (e) => {
+        if (e.target === $("sheet")) {
+          save();
+          closeSheet();
+        }
+      };
+      $("taxiModal").onclick = (e) => {
+        if (e.target === $("taxiModal"))
+          $("taxiModal").classList.remove("show");
+      };
 
       $("reelLinkBox").oninput = () => {
         const u = normalizeVidUrl($("reelLinkBox").value);
@@ -6322,24 +8461,6 @@
         e.target.value = "";
         if (fs.length) await runAnalyzeShare(fs);
       };
-
-      $("file")?.addEventListener("change", async (e) => {
-        const fs = [...(e.target.files || [])];
-        e.target.value = "";
-        if (!fs.length) return;
-        pend = [];
-        for (const f of fs.slice(0, MAX_MULTI_PLACES))
-          pend.push(await fileToBase64(f, 860, 0.72));
-        const pc = $("pc");
-        if (pc) pc.textContent = `📷 사진 ${pend.length}장 선택됨`;
-        toast(
-          `사진 ${pend.length}장이 첨부되었어요. [🔎 인터넷에서 찾기]를 누르세요.`,
-        );
-      });
-      $("go")?.addEventListener("click", runSearch);
-      $("q")?.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") runSearch();
-      });
 
       $("own").onchange = async (e) => {
         const f = e.target.files?.[0];
@@ -6411,28 +8532,6 @@
         toast("Naver Maps 키 저장됨");
         location.reload();
       };
-
-      $("homeMapOpenBtn")?.addEventListener("click", (e) => {
-        e.stopPropagation();
-        tab("map");
-      });
-      $("mapmsg").addEventListener("click", () => {
-        clearTimeout(_mapMsgTimer);
-        $("mapmsg").style.display = "none";
-      });
-      window.addEventListener("resize", () => {
-        if (hm) {
-          try {
-            if (hm._type === "osm") hm.invalidateSize();
-            else if (hm._type === "google")
-              google.maps.event.trigger(hm, "resize");
-            else if (hm._type === "naver")
-              window.naver.maps.Event.trigger(hm, "resize");
-            drawHomeMap(true);
-          } catch (_) {}
-        }
-        refreshMapSize(false);
-      });
       $("savecfproxy").onclick = () => {
         const norm = normalizeCfProxy($("cfproxy").value);
         $("cfproxy").value = norm;
@@ -6466,6 +8565,16 @@
         syncSharedSettings();
         toast("임베드 URL 저장됨");
       };
+
+      function openMyMapsOverlay(rawUrl) {
+        const embedUrl = toEmbedMyMapsUrl(rawUrl);
+        if (!embedUrl) return toast("허용되지 않은 Google My Maps 주소예요");
+        const origUrl = ls.get("TRIP_MYMAPS_URL") || rawUrl;
+        $("myMapsFrame").src = embedUrl;
+        $("myMapsExtLink").href = origUrl;
+        $("myMapsOverlay").classList.add("show");
+      }
+
       $("myMapsBtn").onclick = () => {
         const u = getMyMapsEmbedUrl() || ls.get("TRIP_MYMAPS_URL");
         if (!u)
@@ -6683,49 +8792,206 @@
         }
       };
 
-      $("createRoomBtn").onclick = () => {
-        if (!firebaseConfigured())
-          return setSharedRoomStatus(
-            "firebase-config.js에 Firebase 설정을 먼저 입력하세요.",
-            "error",
-          );
-        const id = makeRoomId();
-        try {
-          ls.set(TRIP_CREATING_ROOM_KEY, id);
-        } catch (_) {}
-        location.href = roomUrl(id);
-      };
-      $("joinRoomBtn").onclick = () => {
-        const id = prompt(
-          "친구에게 받은 방 링크 또는 방 코드를 입력하세요:",
-          "",
+      (function initPullToRefresh() {
+        let startY = 0,
+          startX = 0,
+          pulling = false;
+        window.addEventListener(
+          "touchstart",
+          (e) => {
+            if (
+              e.touches.length !== 1 ||
+              document.body.classList.contains("show-map") ||
+              e.target.closest(
+                "#map-wrap,#sheet,#myMapsOverlay,#taxiModal,input,textarea,select",
+              )
+            ) {
+              pulling = false;
+              return;
+            }
+            const sc = e.target.closest(".tab-content");
+            if ((sc && sc.scrollTop > 0) || e.touches[0].clientY > 70) {
+              pulling = false;
+              return;
+            }
+            startY = e.touches[0].clientY;
+            startX = e.touches[0].clientX;
+            pulling = true;
+          },
+          { passive: true },
         );
-        if (!id) return;
-        const roomId = extractRoomId(id);
-        if (!roomId)
-          return toast("올바른 공유 방 링크나 방 코드를 입력해 주세요.");
-        location.href = roomUrl(roomId);
-      };
-      $("copyRoomBtn").onclick = copyRoomLink;
-      $("googleLoginBtn").onclick = handleGoogleLoginBtn;
-      $("loginDiagCopyBtn").onclick = async () => {
-        const text = buildLoginDiagnostics();
-        const out = $("loginDiagOut");
-        if (out) out.textContent = text;
-        try {
-          await navigator.clipboard.writeText(text);
-          toast("진단 내용이 복사됐어요");
-        } catch (e) {
-          toast("복사 실패 — 보이는 진단 텍스트를 직접 선택해 복사해 주세요");
-        }
-      };
-      $("copyUserIdBtn").onclick = copyUserId;
-      $("requestJoinBtn").onclick = requestJoin;
-      $("addMemberBtn").onclick = addMember;
-      $("undoRoomBtn").onclick = undoRoomChange;
-      $("deleteRoomBtn").onclick = deleteRoom;
-      $("leaveRoomBtn").onclick = leaveRoom;
 
+        window.addEventListener(
+          "touchmove",
+          (e) => {
+            if (!pulling || e.touches.length !== 1) {
+              pulling = false;
+              $("ptr").classList.remove("show");
+              return;
+            }
+            const dy = e.touches[0].clientY - startY;
+            const dx = Math.abs(e.touches[0].clientX - startX);
+            if (dy > 130 && dx < 40) $("ptr").classList.add("show");
+            else $("ptr").classList.remove("show");
+          },
+          { passive: true },
+        );
+
+        window.addEventListener(
+          "touchend",
+          () => {
+            if (pulling && $("ptr").classList.contains("show")) {
+              $("ptr").classList.remove("show");
+              location.reload();
+            }
+            pulling = false;
+          },
+          { passive: true },
+        );
+      })();
+
+      function initMap() {
+        mapProvider = ls.get("TRIP_MAP_PROVIDER") || "osm";
+        $("mapProvider").value = mapProvider;
+        const gkey = (ls.get("TRAVEL_GMAP_KEY") || "").trim();
+        const nkey = (ls.get("TRAVEL_NAVER_KEY") || "").trim();
+        $("gmapkey").value = gkey;
+        $("naverkey").value = nkey;
+        $("mymapsUrl").value = ls.get("TRIP_MYMAPS_URL") || "";
+        $("mymapsEmbed").value = getMyMapsEmbedUrl();
+        $("cfproxy").value =
+          ls.get("TRIP_CF_PROXY") || ls.get("TRIP_WORKER_URL") || "";
+
+        if (mapProvider === "google") {
+          if (!gkey) {
+            fallbackToOsm("Google Maps API 키가 설정되지 않았습니다.");
+            return;
+          }
+          let initialized = false,
+            failed = false;
+          const failGoogle = (message) => {
+            if (failed) return;
+            failed = true;
+            fallbackToOsm(message);
+          };
+          window.gm_authFailure = () =>
+            failGoogle(
+              "Google Maps 인증에 실패했습니다. 키, 결제 설정, Maps JavaScript API 활성화 및 HTTP 리퍼러 제한을 확인하세요.",
+            );
+          const s = document.createElement("script");
+          s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(gkey)}&loading=async&callback=initGoogleMap`;
+          s.async = true;
+          s.onerror = () =>
+            failGoogle(
+              "Google Maps JavaScript API를 불러오지 못했습니다. 네트워크와 API 키 제한을 확인하세요.",
+            );
+          window.initGoogleMap = () => {
+            if (initialized || failed) return;
+            try {
+              if (!window.google?.maps?.Map)
+                throw new Error("Google Maps API가 초기화되지 않았습니다.");
+              gmap = new google.maps.Map($("map"), {
+                center: { lat: 34.668, lng: 135.501 },
+                zoom: 12,
+                mapTypeControl: false,
+                fullscreenControl: false,
+                streetViewControl: false,
+              });
+              GPinClass = makeGPinClass();
+              initialized = true;
+              _mapFallbackNotice = "";
+              $("mapmsg").style.display = "none";
+              draw(true);
+              fit();
+            } catch (e) {
+              failGoogle(`Google Maps 초기화 오류: ${e.message}`);
+            }
+          };
+          document.head.appendChild(s);
+          setTimeout(() => {
+            if (!initialized)
+              failGoogle(
+                "Google Maps 응답 시간이 초과되었습니다. API 키와 네트워크를 확인하세요.",
+              );
+          }, 12000);
+          return;
+        }
+        if (mapProvider === "naver") {
+          if (!nkey) {
+            fallbackToOsm("Naver Maps API 키가 설정되지 않았습니다.");
+            return;
+          }
+          const s = document.createElement("script");
+          s.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${encodeURIComponent(nkey)}`;
+          s.async = true;
+          s.onload = () => {
+            try {
+              nmap = new naver.maps.Map("map", {
+                center: new naver.maps.LatLng(37.5665, 126.978),
+                zoom: 11,
+              });
+              draw(true);
+              fit();
+            } catch (e) {
+              fallbackToOsm(`Naver Maps 초기화 오류: ${e.message}`);
+            }
+          };
+          s.onerror = () =>
+            fallbackToOsm(
+              "Naver Maps JavaScript API를 불러오지 못했습니다. 네트워크와 API 키를 확인하세요.",
+            );
+          document.head.appendChild(s);
+          setTimeout(() => {
+            if (!nmap)
+              fallbackToOsm(
+                "Naver Maps 응답 시간이 초과되었습니다. API 키와 네트워크를 확인하세요.",
+              );
+          }, 12000);
+          return;
+        }
+        fallbackToOsm("default osm");
+      }
+
+      function updateNetworkStatus() {
+        const el = $("netStatus");
+        if (!el) return;
+        const online = navigator.onLine !== false;
+        let pending = 0;
+        if (!online) {
+          try {
+            const q = JSON.parse(ls.get(TRIP_OFFLINE_QUEUE_KEY) || "");
+            pending = Array.isArray(q.finalItems) ? q.finalItems.length : 0;
+          } catch (_) {}
+        }
+        el.textContent = online
+          ? "● 온라인"
+          : `● 오프라인${pending ? ` (대기 ${pending}건)` : ""}`;
+        el.style.color = online ? "var(--ok)" : "var(--dg)";
+        el.title = online
+          ? "인터넷 연결됨"
+          : "오프라인 — 변경 내용이 임시 저장되며, 네트워크가 복구되면 공유 방에 자동 반영돼요.";
+      }
+      window.addEventListener("online", () => {
+        updateNetworkStatus();
+        if (hasOfflineQueue()) flushOfflineQueue().catch(() => {});
+      });
+      window.addEventListener("offline", () => {
+        updateNetworkStatus();
+        if (sharedRoomId) queueOfflineSnapshot();
+      });
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          if ($("sheet").classList.contains("on")) closeSheet();
+          if ($("myMapsOverlay").classList.contains("show"))
+            closeMyMapsOverlay();
+          return;
+        }
+        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+          e.preventDefault();
+          const input = $("q-LIST");
+          input?.focus();
+        }
+      });
       updateNetworkStatus();
       setTheme(ls.get("TRIP_THEME") || "dark");
       buildAiProvUI();
@@ -6734,11 +9000,12 @@
       setInterval(renderRoomSyncInfo, 5000);
       render(true);
       initMap();
-      ensureHomeMap();
       const savedTab = ls.get("TRIP_LAST_TAB");
       if (
         savedTab &&
-        ["add", "list", "friends", "set", "map"].includes(savedTab)
+        ["add", "list", "PLACE", "CAFE", "FOOD", "SHOP", "set", "map"].includes(
+          savedTab,
+        )
       )
         tab(savedTab);
       let initialRoom = extractRoomId(
