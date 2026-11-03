@@ -11,7 +11,7 @@
       name="apple-mobile-web-app-status-bar-style"
       content="black-translucent"
     />
-    <meta name="theme-color" content="#0f1115" />
+    <meta name="theme-color" content="#090a0d" />
     <meta
       http-equiv="Cache-Control"
       content="no-cache, no-store, must-revalidate"
@@ -35,14 +35,14 @@
     />
     <style>
       :root {
-        --bg: #f2f4f7;
-        --s: #fff;
-        --s2: #f6f7fa;
-        --s3: #e9edf3;
-        --bd: #e2e6ee;
-        --bd2: #ccd3de;
-        --tx: #111827;
-        --sub: #5b6472;
+        --bg: #f4f6f9;
+        --s: #ffffff;
+        --s2: #f8fafc;
+        --s3: #eef2f6;
+        --bd: rgba(15, 23, 42, 0.08);
+        --bd2: rgba(15, 23, 42, 0.16);
+        --tx: #0f172a;
+        --sub: #64748b;
         --pr: #2563eb;
         --dg: #ef4444;
         --ok: #10b981;
@@ -50,19 +50,18 @@
         --CAFE: #ec4899;
         --FOOD: #f59e0b;
         --SHOP: #8b5cf6;
-        --pr-soft: rgba(59, 130, 246, 0.15);
-        --sh-card:
-          0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 14px rgba(15, 23, 42, 0.05);
+        --pr-soft: rgba(37, 99, 235, 0.12);
+        --sh-card: 0 4px 20px rgba(15, 23, 42, 0.05);
       }
       [data-theme="dark"] {
-        --bg: #0f1115;
-        --s: #181b20;
-        --s2: #20242b;
-        --s3: #2a2f38;
-        --bd: #2e343e;
-        --bd2: #3c434d;
-        --tx: #f3f4f6;
-        --sub: #9ca3af;
+        --bg: #090a0d;
+        --s: #12141a;
+        --s2: #171a22;
+        --s3: #20242f;
+        --bd: rgba(255, 255, 255, 0.08);
+        --bd2: rgba(255, 255, 255, 0.16);
+        --tx: #f8fafc;
+        --sub: #94a3b8;
         --pr: #3b82f6;
         --dg: #f87171;
         --ok: #34d399;
@@ -71,7 +70,7 @@
         --FOOD: #fbbf24;
         --SHOP: #a78bfa;
         --pr-soft: rgba(59, 130, 246, 0.18);
-        --sh-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 18px rgba(0, 0, 0, 0.28);
+        --sh-card: 0 8px 28px rgba(0, 0, 0, 0.45);
       }
       * {
         box-sizing: border-box;
@@ -81,66 +80,78 @@
       }
       body {
         font:
-          500 14px/1.5 "Pretendard Variable",
+          500 14px/1.55 "Pretendard Variable",
           Pretendard,
           -apple-system,
+          BlinkMacSystemFont,
           system-ui,
           sans-serif;
-        letter-spacing: -0.015em;
+        letter-spacing: -0.02em;
         color: var(--tx);
         background: var(--bg);
         display: flex;
         height: 100vh;
         height: 100dvh;
         overflow: hidden;
+        -webkit-font-smoothing: antialiased;
       }
       #side {
         width: 440px;
         min-width: 440px;
-        background: var(--s);
+        background: var(--bg);
         border-right: 1px solid var(--bd);
         display: flex;
         flex-direction: column;
         height: 100%;
         z-index: 20;
-        box-shadow: 2px 0 24px rgba(15, 23, 42, 0.04);
       }
       header {
-        padding: calc(12px + env(safe-area-inset-top)) 16px 12px;
+        padding: calc(14px + env(safe-area-inset-top)) 18px 14px;
         display: flex;
         justify-content: space-between;
         align-items: center;
+        background: rgba(18, 20, 26, 0.82);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
         border-bottom: 1px solid var(--bd);
         flex-shrink: 0;
+        z-index: 30;
+      }
+      [data-theme="light"] header {
+        background: rgba(255, 255, 255, 0.85);
       }
       .brand {
         display: flex;
-        gap: 10px;
+        gap: 11px;
         align-items: center;
       }
       .brand b {
         display: block;
-        font-size: 17px;
+        font-size: 18px;
         font-weight: 800;
+        letter-spacing: -0.03em;
       }
       .brand small {
-        font-size: 11px;
+        display: block;
+        font-size: 11.5px;
         color: var(--sub);
+        margin-top: 1px;
       }
       .logo {
-        width: 34px;
-        height: 34px;
-        border-radius: 10px;
-        background: linear-gradient(135deg, #2563eb, #ec4899, #f59e0b);
+        width: 36px;
+        height: 36px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #3b82f6, #8b5cf6, #ec4899);
         display: flex;
         align-items: center;
         justify-content: center;
-        box-shadow: 0 3px 10px rgba(59, 130, 246, 0.35);
+        font-size: 18px;
+        box-shadow: 0 4px 14px rgba(59, 130, 246, 0.35);
       }
       #nav {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
-        padding: 4px 6px;
+        padding: 6px 8px;
         border-bottom: 1px solid var(--bd);
         background: var(--s);
         flex-shrink: 0;
@@ -149,26 +160,32 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        padding: 6px 2px;
+        justify-content: center;
+        gap: 2px;
+        padding: 7px 4px;
         background: none;
         border: 0;
-        border-radius: 10px;
+        border-radius: 14px;
         color: var(--sub);
         font-family: inherit;
         font-size: 11px;
         font-weight: 700;
-        line-height: 1.3;
+        line-height: 1.2;
         white-space: nowrap;
         cursor: pointer;
         touch-action: manipulation;
         transition:
-          background 0.15s,
-          color 0.15s;
+          background 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+          color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+          transform 0.12s ease;
+      }
+      .tab-btn:active {
+        transform: scale(0.94);
       }
       .tab-btn i {
         font-style: normal;
         font-size: 18px;
-        line-height: 1.2;
+        line-height: 1.1;
       }
       .tab-btn.active {
         color: var(--pr);
@@ -185,7 +202,7 @@
         -webkit-overflow-scrolling: touch;
         padding: 16px;
         flex-direction: column;
-        gap: 10px;
+        gap: 12px;
       }
       .tab-content > * {
         flex-shrink: 0;
@@ -194,43 +211,48 @@
         display: flex;
       }
       .card {
-        background: var(--s2);
+        background: var(--s);
         border: 1px solid var(--bd);
-        border-radius: 18px;
-        padding: 14px;
+        border-radius: 24px;
+        padding: 18px;
         box-shadow: var(--sh-card);
       }
       label {
         display: block;
-        font-size: 12px;
+        font-size: 12.5px;
         font-weight: 700;
-        margin-bottom: 5px;
+        margin-bottom: 7px;
         color: var(--sub);
+        letter-spacing: -0.01em;
       }
       input[type="text"],
       input[type="password"],
-      textarea {
+      textarea,
+      select.btn.g {
         width: 100%;
-        padding: 11px 12px;
+        padding: 13px 15px;
         border: 1px solid var(--bd);
-        border-radius: 12px;
+        border-radius: 16px;
         font: inherit;
         color: var(--tx);
-        background: var(--s);
-        margin-bottom: 10px;
+        background: var(--s2);
+        margin-bottom: 12px;
         outline: 0;
         transition:
-          border-color 0.15s,
-          box-shadow 0.15s;
+          border-color 0.18s ease,
+          box-shadow 0.18s ease,
+          background 0.18s ease;
       }
       input:focus,
       textarea:focus {
         border-color: var(--pr);
+        background: var(--s);
         box-shadow: 0 0 0 3px var(--pr-soft);
       }
       textarea {
-        min-height: 76px;
+        min-height: 84px;
         resize: vertical;
+        line-height: 1.5;
       }
       input[type="checkbox"] {
         appearance: none;
@@ -238,9 +260,9 @@
         width: 22px;
         height: 22px;
         min-width: 22px;
-        border: 2px solid var(--bd2);
-        border-radius: 7px;
-        background-color: #fff;
+        border: 1.8px solid var(--bd2);
+        border-radius: 8px;
+        background-color: var(--s3);
         background-position: center;
         background-repeat: no-repeat;
         background-size: 13px 13px;
@@ -253,7 +275,7 @@
           transform 0.12s;
       }
       input[type="checkbox"]:active {
-        transform: scale(0.92);
+        transform: scale(0.9);
       }
       input[type="checkbox"]:checked {
         background-color: var(--pr);
@@ -263,67 +285,74 @@
       .seg {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
-        gap: 4px;
-        background: var(--s);
-        padding: 4px;
+        gap: 6px;
+        background: var(--s2);
+        padding: 5px;
         border: 1px solid var(--bd);
-        border-radius: 12px;
-        margin-bottom: 12px;
+        border-radius: 18px;
+        margin-bottom: 14px;
       }
       .seg.seg5 {
         grid-template-columns: repeat(5, 1fr);
-        margin-bottom: 6px;
+        margin-bottom: 8px;
       }
       .seg div {
-        padding: 8px 2px;
+        padding: 9px 4px;
         text-align: center;
-        font-size: 12px;
+        font-size: 12.5px;
         font-weight: 700;
-        border-radius: 9px;
+        border-radius: 13px;
         color: var(--sub);
         white-space: nowrap;
         cursor: pointer;
         transition:
-          background 0.15s,
-          color 0.15s;
+          background 0.18s ease,
+          color 0.18s ease,
+          transform 0.12s ease;
+      }
+      .seg div:active {
+        transform: scale(0.96);
       }
       .seg .on {
-        background: var(--pr-soft);
-        color: var(--pr);
-        box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.22);
+        background: var(--pr);
+        color: #fff;
+        box-shadow: 0 3px 10px rgba(59, 130, 246, 0.32);
       }
       .btn {
         width: 100%;
-        padding: 12px;
+        padding: 13.5px 16px;
         background: var(--pr);
         color: #fff;
         border: 0;
-        border-radius: 12px;
+        border-radius: 16px;
         font: inherit;
+        font-size: 14px;
         font-weight: 700;
         cursor: pointer;
         touch-action: manipulation;
-        box-shadow: 0 2px 10px rgba(37, 99, 235, 0.28);
+        box-shadow: 0 4px 14px rgba(37, 99, 235, 0.32);
         transition:
-          transform 0.12s,
-          opacity 0.15s;
+          transform 0.12s ease,
+          opacity 0.15s ease,
+          background 0.15s ease;
       }
       .btn:active {
-        transform: scale(0.985);
+        transform: scale(0.98);
       }
       .btn:disabled {
         opacity: 0.55;
       }
       .btn.g {
-        background: var(--s3);
+        background: var(--s2);
         color: var(--tx);
+        border: 1px solid var(--bd);
         margin-bottom: 8px;
         box-shadow: none;
       }
       .spinner {
         display: inline-block;
-        width: 12px;
-        height: 12px;
+        width: 13px;
+        height: 13px;
         border: 2px solid var(--bd2);
         border-top-color: var(--pr);
         border-radius: 50%;
@@ -337,38 +366,40 @@
         }
       }
       .item {
-        background: var(--s2);
+        background: var(--s);
         border: 1px solid var(--bd);
-        border-radius: 16px;
-        padding: 12px;
+        border-radius: 22px;
+        padding: 14px;
         display: flex;
-        gap: 12px;
+        gap: 13px;
         align-items: center;
         cursor: pointer;
+        box-shadow: var(--sh-card);
         content-visibility: auto;
-        contain-intrinsic-size: 110px;
+        contain-intrinsic-size: 116px;
         transition:
-          background 0.15s,
-          border-color 0.15s,
-          transform 0.12s;
+          background 0.18s ease,
+          border-color 0.18s ease,
+          transform 0.12s ease;
       }
       .item:active {
-        transform: scale(0.99);
-        background: var(--s3);
+        transform: scale(0.985);
+        background: var(--s2);
       }
       .item.done {
-        opacity: 0.52;
+        opacity: 0.48;
       }
       .item.starred {
-        border-color: rgba(251, 191, 36, 0.45);
+        border-color: rgba(251, 191, 36, 0.55);
       }
       .pic {
         position: relative;
-        width: 82px;
-        height: 82px;
+        width: 84px;
+        height: 84px;
         flex: none;
-        border-radius: 12px;
-        background: var(--s3);
+        border-radius: 16px;
+        background: var(--s2);
+        border: 1px solid var(--bd);
         display: grid;
         place-items: center;
         font-size: 30px;
@@ -386,26 +417,27 @@
         height: auto;
         aspect-ratio: 4/3;
         font-size: 60px;
-        margin-bottom: 12px;
+        border-radius: 20px;
+        margin-bottom: 14px;
       }
       iframe.big {
         width: 100%;
         aspect-ratio: 4/3;
         border: 0;
-        border-radius: 12px;
-        margin-bottom: 12px;
+        border-radius: 20px;
+        margin-bottom: 14px;
       }
       .pic .dayTag {
         position: absolute;
-        left: 4px;
-        top: 4px;
+        left: 5px;
+        top: 5px;
         z-index: 2;
-        background: rgba(37, 99, 235, 0.92);
+        background: rgba(37, 99, 235, 0.94);
         color: #fff;
         font-size: 10px;
         font-weight: 800;
-        padding: 1px 5px;
-        border-radius: 6px;
+        padding: 2px 6px;
+        border-radius: 99px;
         line-height: 1.3;
       }
       .mid {
@@ -413,8 +445,9 @@
         min-width: 0;
       }
       .nm {
-        font-weight: 700;
+        font-weight: 800;
         font-size: 15.5px;
+        letter-spacing: -0.02em;
         word-break: keep-all;
         display: flex;
         align-items: center;
@@ -423,6 +456,7 @@
       .ds {
         font-size: 12.5px;
         color: var(--sub);
+        margin-top: 2px;
         display: -webkit-box;
         line-clamp: 2;
         -webkit-box-orient: vertical;
@@ -430,44 +464,49 @@
       }
       .ds.in {
         color: var(--pr);
+        font-weight: 600;
       }
       .ok {
         font-size: 12px;
+        font-weight: 700;
         color: var(--pr);
         white-space: nowrap;
       }
       .act {
         display: flex;
-        gap: 6px;
+        gap: 7px;
         flex-wrap: wrap;
-        margin: 8px 0;
+        margin: 9px 0;
       }
       .mb {
         min-height: 36px;
-        padding: 7px 11px;
-        border-radius: 10px;
+        padding: 7px 13px;
+        border-radius: 999px;
         font-family: inherit;
         font-size: 12px;
         font-weight: 700;
         border: 1px solid var(--bd);
-        background: var(--s);
+        background: var(--s2);
         color: var(--tx);
         cursor: pointer;
         touch-action: manipulation;
         display: inline-flex;
         align-items: center;
-        gap: 4px;
+        gap: 5px;
+        text-decoration: none;
         transition:
-          background 0.15s,
-          transform 0.12s;
+          background 0.15s ease,
+          border-color 0.15s ease,
+          transform 0.12s ease;
       }
       .mb:active {
-        transform: scale(0.95);
+        transform: scale(0.94);
       }
       .mb.pr {
         background: var(--pr);
         color: #fff;
         border-color: var(--pr);
+        box-shadow: 0 3px 10px rgba(59, 130, 246, 0.28);
       }
       .mb.dg {
         color: var(--dg);
@@ -477,7 +516,7 @@
         color: #fff !important;
         border: 0 !important;
         font-weight: 800;
-        box-shadow: 0 3px 10px rgba(225, 48, 108, 0.28);
+        box-shadow: 0 3px 12px rgba(225, 48, 108, 0.32);
       }
       .star-btn {
         background: none;
@@ -494,10 +533,10 @@
       }
       .star-btn.on {
         opacity: 1;
-        transform: scale(1.1);
+        transform: scale(1.12);
       }
       #netStatus {
-        font-size: 10px;
+        font-size: 10.5px;
         font-weight: 800;
         color: var(--ok);
         white-space: nowrap;
@@ -513,17 +552,19 @@
         flex: 1;
         margin-bottom: 0;
         min-width: 0;
+        border-radius: 999px;
+        padding: 10px 15px;
       }
       .clear-search {
         min-width: 36px;
-        padding: 7px 8px;
+        padding: 7px 10px;
         justify-content: center;
       }
 
       /* 목록 가로 필터 칩 & 상태 배지 */
       .lchips {
         display: flex;
-        gap: 5px;
+        gap: 6px;
         overflow-x: auto;
         scrollbar-width: none;
         -webkit-overflow-scrolling: touch;
@@ -538,36 +579,44 @@
         position: sticky;
         top: 0;
         z-index: 6;
-        background: var(--s);
+        background: var(--bg);
         padding-top: 6px;
         padding-bottom: 6px;
         margin-top: -4px;
       }
       .lchip {
         flex: none;
-        padding: 5px 10px;
-        border-radius: 99px;
+        padding: 6px 12px;
+        border-radius: 999px;
         border: 1px solid var(--bd);
-        background: var(--s2);
+        background: var(--s);
         color: var(--sub);
         font: inherit;
-        font-size: 11.5px;
+        font-size: 12px;
         font-weight: 700;
         cursor: pointer;
         white-space: nowrap;
         touch-action: manipulation;
+        transition:
+          background 0.15s,
+          color 0.15s,
+          transform 0.12s;
+      }
+      .lchip:active {
+        transform: scale(0.95);
       }
       .lchip.on {
         background: var(--pr);
         color: #fff;
         border-color: var(--pr);
+        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
       }
       .bstat {
         display: inline-flex;
         align-items: center;
         gap: 3px;
-        padding: 1px 6px;
-        border-radius: 6px;
+        padding: 2px 7px;
+        border-radius: 99px;
         font-size: 10.5px;
         font-weight: 800;
         white-space: nowrap;
@@ -591,22 +640,26 @@
 
       .empty {
         text-align: center;
-        padding: 44px 0;
+        padding: 48px 16px;
         color: var(--sub);
         font-size: 13px;
+        background: var(--s);
+        border: 1px dashed var(--bd2);
+        border-radius: 22px;
       }
       .empty i {
         display: block;
         font-style: normal;
         font-size: 38px;
-        opacity: 0.8;
+        margin-bottom: 6px;
+        opacity: 0.85;
       }
       #map-wrap {
         flex: 1;
         position: relative;
         height: 100%;
         z-index: 0;
-        background: #0b1220;
+        background: #090a0d;
       }
       #map {
         width: 100%;
@@ -619,49 +672,50 @@
         right: 12px;
         top: 96px;
         z-index: 1100;
-        background: var(--s);
+        background: rgba(18, 20, 26, 0.92);
+        backdrop-filter: blur(14px);
         color: var(--tx);
         border: 1px solid var(--bd);
-        border-radius: 12px;
-        padding: 10px 12px;
+        border-radius: 16px;
+        padding: 12px 14px;
         font-size: 12.5px;
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
       }
-      #locBtn {
-        position: absolute;
-        right: 12px;
-        bottom: 12px;
-        z-index: 1100;
-        padding: 10px 14px;
-        border: 0;
-        border-radius: 12px;
-        background: var(--s);
-        color: var(--tx);
-        font-family: inherit;
-        font-size: 13px;
-        font-weight: 700;
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
-        cursor: pointer;
-        touch-action: manipulation;
-        transition: bottom 0.15s;
-      }
+      #locBtn,
       #myMapsBtn {
         position: absolute;
-        left: 12px;
-        bottom: 12px;
+        bottom: 14px;
         z-index: 1100;
-        padding: 10px 14px;
-        border: 0;
-        border-radius: 12px;
-        background: var(--s);
+        padding: 10px 15px;
+        border: 1px solid var(--bd);
+        border-radius: 999px;
+        background: rgba(18, 20, 26, 0.88);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
         color: var(--tx);
         font-family: inherit;
         font-size: 13px;
         font-weight: 700;
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
         cursor: pointer;
         touch-action: manipulation;
-        transition: bottom 0.15s;
+        transition:
+          bottom 0.15s,
+          transform 0.12s;
+      }
+      [data-theme="light"] #locBtn,
+      [data-theme="light"] #myMapsBtn {
+        background: rgba(255, 255, 255, 0.9);
+      }
+      #locBtn {
+        right: 12px;
+      }
+      #myMapsBtn {
+        left: 12px;
+      }
+      #locBtn:active,
+      #myMapsBtn:active {
+        transform: scale(0.95);
       }
       #mapStrip {
         position: absolute;
@@ -670,9 +724,10 @@
         bottom: 0;
         z-index: 1100;
         display: none;
-        gap: 8px;
+        gap: 10px;
         overflow-x: auto;
-        padding: 12px 12px 14px;
+        padding: 12px 14px 16px;
+        background: linear-gradient(transparent, rgba(9, 10, 13, 0.85));
         scrollbar-width: none;
         -webkit-overflow-scrolling: touch;
       }
@@ -687,7 +742,7 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 3px;
+        gap: 4px;
         background: none;
         border: 0;
         padding: 0;
@@ -696,19 +751,20 @@
         -webkit-user-select: none;
         user-select: none;
         cursor: pointer;
+        transition: transform 0.12s;
       }
       #mapStrip .stripCard:active {
-        transform: scale(0.95);
+        transform: scale(0.93);
       }
       #mapStrip .stripCard > span {
-        max-width: 68px;
-        font-size: 10px;
+        max-width: 70px;
+        font-size: 10.5px;
         font-weight: 700;
         line-height: 1.25;
         color: #fff;
         text-shadow:
-          0 1px 3px rgba(0, 0, 0, 0.85),
-          0 0 6px rgba(0, 0, 0, 0.55);
+          0 1px 3px rgba(0, 0, 0, 0.9),
+          0 0 6px rgba(0, 0, 0, 0.6);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -721,7 +777,7 @@
       }
       #map-wrap.has-strip #locBtn,
       #map-wrap.has-strip #myMapsBtn {
-        bottom: 122px;
+        bottom: 126px;
       }
 
       #mapChips {
@@ -733,7 +789,8 @@
         display: none;
         flex-direction: column;
         gap: 6px;
-        padding: calc(8px + env(safe-area-inset-top)) 10px 6px;
+        padding: calc(10px + env(safe-area-inset-top)) 12px 8px;
+        background: linear-gradient(rgba(9, 10, 13, 0.65), transparent);
         pointer-events: none;
       }
       #mapChips.on {
@@ -755,16 +812,18 @@
         flex: none;
         display: inline-flex;
         align-items: center;
-        gap: 4px;
-        padding: 7px 12px;
-        border-radius: 99px;
+        gap: 5px;
+        padding: 7px 13px;
+        border-radius: 999px;
         border: 1px solid var(--bd);
-        background: var(--s);
+        background: rgba(18, 20, 26, 0.88);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
         color: var(--tx);
         font-family: inherit;
         font-size: 12px;
         font-weight: 800;
-        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
         touch-action: manipulation;
         cursor: pointer;
         transition:
@@ -772,14 +831,17 @@
           background 0.15s,
           opacity 0.15s;
       }
+      [data-theme="light"] #mapChips .chip {
+        background: rgba(255, 255, 255, 0.92);
+      }
       #mapChips .chip:active {
         transform: scale(0.95);
       }
       #mapChips .chip.sub {
-        padding: 5px 10px;
+        padding: 6px 11px;
         font-size: 11.5px;
         font-weight: 700;
-        opacity: 0.94;
+        opacity: 0.95;
       }
       #mapChips .chip.reel-on {
         background: linear-gradient(135deg, #e1306c, #833ab4);
@@ -842,7 +904,9 @@
         position: fixed;
         inset: 0;
         z-index: 300;
-        background: rgba(9, 11, 15, 0.92);
+        background: rgba(6, 7, 10, 0.86);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
         display: none;
         align-items: center;
         justify-content: center;
@@ -856,10 +920,11 @@
         max-width: 460px;
         background: #fff;
         color: #111827;
-        border-radius: 24px;
-        padding: 24px 20px;
-        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+        border-radius: 28px;
+        padding: 26px 22px;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65);
         text-align: center;
+        animation: shUp 0.24s cubic-bezier(0.22, 1, 0.36, 1);
       }
       .taxi-card .t-ph {
         font-size: 13px;
@@ -867,7 +932,7 @@
         color: #2563eb;
         background: #eff6ff;
         display: inline-block;
-        padding: 5px 12px;
+        padding: 6px 14px;
         border-radius: 99px;
         margin-bottom: 12px;
       }
@@ -890,7 +955,7 @@
         line-height: 1.45;
         padding: 16px;
         background: #f3f4f6;
-        border-radius: 16px;
+        border-radius: 18px;
         border: 2px solid #e5e7eb;
         margin-bottom: 16px;
         word-break: break-word;
@@ -898,11 +963,11 @@
       }
 
       .pinCard {
-        width: 52px;
-        height: 66px;
-        border-radius: 10px;
+        width: 54px;
+        height: 68px;
+        border-radius: 14px;
         border: 2px solid #fff;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.55);
         overflow: hidden;
         background: var(--s2);
         position: relative;
@@ -913,7 +978,7 @@
         border: 2.5px solid #fbbf24;
         box-shadow:
           0 0 0 2px rgba(251, 191, 36, 0.5),
-          0 3px 10px rgba(0, 0, 0, 0.6);
+          0 4px 12px rgba(0, 0, 0, 0.65);
       }
       .pinCard i {
         font-style: normal;
@@ -941,9 +1006,9 @@
       }
       .pinCard b {
         position: absolute;
-        right: 2px;
-        bottom: 2px;
-        background: rgba(0, 0, 0, 0.65);
+        right: 3px;
+        bottom: 3px;
+        background: rgba(0, 0, 0, 0.68);
         border-radius: 6px;
         font-size: 10px;
         padding: 1px 4px;
@@ -951,12 +1016,12 @@
       }
       .pinCard em {
         position: absolute;
-        left: 2px;
-        top: 2px;
+        left: 3px;
+        top: 3px;
         font-style: normal;
-        background: rgba(37, 99, 235, 0.92);
+        background: rgba(37, 99, 235, 0.94);
         color: #fff;
-        border-radius: 5px;
+        border-radius: 6px;
         font-size: 9px;
         font-weight: 800;
         padding: 0 4px;
@@ -965,8 +1030,8 @@
       }
       .pinCard .pstar {
         position: absolute;
-        right: 2px;
-        top: 2px;
+        right: 3px;
+        top: 3px;
         font-size: 10px;
         line-height: 1;
         filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.8));
@@ -974,8 +1039,8 @@
       }
       .pinCard .pinNum {
         position: absolute;
-        left: 2px;
-        bottom: 2px;
+        left: 3px;
+        bottom: 3px;
         z-index: 2;
         min-width: 17px;
         height: 17px;
@@ -993,25 +1058,28 @@
         pointer-events: none;
       }
       .mapPinPopup {
-        min-width: 190px;
-        max-width: 260px;
+        min-width: 195px;
+        max-width: 265px;
         font:
-          13px/1.4 system-ui,
+          500 13px/1.45 "Pretendard Variable",
+          system-ui,
           sans-serif;
         color: #111827;
       }
       .mapPinPopup strong {
         display: block;
-        font-size: 14px;
+        font-size: 14.5px;
+        font-weight: 800;
         margin-bottom: 4px;
       }
       .mapPinPopup .mapPinPlace {
         padding-bottom: 8px;
         margin-bottom: 8px;
-        border-bottom: 1px solid #d1d5db;
+        border-bottom: 1px solid #e5e7eb;
       }
       .mapPinPopup .mapPinAddress {
         margin-bottom: 8px;
+        color: #4b5563;
         overflow-wrap: anywhere;
       }
       .mapPinPopup .mapPinActions {
@@ -1028,11 +1096,15 @@
         font-weight: 700;
         cursor: pointer;
       }
+
+      /* 네이티브 스타일 바텀 시트 */
       #sheet {
         position: fixed;
         inset: 0;
         z-index: 220;
-        background: rgba(9, 11, 15, 0.6);
+        background: rgba(5, 6, 9, 0.72);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
         display: none;
         align-items: flex-end;
         justify-content: center;
@@ -1042,20 +1114,21 @@
       }
       .sh {
         background: var(--s);
+        border-top: 1px solid var(--bd2);
         width: 100%;
         max-width: 520px;
         max-height: 92dvh;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
-        border-radius: 20px 20px 0 0;
-        padding: 14px 16px calc(18px + env(safe-area-inset-bottom));
-        box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.35);
-        animation: shUp 0.22s ease;
+        border-radius: 28px 28px 0 0;
+        padding: 16px 18px calc(22px + env(safe-area-inset-bottom));
+        box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.55);
+        animation: shUp 0.28s cubic-bezier(0.22, 1, 0.36, 1);
       }
       @keyframes shUp {
         from {
-          transform: translateY(28px);
-          opacity: 0.4;
+          transform: translateY(42px);
+          opacity: 0.3;
         }
         to {
           transform: translateY(0);
@@ -1068,32 +1141,36 @@
         top: 0;
         z-index: 10;
         display: block;
-        width: 42px;
-        height: 4px;
+        width: 44px;
+        height: 5px;
         border-radius: 99px;
         background: var(--bd2);
-        margin: -4px auto 12px;
-        opacity: 0.85;
+        margin: -4px auto 14px;
+        opacity: 0.9;
         pointer-events: none;
       }
       #toast {
         position: fixed;
         left: 50%;
-        bottom: 20px;
+        bottom: 24px;
         transform: translate(-50%, 150%);
         max-width: 92vw;
         z-index: 9999;
-        background: var(--s);
-        color: var(--tx);
-        border: 1px solid var(--bd);
+        background: rgba(18, 20, 26, 0.94);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        color: #f8fafc;
+        border: 1px solid rgba(255, 255, 255, 0.12);
         border-left: 4px solid var(--pr);
-        padding: 11px 15px;
-        border-radius: 14px;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.45);
+        padding: 12px 16px;
+        border-radius: 18px;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
         font-size: 13px;
-        font-weight: 600;
+        font-weight: 700;
         opacity: 0;
-        transition: 0.2s;
+        transition:
+          transform 0.24s cubic-bezier(0.22, 1, 0.36, 1),
+          opacity 0.2s ease;
         pointer-events: none;
         display: flex;
         align-items: center;
@@ -1113,8 +1190,8 @@
         padding: 10px 18px;
         background: var(--s);
         color: var(--tx);
-        border-radius: 0 0 14px 14px;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+        border-radius: 0 0 16px 16px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
         font-size: 13px;
         font-weight: 700;
         transition:
@@ -1129,7 +1206,7 @@
       }
       details.acc {
         border: 1px solid var(--bd);
-        border-radius: 14px;
+        border-radius: 18px;
         background: var(--s2);
         margin-bottom: 12px;
         box-shadow: var(--sh-card);
@@ -1137,8 +1214,8 @@
       details.acc > summary {
         list-style: none;
         cursor: pointer;
-        padding: 12px 14px;
-        font-size: 13px;
+        padding: 13px 16px;
+        font-size: 13.5px;
         font-weight: 800;
         display: flex;
         align-items: center;
@@ -1169,7 +1246,7 @@
         transform: rotate(225deg);
       }
       .acc-in {
-        padding: 2px 14px 14px;
+        padding: 4px 16px 16px;
       }
       .acc-in .act {
         margin: 8px 0;
@@ -1191,26 +1268,26 @@
         }
         #nav {
           position: fixed;
-          left: 10px;
-          right: 10px;
+          left: 12px;
+          right: 12px;
           bottom: calc(8px + env(safe-area-inset-bottom));
           z-index: 210;
           grid-template-columns: repeat(4, 1fr);
-          border: 1px solid var(--bd);
-          border-radius: 20px;
+          border: 1px solid var(--bd2);
+          border-radius: 24px;
           padding: 6px;
-          background: rgba(24, 27, 32, 0.96);
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
-          box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+          background: rgba(18, 20, 26, 0.88);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55);
         }
         [data-theme="light"] #nav {
-          background: rgba(255, 255, 255, 0.96);
+          background: rgba(255, 255, 255, 0.9);
         }
         .tab-btn {
           font-size: 11px;
-          padding: 6px 2px;
-          border-radius: 14px;
+          padding: 7px 2px;
+          border-radius: 18px;
           letter-spacing: -0.02em;
         }
         .tab-btn i {
@@ -1221,14 +1298,14 @@
           display: flex;
         }
         .tab-content {
-          padding-bottom: calc(115px + env(safe-area-inset-bottom)) !important;
+          padding-bottom: calc(118px + env(safe-area-inset-bottom)) !important;
         }
         #map-wrap {
           position: fixed;
           left: 0;
           right: 0;
           top: 0;
-          bottom: calc(76px + env(safe-area-inset-bottom));
+          bottom: calc(78px + env(safe-area-inset-bottom));
           height: auto;
           z-index: -1;
           visibility: hidden;
@@ -1259,7 +1336,7 @@
           display: none !important;
         }
         #myMapsFloatingBack {
-          bottom: calc(88px + env(safe-area-inset-bottom));
+          bottom: calc(92px + env(safe-area-inset-bottom));
         }
         input[type="text"],
         input[type="password"],
@@ -1267,10 +1344,10 @@
           font-size: 16px;
         }
         .sh {
-          padding-bottom: calc(92px + env(safe-area-inset-bottom));
+          padding-bottom: calc(96px + env(safe-area-inset-bottom));
         }
         #toast {
-          bottom: calc(96px + env(safe-area-inset-bottom));
+          bottom: calc(98px + env(safe-area-inset-bottom));
         }
       }
     </style>
@@ -1301,10 +1378,10 @@
             <div data-cat="FOOD">🍙 음식</div>
             <div data-cat="SHOP">🛍️ 쇼핑</div>
           </div>
-          <label style="margin-bottom: 3px"
+          <label style="margin-bottom: 5px"
             >🎬 1. 릴스·쇼츠 원본 링크 (넣어두면 언제든 릴스로 바로 이동)</label
           >
-          <div style="display: flex; gap: 6px; margin-bottom: 10px">
+          <div style="display: flex; gap: 7px; margin-bottom: 12px">
             <input
               type="text"
               id="reelLinkBox"
@@ -1314,19 +1391,19 @@
             <button
               class="mb pr"
               id="pasteReelLink"
-              style="flex: none; white-space: nowrap"
+              style="flex: none; white-space: nowrap; border-radius: 14px"
             >
               📋 링크 붙여넣기
             </button>
           </div>
-          <label style="margin-bottom: 3px"
+          <label style="margin-bottom: 5px"
             >📋 2. 릴스 캡션·고정댓글 텍스트 (최대 10곳 동시 분석·중복
             자동병합)</label
           >
           <textarea
             id="shareBox"
             placeholder="릴스/쇼츠 캡션이나 고정댓글에서 복사한 맛집·카페 리스트를 붙여넣으세요 (위의 링크만 넣고 분석해도 됩니다)"
-            style="margin-top: 4px; min-height: 68px"
+            style="margin-top: 2px; min-height: 78px"
           ></textarea>
           <div style="display: flex; gap: 8px; margin-bottom: 8px">
             <button
@@ -1348,9 +1425,10 @@
           <small
             style="
               display: block;
-              margin-top: 6px;
+              margin-top: 8px;
               color: var(--sub);
-              font-size: 11px;
+              font-size: 11.5px;
+              line-height: 1.45;
             "
             >💡 Top 6·Top 10 쇼츠도 고정댓글을 붙여넣거나 스샷을 여러 장
             선택하면 최대 10곳까지 한 번에 등록되며, 이미 있는 장소는 중복 없이
@@ -1413,7 +1491,7 @@
               확인 — 이게 없으면 모든 기기에서 로그인이 막힙니다(로딩 중 흰
               화면)<br />
               2) 새로고침 2번(홈 화면 앱은 완전히 닫았다 다시 열기) · 위 "이 앱
-              버전"이 최신(v56)인지 확인<br />
+              버전"이 최신(v57)인지 확인<br />
               3) 아이폰·아이패드: 설정 → 사파리 → "모든 쿠키 차단"은 꺼짐이어야
               하고, "사이트 간 추적 방지"가 원인이면 해제 후 재시도<br />
               4) iCloud 프라이빗 릴레이 사용 중이면 잠시 끄고 재시도<br />
@@ -1540,9 +1618,9 @@
             id="usageBox"
             style="
               margin-top: 10px;
-              padding: 10px;
+              padding: 12px;
               border: 1px solid var(--bd);
-              border-radius: 12px;
+              border-radius: 16px;
               background: var(--s2);
               font-size: 12px;
               line-height: 1.8;
@@ -1893,7 +1971,7 @@
             .map((id) => {
               const local = localMap.get(id),
                 remote = remoteMap.get(id);
-              return `<div style="margin-top:8px;padding:8px;border:1px solid var(--bd);border-radius:8px">
+              return `<div style="margin-top:8px;padding:8px;border:1px solid var(--bd);border-radius:12px">
         <b>${esc(itemLabel(local || remote, id))}</b>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:5px">
           ${local ? `<button class="mb" data-room-action="conflict-local" data-id="${esc(id)}">내 변경 적용</button>` : ""}
@@ -2394,7 +2472,7 @@
       const TRIP_PENDING_CONFLICT_KEY = "TRIP_PENDING_CONFLICT";
       const TRIP_LAST_ROOM_KEY = "TRIP_LAST_ROOM";
       const TRIP_CREATING_ROOM_KEY = "TRIP_CREATING_ROOM";
-      const APP_VERSION = "v56";
+      const APP_VERSION = "v57";
       const TRANSIENT_NET_RE =
         /unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
       let _offlineFlushBusy = false,
@@ -2646,7 +2724,7 @@
             sharedLocalDirty = false;
             return;
           }
-          const history = Array.isArray(d.history) ? d.history.slice(-9) : [];
+          const history = Array.isArray(d.history) ? d.history.slice(-2) : [];
           let mergedItems = finalItems;
           let conflictEntries = [];
           if (Number(q.baseRevision) !== remoteRevision) {
@@ -2660,7 +2738,7 @@
           }
           const newRevision = remoteRevision + 1;
           history.push({
-            items: d.items || [],
+            items: sanitizeSharedItems(d.items || []),
             savedAt: Date.now(),
             savedBy: firebase.auth().currentUser?.uid || "",
           });
@@ -2741,9 +2819,9 @@
           const mergedItems = result.mergedItems;
           const conflictEntries = result.conflictEntries;
           const newRevision = remoteRevision + 1;
-          const history = Array.isArray(d.history) ? d.history.slice(-9) : [];
+          const history = Array.isArray(d.history) ? d.history.slice(-2) : [];
           history.push({
-            items: d.items || [],
+            items: sanitizeSharedItems(d.items || []),
             savedAt: Date.now(),
             savedBy: firebase.auth().currentUser?.uid || "",
           });
@@ -3541,6 +3619,14 @@
             item.lng = Number.isFinite(Number(raw.lng))
               ? Number(raw.lng)
               : null;
+            if (
+              typeof item.img === "string" &&
+              item.img.startsWith("data:image") &&
+              item.img.length > 4000
+            ) {
+              item.img = "";
+              item.useCustomImg = false;
+            }
             item.places = Array.isArray(raw.places)
               ? raw.places
                   .slice(0, 20)
@@ -3595,11 +3681,16 @@
               if (snap.exists && revision !== sharedRevision)
                 throw new Error("CONCURRENT_EDIT");
               const history = Array.isArray(current.history)
-                ? current.history.slice(-9)
+                ? current.history.slice(-1).map((h) => ({
+                    ...h,
+                    items: removeUndefined(sanitizeSharedItems(h?.items || [])),
+                  }))
                 : [];
               if (snap.exists)
                 history.push({
-                  items: current.items || [],
+                  items: removeUndefined(
+                    sanitizeSharedItems(current.items || []),
+                  ),
                   savedAt: Date.now(),
                   savedBy: firebase.auth().currentUser.uid,
                 });
@@ -3708,7 +3799,12 @@
           const revision = Number(data.revision || 0);
           tx.update(ref, {
             ...fields,
-            history: Array.isArray(data.history) ? data.history : [],
+            history: Array.isArray(data.history)
+              ? data.history.slice(-1).map((h) => ({
+                  ...h,
+                  items: removeUndefined(sanitizeSharedItems(h?.items || [])),
+                }))
+              : [],
             revision: revision + 1,
           });
           sharedRevision = revision + 1;
@@ -3833,7 +3929,18 @@
                 listenOwnJoinRequest();
                 if (Array.isArray(data.items)) {
                   remoteApplying = true;
-                  items = sanitizeSharedItems(data.items);
+                  const localImgMap = new Map(
+                    items
+                      .filter((x) => x && x.useCustomImg && x.img)
+                      .map((x) => [String(x.id), x.img]),
+                  );
+                  items = sanitizeSharedItems(data.items).map((it) => {
+                    if (!it.img && localImgMap.has(String(it.id))) {
+                      it.img = localImgMap.get(String(it.id));
+                      it.useCustomImg = true;
+                    }
+                    return it;
+                  });
                   if (sharedSettingsShared && data.settings && sharedOwnerUid) {
                     applySharedSettings(data.settings);
                   }
@@ -4837,7 +4944,7 @@
           onAdd() {
             this.div = document.createElement("div");
             this.div.style.cssText =
-              "position:absolute;width:52px;height:66px;cursor:pointer;pointer-events:auto;touch-action:manipulation";
+              "position:absolute;width:54px;height:68px;cursor:pointer;pointer-events:auto;touch-action:manipulation";
             this.div.innerHTML = pinCardHtml(this.item);
             let moved = false,
               sx = 0,
@@ -4885,8 +4992,8 @@
               ),
             );
             if (!p) return;
-            this.div.style.left = p.x - 26 + "px";
-            this.div.style.top = p.y - 66 + "px";
+            this.div.style.left = p.x - 27 + "px";
+            this.div.style.top = p.y - 68 + "px";
           }
           onRemove() {
             if (this.div) {
@@ -5056,7 +5163,7 @@
               map: nmap,
               icon: {
                 content: pinCardHtml(i),
-                anchor: new naver.maps.Point(26, 66),
+                anchor: new naver.maps.Point(27, 68),
               },
             });
             naver.maps.Event.addListener(m, "click", () => openMapPinPopup(i));
@@ -5073,8 +5180,8 @@
             icon: L.divIcon({
               className: "",
               html: pinCardHtml(i),
-              iconSize: [52, 66],
-              iconAnchor: [26, 66],
+              iconSize: [54, 68],
+              iconAnchor: [27, 68],
             }),
           });
           m.bindPopup(mapPinPopupHtml(i));
@@ -5844,25 +5951,25 @@
       function groupedPlacesSummaryHtml(item) {
         if (!Array.isArray(item.places) || item.places.length < 2) return "";
         return `
-    <div id="groupedPlacesSummary" style="margin-top:10px;padding:10px;border-radius:12px;background:var(--s2);border:1px solid var(--bd)">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">
+    <div id="groupedPlacesSummary" style="margin-top:12px;padding:14px;border-radius:18px;background:var(--s2);border:1px solid var(--bd)">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
         <label style="margin:0">📍 이 릴스에 통합된 장소 (${item.places.length}곳)</label>
-        <button type="button" class="mb pr" data-act="addSubPlace" style="padding:4px 8px;font-size:11px">＋ 장소 추가</button>
+        <button type="button" class="mb pr" data-act="addSubPlace" style="padding:4px 10px;font-size:11px">＋ 장소 추가</button>
       </div>
       <div style="display:flex;flex-direction:column;gap:8px">
         ${item.places
           .map(
             (p, idx) => `
-          <div id="sub-place-${idx}" style="padding:8px;border-radius:10px;background:var(--s);border:1px solid var(--bd)">
-            <div style="font-weight:700;font-size:13.5px">${idx + 1}. ${esc(p.name)} ${p.lat && p.lng ? "🟢" : "🔴"}</div>
+          <div id="sub-place-${idx}" style="padding:11px;border-radius:14px;background:var(--s);border:1px solid var(--bd)">
+            <div style="font-weight:800;font-size:13.5px">${idx + 1}. ${esc(p.name)} ${p.lat && p.lng ? "🟢" : "🔴"}</div>
             <div class="ds" style="margin-top:2px">${esc(p.address || "주소 미입력")}</div>
             ${p.price || p.info ? `<div class="ds in" style="margin-top:2px">${esc([p.price, p.info].filter(Boolean).join(" · "))}</div>` : ""}
-            <div style="display:flex;gap:5px;margin-top:6px;flex-wrap:wrap">
-              <a class="mb pr" href="${esc(getGMapDirLink(p))}" target="_blank" rel="noopener" style="padding:3px 8px;font-size:11px">🧭 길찾기</a>
-              ${p.address ? `<button type="button" class="mb" data-act="copySubAddr" data-idx="${idx}" style="padding:3px 8px;font-size:11px">📋 주소복사</button>` : ""}
-              <button type="button" class="mb" data-act="focusSubPin" data-idx="${idx}" style="padding:3px 8px;font-size:11px">🎯 지도위치</button>
-              <button type="button" class="mb" data-act="taxiSub" data-idx="${idx}" style="padding:3px 8px;font-size:11px">🚕 택시화면</button>
-              <button type="button" class="mb dg" data-act="delSubPlace" data-idx="${idx}" style="padding:3px 8px;font-size:11px">삭제</button>
+            <div style="display:flex;gap:5px;margin-top:7px;flex-wrap:wrap">
+              <a class="mb pr" href="${esc(getGMapDirLink(p))}" target="_blank" rel="noopener" style="padding:4px 9px;font-size:11px">🧭 길찾기</a>
+              ${p.address ? `<button type="button" class="mb" data-act="copySubAddr" data-idx="${idx}" style="padding:4px 9px;font-size:11px">📋 주소복사</button>` : ""}
+              <button type="button" class="mb" data-act="focusSubPin" data-idx="${idx}" style="padding:4px 9px;font-size:11px">🎯 지도위치</button>
+              <button type="button" class="mb" data-act="taxiSub" data-idx="${idx}" style="padding:4px 9px;font-size:11px">🚕 택시화면</button>
+              <button type="button" class="mb dg" data-act="delSubPlace" data-idx="${idx}" style="padding:4px 9px;font-size:11px">삭제</button>
             </div>
           </div>
         `,
@@ -5944,10 +6051,10 @@
         const addressFields = editPlaces
           .map(
             (p, idx) => `
-    <div style="padding:9px;border:1px solid var(--bd);border-radius:11px;background:var(--s)">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:5px">
+    <div style="padding:11px;border:1px solid var(--bd);border-radius:14px;background:var(--s)">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px">
         <label style="margin:0">${idx === 0 ? "대표 장소" : "추가 장소 " + (idx + 1)}</label>
-        ${idx > 0 ? `<button type="button" class="mb dg" data-act="removeEditAddress" data-idx="${idx}" style="padding:3px 8px;font-size:11px">주소칸 삭제</button>` : ""}
+        ${idx > 0 ? `<button type="button" class="mb dg" data-act="removeEditAddress" data-idx="${idx}" style="padding:3px 9px;font-size:11px">주소칸 삭제</button>` : ""}
       </div>
       <input type="text" class="edit-place-name" data-idx="${idx}" value="${esc(idx === 0 && isGenericSharedName(p.name) ? "" : p.name || "")}" placeholder="장소명 (선택)" style="margin-bottom:6px">
       <input type="text" class="edit-place-address" data-idx="${idx}" value="${esc(p.address || "")}" placeholder="주소 / 지역" style="margin-bottom:0">
@@ -5959,41 +6066,41 @@
         $("sbody").innerHTML = `
     ${media}
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
-      <div class="nm" style="font-size:18px;flex:1">${esc(i.name)}${i.localName && i.localName !== i.name ? ` <span style="font-size:13px;color:var(--sub);font-weight:500">(${esc(i.localName)})</span>` : ""}</div>
-      <button type="button" class="mb${i.star ? " pr" : ""}" data-act="toggleStarSheet" style="flex:none;padding:6px 10px">${i.star ? "⭐ 중요됨" : "☆ 중요"}</button>
+      <div class="nm" style="font-size:19px;flex:1">${esc(i.name)}${i.localName && i.localName !== i.name ? ` <span style="font-size:13px;color:var(--sub);font-weight:500">(${esc(i.localName)})</span>` : ""}</div>
+      <button type="button" class="mb${i.star ? " pr" : ""}" data-act="toggleStarSheet" style="flex:none;padding:6px 12px">${i.star ? "⭐ 중요됨" : "☆ 중요"}</button>
     </div>
 
-    <div style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap">
       <div class="ds" style="flex:1;min-width:160px">${esc(i.address || "주소 미입력")}</div>
-      ${i.address ? `<button class="mb" data-act="copyAddr" style="padding:4px 8px;font-size:11px;flex:none">📋 주소복사</button>` : ""}
-      <button class="mb" data-act="openTaxi" style="padding:4px 8px;font-size:11px;flex:none">🚕 택시화면</button>
+      ${i.address ? `<button class="mb" data-act="copyAddr" style="padding:4px 10px;font-size:11px;flex:none">📋 주소복사</button>` : ""}
+      <button class="mb" data-act="openTaxi" style="padding:4px 10px;font-size:11px;flex:none">🚕 택시화면</button>
     </div>
 
-    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px">
       ${!(lat && lng) ? `<span class="bstat closed">🔴 좌표 미설정</span>` : `<span class="bstat open">🟢 좌표 (${lat.toFixed(4)}, ${lng.toFixed(4)})</span>`}
       <span class="bstat ${isMapRegistered(i) ? "open" : "closed"}">${isMapRegistered(i) ? "🗺️ 지도 등록됨" : "🗺️ 지도 미등록"}</span>
       ${biz ? `<span class="bstat ${biz.cls}">⏰ ${esc(biz.lbl)}</span>` : ""}
     </div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
       <button type="button" class="mb pr" data-act="registerMapItem">${isMapRegistered(i) ? "✓ 지도 등록됨" : "＋ 지도 등록"}</button>
       <button type="button" class="mb dg" data-act="hideMapItem">지도에서 삭제</button>
     </div>
 
-    ${i.price ? `<div class="ds" style="color:var(--FOOD);font-weight:700;margin-top:4px">${esc(i.price)}</div>` : ""}
-    ${i.info ? `<div class="ds in" style="margin-top:3px;line-clamp:4">${esc(i.info)}</div>` : ""}
+    ${i.price ? `<div class="ds" style="color:var(--FOOD);font-weight:700;margin-top:6px">${esc(i.price)}</div>` : ""}
+    ${i.info ? `<div class="ds in" style="margin-top:4px;line-clamp:4">${esc(i.info)}</div>` : ""}
     ${groupedPlacesSummaryHtml(i)}
 
-    <div style="margin-top:10px">
-      <label style="margin-bottom:4px">🗓️ 여행 일차 배정</label>
+    <div style="margin-top:12px">
+      <label style="margin-bottom:5px">🗓️ 여행 일차 배정</label>
       <div class="lchips">${dayChips}</div>
     </div>
 
-    <div style="margin:8px 0 10px;padding:10px;border-radius:12px;background:var(--s2);border:1px solid var(--bd)">
-      ${vUrl ? `<button class="btn reel-jump" data-act="openVid" data-id="${i.id}" style="margin-bottom:8px;padding:11px">${esc(vLabel)} (인스타/유튜브 앱 열기)</button>` : ""}
-      <label style="margin-bottom:4px">${vUrl ? "🔗 연결된 릴스·쇼츠 링크 (수정 가능)" : "🎬 릴스·쇼츠 링크 넣기 (넣으면 바로가기 버튼이 생겨요)"}</label>
+    <div style="margin:10px 0 12px;padding:13px;border-radius:18px;background:var(--s2);border:1px solid var(--bd)">
+      ${vUrl ? `<button class="btn reel-jump" data-act="openVid" data-id="${i.id}" style="margin-bottom:10px;padding:12px">${esc(vLabel)} (인스타/유튜브 앱 열기)</button>` : ""}
+      <label style="margin-bottom:5px">${vUrl ? "🔗 연결된 릴스·쇼츠 링크 (수정 가능)" : "🎬 릴스·쇼츠 링크 넣기 (넣으면 바로가기 버튼이 생겨요)"}</label>
       <div style="display:flex;gap:6px">
         <input type="text" id="sh-vid" value="${esc(vUrl)}" placeholder="https://www.instagram.com/reel/..." style="flex:1;margin-bottom:0">
-        <button class="mb pr" data-act="pasteVidInSheet" style="flex:none;white-space:nowrap">📋 링크 붙여넣기</button>
+        <button class="mb pr" data-act="pasteVidInSheet" style="flex:none;white-space:nowrap;border-radius:14px">📋 링크 붙여넣기</button>
       </div>
     </div>
 
@@ -6034,7 +6141,7 @@
     <label>메모 (가격, 영업시간, 같이 갈 사람...)</label>
     <textarea id="sh-note" placeholder="메모 (가격, 영업시간, 같이 갈 사람...)">${esc(i.note || "")}</textarea>
     </div></details>
-    <div class="act" style="justify-content:space-between;margin-top:8px">
+    <div class="act" style="justify-content:space-between;margin-top:10px">
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         ${vUrl ? `<button class="mb reel-jump" data-act="openVid" data-id="${i.id}">${esc(vLabel)}</button>` : ""}
         <a class="mb pr" href="${esc(dirHref)}" target="_blank" rel="noopener">🧭 길찾기 ↗</a>
@@ -6215,10 +6322,10 @@
       function buildAiProvUI() {
         $("aiProv").innerHTML = AI_DEFS.map((d) => {
           const c = aiCfg[d.id] || { key: "", model: d.defModel };
-          return `<div style="padding:10px;border:1px solid var(--bd);border-radius:12px;background:var(--s);margin-bottom:8px">
-      <label style="margin-bottom:4px;color:var(--tx)">${esc(d.name)}</label>
-      <input type="password" id="aik-${d.id}" value="${esc(c.key || "")}" placeholder="API 키 (${esc(d.ph)})" style="margin-bottom:6px">
-      <input type="text" id="aim-${d.id}" value="${esc(c.model || "")}" placeholder="모델명 (비워두면 기본값: ${esc(d.defModel || "자동")})" style="margin-bottom:0">
+          return `<div style="padding:12px;border:1px solid var(--bd);border-radius:16px;background:var(--s2);margin-bottom:8px">
+      <label style="margin-bottom:5px;color:var(--tx)">${esc(d.name)}</label>
+      <input type="password" id="aik-${d.id}" value="${esc(c.key || "")}" placeholder="API 키 (${esc(d.ph)})" style="margin-bottom:6px;background:var(--s)">
+      <input type="text" id="aim-${d.id}" value="${esc(c.model || "")}" placeholder="모델명 (비워두면 기본값: ${esc(d.defModel || "자동")})" style="margin-bottom:0;background:var(--s)">
     </div>`;
         }).join("");
         AI_DEFS.forEach((d) => {
@@ -7212,9 +7319,9 @@ ${caption || rawText}
         <div class="ds">${esc(r.address || "입력한 그대로 저장")}</div>
         ${r.price ? `<div class="ds" style="color:var(--FOOD);font-weight:700">${esc(r.price)}</div>` : ""}
         ${r.info ? `<div class="ds in">${esc(r.info)}</div>` : ""}
-        <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">
-          <button class="mb" data-act="resPic" data-idx="${idx}" style="padding:3px 8px;font-size:11px">🔄 다른 사진</button>
-          ${vUrl ? `<button class="mb reel-jump" data-act="openResVid" data-idx="${idx}" style="padding:3px 8px;font-size:11px">${esc(getVidBtnLabel(vUrl))}</button>` : ""}
+        <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+          <button class="mb" data-act="resPic" data-idx="${idx}" style="padding:4px 9px;font-size:11px">🔄 다른 사진</button>
+          ${vUrl ? `<button class="mb reel-jump" data-act="openResVid" data-idx="${idx}" style="padding:4px 9px;font-size:11px">${esc(getVidBtnLabel(vUrl))}</button>` : ""}
         </div>
       </div>
       <div class="ok">${r._merged ? "✓ 병합됨" : r._saved ? "✓ 저장됨" : "선택"}</div>
