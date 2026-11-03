@@ -1723,7 +1723,14 @@
                   <span class="ms">delete_sweep</span>모두 지우기
                 </button>
               </div>
-              <label>나만의 CORS 프록시 주소 (선택)</label>
+              <label>인스타 캡션 추출용 RapidAPI 키 (선택 · 차단 우회)</label>
+              <input
+                type="password"
+                id="rapidkey"
+                placeholder="RapidAPI Application Key 입력"
+              />
+              <button id="saverapid" class="btn g">RapidAPI 키 저장</button>
+              <label style="margin-top: 8px">나만의 CORS 프록시 주소 (선택)</label>
               <input
                 type="text"
                 id="cfproxy"
@@ -3644,7 +3651,7 @@
       }
       function sanitizeSharedItems(rawItems) {
         if (!Array.isArray(rawItems)) return [];
-        const codeNoiseRe = /allorigins\s*em|fetchTO\(|encodeURIComponent|throw\s+new\s+Error|async\s*\(\)/i;
+        const codeNoiseRe = /allorigins|fetchTO\(|encodeURIComponent|throw\s+new\s+Error|async\s*\(\)|parseIgEmbedHtml|Async\s*Labs|Lipovečka|Nikola\s*Tesla/i;
         return rawItems
           .slice(0, 200)
           .filter((item) => item && typeof item === "object")
@@ -3654,6 +3661,11 @@
               ? String(raw.id)
               : `shared_${Date.now()}_${index}`;
             if (codeNoiseRe.test(String(item.name || ""))) item.name = "저장된 장소";
+            if (codeNoiseRe.test(String(item.address || ""))) {
+              item.address = "";
+              item.lat = null;
+              item.lng = null;
+            }
             if (codeNoiseRe.test(String(item.info || ""))) item.info = "";
             if (codeNoiseRe.test(String(item.note || ""))) item.note = "";
             item.category = CATS[raw.category] ? raw.category : "PLACE";
@@ -3665,12 +3677,16 @@
                 : raw.mapVisible === false
                   ? false
                   : undefined;
-            item.lat = Number.isFinite(Number(raw.lat))
-              ? Number(raw.lat)
+            item.lat = Number.isFinite(Number(item.lat)) && item.lat !== 0
+              ? Number(item.lat)
               : null;
-            item.lng = Number.isFinite(Number(raw.lng))
-              ? Number(raw.lng)
+            item.lng = Number.isFinite(Number(item.lng)) && item.lng !== 0
+              ? Number(item.lng)
               : null;
+            if (item.lat && item.lng && Math.abs(item.lat - 45.799) < 0.05 && Math.abs(item.lng - 15.948) < 0.05) {
+              item.lat = null;
+              item.lng = null;
+            }
             if (
               typeof item.img === "string" &&
               item.img.startsWith("data:image") &&
@@ -3684,20 +3700,24 @@
               ? raw.places
                   .slice(0, 20)
                   .filter((place) => place && typeof place === "object")
-                  .map((place) => ({
-                    ...place,
-                    name: codeNoiseRe.test(String(place.name || ""))
-                      ? ""
-                      : String(place.name || "").slice(0, 500),
-                    localName: String(place.localName || "").slice(0, 500),
-                    address: String(place.address || "").slice(0, 1000),
-                    lat: Number.isFinite(Number(place.lat))
-                      ? Number(place.lat)
-                      : null,
-                    lng: Number.isFinite(Number(place.lng))
-                      ? Number(place.lng)
-                      : null,
-                  }))
+                  .map((place) => {
+                    const badAddr = codeNoiseRe.test(String(place.address || ""));
+                    const badCoord = place.lat && place.lng && Math.abs(Number(place.lat) - 45.799) < 0.05 && Math.abs(Number(place.lng) - 15.948) < 0.05;
+                    return {
+                      ...place,
+                      name: codeNoiseRe.test(String(place.name || ""))
+                        ? ""
+                        : String(place.name || "").slice(0, 500),
+                      localName: String(place.localName || "").slice(0, 500),
+                      address: badAddr ? "" : String(place.address || "").slice(0, 1000),
+                      lat: !badAddr && !badCoord && Number.isFinite(Number(place.lat)) && Number(place.lat) !== 0
+                        ? Number(place.lat)
+                        : null,
+                      lng: !badAddr && !badCoord && Number.isFinite(Number(place.lng)) && Number(place.lng) !== 0
+                        ? Number(place.lng)
+                        : null,
+                    };
+                  })
               : undefined;
             return item;
           });
@@ -4175,6 +4195,10 @@
       }
 
       (function immediateQuotaRescue() {
+        try {
+          localStorage.removeItem("TRIP_GEO_CACHE");
+          items = sanitizeSharedItems(items);
+        } catch (e) {}
         let changed = false;
         try {
           localStorage.removeItem("TRIP_PHOTO_CACHE");
@@ -6349,14 +6373,17 @@
 
         const vdEl = $("sh-vid"),
           ntEl = $("sh-note");
-        const editPlaceFields = () => ensureEditablePlaces(i);
+        const getLive = () => items.find((x) => x.id === cur) || i;
+        const editPlaceFields = () => ensureEditablePlaces(getLive());
         const syncEditedPlace = () => {
-          syncGroupedItem(i);
+          const lv = getLive();
+          syncGroupedItem(lv);
+          if (lv !== i) Object.assign(i, lv);
           const titleEl = $("sbody")?.querySelector(".nm");
-          if (titleEl) titleEl.textContent = i.name || "저장된 장소";
+          if (titleEl) titleEl.textContent = lv.name || "저장된 장소";
           const addrDisplays = $("sbody")?.querySelectorAll(".ds");
           if (addrDisplays && addrDisplays[0]) {
-            addrDisplays[0].textContent = i.address || "주소 미입력";
+            addrDisplays[0].textContent = lv.address || "주소 미입력";
           }
         };
         $("sbody")
@@ -6968,10 +6995,14 @@
         const cfBase = normalizeCfProxy(
           ls.get("TRIP_CF_PROXY") || ls.get("TRIP_WORKER_URL") || ""
         );
+        const rapidKey = (ls.get("TRIP_RAPIDAPI_KEY") || "").trim();
+        const isCodeGarbage = (s) =>
+          !s ||
+          typeof s !== "string" ||
+          /fetchTO\(|parseIgEmbedHtml|allorigins\s*empty|async\s*\(\)|TRIP_MASTER_ITEMS/i.test(s);
 
         if (meta.platform === "ig") {
           let igId = meta.id;
-          // /share/reel/ 단축 링크인 경우 리다이렉트된 실제 shortcode 추출
           if (!igId && meta.shareId) {
             const shareTargets = [
               ...(cfBase ? [cfBase + encodeURIComponent(meta.url)] : []),
@@ -6998,6 +7029,59 @@
           const ddUrl = `https://www.ddinstagram.com/reel/${igId}/`;
           const reelUrl = `https://www.instagram.com/reel/${igId}/`;
 
+          // 1단계: RapidAPI 키가 있으면 RapidAPI 인스타 스크래퍼들로 우선 조회
+          if (rapidKey) {
+            const rapidEndpoints = [
+              {
+                url: `https://instagram-scraper-api2.p.rapidapi.com/v1/post_info?code_or_id_or_url=${encodeURIComponent(igId)}`,
+                host: "instagram-scraper-api2.p.rapidapi.com",
+              },
+              {
+                url: `https://instagram-looter2.p.rapidapi.com/post?url=${encodeURIComponent(reelUrl)}`,
+                host: "instagram-looter2.p.rapidapi.com",
+              },
+              {
+                url: `https://instagram-scraper-20251.p.rapidapi.com/postinfo/?code_or_id_or_url=${encodeURIComponent(igId)}`,
+                host: "instagram-scraper-20251.p.rapidapi.com",
+              },
+              {
+                url: `https://instagram-bulk-scraper-latest.p.rapidapi.com/webget_post_info/${encodeURIComponent(igId)}`,
+                host: "instagram-bulk-scraper-latest.p.rapidapi.com",
+              },
+            ];
+            try {
+              const rapidCap = await Promise.any(
+                rapidEndpoints.map(async (ep) => {
+                  const rr = await fetchTO(
+                    ep.url,
+                    {
+                      headers: {
+                        "x-rapidapi-key": rapidKey,
+                        "x-rapidapi-host": ep.host,
+                      },
+                    },
+                    6000
+                  );
+                  if (!rr.ok) throw new Error("rapid status " + rr.status);
+                  const rd = await rr.json();
+                  const capTxt =
+                    rd?.data?.caption?.text ||
+                    rd?.data?.edge_media_to_caption?.edges?.[0]?.node?.text ||
+                    rd?.edge_media_to_caption?.edges?.[0]?.node?.text ||
+                    rd?.caption?.text ||
+                    (typeof rd?.caption === "string" ? rd.caption : "") ||
+                    (typeof rd?.data?.caption === "string" ? rd.data.caption : "") ||
+                    "";
+                  if (typeof capTxt === "string" && capTxt.trim().length >= 4 && !isCodeGarbage(capTxt)) {
+                    return capTxt.trim();
+                  }
+                  throw new Error("rapid empty");
+                })
+              );
+              if (rapidCap) return rapidCap;
+            } catch (_) {}
+          }
+
           const parseJinaMarkdown = (txt) => {
             if (!txt || !txt.includes("Markdown Content:")) return "";
             let md = txt.split("Markdown Content:")[1] || "";
@@ -7006,33 +7090,28 @@
               .replace(/!\[.*?\]\(.*?\)/g, "")
               .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
               .trim();
-            if (/Create an account or log in/i.test(md)) return "";
+            if (/Create an account or log in/i.test(md) || isCodeGarbage(md)) return "";
             return md.length >= 6 ? md : "";
           };
 
-          // 1단계: 사용자가 설정한 Cloudflare 프록시가 있으면 최우선 실행
-          if (cfBase) {
+          // 2단계: 사용자 프록시(cfBase) 시도
+          if (cfBase && !cfBase.includes(location.host)) {
             const cfTargets = [embedUrl, reelEmbedUrl, ddUrl];
             try {
               const cfRes = await Promise.any(
                 cfTargets.map(async (u) => {
-                  const r = await fetchTO(
-                    cfBase + encodeURIComponent(u),
-                    {},
-                    5500
-                  );
-                  if (!r.ok) throw new Error("cf status " + r.status);
-                  const html = await r.text();
-                  const cap = parseIgEmbedHtml(html);
-                  if (cap && cap.length >= 4) return cap;
-                  throw new Error("cf parse empty");
+                  const r = await fetchTO(cfBase + encodeURIComponent(u), {}, 5500);
+                  if (!r.ok) throw new Error("cf status");
+                  const cap = parseIgEmbedHtml(await r.text());
+                  if (cap && cap.length >= 4 && !isCodeGarbage(cap)) return cap;
+                  throw new Error("cf empty");
                 })
               );
               if (cfRes) return cfRes;
             } catch (_) {}
           }
 
-          // 2단계: 공용 우회 채널 병렬 시도 (HTML 파서와 JSON/Markdown 파서 엄격 분리)
+          // 3단계: 공용 우회 채널 병렬 실행 (반드시 fn() 호출!)
           const jobs = [
             async () => {
               const r = await fetchTO(
@@ -7041,8 +7120,8 @@
                 5000
               );
               const cap = parseIgEmbedHtml(await r.text());
-              if (cap) return cap;
-              throw new Error("allorigins empty");
+              if (cap && !isCodeGarbage(cap)) return cap;
+              throw new Error("empty");
             },
             async () => {
               const r = await fetchTO(
@@ -7051,8 +7130,8 @@
                 5000
               );
               const cap = parseIgEmbedHtml(await r.text());
-              if (cap) return cap;
-              throw new Error("codetabs empty");
+              if (cap && !isCodeGarbage(cap)) return cap;
+              throw new Error("empty");
             },
             async () => {
               const r = await fetchTO(
@@ -7061,8 +7140,8 @@
                 5000
               );
               const cap = parseIgEmbedHtml(await r.text());
-              if (cap) return cap;
-              throw new Error("corsproxy empty");
+              if (cap && !isCodeGarbage(cap)) return cap;
+              throw new Error("empty");
             },
             async () => {
               const r = await fetchTO(
@@ -7071,14 +7150,14 @@
                 5000
               );
               const cap = parseIgEmbedHtml(await r.text());
-              if (cap) return cap;
-              throw new Error("ddig empty");
+              if (cap && !isCodeGarbage(cap)) return cap;
+              throw new Error("empty");
             },
             async () => {
               const r = await fetchTO(`https://r.jina.ai/${embedUrl}`, {}, 5500);
               const cap = parseJinaMarkdown(await r.text());
-              if (cap) return cap;
-              throw new Error("jina embed empty");
+              if (cap && !isCodeGarbage(cap)) return cap;
+              throw new Error("empty");
             },
             async () => {
               const r = await fetchTO(
@@ -7086,19 +7165,20 @@
                 {},
                 5500
               );
-              if (!r.ok) throw new Error("microlink status");
+              if (!r.ok) throw new Error("status");
               const d = await r.json();
               const rawDesc = d?.data?.description || "";
               const cap = parseIgEmbedHtml(
                 `<meta property="og:description" content="${esc(rawDesc)}">`
               );
-              if (cap) return cap;
-              throw new Error("microlink empty");
+              if (cap && !isCodeGarbage(cap)) return cap;
+              throw new Error("empty");
             },
           ];
 
           try {
-            return await Promise.any(jobs);
+            const out = await Promise.any(jobs.map((fn) => fn()));
+            return typeof out === "string" && !isCodeGarbage(out) ? out : "";
           } catch (e) {
             return "";
           }
@@ -7384,36 +7464,48 @@
       /* 지오코딩 엔진: ignoreCache=true 시 기존 캐시·이전 좌표를 무시하고 새 주소로 강제 재검색 */
       async function geocodePlace(cand, hint = "", ignoreCache = false) {
         const gkey = (ls.get("TRAVEL_GMAP_KEY") || "").trim();
-        const rawAddr = normalizeOcrAddr(cand.address || "");
+        const toHalfWidth = (s) =>
+          String(s || "")
+            .replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xfee0))
+            .replace(/[−ー―‐–—]/g, "-");
+        const rawAddr = toHalfWidth(normalizeOcrAddr(cand.address || ""));
         const stripFloorNoise = (s) =>
           String(s || "")
+            .replace(/\([^)]*[가-힣]+[^)]*\)/g, " ")
             .replace(/(?:^|\s)B?\d+\s*(?:F|층|階)(?=\s|$)/gi, " ")
             .replace(/지하\s*\d+\s*층/g, " ")
-            .replace(/(?:안에\s*있음|역\s*안|구내|내부|근처)/g, " ")
+            .replace(/(?:안에\s*있음|역\s*안|구내|내부|근처|도보\s*\d+분)/g, " ")
+            .replace(/(?:^|\s)일본(?=\s|$)/g, " Japan ")
             .replace(/\s+/g, " ")
             .trim();
         const cleanAddr = stripFloorNoise(rawAddr);
-        const rawName = isGenericSharedName(cand.name)
-          ? ""
-          : String(cand.name || "").trim();
+        const rawName =
+          isGenericSharedName(cand.name) || /async\s*\(\)|allorigins/i.test(cand.name || "")
+            ? ""
+            : String(cand.name || "").trim();
         const localName = String(cand.localName || "").trim();
         const aiLat = ignoreCache ? null : Number(cand.lat),
           aiLng = ignoreCache ? null : Number(cand.lng);
         const context = `${hint || ""} ${rawAddr} ${rawName}`.toLowerCase();
         const isJapan =
-          /日本|北海道|東京|大阪|京都|福岡|札幌|名古屋|沖縄|千日前|難波|梅田|道頓堀|心斎橋|丁目|番地|〒|\b\d{3}-\d{4}\b|japan|osaka|tokyo|kyoto|fukuoka/i.test(
-            context,
+          /日本|北海道|東京|大阪|京都|福岡|札幌|名古屋|沖縄|千日前|難波|梅田|道頓堀|心斎橋|丁目|番地|〒|\b\d{3}-\d{4}\b|japan|osaka|tokyo|kyoto|fukuoka|namba|umeda|shinjuku|shibuya/i.test(
+            context
           );
 
-        const cacheKey = `${localName}|${rawName}|${rawAddr}|${hint}`.trim();
-        if (!ignoreCache && cacheKey.length >= 3 && geoCache[cacheKey])
+        const cacheKey = `v2|${localName}|${rawName}|${cleanAddr}|${hint}`.trim();
+        if (!ignoreCache && cacheKey.length >= 6 && geoCache[cacheKey])
           return geoCache[cacheKey];
 
-        const zipM = (rawAddr + " " + (cand.postal || "")).match(
-          /(\d{3})-?(\d{4})/,
+        const zipM = (cleanAddr + " " + (cand.postal || "")).match(
+          /(\d{3})-?(\d{4})/
         );
-        const banchiM = rawAddr.match(/(\d+\s*-\s*\d+(?:\s*-\s*\d+)?)/);
-        const banchi = banchiM ? banchiM[1].replace(/\s+/g, "") : "";
+        const chomeM = cleanAddr.match(/(\d+)\s*(?:Chome|-|丁目)\s*(\d+(?:\s*-\s*\d+)?)/i);
+        const banchiM = cleanAddr.match(/(\d+\s*-\s*\d+(?:\s*-\s*\d+)?)/);
+        const banchi = chomeM
+          ? `${chomeM[1]}丁目${chomeM[2].replace(/\s+/g, "")}`
+          : banchiM
+            ? banchiM[1].replace(/\s+/g, "")
+            : "";
 
         let jpTown = "";
         if (zipM) {
@@ -7421,7 +7513,7 @@
             const zr = await fetchTO(
               `https://zipcloud.ibsnet.co.jp/api/search?zipcode=${zipM[1]}${zipM[2]}`,
               {},
-              2500,
+              2800
             );
             const zd = await zr.json();
             if (zd && zd.results && zd.results[0]) {
@@ -7431,53 +7523,61 @@
           } catch (e) {}
         }
 
+        const noZipAddr = cleanAddr
+          .replace(/(?:〒|T)?\s*\d{3}-\d{4}/g, "")
+          .replace(/^[,\s]+|[,\s]+$/g, "")
+          .trim();
+        const dashChomeAddr = noZipAddr.replace(
+          /(\d+)\s*Chome\s*-\s*(\d+)/gi,
+          "$1-$2"
+        );
+
         const queries = [];
-        if (cleanAddr) {
-          const cleaned = cleanAddr
-            .replace(/(?:〒|T)?\d{3}-\d{4}/g, "")
-            .replace(/^일본\s*/, "")
-            .trim();
-          if (cleaned) queries.push(cleaned);
-          if (cleanAddr !== cleaned) queries.push(cleanAddr);
-        }
-        if (rawName && cleanAddr) queries.push(`${rawName} ${cleanAddr}`);
-        if (localName && cleanAddr) queries.push(`${localName} ${cleanAddr}`);
         if (jpTown && banchi) queries.push(`${jpTown}${banchi}`);
+        if (noZipAddr) queries.push(noZipAddr);
+        if (dashChomeAddr && dashChomeAddr !== noZipAddr) queries.push(dashChomeAddr);
+        if (cleanAddr && cleanAddr !== noZipAddr) queries.push(cleanAddr);
+        if (localName && noZipAddr) queries.push(`${localName} ${noZipAddr}`);
+        if (rawName && noZipAddr && !/[가-힣]/.test(rawName)) queries.push(`${rawName} ${noZipAddr}`);
+        if (jpTown) queries.push(jpTown);
+        if (localName) queries.push(`${localName} ${jpTown || hint || ""}`.trim());
         if (rawName) queries.push(`${rawName} ${hint || ""}`.trim());
-        if (localName)
-          queries.push(`${localName} ${jpTown || hint || ""}`.trim());
 
         const uniq = [
           ...new Set(
             queries
-              .map((q) => {
-                const value = q.trim();
-                return isJapan && !/\bJapan\b/i.test(value)
-                  ? `${value} Japan`
-                  : value;
-              })
-              .filter((q) => q.length >= 2),
+              .map((q) => q.replace(/\s+/g, " ").trim())
+              .filter((q) => q.length >= 2)
           ),
-        ].slice(0, 6);
+        ].slice(0, 8);
+
         if (!uniq.length) {
           if (aiLat && aiLng) return { lat: aiLat, lng: aiLng };
           return null;
         }
 
+        const isValidCoord = (lat, lng) => {
+          if (!Number.isFinite(lat) || !Number.isFinite(lng) || !lat || !lng) return false;
+          if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return false;
+          if (isJapan && (lat < 24 || lat > 46 || lng < 122 || lng > 154)) return false;
+          return true;
+        };
+
         const remember = (res) => {
-          if (res && res.lat && res.lng && cacheKey.length >= 3) {
+          if (res && isValidCoord(Number(res.lat), Number(res.lng)) && cacheKey.length >= 6) {
             geoCache[cacheKey] = res;
             saveGeoCache();
           }
           return res;
         };
 
+        // 1단계: Google Maps Geocoding API (키가 있는 경우)
         if (gkey) {
           for (const q of uniq.slice(0, 4)) {
             try {
               bumpCnt("gmap");
               const params = new URLSearchParams({
-                address: q,
+                address: isJapan && !/Japan|日本/i.test(q) ? `${q}, Japan` : q,
                 key: gkey,
                 language: isJapan ? "ja" : "ko",
               });
@@ -7485,40 +7585,114 @@
               const r = await fetchTO(
                 `https://maps.googleapis.com/maps/api/geocode/json?${params}`,
                 {},
-                3800,
+                3800
               );
               const d = await r.json();
               if (d.status === "OK" && d.results && d.results[0]) {
                 const loc = d.results[0].geometry.location;
-                return remember({
-                  lat: Number(loc.lat),
-                  lng: Number(loc.lng),
-                  formatted: d.results[0].formatted_address,
-                });
+                if (isValidCoord(Number(loc.lat), Number(loc.lng))) {
+                  return remember({
+                    lat: Number(loc.lat),
+                    lng: Number(loc.lng),
+                    formatted: d.results[0].formatted_address,
+                  });
+                }
               }
             } catch (e) {}
           }
         }
 
-        for (const q of uniq.slice(0, 4)) {
+        // 2단계: 일본 국토지리원(GSI) 공식 주소 검색 API (일본 주소 무키·초정밀 검색)
+        if (isJapan) {
+          const gsiTargets = [
+            ...(jpTown && banchi ? [`${jpTown}${banchi}`] : []),
+            ...uniq.filter((q) => /[一-龯ぁ-んァ-ン]/.test(q)),
+            ...(jpTown ? [jpTown] : []),
+          ];
+          for (const gq of [...new Set(gsiTargets)].slice(0, 4)) {
+            try {
+              const r = await fetchTO(
+                `https://msearch.gsi.go.jp/address-search/AddressSearch?q=${encodeURIComponent(gq)}`,
+                {},
+                3500
+              );
+              if (r.ok) {
+                const d = await r.json();
+                if (Array.isArray(d) && d[0]?.geometry?.coordinates) {
+                  const [lng, lat] = d[0].geometry.coordinates;
+                  if (isValidCoord(Number(lat), Number(lng))) {
+                    return remember({
+                      lat: Number(lat),
+                      lng: Number(lng),
+                      formatted: d[0].properties?.title || gq,
+                    });
+                  }
+                }
+              }
+            } catch (e) {}
+          }
+        }
+
+        // 3단계: ArcGIS World Geocoding API (구글맵 영문/일문/한글 주소 무키 100% 호환)
+        for (const q of uniq.slice(0, 5)) {
           try {
+            const arcQ = isJapan && !/Japan|日本/i.test(q) ? `${q}, Japan` : q;
+            const params = new URLSearchParams({
+              f: "json",
+              singleLine: arcQ,
+              maxLocations: "3",
+              outFields: "Match_addr,Addr_type",
+            });
+            if (isJapan) params.set("sourceCountry", "JPN");
             const r = await fetchTO(
-              `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=3`,
+              `https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?${params}`,
               {},
-              4000,
+              4000
             );
-            const d = await r.json();
-            if (Array.isArray(d) && d[0]) {
-              return remember({
-                lat: Number(d[0].lat),
-                lng: Number(d[0].lon),
-                formatted: d[0].display_name,
-              });
+            if (r.ok) {
+              const d = await r.json();
+              const best = (d?.candidates || []).find(
+                (c) =>
+                  c?.score >= 70 &&
+                  c?.location &&
+                  isValidCoord(Number(c.location.y), Number(c.location.x))
+              );
+              if (best) {
+                return remember({
+                  lat: Number(best.location.y),
+                  lng: Number(best.location.x),
+                  formatted: best.address || q,
+                });
+              }
             }
           } catch (e) {}
         }
 
-        if (aiLat && aiLng && Math.abs(aiLat) <= 90 && Math.abs(aiLng) <= 180) {
+        // 4단계: OpenStreetMap Nominatim (보조 폴백)
+        for (const q of uniq.slice(0, 4)) {
+          try {
+            const nomQ = isJapan && !/Japan|日本/i.test(q) ? `${q}, Japan` : q;
+            const r = await fetchTO(
+              `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(nomQ)}&limit=3`,
+              {},
+              4000
+            );
+            const d = await r.json();
+            if (Array.isArray(d) && d[0]) {
+              const lat = Number(d[0].lat),
+                lng = Number(d[0].lon);
+              if (isValidCoord(lat, lng)) {
+                return remember({
+                  lat,
+                  lng,
+                  formatted: d[0].display_name,
+                });
+              }
+            }
+          } catch (e) {}
+        }
+
+        if (aiLat && aiLng && isValidCoord(aiLat, aiLng)) {
           return remember({ lat: aiLat, lng: aiLng });
         }
         return null;
@@ -9061,6 +9235,14 @@ ${caption || rawText}
         toast("Naver Maps 키 저장됨");
         location.reload();
       };
+      if ($("rapidkey")) $("rapidkey").value = ls.get("TRIP_RAPIDAPI_KEY") || "";
+      if ($("saverapid")) {
+        $("saverapid").onclick = () => {
+          ls.set("TRIP_RAPIDAPI_KEY", ($("rapidkey")?.value || "").trim());
+          syncSharedSettings();
+          toast("✅ RapidAPI 키가 저장되었어요!");
+        };
+      }
       $("savecfproxy").onclick = () => {
         const norm = normalizeCfProxy($("cfproxy").value);
         $("cfproxy").value = norm;
