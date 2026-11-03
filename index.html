@@ -6824,13 +6824,70 @@
         )
           return "";
 
+        // 1순위: script 내부의 contextJSON 안전 파싱 (릴스 영상 캡션 핵심 경로)
+        const ctxMatch = html.match(/"contextJSON"\s*:\s*("[^"\\]*(?:\\.[^"\\]*)*")/);
+        if (ctxMatch && ctxMatch[1]) {
+          try {
+            const innerStr = JSON.parse(ctxMatch[1]);
+            const ctxObj = JSON.parse(innerStr);
+            const media =
+              ctxObj?.gql_data?.shortcode_media ||
+              ctxObj?.gql_data?.xdt_shortcode_media ||
+              ctxObj?.context?.media ||
+              {};
+            const edges =
+              media?.edge_media_to_caption?.edges ||
+              media?.caption?.edges ||
+              [];
+            const capText =
+              edges[0]?.node?.text ||
+              media?.caption?.text ||
+              ctxObj?.context?.caption ||
+              "";
+            if (typeof capText === "string" && capText.trim().length >= 4) {
+              return capText.trim();
+            }
+          } catch (e) {}
+        }
+
+        // 2순위: 비이스케이프 / 이스케이프 edge_media_to_caption 정규식 추출
+        const rawJsonMatch = html.match(
+          /"edge_media_to_caption"\s*:\s*\{\s*"edges"\s*:\s*\[\s*\{\s*"node"\s*:\s*\{\s*"text"\s*:\s*("[^"\\]*(?:\\.[^"\\]*)*")/i
+        );
+        if (rawJsonMatch && rawJsonMatch[1]) {
+          try {
+            const dec = JSON.parse(rawJsonMatch[1]);
+            if (dec && dec.trim().length >= 4) return dec.trim();
+          } catch (e) {}
+        }
+
+        const escJsonMatch = html.match(
+          /\\"edge_media_to_caption\\"\s*:\s*\{\s*\\"edges\\"\s*:\s*\[\s*\{\s*\\"node\\"\s*:\s*\{\s*\\"text\\"\s*:\s*\\"((?:[^"\\]|\\\\.|\\(?!" ))*)\\"/i
+        );
+        if (escJsonMatch && escJsonMatch[1]) {
+          try {
+            const unescaped = JSON.parse('"' + escJsonMatch[1] + '"');
+            const dec = JSON.parse('"' + unescaped + '"');
+            if (dec && dec.trim().length >= 4) return dec.trim();
+          } catch (e) {
+            try {
+              const fallbackDec = escJsonMatch[1]
+                .replace(/\\n/g, "\n")
+                .replace(/\\"/g, '"')
+                .replace(/\\\\/g, "\\");
+              if (fallbackDec.trim().length >= 4) return fallbackDec.trim();
+            } catch (_) {}
+          }
+        }
+
+        // 3순위: HTML DOM 내 Caption 블록 파싱
         const cm =
           html.match(
-            /<div class="Caption"[^>]*>([\s\S]*?)<div class="CaptionComments"/i,
+            /<div class="Caption"[^>]*>([\s\S]*?)<div class="CaptionComments"/i
           ) || html.match(/<div class="Caption"[^>]*>([\s\S]*?)<\/div>/i);
-        if (cm) {
+        if (cm && cm[1]) {
           let s = cm[1]
-            .replace(/<a class="CaptionUsername"[^>]*>[\s\S]*?<\/a>/i, "")
+            .replace(/<a class="CaptionUsername"[^>]*>[\s\S]*?<\/a>/gi, "")
             .replace(/<br\s*\/?>/gi, "\n")
             .replace(/<[^>]+>/g, " ");
           s = decodeHtml(s)
@@ -6838,45 +6895,33 @@
             .replace(/\n\s+/g, "\n")
             .trim();
           if (
-            s.length >= 6 &&
+            s.length >= 4 &&
             !s.includes("[\\s\\S]") &&
             /[가-힣a-zA-Z0-9一-龯ぁ-んァ-ン]/.test(s)
           )
             return s;
         }
-        const jm =
-          html.match(
-            /"edge_media_to_caption"\s*:\s*\{\s*"edges"\s*:\s*\[\s*\{\s*"node"\s*:\s*\{\s*"text"\s*:\s*"((?:[^"\\]|\\.)*)"/i,
-          ) ||
-          html.match(
-            /\\"edge_media_to_caption\\"\s*:\s*\{\s*\\"edges\\"\s*:\s*\[\s*\{\s*\\"node\\"\s*:\s*\{\s*\\"text\\"\s*:\s*\\"((?:[^"\\]|\\.)*)\\"/i,
-          );
-        if (jm) {
-          try {
-            let raw = jm[1];
-            if (html.includes('\\"edge_media_to_caption\\"'))
-              raw = raw.replace(/\\"/g, '"').replace(/\\\\/g, "\\");
-            const dec = JSON.parse('"' + raw + '"');
-            if (dec && dec.trim().length >= 6) return dec.trim();
-          } catch (e) {}
-        }
+
+        // 4순위: OpenGraph / Meta Description 파싱 (ddinstagram 등 호환)
         const om =
           html.match(
-            /<meta[^>]+(?:property="og:description"|name="description")[^>]+content="([^"]+)"/i,
+            /<meta[^>]+(?:property=["']og:description["']|name=["']description["'])[^>]+content=["']([^"']+)["']/i
           ) ||
           html.match(
-            /<meta[^>]+content="([^"]+)"[^>]+(?:property="og:description"|name="description")/i,
+            /<meta[^>]+content=["']([^"']+)["'][^>]+(?:property=["']og:description["']|name=["']description["'])/i
           );
-        if (om) {
-          let d = decodeHtml(om[1]);
-          const qm = d.match(/:\s*["“]([\s\S]+)["”]\.?$/);
-          if (qm) d = qm[1];
+        if (om && om[1]) {
+          let d = decodeHtml(om[1]).trim();
+          const qm =
+            d.match(/:\s*["“]([\s\S]+)["”]\.?$/) ||
+            d.match(/on Instagram:\s*["“]?([\s\S]+?)["”]?\s*$/i);
+          if (qm && qm[1]) d = qm[1].trim();
           if (
             d &&
-            !/Create an account or log in/i.test(d) &&
-            d.trim().length >= 6
+            !/Create an account or log in|Instagram photos and videos/i.test(d) &&
+            d.length >= 4
           )
-            return d.trim();
+            return d;
         }
         return "";
       }
@@ -6885,92 +6930,154 @@
         const meta = parseVideoMeta(vUrl);
         if (!meta) return "";
         const cfBase = normalizeCfProxy(
-          ls.get("TRIP_CF_PROXY") || ls.get("TRIP_WORKER_URL") || "",
+          ls.get("TRIP_CF_PROXY") || ls.get("TRIP_WORKER_URL") || ""
         );
 
-        if (meta.platform === "ig" && meta.id) {
-          const embedUrl = `https://www.instagram.com/p/${meta.id}/embed/captioned/`;
-          const reelEmbedUrl = `https://www.instagram.com/reel/${meta.id}/embed/captioned/`;
-          const postUrl = `https://www.instagram.com/p/${meta.id}/`;
-          const jobs = [];
-          if (cfBase) {
-            jobs.push(
-              () =>
-                fetchTO(cfBase + encodeURIComponent(embedUrl), {}, 4800).then(
-                  (r) => r.text(),
-                ),
-              () =>
-                fetchTO(
-                  cfBase + encodeURIComponent(reelEmbedUrl),
-                  {},
-                  4800,
-                ).then((r) => r.text()),
-              () =>
-                fetchTO(cfBase + encodeURIComponent(postUrl), {}, 4800).then(
-                  (r) => r.text(),
-                ),
-            );
+        if (meta.platform === "ig") {
+          let igId = meta.id;
+          // /share/reel/ 단축 링크인 경우 리다이렉트된 실제 shortcode 추출
+          if (!igId && meta.shareId) {
+            const shareTargets = [
+              ...(cfBase ? [cfBase + encodeURIComponent(meta.url)] : []),
+              `https://api.allorigins.win/raw?url=${encodeURIComponent(meta.url)}`,
+            ];
+            for (const st of shareTargets) {
+              try {
+                const sr = await fetchTO(st, {}, 4500);
+                const sh = await sr.text();
+                const sm = sh.match(
+                  /(?:instagram\.com|instagr\.am)\/(?:reel|reels|p|tv)\/([A-Za-z0-9_-]{5,25})/i
+                );
+                if (sm && sm[1]) {
+                  igId = sm[1];
+                  break;
+                }
+              } catch (_) {}
+            }
           }
-          jobs.push(
-            () =>
-              fetchTO(
+          if (!igId) return "";
+
+          const embedUrl = `https://www.instagram.com/p/${igId}/embed/captioned/`;
+          const reelEmbedUrl = `https://www.instagram.com/reel/${igId}/embed/captioned/`;
+          const ddUrl = `https://www.ddinstagram.com/reel/${igId}/`;
+          const reelUrl = `https://www.instagram.com/reel/${igId}/`;
+
+          const parseJinaMarkdown = (txt) => {
+            if (!txt || !txt.includes("Markdown Content:")) return "";
+            let md = txt.split("Markdown Content:")[1] || "";
+            md = md
+              .split(/View all \d+ comments|Watch on Instagram|Log in to Instagram| 더 보기/i)[0]
+              .replace(/!\[.*?\]\(.*?\)/g, "")
+              .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+              .trim();
+            if (/Create an account or log in/i.test(md)) return "";
+            return md.length >= 6 ? md : "";
+          };
+
+          // 1단계: 사용자가 설정한 Cloudflare 프록시가 있으면 최우선 실행
+          if (cfBase) {
+            const cfTargets = [embedUrl, reelEmbedUrl, ddUrl];
+            try {
+              const cfRes = await Promise.any(
+                cfTargets.map(async (u) => {
+                  const r = await fetchTO(
+                    cfBase + encodeURIComponent(u),
+                    {},
+                    5500
+                  );
+                  if (!r.ok) throw new Error("cf status " + r.status);
+                  const html = await r.text();
+                  const cap = parseIgEmbedHtml(html);
+                  if (cap && cap.length >= 4) return cap;
+                  throw new Error("cf parse empty");
+                })
+              );
+              if (cfRes) return cfRes;
+            } catch (_) {}
+          }
+
+          // 2단계: 공용 우회 채널 병렬 시도 (HTML 파서와 JSON/Markdown 파서 엄격 분리)
+          const jobs = [
+            async () => {
+              const r = await fetchTO(
                 `https://api.allorigins.win/raw?url=${encodeURIComponent(embedUrl)}`,
                 {},
-                4200,
-              ).then((r) => r.text()),
-            () =>
-              fetchTO(
+                5000
+              );
+              const cap = parseIgEmbedHtml(await r.text());
+              if (cap) return cap;
+              throw new Error("allorigins empty");
+            },
+            async () => {
+              const r = await fetchTO(
                 `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(embedUrl)}`,
                 {},
-                4200,
-              ).then((r) => r.text()),
-            () =>
-              fetchTO(
+                5000
+              );
+              const cap = parseIgEmbedHtml(await r.text());
+              if (cap) return cap;
+              throw new Error("codetabs empty");
+            },
+            async () => {
+              const r = await fetchTO(
                 `https://corsproxy.io/?url=${encodeURIComponent(embedUrl)}`,
                 {},
-                4200,
-              ).then((r) => r.text()),
-            () =>
-              fetchTO(`https://r.jina.ai/${embedUrl}`, {}, 4500).then((r) =>
-                r.text(),
-              ),
-          );
+                5000
+              );
+              const cap = parseIgEmbedHtml(await r.text());
+              if (cap) return cap;
+              throw new Error("corsproxy empty");
+            },
+            async () => {
+              const r = await fetchTO(
+                `https://api.allorigins.win/raw?url=${encodeURIComponent(ddUrl)}`,
+                {},
+                5000
+              );
+              const cap = parseIgEmbedHtml(await r.text());
+              if (cap) return cap;
+              throw new Error("ddig empty");
+            },
+            async () => {
+              const r = await fetchTO(`https://r.jina.ai/${embedUrl}`, {}, 5500);
+              const cap = parseJinaMarkdown(await r.text());
+              if (cap) return cap;
+              throw new Error("jina embed empty");
+            },
+            async () => {
+              const r = await fetchTO(
+                `https://api.microlink.io/?url=${encodeURIComponent(reelUrl)}`,
+                {},
+                5500
+              );
+              if (!r.ok) throw new Error("microlink status");
+              const d = await r.json();
+              const rawDesc = d?.data?.description || "";
+              const cap = parseIgEmbedHtml(
+                `<meta property="og:description" content="${esc(rawDesc)}">`
+              );
+              if (cap) return cap;
+              throw new Error("microlink empty");
+            },
+          ];
+
           try {
-            return await Promise.any(
-              jobs.map(async (fn) => {
-                const txt = await fn();
-                const cap = parseIgEmbedHtml(txt);
-                if (cap && cap.length >= 8) return cap;
-                if (
-                  txt &&
-                  txt.includes("Markdown Content:") &&
-                  !txt.includes("Log in to Instagram")
-                ) {
-                  const md = txt.split("Markdown Content:")[1] || "";
-                  const cl = md
-                    .replace(/!\[.*?\]\(.*?\)/g, "")
-                    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-                    .trim();
-                  if (cl.length >= 12) return cl;
-                }
-                throw new Error("no caption");
-              }),
-            );
+            return await Promise.any(jobs);
           } catch (e) {
             return "";
           }
         }
+
         if (meta.platform === "yt" && meta.id) {
           const wUrl = `https://www.youtube.com/watch?v=${meta.id}`;
-          const titleP = fetchTO(
+          const title = await fetchTO(
             `https://noembed.com/embed?url=${encodeURIComponent(wUrl)}`,
             {},
-            3500,
+            3500
           )
             .then((r) => (r.ok ? r.json() : {}))
             .then((d) => d.title || "")
             .catch(() => "");
-          const [title] = await Promise.all([titleP]);
           return title.trim();
         }
         if (meta.platform === "tt") {
@@ -6978,7 +7085,7 @@
             const r = await fetchTO(
               `https://www.tiktok.com/oembed?url=${encodeURIComponent(meta.url)}`,
               {},
-              4000,
+              4000
             );
             if (r.ok) {
               const d = await r.json();
@@ -7095,14 +7202,24 @@
           }
         }
 
-        if (
-          !name &&
-          lines.length === 1 &&
-          !lines[0].startsWith("http") &&
-          !isLikelyAddressLine(lines[0]) &&
-          lines[0].length <= 35
-        ) {
-          name = lines[0];
+        if (!name) {
+          const candLine = lines.find(
+            (l) =>
+              !l.startsWith("http") &&
+              !l.startsWith("#") &&
+              !isLikelyAddressLine(l) &&
+              l.length >= 2 &&
+              l.length <= 45
+          );
+          if (candLine) {
+            name = candLine.replace(/^[0-9]+[.)]\s*/, "").trim();
+          }
+        }
+        if (!info && lines.length > 1) {
+          const bodyLines = lines
+            .filter((l) => l !== name && !l.startsWith("http") && !l.startsWith("#"))
+            .slice(0, 3);
+          if (bodyLines.length) info = bodyLines.join(" · ").slice(0, 140);
         }
 
         let category = cat || "PLACE";
@@ -7339,6 +7456,9 @@
           const fetched = await fetchVideoCaption(vidUrl);
           if (fetched) {
             caption = (caption + "\n" + fetched).trim();
+            if ($("shareBox") && (!($("shareBox").value || "").replace(/https?:\/\/[^\s]+/g, "").trim())) {
+              $("shareBox").value = fetched;
+            }
           } else {
             capStatus =
               "🔒 인스타 차단으로 캡션을 가져오지 못했습니다. 캡션·고정댓글을 직접 붙여넣어 주세요";
