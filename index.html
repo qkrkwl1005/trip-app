@@ -380,6 +380,19 @@
           border-color 0.18s ease,
           transform 0.12s ease;
       }
+      .item.flash-item {
+        outline: 2px solid var(--pr);
+        animation: listFlash 1.1s ease 2;
+      }
+      @keyframes listFlash {
+        0%,
+        100% {
+          background-color: transparent;
+        }
+        45% {
+          background-color: rgba(37, 99, 235, 0.28);
+        }
+      }
       .item:active {
         transform: scale(0.985);
         background: var(--s2);
@@ -1343,19 +1356,6 @@
   </head>
   <body>
     <aside id="side">
-      <header>
-        <div class="brand">
-          <div class="logo">⚡</div>
-          <div><b>여행플래너</b><small>장소·카페·음식·쇼핑 플래너</small></div>
-        </div>
-        <div style="display: flex; align-items: center; gap: 6px">
-          <button id="planCopyTopBtn" class="mb" title="일정 텍스트 복사">
-            📋 일정복사
-          </button>
-          <span id="netStatus" aria-live="polite">● 온라인</span>
-          <button id="themeBtn" class="mb"></button>
-        </div>
-      </header>
       <nav id="nav"></nav>
 
       <!-- ⌂ 홈 탭 (릴스/쇼츠 분석 및 장소 찾기 전용) -->
@@ -1430,6 +1430,26 @@
       <!-- ⚙️ 설정 탭 -->
       <section id="tab-set" class="tab-content">
         <div class="card">
+          <div
+            style="
+              display: flex;
+              gap: 7px;
+              align-items: center;
+              flex-wrap: wrap;
+              margin-bottom: 12px;
+            "
+          >
+            <button id="themeBtn" class="mb" aria-label="테마 전환"></button>
+            <button id="planCopyTopBtn" class="mb" title="일정 텍스트 복사">
+              📋 일정복사
+            </button>
+            <span
+              id="netStatus"
+              aria-live="polite"
+              style="font-size: 12px; font-weight: 700"
+              >● 온라인</span
+            >
+          </div>
           <label>📋 동행자 공유용 일정·장소 리스트 내보내기</label>
           <button id="exportPlanBtn" class="btn" style="margin-bottom: 14px">
             📋 카톡·메모장용 깔끔 리스트 복사
@@ -1480,7 +1500,7 @@
               확인 — 이게 없으면 모든 기기에서 로그인이 막힙니다(로딩 중 흰
               화면)<br />
               2) 새로고침 2번(홈 화면 앱은 완전히 닫았다 다시 열기) · 위 "이 앱
-              버전"이 최신(v58)인지 확인<br />
+              버전"이 최신(v59)인지 확인<br />
               3) 아이폰·아이패드: 설정 → 사파리 → "모든 쿠키 차단"은 꺼짐이어야
               하고, "사이트 간 추적 방지"가 원인이면 해제 후 재시도<br />
               4) iCloud 프라이빗 릴레이 사용 중이면 잠시 끄고 재시도<br />
@@ -2457,7 +2477,7 @@
       const TRIP_PENDING_CONFLICT_KEY = "TRIP_PENDING_CONFLICT";
       const TRIP_LAST_ROOM_KEY = "TRIP_LAST_ROOM";
       const TRIP_CREATING_ROOM_KEY = "TRIP_CREATING_ROOM";
-      const APP_VERSION = "v58";
+      const APP_VERSION = "v59";
       const TRANSIENT_NET_RE =
         /unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
       let _offlineFlushBusy = false,
@@ -3769,6 +3789,134 @@
           sharedRevision = revision + 1;
         });
       }
+      /* 실시간 방 데이터 적용 — onSnapshot과 강제 새로고침이 공용으로 사용 */
+      function applyRoomSnapshotData(ref, data) {
+        const incomingRevision = Number(data.revision || 0);
+        sharedOwnerUid = String(data.ownerUid || "");
+        sharedMembers =
+          data.members && typeof data.members === "object" ? data.members : {};
+        sharedSettingsShared = data.settingsShared === true;
+        sharedRevision = incomingRevision;
+        sharedHistory = [];
+        const currentUser = firebase.auth().currentUser;
+        if (
+          currentUser?.uid === sharedOwnerUid &&
+          Array.isArray(data.history) &&
+          data.history.length > 0
+        ) {
+          ref.update({ history: [] }).catch(() => {});
+        }
+        if (currentUser?.uid === sharedOwnerUid && !sharedSettingsShared) {
+          sharedSettingsShared = true;
+          ref
+            .update({
+              settings: collectSharedSettings(),
+              settingsShared: true,
+              history: [],
+            })
+            .catch(() => {});
+        }
+        renderRoomMembers();
+        if (!joinRequestsUnsubscribe) listenJoinRequests();
+        renderRoomGuide();
+        listenOwnJoinRequest();
+        let applied = false;
+        if (Array.isArray(data.items)) {
+          remoteApplying = true;
+          const localImgMap = new Map(
+            items
+              .filter((x) => x && x.useCustomImg && x.img)
+              .map((x) => [String(x.id), x.img]),
+          );
+          const sanitized = sanitizeSharedItems(data.items).map((it) => {
+            if (!it.img && localImgMap.has(String(it.id))) {
+              it.img = localImgMap.get(String(it.id));
+              it.useCustomImg = true;
+            }
+            return it;
+          });
+          items = sanitized;
+          sharedBaseItems = sanitized;
+          if (sharedSettingsShared && data.settings && sharedOwnerUid) {
+            applySharedSettings(data.settings);
+          }
+          persistNow();
+          remoteApplying = false;
+          render(true);
+          draw(true);
+          hydrateInstagramThumbs();
+          setSharedRoomStatus(`✅ 공유 중 · ${sharedRoomId}`, "ok");
+          applied = true;
+        }
+        return applied;
+      }
+      /* org: 실시간 수신이 늦거나 멈췄을 때 서버에서 최신 방 내용을 직접 받아 적용 */
+      let _syncRefreshBusy = false,
+        _lastForcedRefreshAt = 0,
+        _staleCaughtUpInRow = 0;
+      async function refreshSharedRoomNow({ force = false } = {}) {
+        if (!sharedRoomId || !window.firestoreDb) return false;
+        if (!window.firebase?.auth?.().currentUser) return false;
+        if (!firebaseConfigured()) return false;
+        if (
+          _syncRefreshBusy ||
+          remoteApplying ||
+          _autoResolveBusy ||
+          creatingSharedRoom
+        )
+          return false;
+        if (navigator.onLine === false) return false;
+        if (document.visibilityState === "hidden") return false;
+        if (!force && Date.now() - _lastForcedRefreshAt < 20000) return false;
+        _syncRefreshBusy = true;
+        try {
+          const ref = window.firestoreDb.collection("rooms").doc(sharedRoomId);
+          const snap = await ref.get({ source: "server" });
+          if (!snap || !snap.exists) return false;
+          const data = snap.data() || {};
+          _lastForcedRefreshAt = Date.now();
+          _lastRoomSyncAt = Date.now();
+          renderRoomSyncInfo();
+          const incomingRevision = Number(data.revision || 0);
+          if (sharedLocalDirty && sharedWriteRevision === incomingRevision) {
+            sharedLocalDirty = false;
+            return false;
+          }
+          if (sharedLocalDirty && incomingRevision !== sharedRevision) {
+            if (_autoResolveBusy) return false;
+            setSharedRoomStatus(
+              "🔄 친구의 변경과 내 변경을 자동으로 합치는 중이에요…",
+              "",
+            );
+            await autoResolveSharedConflict();
+            return false;
+          }
+          if (incomingRevision === sharedRevision) {
+            _staleCaughtUpInRow = 0;
+            return false;
+          }
+          const applied = applyRoomSnapshotData(ref, data);
+          if (applied) {
+            _staleCaughtUpInRow++;
+            if (_staleCaughtUpInRow >= 2) {
+              _staleCaughtUpInRow = 0;
+              toast("🔄 방 실시간 연결을 새로 맺는 중…");
+              try {
+                if (sharedUnsubscribe) sharedUnsubscribe();
+              } catch (_) {}
+              sharedUnsubscribe = null;
+              await connectSharedRoom(sharedRoomId).catch(() => {});
+            }
+          } else {
+            _staleCaughtUpInRow = 0;
+          }
+          return applied;
+        } catch (e) {
+          return false;
+        } finally {
+          _syncRefreshBusy = false;
+        }
+      }
       async function connectSharedRoom(roomId) {
         if (!roomId) return;
         if (!firebaseConfigured()) {
@@ -3839,67 +3987,7 @@
                   autoResolveSharedConflict();
                   return;
                 }
-                sharedOwnerUid = String(data.ownerUid || "");
-                sharedMembers =
-                  data.members && typeof data.members === "object"
-                    ? data.members
-                    : {};
-                sharedSettingsShared = data.settingsShared === true;
-                sharedRevision = incomingRevision;
-                sharedHistory = [];
-                const currentUser = firebase.auth().currentUser;
-                if (
-                  currentUser?.uid === sharedOwnerUid &&
-                  Array.isArray(data.history) &&
-                  data.history.length > 0
-                ) {
-                  ref.update({ history: [] }).catch(() => {});
-                }
-                if (
-                  currentUser?.uid === sharedOwnerUid &&
-                  !sharedSettingsShared
-                ) {
-                  sharedSettingsShared = true;
-                  ref
-                    .update({
-                      settings: collectSharedSettings(),
-                      settingsShared: true,
-                      history: [],
-                    })
-                    .catch(() => {});
-                }
-                renderRoomMembers();
-                if (!joinRequestsUnsubscribe) listenJoinRequests();
-                renderRoomGuide();
-                listenOwnJoinRequest();
-                if (Array.isArray(data.items)) {
-                  remoteApplying = true;
-                  const localImgMap = new Map(
-                    items
-                      .filter((x) => x && x.useCustomImg && x.img)
-                      .map((x) => [String(x.id), x.img]),
-                  );
-                  const sanitized = sanitizeSharedItems(data.items).map(
-                    (it) => {
-                      if (!it.img && localImgMap.has(String(it.id))) {
-                        it.img = localImgMap.get(String(it.id));
-                        it.useCustomImg = true;
-                      }
-                      return it;
-                    },
-                  );
-                  items = sanitized;
-                  sharedBaseItems = sanitized;
-                  if (sharedSettingsShared && data.settings && sharedOwnerUid) {
-                    applySharedSettings(data.settings);
-                  }
-                  persistNow();
-                  remoteApplying = false;
-                  render(true);
-                  draw(true);
-                  hydrateInstagramThumbs();
-                  setSharedRoomStatus(`✅ 공유 중 · ${sharedRoomId}`, "ok");
-                }
+                applyRoomSnapshotData(ref, data);
               } else {
                 const currentUser = firebase.auth().currentUser;
                 if (!currentUser) {
@@ -4828,9 +4916,7 @@
       }
 
       function mapPinPlaceHtml(item, place, index) {
-        const searchQuery =
-          getValidSearchQuery(place) || place.name || place.address || "";
-        return `<div class="mapPinPlace"><strong>${index + 1}. ${esc(place.name || "장소")}</strong><div class="mapPinAddress">${esc(place.address || "주소 미입력")}</div><div class="mapPinActions"><a class="mb pr" href="${esc(getGMapLink(place))}" target="_blank" rel="noopener">🗺️ 구글지도</a><a class="mb" href="https://www.google.com/search?q=${encodeURIComponent(searchQuery)}" target="_blank" rel="noopener">🔎 검색</a><a class="mb" href="${esc(getGMapDirLink(place))}" target="_blank" rel="noopener">🧭 길찾기</a><button type="button" class="mb" data-act="openGroupedItem" data-id="${esc(item.id)}" data-place-idx="${index}">릴스에서 보기</button></div></div>`;
+        return `<div class="mapPinPlace"><strong>${index + 1}. ${esc(place.name || "장소")}</strong><div class="mapPinAddress">${esc(place.address || "주소 미입력")}</div><div class="mapPinActions"><a class="mb pr" href="${esc(getGMapLink(place))}" target="_blank" rel="noopener">🗺️ 구글지도</a><button type="button" class="mb" data-act="goToListItem" data-id="${esc(item.id)}">☰ 목록</button><a class="mb" href="${esc(getGMapDirLink(place))}" target="_blank" rel="noopener">🧭 길찾기</a><button type="button" class="mb" data-act="openGroupedItem" data-id="${esc(item.id)}" data-place-idx="${index}">릴스에서 보기</button></div></div>`;
       }
       function mapPinPopupHtml(item, expanded = false) {
         const places = Array.isArray(item.places) ? item.places : [];
@@ -5704,8 +5790,11 @@
       document.addEventListener("visibilitychange", () => {
         try {
           if (document.visibilityState === "hidden") persistNow();
-          else if (navigator.onLine && hasOfflineQueue())
-            flushOfflineQueue().catch(() => {});
+          else {
+            if (navigator.onLine && hasOfflineQueue())
+              flushOfflineQueue().catch(() => {});
+            refreshSharedRoomNow({ force: true }).catch(() => {});
+          }
         } catch (e) {}
       });
       setInterval(() => {
@@ -8193,6 +8282,9 @@ ${caption || rawText}
           if (it) {
             if (mapInfoWindow) mapInfoWindow.close();
             if (nMapInfoWindow) nMapInfoWindow.close();
+            try {
+              if (lm) lm.closePopup();
+            } catch (_) {}
             cur = it.id;
             view = "photo";
             showSheet();
@@ -8205,6 +8297,38 @@ ${caption || rawText}
               }
             }
           }
+          return;
+        }
+        if (act === "goToListItem") {
+          const it = items.find((x) => x.id === id);
+          if (mapInfoWindow) mapInfoWindow.close();
+          if (nMapInfoWindow) nMapInfoWindow.close();
+          try {
+            if (lm) lm.closePopup();
+          } catch (_) {}
+          if (it && CATS[it.category]) listCat = it.category;
+          else listCat = "ALL";
+          for (const fk in listFilter) listFilter[fk] = "ALL";
+          const searchInput = $("q-LIST");
+          if (searchInput) searchInput.value = "";
+          tab("list");
+          requestAnimationFrame(() => {
+            const listEl = $("list-LIST");
+            const cardEl = listEl
+              ? [...listEl.querySelectorAll(".item")].find(
+                  (n) => String(n.dataset.id || "") === String(id),
+                )
+              : null;
+            if (cardEl) {
+              cardEl.scrollIntoView({ block: "center", behavior: "smooth" });
+              cardEl.classList.remove("flash-item");
+              void cardEl.offsetWidth;
+              cardEl.classList.add("flash-item");
+              setTimeout(() => cardEl.classList.remove("flash-item"), 2600);
+            } else if (it) {
+              toast(`목록에서 "${it.name || "장소"}"을 찾지 못했어요`);
+            }
+          });
           return;
         }
         if (act === "toggleEdit") {
@@ -9068,6 +9192,7 @@ ${caption || rawText}
       window.addEventListener("online", () => {
         updateNetworkStatus();
         if (hasOfflineQueue()) flushOfflineQueue().catch(() => {});
+        refreshSharedRoomNow({ force: true }).catch(() => {});
       });
       window.addEventListener("offline", () => {
         updateNetworkStatus();
@@ -9093,7 +9218,38 @@ ${caption || rawText}
       updateRoomButtons();
       updateRoomAlert();
       pushLocalHistory();
-      setInterval(renderRoomSyncInfo, 5000);
+      setInterval(() => {
+        renderRoomSyncInfo();
+        try {
+          if (
+            sharedRoomId &&
+            _lastRoomSyncAt &&
+            navigator.onLine !== false &&
+            document.visibilityState === "visible" &&
+            Date.now() - _lastRoomSyncAt > 180000
+          ) {
+            refreshSharedRoomNow({ force: true }).catch(() => {});
+          }
+        } catch (e) {}
+      }, 5000);
+      (() => {
+        const rsi = $("roomSyncInfo");
+        if (!rsi) return;
+        rsi.title =
+          "누르면 서버에서 최신 내용을 다시 가져와요 (실시간이 안 될 때)";
+        rsi.style.cursor = "pointer";
+        rsi.addEventListener("click", () => {
+          if (!sharedRoomId) return;
+          toast("🔄 서버에서 최신 내용 확인 중...");
+          refreshSharedRoomNow({ force: true }).then((applied) => {
+            toast(
+              applied
+                ? "✅ 서버에서 최신 내용을 가져왔어요"
+                : "⭕ 이미 최신 상태예요. 연결 상태가 이상하면 새로고침해 주세요",
+            );
+          });
+        });
+      })();
       render(true);
       initMap();
       const savedTab = ls.get("TRIP_LAST_TAB");
