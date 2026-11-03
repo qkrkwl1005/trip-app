@@ -6989,13 +6989,57 @@
         return "";
       }
 
+      const DEFAULT_RAPID_KEY = "5fd6fbd834msh3820caaabb2d544p1887a1jsn8dfc3415ab40";
+
+      function extractCaptionFromRapidJson(obj) {
+        if (!obj || typeof obj !== "object") return "";
+        const direct =
+          obj?.data?.caption?.text ||
+          obj?.caption?.text ||
+          obj?.edge_media_to_caption?.edges?.[0]?.node?.text ||
+          obj?.data?.edge_media_to_caption?.edges?.[0]?.node?.text ||
+          obj?.xdt_shortcode_media?.edge_media_to_caption?.edges?.[0]?.node?.text ||
+          obj?.data?.xdt_shortcode_media?.edge_media_to_caption?.edges?.[0]?.node?.text ||
+          obj?.items?.[0]?.caption?.text ||
+          obj?.data?.items?.[0]?.caption?.text ||
+          (typeof obj?.caption === "string" ? obj.caption : "") ||
+          (typeof obj?.data?.caption === "string" ? obj.data.caption : "") ||
+          "";
+        if (typeof direct === "string" && direct.trim().length >= 4) {
+          return direct.trim();
+        }
+        // 깊은 탐색: edge_media_to_caption 또는 caption.text 재귀 검색
+        const seen = new Set();
+        const stack = [obj];
+        while (stack.length) {
+          const cur = stack.pop();
+          if (!cur || typeof cur !== "object" || seen.has(cur)) continue;
+          seen.add(cur);
+          if (typeof cur.text === "string" && cur.text.trim().length >= 10 && !/^https?:\/\//i.test(cur.text.trim())) {
+            if (cur.pk || cur.user_id || cur.created_at || cur.content_type || cur.did_report_as_spam !== undefined) {
+              return cur.text.trim();
+            }
+          }
+          if (Array.isArray(cur.edges) && cur.edges[0]?.node?.text) {
+            const t = String(cur.edges[0].node.text).trim();
+            if (t.length >= 4) return t;
+          }
+          for (const k of Object.keys(cur)) {
+            if (k === "comments" || k === "edge_media_to_comment" || k === "edge_media_to_parent_comment") continue;
+            const v = cur[k];
+            if (v && typeof v === "object") stack.push(v);
+          }
+        }
+        return "";
+      }
+
       async function fetchVideoCaption(vUrl) {
         const meta = parseVideoMeta(vUrl);
         if (!meta) return "";
         const cfBase = normalizeCfProxy(
           ls.get("TRIP_CF_PROXY") || ls.get("TRIP_WORKER_URL") || ""
         );
-        const rapidKey = (ls.get("TRIP_RAPIDAPI_KEY") || "").trim();
+        const rapidKey = (ls.get("TRIP_RAPIDAPI_KEY") || DEFAULT_RAPID_KEY).trim();
         const isCodeGarbage = (s) =>
           !s ||
           typeof s !== "string" ||
@@ -7028,54 +7072,58 @@
           const reelEmbedUrl = `https://www.instagram.com/reel/${igId}/embed/captioned/`;
           const ddUrl = `https://www.ddinstagram.com/reel/${igId}/`;
           const reelUrl = `https://www.instagram.com/reel/${igId}/`;
+          const stableHost = "instagram-scraper-stable-api.p.rapidapi.com";
 
-          // 1단계: RapidAPI 키가 있으면 RapidAPI 인스타 스크래퍼들로 우선 조회
+          // 1단계: 구독 완료된 instagram-scraper-stable-api (.php GET & POST Form) 최우선 실행
           if (rapidKey) {
-            const rapidEndpoints = [
-              {
-                url: `https://instagram-scraper-api2.p.rapidapi.com/v1/post_info?code_or_id_or_url=${encodeURIComponent(igId)}`,
-                host: "instagram-scraper-api2.p.rapidapi.com",
-              },
-              {
-                url: `https://instagram-looter2.p.rapidapi.com/post?url=${encodeURIComponent(reelUrl)}`,
-                host: "instagram-looter2.p.rapidapi.com",
-              },
-              {
-                url: `https://instagram-scraper-20251.p.rapidapi.com/postinfo/?code_or_id_or_url=${encodeURIComponent(igId)}`,
-                host: "instagram-scraper-20251.p.rapidapi.com",
-              },
-              {
-                url: `https://instagram-bulk-scraper-latest.p.rapidapi.com/webget_post_info/${encodeURIComponent(igId)}`,
-                host: "instagram-bulk-scraper-latest.p.rapidapi.com",
-              },
+            const stableCalls = [
+              () =>
+                fetchTO(
+                  `https://${stableHost}/get_media_data.php?reel_post_code_or_url=${encodeURIComponent(reelUrl)}&type=reel`,
+                  { headers: { "x-rapidapi-key": rapidKey, "x-rapidapi-host": stableHost } },
+                  6500
+                ),
+              () =>
+                fetchTO(
+                  `https://${stableHost}/get_media_data_v2.php?media_code=${encodeURIComponent(igId)}`,
+                  { headers: { "x-rapidapi-key": rapidKey, "x-rapidapi-host": stableHost } },
+                  6500
+                ),
+              () =>
+                fetchTO(
+                  `https://${stableHost}/get_media_data.php`,
+                  {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/x-www-form-urlencoded",
+                      "x-rapidapi-key": rapidKey,
+                      "x-rapidapi-host": stableHost,
+                    },
+                    body: new URLSearchParams({
+                      reel_post_code_or_url: reelUrl,
+                      media_code: igId,
+                      type: "reel",
+                    }).toString(),
+                  },
+                  6500
+                ),
+              () =>
+                fetchTO(
+                  `https://${stableHost}/get_ig_reel_info.php?reel_post_code_or_url=${encodeURIComponent(reelUrl)}`,
+                  { headers: { "x-rapidapi-key": rapidKey, "x-rapidapi-host": stableHost } },
+                  6500
+                ),
             ];
+
             try {
               const rapidCap = await Promise.any(
-                rapidEndpoints.map(async (ep) => {
-                  const rr = await fetchTO(
-                    ep.url,
-                    {
-                      headers: {
-                        "x-rapidapi-key": rapidKey,
-                        "x-rapidapi-host": ep.host,
-                      },
-                    },
-                    6000
-                  );
-                  if (!rr.ok) throw new Error("rapid status " + rr.status);
+                stableCalls.map(async (callFn) => {
+                  const rr = await callFn();
+                  if (!rr.ok) throw new Error("status " + rr.status);
                   const rd = await rr.json();
-                  const capTxt =
-                    rd?.data?.caption?.text ||
-                    rd?.data?.edge_media_to_caption?.edges?.[0]?.node?.text ||
-                    rd?.edge_media_to_caption?.edges?.[0]?.node?.text ||
-                    rd?.caption?.text ||
-                    (typeof rd?.caption === "string" ? rd.caption : "") ||
-                    (typeof rd?.data?.caption === "string" ? rd.data.caption : "") ||
-                    "";
-                  if (typeof capTxt === "string" && capTxt.trim().length >= 4 && !isCodeGarbage(capTxt)) {
-                    return capTxt.trim();
-                  }
-                  throw new Error("rapid empty");
+                  const capTxt = extractCaptionFromRapidJson(rd);
+                  if (capTxt && !isCodeGarbage(capTxt)) return capTxt;
+                  throw new Error("empty caption");
                 })
               );
               if (rapidCap) return rapidCap;
@@ -7111,7 +7159,7 @@
             } catch (_) {}
           }
 
-          // 3단계: 공용 우회 채널 병렬 실행 (반드시 fn() 호출!)
+          // 3단계: 공용 우회 채널 병렬 실행
           const jobs = [
             async () => {
               const r = await fetchTO(
@@ -9235,7 +9283,7 @@ ${caption || rawText}
         toast("Naver Maps 키 저장됨");
         location.reload();
       };
-      if ($("rapidkey")) $("rapidkey").value = ls.get("TRIP_RAPIDAPI_KEY") || "";
+      if ($("rapidkey")) $("rapidkey").value = ls.get("TRIP_RAPIDAPI_KEY") || DEFAULT_RAPID_KEY;
       if ($("saverapid")) {
         $("saverapid").onclick = () => {
           ls.set("TRIP_RAPIDAPI_KEY", ($("rapidkey")?.value || "").trim());
