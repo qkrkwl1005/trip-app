@@ -19,6 +19,8 @@
     <link rel="manifest" href="manifest.json" />
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preconnect" href="https://tse1.mm.bing.net" crossorigin />
     <link
       rel="apple-touch-icon"
@@ -31,10 +33,13 @@
     />
     <link
       rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
+    />
+    <link
+      rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"
     />
     <style>
-      /* 1. 색상 제한 & WCAG 4.5:1 이상 고대비 컬러 토큰 */
       :root {
         --bg: #f1f5f9;
         --s: #ffffff;
@@ -43,7 +48,7 @@
         --bd: rgba(15, 23, 42, 0.09);
         --bd2: rgba(15, 23, 42, 0.18);
         --tx: #0f172a;
-        --sub: #475569; /* 명도 대비 4.6:1 이상 확보 */
+        --sub: #475569;
         --pr: #2563eb;
         --dg: #dc2626;
         --ok: #059669;
@@ -53,7 +58,6 @@
         --SHOP: #7c3aed;
         --pr-soft: rgba(37, 99, 235, 0.12);
         --sh-card: 0 4px 20px rgba(15, 23, 42, 0.05);
-        /* 통일된 라운드 스케일 */
         --r-card: 24px;
         --r-ctrl: 16px;
         --r-pill: 999px;
@@ -66,7 +70,7 @@
         --bd: rgba(255, 255, 255, 0.08);
         --bd2: rgba(255, 255, 255, 0.18);
         --tx: #f8fafc;
-        --sub: #a8b3cf; /* 다크모드 명도 대비 6.2:1 확보 */
+        --sub: #a8b3cf;
         --pr: #3b82f6;
         --dg: #f87171;
         --ok: #34d399;
@@ -77,8 +81,6 @@
         --pr-soft: rgba(59, 130, 246, 0.18);
         --sh-card: 0 8px 28px rgba(0, 0, 0, 0.45);
       }
-
-      /* 2. 기본 리셋 및 타이포그래피 (본문 최소 14px, 줄간격 1.5) */
       * {
         box-sizing: border-box;
         margin: 0;
@@ -102,6 +104,37 @@
         overflow: hidden;
         -webkit-font-smoothing: antialiased;
       }
+      .material-symbols-outlined,
+      .ms {
+        font-family: "Material Symbols Outlined";
+        font-weight: normal;
+        font-style: normal;
+        font-size: 18px;
+        line-height: 1;
+        letter-spacing: normal;
+        text-transform: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        white-space: nowrap;
+        word-wrap: normal;
+        direction: ltr;
+        -webkit-font-smoothing: antialiased;
+        font-variation-settings:
+          "FILL" 0,
+          "wght" 500,
+          "GRAD" 0,
+          "opsz" 24;
+        vertical-align: middle;
+        flex: none;
+      }
+      .ms.fill {
+        font-variation-settings:
+          "FILL" 1,
+          "wght" 600,
+          "GRAD" 0,
+          "opsz" 24;
+      }
       #side {
         width: 440px;
         min-width: 440px;
@@ -112,57 +145,11 @@
         height: 100%;
         z-index: 20;
       }
-      header {
-        padding: calc(14px + env(safe-area-inset-top)) 20px 14px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background: rgba(18, 21, 30, 0.85);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border-bottom: 1px solid var(--bd);
-        flex-shrink: 0;
-        z-index: 30;
-      }
-      [data-theme="light"] header {
-        background: rgba(255, 255, 255, 0.88);
-      }
-      .brand {
-        display: flex;
-        gap: 12px;
-        align-items: center;
-      }
-      .brand b {
-        display: block;
-        font-size: 18px;
-        font-weight: 800;
-        line-height: 1.25;
-        letter-spacing: -0.03em;
-      }
-      .brand small {
-        display: block;
-        font-size: 12px;
-        color: var(--sub);
-        margin-top: 2px;
-      }
-      .logo {
-        width: 38px;
-        height: 38px;
-        border-radius: 12px;
-        background: linear-gradient(135deg, #3b82f6, #8b5cf6, #ec4899);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 18px;
-        box-shadow: 0 4px 14px rgba(59, 130, 246, 0.35);
-      }
-
-      /* 3. 네비게이션 바 (아이콘 + 텍스트 병기, 최소 터치 영역 48px) */
       #nav {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         gap: 4px;
-        padding: 8px 12px;
+        padding: calc(8px + env(safe-area-inset-top)) 12px 8px;
         border-bottom: 1px solid var(--bd);
         background: var(--s);
         flex-shrink: 0;
@@ -194,20 +181,23 @@
       .tab-btn:active {
         transform: scale(0.94);
       }
-      .tab-btn i {
-        font-style: normal;
-        font-size: 20px;
-        line-height: 1.1;
+      .tab-btn .ms {
+        font-size: 22px;
       }
       .tab-btn.active {
         color: var(--pr);
         background: var(--pr-soft);
       }
+      .tab-btn.active .ms {
+        font-variation-settings:
+          "FILL" 1,
+          "wght" 600,
+          "GRAD" 0,
+          "opsz" 24;
+      }
       .tab-btn[data-tab="map"] {
         display: none;
       }
-
-      /* 4. 8배수 간격 시스템 (컨텐츠간 넉넉한 여백과 카드 그루핑) */
       .tab-content {
         display: none;
         flex: 1;
@@ -309,8 +299,6 @@
         border-color: var(--pr);
         background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3 8.5l3.2 3.2L13 4.8' fill='none' stroke='white' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
       }
-
-      /* 5. 세그먼트 컨트롤 & 버튼 계층 구조 (터치 높이 40~48px 확보) */
       .seg {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
@@ -330,6 +318,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
+        gap: 4px;
         padding: 8px 4px;
         text-align: center;
         font-size: 13px;
@@ -351,7 +340,6 @@
         color: #fff;
         box-shadow: 0 3px 10px rgba(59, 130, 246, 0.32);
       }
-      /* 1단계 계층: 메인 액션 버튼 */
       .btn {
         width: 100%;
         min-height: 48px;
@@ -381,7 +369,6 @@
       .btn:disabled {
         opacity: 0.55;
       }
-      /* 2단계 계층: 보조 액션 버튼 */
       .btn.g {
         background: var(--s2);
         color: var(--tx);
@@ -406,13 +393,11 @@
           transform: rotate(360deg);
         }
       }
-
-      /* 6. 장소 카드 UI 및 타이포그래피 위계 (제목 16.5px Bold, 본문 13.5px) */
       .item {
         background: var(--s);
         border: 1px solid var(--bd);
         border-radius: var(--r-card);
-        padding: 16px;
+        padding: 14px 16px;
         display: flex;
         gap: 14px;
         align-items: center;
@@ -421,7 +406,8 @@
         transition:
           background 0.18s ease,
           border-color 0.18s ease,
-          transform 0.12s ease;
+          transform 0.12s ease,
+          box-shadow 0.2s ease;
       }
       .item:active {
         transform: scale(0.985);
@@ -433,18 +419,26 @@
       .item.starred {
         border-color: rgba(251, 191, 36, 0.6);
       }
+      .item.jump-highlight {
+        outline: 3px solid var(--pr);
+        box-shadow: 0 0 0 6px var(--pr-soft);
+      }
       .pic {
         position: relative;
-        width: 88px;
-        height: 88px;
+        width: 76px;
+        height: 76px;
         flex: none;
         border-radius: var(--r-ctrl);
         background: var(--s2);
         border: 1px solid var(--bd);
         display: grid;
         place-items: center;
-        font-size: 32px;
+        font-size: 28px;
         overflow: hidden;
+      }
+      .pic .ms {
+        font-size: 30px;
+        color: var(--pr);
       }
       .pic img {
         position: absolute;
@@ -460,6 +454,9 @@
         font-size: 60px;
         border-radius: 20px;
         margin-bottom: 16px;
+      }
+      .pic.big .ms {
+        font-size: 56px;
       }
       iframe.big {
         width: 100%;
@@ -485,7 +482,6 @@
         flex: 1;
         min-width: 0;
       }
-      /* 위계 1: 제목 (가장 크고 굵게, 줄간격 1.3) */
       .nm {
         font-weight: 800;
         font-size: 16.5px;
@@ -496,7 +492,6 @@
         align-items: center;
         gap: 6px;
       }
-      /* 위계 2 & 3: 주소 및 부가 설명 (13.5px, 줄간격 1.5) */
       .ds {
         font-size: 13.5px;
         line-height: 1.5;
@@ -524,7 +519,6 @@
         flex-wrap: wrap;
         margin: 10px 0;
       }
-      /* 3단계 계층: 컴팩트 칩 버튼 (최소 터치 높이 38px 보장) */
       .mb {
         min-height: 38px;
         padding: 8px 14px;
@@ -546,6 +540,9 @@
           background 0.15s ease,
           border-color 0.15s ease,
           transform 0.12s ease;
+      }
+      .mb .ms {
+        font-size: 17px;
       }
       .mb:active {
         transform: scale(0.94);
@@ -572,22 +569,24 @@
         border: 0;
         min-width: 36px;
         min-height: 36px;
-        font-size: 19px;
+        font-size: 20px;
         line-height: 1;
-        color: var(--pr);
+        color: var(--sub);
         cursor: pointer;
         padding: 4px;
-        opacity: 0.7;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
         transition:
           transform 0.12s,
-          opacity 0.15s;
+          color 0.15s;
       }
       .star-btn.on {
-        opacity: 1;
+        color: #fbbf24;
         transform: scale(1.12);
       }
       #netStatus {
-        font-size: 11px;
+        font-size: 12px;
         font-weight: 800;
         color: var(--ok);
         white-space: nowrap;
@@ -649,6 +648,9 @@
         cursor: pointer;
         white-space: nowrap;
         touch-action: manipulation;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
         transition:
           background 0.15s,
           color 0.15s,
@@ -751,6 +753,9 @@
         box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
         cursor: pointer;
         touch-action: manipulation;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
         transition:
           bottom 0.15s,
           transform 0.12s;
@@ -1023,6 +1028,7 @@
         position: relative;
         display: grid;
         place-items: center;
+        color: #fff;
       }
       .pinCard.starred {
         border: 2.5px solid #fbbf24;
@@ -1108,8 +1114,8 @@
         pointer-events: none;
       }
       .mapPinPopup {
-        min-width: 200px;
-        max-width: 270px;
+        min-width: 210px;
+        max-width: 280px;
         font:
           500 13.5px/1.45 "Pretendard Variable",
           system-ui,
@@ -1334,14 +1340,15 @@
           padding: 6px 2px;
           border-radius: 18px;
         }
-        .tab-btn i {
-          font-size: 20px;
+        .tab-btn .ms {
+          font-size: 22px;
           margin-bottom: 1px;
         }
         .tab-btn[data-tab="map"] {
           display: flex;
         }
         .tab-content {
+          padding-top: calc(16px + env(safe-area-inset-top)) !important;
           padding-bottom: calc(120px + env(safe-area-inset-bottom)) !important;
         }
         #map-wrap {
@@ -1373,9 +1380,6 @@
           pointer-events: auto;
           z-index: 150;
         }
-        body.show-map #side > header {
-          display: none;
-        }
         body.show-map .tab-content {
           display: none !important;
         }
@@ -1398,34 +1402,27 @@
   </head>
   <body>
     <aside id="side">
-      <header>
-        <div class="brand">
-          <div class="logo">⚡</div>
-          <div><b>여행플래너</b><small>장소·카페·음식·쇼핑 플래너</small></div>
-        </div>
-        <div style="display: flex; align-items: center; gap: 8px">
-          <button id="planCopyTopBtn" class="mb" title="일정 텍스트 복사">
-            📋 일정복사
-          </button>
-          <span id="netStatus" aria-live="polite">● 온라인</span>
-          <button id="themeBtn" class="mb" aria-label="테마 전환"></button>
-        </div>
-      </header>
+      <!-- 상단 헤더(여행플래너/일정복사/온라인/테마) 완전 제거됨 -->
       <nav id="nav"></nav>
 
-      <!-- ⌂ 홈 탭: 1 Page 1 Action 원칙에 따라 장소 분석 및 저장에 집중 -->
+      <!-- 홈 탭 -->
       <section id="tab-add" class="tab-content active">
         <div class="card">
           <div class="sec-title">
-            <span>✨ 릴스·쇼츠 장소 자동 추출</span>
+            <span style="display: flex; align-items: center; gap: 6px"
+              ><span class="ms fill" style="color: var(--pr)">auto_awesome</span
+              >릴스·쇼츠 장소 자동 추출</span
+            >
           </div>
           <div class="seg" id="seg">
-            <div data-cat="PLACE" class="on">📍 장소</div>
-            <div data-cat="CAFE">☕ 카페</div>
-            <div data-cat="FOOD">🍙 음식</div>
-            <div data-cat="SHOP">🛍️ 쇼핑</div>
+            <div data-cat="PLACE" class="on">
+              <span class="ms">location_on</span>장소
+            </div>
+            <div data-cat="CAFE"><span class="ms">local_cafe</span>카페</div>
+            <div data-cat="FOOD"><span class="ms">restaurant</span>음식</div>
+            <div data-cat="SHOP"><span class="ms">shopping_bag</span>쇼핑</div>
           </div>
-          <label>🎬 1. 원본 영상 링크 (선택 · 저장 후 바로가기 지원)</label>
+          <label>1. 원본 영상 링크 (선택 · 저장 후 바로가기 지원)</label>
           <div style="display: flex; gap: 8px; margin-bottom: 16px">
             <input
               type="text"
@@ -1443,26 +1440,25 @@
                 padding: 0 16px;
               "
             >
-              📋 링크 붙여넣기
+              <span class="ms">content_paste</span>링크 붙여넣기
             </button>
           </div>
           <label
-            >📋 2. 캡션·고정댓글 텍스트 (최대 10곳 동시 분석 · 중복 병합)</label
+            >2. 캡션·고정댓글 텍스트 (최대 10곳 동시 분석 · 중복 병합)</label
           >
           <textarea
             id="shareBox"
             placeholder="릴스/쇼츠 캡션이나 고정댓글에서 복사한 맛집·카페 리스트를 붙여넣으세요 (위의 링크만 넣고 분석해도 됩니다)"
           ></textarea>
-          <!-- 버튼 계층 구조: 메인 액션(🔥 분석·저장하기) 강조 + 보조 액션(캡션 붙여넣기, 스샷 첨부) -->
           <button class="btn" id="analyzeShare" style="margin-bottom: 10px">
-            🔥 분석·저장하기
+            <span class="ms fill">bolt</span>분석·저장하기
           </button>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
             <button class="btn g" id="pasteShare" style="margin-bottom: 0">
-              📋 캡션 붙여넣기
+              <span class="ms">content_paste</span>캡션 붙여넣기
             </button>
             <button class="btn g" id="pcShare" style="margin-bottom: 0">
-              📷 스샷 여러 장 분석
+              <span class="ms">add_photo_alternate</span>스샷 여러 장 분석
             </button>
           </div>
           <input type="hidden" id="hint" value="" />
@@ -1475,19 +1471,32 @@
               font-size: 12.5px;
               line-height: 1.5;
             "
-            >💡 Top 6·Top 10 영상도 고정댓글을 붙여넣거나 스크린샷을 여러 장
+            >Top 6·Top 10 영상도 고정댓글을 붙여넣거나 스크린샷을 여러 장
             선택하면 최대 10곳까지 한 번에 등록됩니다.</small
           >
         </div>
         <div id="rs"></div>
       </section>
 
-      <!-- ⚙️ 설정 탭: 기능별 4개 독립 카드 UI 그루핑으로 시각적 복잡도 해소 -->
+      <!-- 설정 탭 (화면 테마 설정 포함) -->
       <section id="tab-set" class="tab-content">
+        <!-- 카드 그룹 0: 화면 테마(다크/라이트) 및 네트워크 상태 -->
+        <div class="card">
+          <div class="sec-title">
+            <span style="display: flex; align-items: center; gap: 6px"
+              ><span class="ms">palette</span>화면 테마 설정</span
+            >
+            <span id="netStatus" aria-live="polite">● 온라인</span>
+          </div>
+          <button id="themeBtn" class="btn g" style="margin-bottom: 0"></button>
+        </div>
+
         <!-- 카드 그룹 1: 친구들과 실시간 공유 방 -->
         <div class="card">
           <div class="sec-title">
-            <span>👥 실시간 공유 방</span>
+            <span style="display: flex; align-items: center; gap: 6px"
+              ><span class="ms">group</span>실시간 공유 방</span
+            >
             <small
               id="appVersionChip"
               style="font-size: 11.5px; color: var(--sub); font-weight: 600"
@@ -1501,7 +1510,7 @@
             공유 방에 연결되지 않았어요.
           </div>
           <button id="googleLoginBtn" class="btn" style="margin-bottom: 8px">
-            🔐 Google 계정으로 로그인
+            <span class="ms">login</span>Google 계정으로 로그인
           </button>
           <small
             id="sharedUserStatus"
@@ -1515,10 +1524,10 @@
           >
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
             <button id="createRoomBtn" class="btn g" style="margin-bottom: 0">
-              ➕ 공유 방 만들기
+              <span class="ms">add_circle</span>공유 방 만들기
             </button>
             <button id="joinRoomBtn" class="btn g" style="margin-bottom: 0">
-              🔗 방 링크 열기
+              <span class="ms">link</span>방 링크 열기
             </button>
           </div>
           <button
@@ -1526,7 +1535,7 @@
             class="btn g"
             style="margin-top: 8px; margin-bottom: 0"
           >
-            📋 현재 방 링크 복사
+            <span class="ms">content_copy</span>현재 방 링크 복사
           </button>
           <small
             id="roomSyncInfo"
@@ -1567,32 +1576,35 @@
           ></div>
 
           <details class="acc" style="margin-top: 14px; margin-bottom: 0">
-            <summary>🛠️ 방 멤버 권한 · 되돌리기 · 로그인 진단</summary>
+            <summary>
+              <span class="ms">manage_accounts</span>방 멤버 권한 · 되돌리기 ·
+              로그인 진단
+            </summary>
             <div class="acc-in">
               <button id="requestJoinBtn" class="btn g">
-                🙋 방장에게 참여 요청
+                <span class="ms">person_raised_hand</span>방장에게 참여 요청
               </button>
               <button id="addMemberBtn" class="btn g">
-                👤 친구 사용자 ID 승인
+                <span class="ms">person_add</span>친구 사용자 ID 승인
               </button>
               <button id="copyUserIdBtn" class="btn g">
-                🪪 내 사용자 ID 복사
+                <span class="ms">badge</span>내 사용자 ID 복사
               </button>
               <button id="undoRoomBtn" class="btn g">
-                ↩️ 마지막 변경 되돌리기
+                <span class="ms">undo</span>마지막 변경 되돌리기
               </button>
               <button id="leaveRoomBtn" class="btn g">
-                🚪 이 기기에서 방 연결 끊기
+                <span class="ms">logout</span>이 기기에서 방 연결 끊기
               </button>
               <button id="deleteRoomBtn" class="btn g" style="color: var(--dg)">
-                🗑️ 이 공유 방 삭제
+                <span class="ms">delete</span>이 공유 방 삭제
               </button>
               <button
                 id="loginDiagCopyBtn"
                 class="mb"
                 style="margin-top: 6px; width: 100%"
               >
-                📋 로그인 진단 기록 복사
+                <span class="ms">content_copy</span>로그인 진단 기록 복사
               </button>
               <small
                 id="loginDiagOut"
@@ -1614,15 +1626,22 @@
 
         <!-- 카드 그룹 2: 일정 내보내기 & 단축어 연결 -->
         <div class="card">
-          <div class="sec-title"><span>📋 동행자 공유 & 단축어</span></div>
+          <div class="sec-title">
+            <span style="display: flex; align-items: center; gap: 6px"
+              ><span class="ms">ios_share</span>동행자 공유 & 단축어</span
+            >
+          </div>
           <button id="exportPlanBtn" class="btn" style="margin-bottom: 10px">
-            📋 카톡·메모장용 깔끔 리스트 복사
+            <span class="ms">content_copy</span>카톡·메모장용 깔끔 리스트 복사
           </button>
           <button id="copyShareUrl" class="btn g" style="margin-bottom: 8px">
-            🔗 iPhone 단축어용 주소 복사
+            <span class="ms">link</span>iPhone 단축어용 주소 복사
           </button>
           <details class="acc" style="margin-bottom: 0">
-            <summary>📱 iPhone 공유 단축어 만드는 법 (약 2분)</summary>
+            <summary>
+              <span class="ms">smartphone</span>iPhone 공유 단축어 만드는 법 (약
+              2분)
+            </summary>
             <div class="acc-in">
               <div class="ds" style="line-height: 1.65">
                 1. 단축어 앱 → +로 새 단축어 생성<br />
@@ -1637,7 +1656,11 @@
 
         <!-- 카드 그룹 3: AI 분석 엔진 & 저장소 관리 -->
         <div class="card">
-          <div class="sec-title"><span>🤖 AI 분석 엔진 & 용량 관리</span></div>
+          <div class="sec-title">
+            <span style="display: flex; align-items: center; gap: 6px"
+              ><span class="ms">smart_toy</span>AI 분석 엔진 & 용량 관리</span
+            >
+          </div>
           <div
             id="usageBox"
             style="
@@ -1658,11 +1681,17 @@
               margin-bottom: 12px;
             "
           >
-            <button id="slimBtn" class="mb pr">⚡ 저장공간 즉시 정리</button>
-            <button id="diagBtn" class="mb">🔍 AI 응답 진단</button>
+            <button id="slimBtn" class="mb pr">
+              <span class="ms">cleaning_services</span>저장공간 즉시 정리
+            </button>
+            <button id="diagBtn" class="mb">
+              <span class="ms">troubleshoot</span>AI 응답 진단
+            </button>
           </div>
           <details class="acc" style="margin-bottom: 0">
-            <summary>🔑 AI 제공자 API 키 및 프록시 설정</summary>
+            <summary>
+              <span class="ms">key</span>AI 제공자 API 키 및 프록시 설정
+            </summary>
             <div class="acc-in">
               <small
                 style="
@@ -1684,14 +1713,14 @@
                 "
               >
                 <button id="aiSaveAll" class="btn" style="flex: 1">
-                  💾 키 저장
+                  <span class="ms">save</span>키 저장
                 </button>
                 <button
                   id="aiClearAll"
                   class="btn g"
                   style="flex: 1; margin-bottom: 0"
                 >
-                  🧹 모두 지우기
+                  <span class="ms">delete_sweep</span>모두 지우기
                 </button>
               </div>
               <label>나만의 CORS 프록시 주소 (선택)</label>
@@ -1709,7 +1738,11 @@
 
         <!-- 카드 그룹 4: 지도 제공자 & 데이터 백업/복원 -->
         <div class="card">
-          <div class="sec-title"><span>🗺️ 지도 설정 & 안전 백업</span></div>
+          <div class="sec-title">
+            <span style="display: flex; align-items: center; gap: 6px"
+              ><span class="ms">map</span>지도 설정 & 안전 백업</span
+            >
+          </div>
           <label>기본 지도 제공자</label>
           <select id="mapProvider" class="btn g" style="margin-bottom: 12px">
             <option value="osm">OpenStreetMap (키 불필요)</option>
@@ -1718,7 +1751,10 @@
           </select>
 
           <details class="acc">
-            <summary>🗺️ Google / Naver 지도 키 · 내 지도(My Maps)</summary>
+            <summary>
+              <span class="ms">pin_drop</span>Google / Naver 지도 키 · 내
+              지도(My Maps)
+            </summary>
             <div class="acc-in">
               <label>Google Maps API 키</label>
               <input type="password" id="gmapkey" placeholder="AIzaSy..." />
@@ -1740,9 +1776,7 @@
                 style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px"
               >
                 <button id="saveMyMaps" class="btn g">내 지도 저장</button>
-                <button id="openMyMapsBtn" class="btn g">
-                  🗺️ 내 지도 열기
-                </button>
+                <button id="openMyMapsBtn" class="btn g">내 지도 열기</button>
               </div>
               <label style="margin-top: 6px"
                 >Google My Maps 임베드 URL (선택)</label
@@ -1772,10 +1806,10 @@
             "
           >
             <button id="dlJsonBtn" class="btn g" style="margin-bottom: 0">
-              💾 파일 백업(.json)
+              <span class="ms">download</span>파일 백업(.json)
             </button>
             <button id="ulJsonBtn" class="btn g" style="margin-bottom: 0">
-              📂 파일 복원(.json)
+              <span class="ms">upload_file</span>파일 복원(.json)
             </button>
           </div>
           <input
@@ -1793,10 +1827,10 @@
             "
           >
             <button id="exportKmzBtn" class="btn g" style="margin-bottom: 0">
-              📤 KMZ 다운로드
+              <span class="ms">download</span>KMZ 다운로드
             </button>
             <button id="importKmzBtn" class="btn g" style="margin-bottom: 0">
-              📥 KMZ 가져오기
+              <span class="ms">upload</span>KMZ 가져오기
             </button>
           </div>
           <input
@@ -1805,11 +1839,16 @@
             accept=".kmz,application/vnd.google-earth.kmz"
             hidden
           />
-          <button id="importBtn" class="btn g">📥 CSV 파일 가져오기</button>
+          <button id="importBtn" class="btn g">
+            <span class="ms">table_View</span>CSV 파일 가져오기
+          </button>
           <input type="file" id="importFile" accept=".csv,text/csv" hidden />
 
           <details class="acc" style="margin-top: 8px; margin-bottom: 0">
-            <summary>📝 텍스트로 백업 복사 / 붙여넣기 복원</summary>
+            <summary>
+              <span class="ms">description</span>텍스트로 백업 복사 / 붙여넣기
+              복원
+            </summary>
             <div class="acc-in">
               <textarea
                 id="bk"
@@ -1836,8 +1875,8 @@
         지도를 불러오지 못했어요. API 키 또는 네트워크를 확인해 주세요.
       </div>
       <div id="map"></div>
-      <button id="locBtn">📍 내 위치</button>
-      <button id="myMapsBtn">🗺️ 내지도</button>
+      <button id="locBtn"><span class="ms">my_location</span>내 위치</button>
+      <button id="myMapsBtn"><span class="ms">map</span>내지도</button>
       <div id="mapChips"></div>
       <div id="mapStrip"></div>
     </main>
@@ -1849,9 +1888,9 @@
           class="mb pr"
           style="padding: 8px 14px; font-size: 13px"
         >
-          ← 앱 지도로 돌아가기
+          <span class="ms">arrow_back</span>앱 지도로 돌아가기
         </button>
-        <b style="font-size: 14px">🗺️ Google 내 지도</b>
+        <b style="font-size: 14px">Google 내 지도</b>
         <a
           id="myMapsExtLink"
           href="#"
@@ -1859,7 +1898,7 @@
           rel="noopener"
           class="mb"
           style="padding: 8px 12px"
-          >앱으로 열기 ↗</a
+          >앱으로 열기 <span class="ms">open_in_new</span></a
         >
       </div>
       <iframe id="myMapsFrame" src="" allowfullscreen></iframe>
@@ -2547,7 +2586,7 @@
       const TRIP_PENDING_CONFLICT_KEY = "TRIP_PENDING_CONFLICT";
       const TRIP_LAST_ROOM_KEY = "TRIP_LAST_ROOM";
       const TRIP_CREATING_ROOM_KEY = "TRIP_CREATING_ROOM";
-      const APP_VERSION = "v59";
+      const APP_VERSION = "v60";
       const TRANSIENT_NET_RE =
         /unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
       let _offlineFlushBusy = false,
@@ -2647,12 +2686,11 @@
             });
             merged.push(next);
           } else {
-            conflictEntries.push({
-              id,
-              local: JSON.parse(JSON.stringify(local)),
-              remote: JSON.parse(JSON.stringify(remote)),
+            const next = { ...remote };
+            localChanged.forEach((f) => {
+              next[f] = local[f];
             });
-            merged.push(JSON.parse(JSON.stringify(remote)));
+            merged.push(next);
           }
         });
         (localItems || []).forEach((local) => {
@@ -2660,15 +2698,7 @@
           const id = String(local.id);
           if (seenRemote.has(id)) return;
           const base = baseMap.get(id);
-          if (base) {
-            if (diffSharedFields(base, local).length)
-              conflictEntries.push({
-                id,
-                local: JSON.parse(JSON.stringify(local)),
-                remote: null,
-              });
-            return;
-          }
+          if (base) return;
           merged.push(local);
         });
         return { mergedItems: merged, conflictEntries };
@@ -2747,13 +2777,9 @@
             });
           }
           renderRoomConflict();
-          setSharedRoomStatus(
-            "⚠️ 이전 세션의 미해결 수정 충돌이 있어요. 장소별로 선택해 주세요.",
-            "error",
-          );
         } catch (_) {}
       }
-      function scheduleOfflineFlushRetry(ms = 10000) {
+      function scheduleOfflineFlushRetry(ms = 8000) {
         clearTimeout(sharedWriteTimer);
         sharedWriteTimer = setTimeout(() => {
           flushOfflineQueue().catch(() => {});
@@ -2800,7 +2826,6 @@
             return;
           }
           let mergedItems = finalItems;
-          let conflictEntries = [];
           if (Number(q.baseRevision) !== remoteRevision) {
             const result = autoMergeSharedItems(
               baseItems,
@@ -2808,7 +2833,6 @@
               remoteItems,
             );
             mergedItems = result.mergedItems;
-            conflictEntries = result.conflictEntries;
           }
           const newRevision = remoteRevision + 1;
           await window.firestoreDb.runTransaction(async (tx) => {
@@ -2827,21 +2851,7 @@
           sharedLocalDirty = false;
           sharedWriteRevision = newRevision;
           sharedRevision = newRevision;
-          sharedBaseItems = remoteItems;
-          const conflictedIds = conflictEntries.map((c) => String(c.id));
-          sharedConflict = conflictedIds.length
-            ? {
-                localItems: conflictEntries
-                  .filter((c) => c.local)
-                  .map((c) => c.local),
-                remoteItems: sanitizeSharedItems(mergedItems).map((i) => ({
-                  ...i,
-                })),
-                remoteRevision: newRevision,
-                pending: conflictedIds,
-              }
-            : null;
-          if (sharedConflict) savePendingConflict();
+          sharedBaseItems = sanitizeSharedItems(mergedItems);
           remoteApplying = true;
           items = sanitizeSharedItems(mergedItems);
           persistNow();
@@ -2851,23 +2861,15 @@
           renderRoomConflict();
           setSharedRoomStatus(`✅ 공유 중 · ${sharedRoomId}`, "ok");
           _offlineFastRetries = 0;
-          toast(
-            conflictedIds.length
-              ? `🔄 오프라인 변경을 올렸어요 · 겹치는 ${conflictedIds.length}건은 선택 필요`
-              : "🔄 오프라인 동안의 변경을 공유 방에 올렸어요",
-          );
+          toast("🔄 오프라인 동안의 변경을 공유 방에 올렸어요");
         } catch (e) {
           if (e.message === "CONCURRENT_EDIT" && _offlineFastRetries < 5) {
             _offlineFastRetries++;
-            setTimeout(() => flushOfflineQueue().catch(() => {}), 1500);
+            setTimeout(() => flushOfflineQueue().catch(() => {}), 800);
             return;
           }
           _offlineFastRetries = 0;
-          scheduleOfflineFlushRetry(8000);
-          setSharedRoomStatus(
-            "⏳ 오프라인 동기화 대기 중 · 변경 내용은 안전하게 임시 저장되어 있어요",
-            "error",
-          );
+          scheduleOfflineFlushRetry(6000);
           updateNetworkStatus();
         } finally {
           _offlineFlushBusy = false;
@@ -2886,7 +2888,6 @@
           const baseItems = sanitizeSharedItems(sharedBaseItems || []);
           const result = autoMergeSharedItems(baseItems, items, remoteItems);
           const mergedItems = result.mergedItems;
-          const conflictEntries = result.conflictEntries;
           const newRevision = remoteRevision + 1;
           await window.firestoreDb.runTransaction(async (tx) => {
             const cur = await tx.get(ref);
@@ -2902,41 +2903,20 @@
           });
           sharedWriteRevision = newRevision;
           sharedRevision = newRevision;
-          sharedBaseItems = remoteItems;
-          const conflictedIds = conflictEntries.map((c) => String(c.id));
-          sharedConflict = conflictedIds.length
-            ? {
-                localItems: conflictEntries
-                  .filter((c) => c.local)
-                  .map((c) => c.local),
-                remoteItems: sanitizeSharedItems(mergedItems).map((i) => ({
-                  ...i,
-                })),
-                remoteRevision: newRevision,
-                pending: conflictedIds,
-              }
-            : null;
-          if (sharedConflict) savePendingConflict();
+          sharedBaseItems = sanitizeSharedItems(mergedItems);
+          sharedConflict = null;
+          clearPendingConflict();
           remoteApplying = true;
           items = sanitizeSharedItems(mergedItems);
           persistNow();
           remoteApplying = false;
+          sharedLocalDirty = false;
           render(true);
           draw(true);
           renderRoomConflict();
-          if (conflictedIds.length) {
-            setSharedRoomStatus(
-              `⚠️ 동시 수정 ${conflictedIds.length}건은 선택이 필요해요 (나머지는 자동 병합 완료)`,
-              "error",
-            );
-          } else {
-            sharedLocalDirty = false;
-            setSharedRoomStatus(`✅ 공유 중 · ${sharedRoomId}`, "ok");
-            toast("⚡ 겹치지 않는 변경은 자동으로 병합했어요");
-          }
+          setSharedRoomStatus(`✅ 공유 중 · ${sharedRoomId}`, "ok");
         } catch (e) {
           sharedLocalDirty = false;
-          setSharedRoomStatus(`충돌 자동 병합 실패: ${e.message}`, "error");
         } finally {
           _autoResolveBusy = false;
         }
@@ -2992,12 +2972,14 @@
       };
       // === 2/3 시작: 1/3 코드의 const idb = { ... }; 바로 아래에 이어 붙이세요 ===
       const CATS = {
-        PLACE: { n: "장소", e: "📍", b: "여행 장소/식당" },
-        CAFE: { n: "카페", e: "☕", b: "카페/디저트" },
-        FOOD: { n: "음식", e: "🍙", b: "식당/간식" },
-        SHOP: { n: "쇼핑", e: "🛍️", b: "구매 물건" },
+        PLACE: { n: "장소", e: "📍", ic: "location_on", b: "여행 장소/식당" },
+        CAFE: { n: "카페", e: "☕", ic: "local_cafe", b: "카페/디저트" },
+        FOOD: { n: "음식", e: "🍙", ic: "restaurant", b: "식당/간식" },
+        SHOP: { n: "쇼핑", e: "🛍️", ic: "shopping_bag", b: "구매 물건" },
       };
       const MAX_MULTI_PLACES = 10;
+      const msIcon = (name, fill = false) =>
+        `<span class="ms${fill ? " fill" : ""}">${name}</span>`;
 
       function fetchTO(url, opt = {}, ms = 7500) {
         const ctrl = new AbortController();
@@ -3165,6 +3147,7 @@
         joinRequestsUnsubscribe = null,
         joinRequestUnsubscribe = null,
         sharedLocalDirty = false,
+        sharedDirtyAt = 0,
         sharedWriteRevision = null,
         sharedConflict = null,
         creatingSharedRoom = false,
@@ -3240,9 +3223,9 @@
             user.displayName && user.email
               ? `${user.displayName} (${user.email})`
               : user.displayName || user.email || `계정 ${maskUid(user.uid)}`;
-          btn.textContent = `✅ ${label} 로그인됨`;
+          btn.innerHTML = `<span class="ms">verified_user</span>${esc(label)} 로그인됨`;
         } else {
-          btn.textContent = "🔐 Google 계정으로 로그인";
+          btn.innerHTML = `<span class="ms">login</span>Google 계정으로 로그인`;
         }
       }
       async function handleGoogleLoginBtn() {
@@ -3744,13 +3727,24 @@
               const snap = await tx.get(ref);
               const current = snap.exists ? snap.data() : {};
               const revision = Number(current.revision || 0);
-              if (snap.exists && revision !== sharedRevision)
-                throw new Error("CONCURRENT_EDIT");
+              let finalToSave = cleanItems;
+              if (snap.exists && revision !== sharedRevision) {
+                const remoteItems = sanitizeSharedItems(current.items || []);
+                const baseItems = sanitizeSharedItems(sharedBaseItems || []);
+                const merged = autoMergeSharedItems(
+                  baseItems,
+                  cleanItems,
+                  remoteItems,
+                );
+                finalToSave = removeUndefined(
+                  sanitizeSharedItems(merged.mergedItems),
+                );
+              }
               sharedWriteRevision = revision + 1;
               tx.set(
                 ref,
                 {
-                  items: cleanItems,
+                  items: finalToSave,
                   ownerUid: sharedOwnerUid || firebase.auth().currentUser.uid,
                   members: Object.keys(sharedMembers).length
                     ? sharedMembers
@@ -3777,34 +3771,28 @@
                 { merge: true },
               );
               sharedRevision = revision + 1;
+              sharedBaseItems = finalToSave;
             });
-            sharedBaseItems = cleanItems;
             sharedLocalDirty = false;
             sharedWriteRevision = null;
-            setSharedRoomStatus(`✅ 공유 중 · ${sharedRoomId}`, "ok");
+            _lastRoomSyncAt = Date.now();
+            renderRoomSyncInfo();
+            setSharedRoomStatus(`✅ 실시간 공유 중 · ${sharedRoomId}`, "ok");
           } catch (e) {
             const transient = TRANSIENT_NET_RE.test(
               `${e?.code || ""} ${e?.message || ""}`,
             );
             if (e.message === "CONCURRENT_EDIT") {
-              setSharedRoomStatus(
-                "⚡ 친구가 먼저 수정했어요. 겹치지 않는 변경은 자동 병합을 시도합니다.",
-                "",
-              );
               await autoResolveSharedConflict();
             } else if (transient || navigator.onLine === false) {
               queueOfflineSnapshot();
-              setSharedRoomStatus(
-                "📴 오프라인 · 변경 내용을 임시 저장했어요. 네트워크가 복구되면 자동으로 반영돼요.",
-                "",
-              );
-              scheduleOfflineFlushRetry(10000);
+              scheduleOfflineFlushRetry(6000);
             } else {
               sharedLocalDirty = false;
               setSharedRoomStatus(`공유 저장 실패: ${e.message}`, "error");
             }
           }
-        }, 250);
+        }, 180);
       }
       function syncSharedSettings() {
         const user = window.firebase?.auth?.().currentUser;
@@ -3859,6 +3847,110 @@
           sharedRevision = revision + 1;
         });
       }
+      function applyRemoteRoomSnapshot(data, roomId, ref) {
+        _lastRoomSyncAt = Date.now();
+        if (String(ls.get(TRIP_CREATING_ROOM_KEY) || "") === roomId) {
+          try {
+            localStorage.removeItem(TRIP_CREATING_ROOM_KEY);
+          } catch (_) {}
+        }
+        renderRoomSyncInfo();
+        const incomingRevision = Number(data.revision || 0);
+        if (sharedLocalDirty && Date.now() - (sharedDirtyAt || 0) > 4000) {
+          sharedLocalDirty = false;
+        }
+        if (sharedLocalDirty && sharedWriteRevision === incomingRevision) {
+          sharedLocalDirty = false;
+        } else if (sharedLocalDirty && incomingRevision !== sharedRevision) {
+          if (_autoResolveBusy) return;
+          autoResolveSharedConflict();
+          return;
+        }
+        sharedOwnerUid = String(data.ownerUid || "");
+        sharedMembers =
+          data.members && typeof data.members === "object" ? data.members : {};
+        sharedSettingsShared = data.settingsShared === true;
+        sharedRevision = incomingRevision;
+        sharedHistory = [];
+        const currentUser = firebase.auth().currentUser;
+        if (
+          ref &&
+          currentUser?.uid === sharedOwnerUid &&
+          Array.isArray(data.history) &&
+          data.history.length > 0
+        ) {
+          ref.update({ history: [] }).catch(() => {});
+        }
+        renderRoomMembers();
+        if (!joinRequestsUnsubscribe) listenJoinRequests();
+        renderRoomGuide();
+        listenOwnJoinRequest();
+        if (Array.isArray(data.items)) {
+          const localImgMap = new Map(
+            items
+              .filter((x) => x && x.useCustomImg && x.img)
+              .map((x) => [String(x.id), x.img]),
+          );
+          const sanitized = sanitizeSharedItems(data.items).map((it) => {
+            if (!it.img && localImgMap.has(String(it.id))) {
+              it.img = localImgMap.get(String(it.id));
+              it.useCustomImg = true;
+            }
+            return it;
+          });
+          const changed = !sameJsonish(items, sanitized);
+          remoteApplying = true;
+          items = sanitized;
+          sharedBaseItems = sanitized;
+          if (sharedSettingsShared && data.settings && sharedOwnerUid) {
+            applySharedSettings(data.settings);
+          }
+          persistNow();
+          remoteApplying = false;
+          if (changed) {
+            render(true);
+            draw(true);
+            hydrateInstagramThumbs();
+            if ($("sheet").classList.contains("on") && cur) {
+              const activeEl = document.activeElement;
+              if (
+                !activeEl ||
+                !["INPUT", "TEXTAREA"].includes(activeEl.tagName)
+              ) {
+                showSheet();
+              }
+            }
+          }
+          setSharedRoomStatus(`✅ 실시간 공유 중 · ${sharedRoomId}`, "ok");
+        }
+      }
+      async function pollSharedRoomNow() {
+        if (
+          !sharedRoomId ||
+          !window.firestoreDb ||
+          sharedLocalDirty ||
+          navigator.onLine === false
+        )
+          return;
+        try {
+          const ref = window.firestoreDb.collection("rooms").doc(sharedRoomId);
+          const snap = await ref
+            .get({ source: "server" })
+            .catch(() => ref.get());
+          if (snap && snap.exists) {
+            const data = snap.data() || {};
+            if (
+              Number(data.revision || 0) !== sharedRevision ||
+              !sameJsonish(
+                sanitizeSharedItems(data.items || []),
+                sharedBaseItems,
+              )
+            ) {
+              applyRemoteRoomSnapshot(data, sharedRoomId, ref);
+            }
+          }
+        } catch (_) {}
+      }
       async function connectSharedRoom(roomId) {
         if (!roomId) return;
         if (!firebaseConfigured()) {
@@ -3883,11 +3975,6 @@
           try {
             window.firestoreDb.settings({ ignoreUndefinedProperties: true });
           } catch (_) {}
-          try {
-            await window.firestoreDb.enablePersistence({
-              synchronizeTabs: true,
-            });
-          } catch (_) {}
           setSharedUserStatus(`✅ 로그인됨 · ${user.email || user.uid}`, "ok");
           sharedRoomId = roomId;
           try {
@@ -3898,98 +3985,13 @@
           if (sharedUnsubscribe) sharedUnsubscribe();
           const ref = window.firestoreDb.collection("rooms").doc(roomId);
           sharedUnsubscribe = ref.onSnapshot(
+            { includeMetadataChanges: true },
             (snapshot) => {
               clearTimeout(_roomListenRetryTimer);
               _roomListenRetryTimer = null;
               _roomListenRetries = 0;
               if (snapshot.exists) {
-                _lastRoomSyncAt = Date.now();
-                if (String(ls.get(TRIP_CREATING_ROOM_KEY) || "") === roomId) {
-                  try {
-                    localStorage.removeItem(TRIP_CREATING_ROOM_KEY);
-                  } catch (_) {}
-                }
-                renderRoomSyncInfo();
-                const data = snapshot.data();
-                const incomingRevision = Number(data.revision || 0);
-                if (
-                  sharedLocalDirty &&
-                  sharedWriteRevision === incomingRevision
-                ) {
-                  sharedLocalDirty = false;
-                } else if (
-                  sharedLocalDirty &&
-                  incomingRevision !== sharedRevision
-                ) {
-                  if (_autoResolveBusy) return;
-                  setSharedRoomStatus(
-                    "🔄 친구의 변경과 내 변경을 자동으로 합치는 중이에요…",
-                    "",
-                  );
-                  autoResolveSharedConflict();
-                  return;
-                }
-                sharedOwnerUid = String(data.ownerUid || "");
-                sharedMembers =
-                  data.members && typeof data.members === "object"
-                    ? data.members
-                    : {};
-                sharedSettingsShared = data.settingsShared === true;
-                sharedRevision = incomingRevision;
-                sharedHistory = [];
-                const currentUser = firebase.auth().currentUser;
-                if (
-                  currentUser?.uid === sharedOwnerUid &&
-                  Array.isArray(data.history) &&
-                  data.history.length > 0
-                ) {
-                  ref.update({ history: [] }).catch(() => {});
-                }
-                if (
-                  currentUser?.uid === sharedOwnerUid &&
-                  !sharedSettingsShared
-                ) {
-                  sharedSettingsShared = true;
-                  ref
-                    .update({
-                      settings: collectSharedSettings(),
-                      settingsShared: true,
-                      history: [],
-                    })
-                    .catch(() => {});
-                }
-                renderRoomMembers();
-                if (!joinRequestsUnsubscribe) listenJoinRequests();
-                renderRoomGuide();
-                listenOwnJoinRequest();
-                if (Array.isArray(data.items)) {
-                  remoteApplying = true;
-                  const localImgMap = new Map(
-                    items
-                      .filter((x) => x && x.useCustomImg && x.img)
-                      .map((x) => [String(x.id), x.img]),
-                  );
-                  const sanitized = sanitizeSharedItems(data.items).map(
-                    (it) => {
-                      if (!it.img && localImgMap.has(String(it.id))) {
-                        it.img = localImgMap.get(String(it.id));
-                        it.useCustomImg = true;
-                      }
-                      return it;
-                    },
-                  );
-                  items = sanitized;
-                  sharedBaseItems = sanitized;
-                  if (sharedSettingsShared && data.settings && sharedOwnerUid) {
-                    applySharedSettings(data.settings);
-                  }
-                  persistNow();
-                  remoteApplying = false;
-                  render(true);
-                  draw(true);
-                  hydrateInstagramThumbs();
-                  setSharedRoomStatus(`✅ 공유 중 · ${sharedRoomId}`, "ok");
-                }
+                applyRemoteRoomSnapshot(snapshot.data(), roomId, ref);
               } else {
                 const currentUser = firebase.auth().currentUser;
                 if (!currentUser) {
@@ -4061,11 +4063,11 @@
                   "🔒 아직 이 방의 멤버가 아니에요. 아래 참여 요청을 눌러 방장에게 승인을 요청하세요.",
                   "",
                 );
-                scheduleRoomListenRetry(roomId, 30000);
+                scheduleRoomListenRetry(roomId, 15000);
                 return;
               }
-              setSharedRoomStatus(`실시간 연결 실패: ${e.message}`, "error");
-              scheduleRoomListenRetry(roomId);
+              setSharedRoomStatus(`실시간 연결 재시도 중...`, "error");
+              scheduleRoomListenRetry(roomId, 5000);
             },
           );
           flushOfflineQueue().catch(() => {});
@@ -4384,7 +4386,7 @@
         _toastBusy = false;
         _undoFn = undoFn;
         if (undoFn) {
-          t.innerHTML = `<span>${esc(m)}</span><button type="button" class="mb pr" data-act="undoToast" style="padding:5px 11px;font-size:12px;min-height:32px;flex:none">↩ 되돌리기</button>`;
+          t.innerHTML = `<span>${esc(m)}</span><button type="button" class="mb pr" data-act="undoToast" style="padding:5px 11px;font-size:12px;min-height:32px;flex:none"><span class="ms">undo</span>되돌리기</button>`;
         } else {
           t.textContent = m;
         }
@@ -4497,11 +4499,11 @@
       }
       function getVidBtnLabel(v) {
         const u = getVidUrlStr(v);
-        if (!u) return "🎬 릴스 ↗";
-        if (/instagram\.com|instagr\.am/i.test(u)) return "🎬 릴스 ↗";
-        if (/youtu\.?be|youtube\.com/i.test(u)) return "🎬 쇼츠 ↗";
-        if (/tiktok\.com/i.test(u)) return "🎬 틱톡 ↗";
-        return "🎬 영상 ↗";
+        if (!u) return "릴스";
+        if (/instagram\.com|instagr\.am/i.test(u)) return "릴스";
+        if (/youtu\.?be|youtube\.com/i.test(u)) return "쇼츠";
+        if (/tiktok\.com/i.test(u)) return "틱톡";
+        return "영상";
       }
       function openExternalVideo(url) {
         const u = normalizeVidUrl(url) || String(url || "").trim();
@@ -4738,7 +4740,13 @@
       function setTheme(t) {
         document.documentElement.dataset.theme = t;
         ls.set("TRIP_THEME", t);
-        $("themeBtn").textContent = t === "dark" ? "☀️" : "🌙";
+        const tb = $("themeBtn");
+        if (tb) {
+          tb.innerHTML =
+            t === "dark"
+              ? `<span class="ms">light_mode</span>라이트 모드로 전환 (현재: 다크 모드)`
+              : `<span class="ms">dark_mode</span>다크 모드로 전환 (현재: 라이트 모드)`;
+        }
         if (lm) rebuildTiles();
         renderMapChips();
       }
@@ -4771,18 +4779,18 @@
         }
       }
 
-      /* 하단 4탭(⌂ 홈 / ☷ 목록 / 🗺️ 지도 / ⚙️ 설정) 및 카드형 필터 헤더가 적용된 목록 탭 */
+      /* 하단 4탭(구글 폰트 아이콘) 및 통합 목록 탭 구성 */
       (function build() {
         const tabs = [
-          ["add", "⌂", "홈"],
-          ["list", "☷", "목록"],
-          ["map", "🗺️", "지도"],
-          ["set", "⚙️", "설정"],
+          ["add", "home", "홈"],
+          ["list", "format_list_bulleted", "목록"],
+          ["map", "map", "지도"],
+          ["set", "settings", "설정"],
         ];
         $("nav").innerHTML = tabs
           .map(
-            ([k, e, n]) =>
-              `<button class="tab-btn${k === "add" ? " active" : ""}" data-tab="${k}"><i>${e}</i><span>${n}</span></button>`,
+            ([k, ic, n]) =>
+              `<button class="tab-btn${k === "add" ? " active" : ""}" data-tab="${k}"><span class="ms">${ic}</span><span>${n}</span></button>`,
           )
           .join("");
 
@@ -4793,15 +4801,15 @@
           <div class="card" style="padding:14px 16px">
             <div class="seg seg5" id="listCatSeg" style="margin-bottom:10px">
               <div data-lcat="ALL" class="on">전체 <span id="cnt-ALL">0</span></div>
-              <div data-lcat="PLACE">📍 장소 <span id="cnt-PLACE">0</span></div>
-              <div data-lcat="CAFE">☕ 카페 <span id="cnt-CAFE">0</span></div>
-              <div data-lcat="FOOD">🍙 음식 <span id="cnt-FOOD">0</span></div>
-              <div data-lcat="SHOP">🛍️ 쇼핑 <span id="cnt-SHOP">0</span></div>
+              <div data-lcat="PLACE"><span class="ms">location_on</span>장소 <span id="cnt-PLACE">0</span></div>
+              <div data-lcat="CAFE"><span class="ms">local_cafe</span>카페 <span id="cnt-CAFE">0</span></div>
+              <div data-lcat="FOOD"><span class="ms">restaurant</span>음식 <span id="cnt-FOOD">0</span></div>
+              <div data-lcat="SHOP"><span class="ms">shopping_bag</span>쇼핑 <span id="cnt-SHOP">0</span></div>
             </div>
             <div style="display:flex;gap:8px;align-items:center">
-              <div class="search-row"><input type="text" id="q-LIST" placeholder="이름·주소·메뉴 검색..." oninput="renderListTab()"><button type="button" class="mb clear-search" data-act="clearSearch" data-cat="LIST" aria-label="검색어 지우기">×</button></div>
-              <button class="mb" data-act="nearSort" style="flex:none">⚡ 가까운순</button>
-              <button class="mb" data-act="toggleEdit" data-cat="LIST" style="flex:none" title="선택 삭제">✏️ 선택</button>
+              <div class="search-row"><input type="text" id="q-LIST" placeholder="이름·주소·메뉴 검색..." oninput="renderListTab()"><button type="button" class="mb clear-search" data-act="clearSearch" data-cat="LIST" aria-label="검색어 지우기"><span class="ms">close</span></button></div>
+              <button class="mb" data-act="nearSort" style="flex:none"><span class="ms">near_me</span>가까운순</button>
+              <button class="mb" data-act="toggleEdit" data-cat="LIST" style="flex:none" title="선택 삭제"><span class="ms">checklist</span>선택</button>
             </div>
           </div>
           <div class="lchips sticky" id="lchips-LIST"></div>
@@ -4809,7 +4817,7 @@
             <label style="display:flex;align-items:center;gap:8px;margin:0;color:var(--tx);font-size:14px"><input type="checkbox" data-act="selectAll" data-cat="LIST"> 전체 선택</label>
             <div style="display:flex;align-items:center;gap:8px">
               <span id="selCount-LIST" style="font-size:13px;font-weight:700;color:var(--sub)"></span>
-              <button class="mb dg" data-act="bulkDelete" data-cat="LIST">🗑️ 선택 삭제</button>
+              <button class="mb dg" data-act="bulkDelete" data-cat="LIST"><span class="ms">delete</span>선택 삭제</button>
             </div>
           </div>
           <div id="list-LIST" style="display:flex;flex-direction:column;gap:12px"></div>
@@ -4868,6 +4876,33 @@
         }
       }
 
+      /* 지도 팝업에서 '목록' 버튼을 누르면 목록 탭의 해당 카드로 바로 이동 */
+      function jumpToListItem(itemId) {
+        if (mapInfoWindow) mapInfoWindow.close();
+        if (nMapInfoWindow) nMapInfoWindow.close();
+        if (lm) {
+          try {
+            lm.closePopup();
+          } catch (_) {}
+        }
+        listCat = "ALL";
+        listFilter.ALL = "ALL";
+        const qInput = $("q-LIST");
+        if (qInput) qInput.value = "";
+        tab("list");
+        renderListTab();
+        requestAnimationFrame(() => {
+          const targetEl = document.querySelector(
+            `#list-LIST .item[data-id="${CSS.escape(String(itemId))}"]`,
+          );
+          if (targetEl) {
+            targetEl.classList.add("jump-highlight");
+            targetEl.scrollIntoView({ block: "center", behavior: "smooth" });
+            setTimeout(() => targetEl.classList.remove("jump-highlight"), 2400);
+          }
+        });
+      }
+
       function fit() {
         if (gmap) {
           if (!gposPts.length) return;
@@ -4908,23 +4943,24 @@
       }
 
       function pinCardHtml(i) {
-        const ic = CATS[i.category] ? CATS[i.category].e : "📍";
+        const icName = CATS[i.category] ? CATS[i.category].ic : "location_on";
         const thumbs = itemThumbCandidates(i);
         const thumb = thumbs[0] || "";
         const alts = thumbs.slice(1).join("|");
         const altAttr = alts ? ` data-imgalts="${esc(alts)}"` : "";
         const dayBadge = i.day ? `<em>D${i.day}</em>` : "";
-        const starBadge = i.star ? `<span class="pstar">⭐</span>` : "";
+        const starBadge = i.star
+          ? `<span class="pstar"><span class="ms fill" style="font-size:12px;color:#fbbf24">star</span></span>`
+          : "";
         const placeNumber = i._pinNumber
           ? `<em class="pinNum">${i._pinNumber}</em>`
           : "";
-        return `<div class="pinCard c-${CATS[i.category] ? i.category : "PLACE"}${i.star ? " starred" : ""}">${dayBadge}${starBadge}${placeNumber}<i>${ic}</i>${thumb ? `<img loading="eager" fetchpriority="high" decoding="async" referrerpolicy="no-referrer" src="${esc(thumb)}"${altAttr} onerror="imgErr(this)">` : ""}${getVidUrlStr(i.vid) ? "<b>🎬</b>" : ""}</div>`;
+        return `<div class="pinCard c-${CATS[i.category] ? i.category : "PLACE"}${i.star ? " starred" : ""}">${dayBadge}${starBadge}${placeNumber}<i><span class="ms" style="font-size:22px;color:#fff">${icName}</span></i>${thumb ? `<img loading="eager" fetchpriority="high" decoding="async" referrerpolicy="no-referrer" src="${esc(thumb)}"${altAttr} onerror="imgErr(this)">` : ""}${getVidUrlStr(i.vid) ? `<b><span class="ms fill" style="font-size:11px;color:#fff">play_circle</span></b>` : ""}</div>`;
       }
 
+      /* 지도 핀 팝업: '검색' 버튼을 '목록' 이동 버튼으로 교체 */
       function mapPinPlaceHtml(item, place, index) {
-        const searchQuery =
-          getValidSearchQuery(place) || place.name || place.address || "";
-        return `<div class="mapPinPlace"><strong>${index + 1}. ${esc(place.name || "장소")}</strong><div class="mapPinAddress">${esc(place.address || "주소 미입력")}</div><div class="mapPinActions"><a class="mb pr" href="${esc(getGMapLink(place))}" target="_blank" rel="noopener">🗺️ 구글지도</a><a class="mb" href="https://www.google.com/search?q=${encodeURIComponent(searchQuery)}" target="_blank" rel="noopener">🔎 검색</a><a class="mb" href="${esc(getGMapDirLink(place))}" target="_blank" rel="noopener">🧭 길찾기</a><button type="button" class="mb" data-act="openGroupedItem" data-id="${esc(item.id)}" data-place-idx="${index}">릴스에서 보기</button></div></div>`;
+        return `<div class="mapPinPlace"><strong>${index + 1}. ${esc(place.name || "장소")}</strong><div class="mapPinAddress">${esc(place.address || "주소 미입력")}</div><div class="mapPinActions"><a class="mb pr" href="${esc(getGMapLink(place))}" target="_blank" rel="noopener"><span class="ms">map</span>구글지도</a><button type="button" class="mb" data-act="jumpToList" data-id="${esc(item.id)}"><span class="ms">format_list_bulleted</span>목록</button><a class="mb" href="${esc(getGMapDirLink(place))}" target="_blank" rel="noopener"><span class="ms">directions</span>길찾기</a><button type="button" class="mb" data-act="openGroupedItem" data-id="${esc(item.id)}" data-place-idx="${index}"><span class="ms">movie</span>릴스에서 보기</button></div></div>`;
       }
       function mapPinPopupHtml(item, expanded = false) {
         const places = Array.isArray(item.places) ? item.places : [];
@@ -4951,7 +4987,7 @@
         const expandButton = grouped
           ? `<button type="button" class="mb" data-act="toggleMapPinGroup" data-id="${esc(item.id)}" data-place-idx="${selectedIndex}" data-expanded="${expanded ? "true" : "false"}">${expanded ? "장소 목록 접기" : `같은 릴스 장소 ${places.length}곳 펼쳐보기`}</button>`
           : "";
-        return `<div class="mapPinPopup">${selectedHtml}<div class="mapPinActions" style="margin-top:8px">${expandButton}<button type="button" class="mb dg" data-act="hideMapItem" data-id="${esc(item.id)}">지도에서 삭제</button></div></div>`;
+        return `<div class="mapPinPopup">${selectedHtml}<div class="mapPinActions" style="margin-top:8px">${expandButton}<button type="button" class="mb dg" data-act="hideMapItem" data-id="${esc(item.id)}"><span class="ms">visibility_off</span>지도에서 삭제</button></div></div>`;
       }
       function openMapPinPopup(item, expanded = false) {
         if (gmap && window.google?.maps) {
@@ -5449,14 +5485,17 @@
           item.places.length > 1
             ? `${firstName.replace(/\s*외\s*\d+곳$/, "")} 외 ${item.places.length - 1}곳`
             : firstName;
-        item.localName = first.localName || item.localName || "";
-        item.address = first.address || item.address || "";
+        item.localName = first.localName ?? item.localName ?? "";
+        item.address = first.address ?? "";
         item.price = first.price || item.price || "";
         item.info = first.info || item.info || "";
         const located = item.places.find((p) => Number(p.lat) && Number(p.lng));
         if (located) {
           item.lat = Number(located.lat);
           item.lng = Number(located.lng);
+        } else {
+          item.lat = null;
+          item.lng = null;
         }
       }
 
@@ -5538,29 +5577,29 @@
 
         w.classList.add("on");
         const allOn = mapCat === "ALL";
-        const allBtn = `<button type="button" class="chip" data-act="mapcat" data-cat="ALL" style="${allOn ? "background:var(--pr);color:#fff;border-color:transparent" : ""}">🗺️ 전체 ${cnt.ALL}</button>`;
+        const allBtn = `<button type="button" class="chip" data-act="mapcat" data-cat="ALL" style="${allOn ? "background:var(--pr);color:#fff;border-color:transparent" : ""}"><span class="ms">map</span>전체 ${cnt.ALL}</button>`;
         const catBtns = Object.keys(CATS)
           .map((c) => {
             const on = mapCat === c;
             const st = on
               ? `background:${catColor(c)};color:#fff;border-color:transparent`
               : "";
-            return `<button type="button" class="chip" data-act="mapcat" data-cat="${c}" style="${st}"><i>${CATS[c].e}</i>${esc(CATS[c].n)} ${cnt[c]}</button>`;
+            return `<button type="button" class="chip" data-act="mapcat" data-cat="${c}" style="${st}"><span class="ms">${CATS[c].ic}</span>${esc(CATS[c].n)} ${cnt[c]}</button>`;
           })
           .join("");
 
-        const dayLabel = mapDay ? `🗓️ Day ${mapDay}` : "🗓️ 전체일차";
+        const dayLabel = mapDay ? `Day ${mapDay}` : "전체일차";
         const subRow = `
-    <button type="button" class="chip sub${mapOnlyVid ? " reel-on" : ""}" data-act="mapVidToggle">🎬 릴스·쇼츠만 ${totalVid}</button>
-    <button type="button" class="chip sub" data-act="mapStarToggle" style="${mapOnlyStar ? "background:#f59e0b;color:#fff;border-color:transparent" : ""}">⭐ 중요만</button>
-    ${activeDays.length ? `<button type="button" class="chip sub" data-act="mapDayCycle" style="${mapDay ? "background:var(--pr);color:#fff;border-color:transparent" : ""}">${dayLabel}</button>` : ""}
-    <button type="button" class="chip sub" data-act="mapRouteToggle" style="${mapRouteOn ? "background:#2563eb;color:#fff;border-color:transparent" : ""}">🔗 동선선</button>
-    <button type="button" class="chip sub" data-act="mapTodoToggle" style="${mapOnlyTodo ? "background:#10b981;color:#fff;border-color:transparent" : ""}">👁️ 미방문만</button>
-    <button type="button" class="chip sub" data-act="nearSort" style="${nearSortOn ? "background:var(--pr);color:#fff;border-color:transparent" : ""}">⚡ 가까운순</button>
-    <button type="button" class="chip sub" data-act="mapFitAll">🎯 화면맞춤</button>
+    <button type="button" class="chip sub${mapOnlyVid ? " reel-on" : ""}" data-act="mapVidToggle"><span class="ms">movie</span>릴스·쇼츠만 ${totalVid}</button>
+    <button type="button" class="chip sub" data-act="mapStarToggle" style="${mapOnlyStar ? "background:#f59e0b;color:#fff;border-color:transparent" : ""}"><span class="ms fill">star</span>중요만</button>
+    ${activeDays.length ? `<button type="button" class="chip sub" data-act="mapDayCycle" style="${mapDay ? "background:var(--pr);color:#fff;border-color:transparent" : ""}"><span class="ms">calendar_today</span>${dayLabel}</button>` : ""}
+    <button type="button" class="chip sub" data-act="mapRouteToggle" style="${mapRouteOn ? "background:#2563eb;color:#fff;border-color:transparent" : ""}"><span class="ms">route</span>동선선</button>
+    <button type="button" class="chip sub" data-act="mapTodoToggle" style="${mapOnlyTodo ? "background:#10b981;color:#fff;border-color:transparent" : ""}"><span class="ms">visibility</span>미방문만</button>
+    <button type="button" class="chip sub" data-act="nearSort" style="${nearSortOn ? "background:var(--pr);color:#fff;border-color:transparent" : ""}"><span class="ms">near_me</span>가까운순</button>
+    <button type="button" class="chip sub" data-act="mapFitAll"><span class="ms">center_focus_strong</span>화면맞춤</button>
   `;
         const dayRow = activeDays.length
-          ? `<div class="chip-row"><button type="button" class="chip" data-act="mapDaySet" data-day="0" style="${mapDay ? "" : "background:var(--pr);color:#fff;border-color:transparent"}">🗓️ 전체일차</button>${activeDays.map((d) => `<button type="button" class="chip sub" data-act="mapDaySet" data-day="${d}" style="${mapDay === Number(d) ? "background:var(--pr);color:#fff;border-color:transparent" : ""}">Day ${d}</button>`).join("")}</div>`
+          ? `<div class="chip-row"><button type="button" class="chip" data-act="mapDaySet" data-day="0" style="${mapDay ? "" : "background:var(--pr);color:#fff;border-color:transparent"}"><span class="ms">calendar_today</span>전체일차</button>${activeDays.map((d) => `<button type="button" class="chip sub" data-act="mapDaySet" data-day="${d}" style="${mapDay === Number(d) ? "background:var(--pr);color:#fff;border-color:transparent" : ""}">Day ${d}</button>`).join("")}</div>`
           : "";
         w.innerHTML = `<div class="chip-row">${allBtn}${catBtns}</div><div class="chip-row">${subRow}</div>${dayRow}`;
       }
@@ -5591,46 +5630,32 @@
         return found[1].test(hay);
       }
 
-      /* 정보 위계(제목 > 배지 > 주소 > 가격/메모 > 액션 버튼)가 적용된 장소 카드 */
+      /* 목록 카드: 주소·설명 없이 오직 '제목 + 릴스 버튼 + 길찾기 버튼'만 표시 */
       const card = (i) => {
         const vUrl = getVidUrlStr(i.vid);
         const dirHref = getGMapDirLink(i);
-        const biz = getBizStatus(i);
         const isEdit = Boolean(editMode.LIST || editMode[i.category]);
         const vAction = vUrl
-          ? `<button class="mb reel-jump" data-act="openVid" data-id="${i.id}" style="padding:6px 12px;font-size:12px;min-height:34px">${esc(getVidBtnLabel(vUrl))}</button>`
-          : `<button class="mb" data-act="quickAddVid" data-id="${i.id}" style="padding:6px 11px;font-size:12px;min-height:34px;color:var(--pr);border-color:var(--pr)">+🔗 릴스링크</button>`;
+          ? `<button class="mb reel-jump" data-act="openVid" data-id="${i.id}" style="padding:6px 13px;font-size:12px;min-height:36px"><span class="ms fill">play_circle</span>${esc(getVidBtnLabel(vUrl))} <span class="ms" style="font-size:14px">north_east</span></button>`
+          : `<button class="mb" data-act="quickAddVid" data-id="${i.id}" style="padding:6px 12px;font-size:12px;min-height:36px;color:var(--pr);border-color:var(--pr)"><span class="ms">add_link</span>릴스</button>`;
         return `<div class="item${i.done ? " done" : ""}${i.star ? " starred" : ""}${selected.has(i.id) ? " selected" : ""}" data-act="${isEdit ? "toggleSel" : "open"}" data-id="${i.id}" data-cat="LIST" style="${selected.has(i.id) ? "outline:2px solid var(--pr)" : ""}">
     ${isEdit ? `<input type="checkbox" data-act="sel" data-id="${i.id}" data-cat="LIST"${selected.has(i.id) ? " checked" : ""} style="margin-right:4px">` : ""}
-    ${ph(CATS[i.category] ? CATS[i.category].e : "📍", itemThumb(i), "", i.img, i.day, itemThumbCandidates(i).slice(1).join("|"))}
+    ${ph(CATS[i.category] ? CATS[i.category].ic : "location_on", itemThumb(i), "", i.img, i.day, itemThumbCandidates(i).slice(1).join("|"))}
     <div class="mid">
       <div class="nm">
         <span style="flex:1;min-width:0">${esc(i.name)}</span>
-        <button type="button" class="star-btn${i.star ? " on" : ""}" data-act="toggleStar" data-id="${i.id}" title="중요 표시">${i.star ? "⭐" : "☆"}</button>
+        <button type="button" class="star-btn${i.star ? " on" : ""}" data-act="toggleStar" data-id="${i.id}" title="중요 표시"><span class="ms${i.star ? " fill" : ""}" style="font-size:21px">star</span></button>
       </div>
-      <div style="display:flex;gap:5px;flex-wrap:wrap;margin:4px 0">
-        ${(() => {
-          const d = itemDist(i);
-          return d != null
-            ? `<span class="bstat day">📍 ${fmtDist(d)}</span>`
-            : "";
-        })()}
-        ${i.day ? `<span class="bstat day">🗓️ Day ${i.day}</span>` : ""}
-        ${biz ? `<span class="bstat ${biz.cls}">${esc(biz.lbl)}</span>` : ""}
-      </div>
-      <div class="ds">${esc(i.address || i.note || "")}</div>
-      ${i.price ? `<div class="ds" style="color:var(--FOOD);font-weight:800;font-size:13.5px">${esc(i.price)}</div>` : ""}
-      ${i.info ? `<div class="ds in">${esc(i.info)}</div>` : ""}
-      <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
         ${vAction}
-        <a class="mb" href="${esc(dirHref)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="padding:6px 12px;font-size:12px;min-height:34px">🧭 길찾기</a>
+        <a class="mb" href="${esc(dirHref)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="padding:6px 13px;font-size:12px;min-height:36px"><span class="ms">explore</span>길찾기</a>
       </div>
     </div>
     <input type="checkbox" data-act="done" data-id="${i.id}"${i.done ? " checked" : ""} style="flex:none" aria-label="방문 완료 체크">
   </div>`;
       };
 
-      function ph(e, src, c = "", fb = "", day = 0, alts = "") {
+      function ph(icName, src, c = "", fb = "", day = 0, alts = "") {
         const fba = fb && fb !== src ? ` data-fbsrc="${esc(fb)}"` : "";
         const altAttr = alts ? ` data-imgalts="${esc(alts)}"` : "";
         const dTag =
@@ -5638,10 +5663,13 @@
             ? `<span class="dayTag">D${day}</span>`
             : "";
         const priority = c.includes("big") ? ' fetchpriority="high"' : "";
-        return `<div class="pic ${c}">${dTag}${e}${src ? `<img loading="${c.includes("big") ? "eager" : "lazy"}"${priority} decoding="async" referrerpolicy="no-referrer" src="${esc(src)}"${fba}${altAttr} onerror="imgErr(this)">` : ""}</div>`;
+        const iconHtml = /^[a-z0-9_]+$/.test(String(icName || ""))
+          ? `<span class="ms">${icName}</span>`
+          : icName;
+        return `<div class="pic ${c}">${dTag}${iconHtml}${src ? `<img loading="${c.includes("big") ? "eager" : "lazy"}"${priority} decoding="async" referrerpolicy="no-referrer" src="${esc(src)}"${fba}${altAttr} onerror="imgErr(this)">` : ""}</div>`;
       }
 
-      /* 통합 목록 탭 렌더링 (전체 / 장소 / 카페 / 음식 / 쇼핑 카테고리별 표시) */
+      /* 통합 목록 탭 렌더링 */
       function renderListTab() {
         const cntAll = $("cnt-ALL");
         if (cntAll) cntAll.textContent = items.length;
@@ -5662,29 +5690,44 @@
         const chipEl = $("lchips-LIST");
         if (chipEl) {
           const chips = [
-            ["ALL", `전체 ${all.length}`],
-            ["TODO", `미방문 ${all.filter((x) => !x.done).length}`],
-            ["STAR", `⭐ 중요 ${all.filter((x) => x.star).length}`],
-            ["VID", `🎬 영상 ${all.filter((x) => getVidUrlStr(x.vid)).length}`],
+            ["ALL", "", `전체 ${all.length}`],
+            [
+              "TODO",
+              "visibility",
+              `미방문 ${all.filter((x) => !x.done).length}`,
+            ],
+            ["STAR", "star", `중요 ${all.filter((x) => x.star).length}`],
+            [
+              "VID",
+              "movie",
+              `영상 ${all.filter((x) => getVidUrlStr(x.vid)).length}`,
+            ],
           ];
           const days = [
             ...new Set(
               all.filter((x) => Number(x.day) > 0).map((x) => Number(x.day)),
             ),
           ].sort((a, b) => a - b);
-          days.forEach((d) => chips.push(["DAY:" + d, `🗓️ D${d}`]));
+          days.forEach((d) =>
+            chips.push(["DAY:" + d, "calendar_today", `D${d}`]),
+          );
           REGION_TAGS.forEach(([lbl, re]) => {
             const cnt = all.filter((x) =>
               re.test(`${x.name || ""} ${x.address || ""} ${x.note || ""}`),
             ).length;
-            if (cnt > 0) chips.push(["REG:" + lbl, `📍 ${lbl} ${cnt}`]);
+            if (cnt > 0)
+              chips.push(["REG:" + lbl, "location_on", `${lbl} ${cnt}`]);
           });
           if (all.some((x) => x.done))
-            chips.push(["DONE", `완료 ${all.filter((x) => x.done).length}`]);
+            chips.push([
+              "DONE",
+              "check_circle",
+              `완료 ${all.filter((x) => x.done).length}`,
+            ]);
           chipEl.innerHTML = chips
             .map(
-              ([fk, fl]) =>
-                `<button type="button" class="lchip${curF === fk ? " on" : ""}" data-act="setListFilter" data-cat="${listCat}" data-f="${esc(fk)}">${esc(fl)}</button>`,
+              ([fk, ic, fl]) =>
+                `<button type="button" class="lchip${curF === fk ? " on" : ""}" data-act="setListFilter" data-cat="${listCat}" data-f="${esc(fk)}">${ic ? `<span class="ms" style="font-size:15px">${ic}</span>` : ""}${esc(fl)}</button>`,
             )
             .join("");
         }
@@ -5728,10 +5771,10 @@
 
         const listEl = $("list-LIST");
         if (listEl) {
-          const emptyIcon = CATS[listCat] ? CATS[listCat].e : "📍";
+          const emptyIcon = CATS[listCat] ? CATS[listCat].ic : "location_on";
           listEl.innerHTML = l.length
             ? l.map(card).join("")
-            : `<div class="empty"><i>${emptyIcon}</i>${all.length ? "선택한 필터 조건에 맞는 항목이 없어요" : "홈 탭에서 장소를 추가해 보세요"}</div>`;
+            : `<div class="empty"><i><span class="ms" style="font-size:40px">${emptyIcon}</span></i>${all.length ? "선택한 필터 조건에 맞는 항목이 없어요" : "홈 탭에서 장소를 추가해 보세요"}</div>`;
         }
         const bulk = $("bulk-LIST");
         if (bulk) bulk.style.display = editMode.LIST ? "flex" : "none";
@@ -5756,7 +5799,10 @@
         const now = Date.now();
         ls.set("TRIP_UPDATED_AT", String(now));
         idb.set("TRIP_MASTER_DATA", { items, updatedAt: now });
-        if (!remoteApplying && sharedRoomId) sharedLocalDirty = true;
+        if (!remoteApplying && sharedRoomId) {
+          sharedLocalDirty = true;
+          sharedDirtyAt = now;
+        }
         const fullSaved = ls.set("TRIP_MASTER_ITEMS", JSON.stringify(items));
         const saved =
           fullSaved ||
@@ -5779,7 +5825,7 @@
       }
       function persist() {
         clearTimeout(_persistT);
-        _persistT = setTimeout(persistNow, 300);
+        _persistT = setTimeout(persistNow, 220);
       }
       function save() {
         if (typeof pushLocalHistory === "function") pushLocalHistory();
@@ -5789,27 +5835,35 @@
           persistNow();
           draw();
           hydrateInstagramThumbs();
-        }, 150);
+        }, 120);
       }
       window.addEventListener("pagehide", () => {
         try {
-          persistNow();
+          if (sharedLocalDirty) persistNow();
         } catch (e) {}
       });
       document.addEventListener("visibilitychange", () => {
         try {
-          if (document.visibilityState === "hidden") persistNow();
-          else if (navigator.onLine && hasOfflineQueue())
-            flushOfflineQueue().catch(() => {});
+          if (document.visibilityState === "hidden") {
+            if (sharedLocalDirty) persistNow();
+          } else {
+            if (navigator.onLine && hasOfflineQueue())
+              flushOfflineQueue().catch(() => {});
+            pollSharedRoomNow();
+          }
         } catch (e) {}
+      });
+      window.addEventListener("focus", () => {
+        pollSharedRoomNow();
       });
       setInterval(() => {
         try {
           if (navigator.onLine && hasOfflineQueue())
             flushOfflineQueue().catch(() => {});
+          pollSharedRoomNow();
         } catch (e) {}
-      }, 60000);
-      // === 3/3 시작: 2/3 코드의 setInterval(..., 60000); 바로 아래에 이어 붙이세요 ===
+      }, 8000);
+      // === 3/3 시작: 2/3 코드의 setInterval(..., 8000); 바로 아래에 이어 붙이세요 ===
       function normalizeOcrAddr(s) {
         return String(s || "")
           .replace(/(^|[\s,])T(\d{3}-\d{4})\b/g, "$1〒$2")
@@ -5951,8 +6005,8 @@
     ${subTitle ? `<div class="t-sub">${esc(subTitle)}</div>` : ""}
     <div class="t-ad">${esc(addr)}</div>
     <div style="display:flex;gap:10px;justify-content:center">
-      <a class="btn" href="${esc(getGMapDirLink(i))}" target="_blank" rel="noopener" style="text-decoration:none;flex:1">🧭 구글 길찾기 열기</a>
-      <button type="button" class="btn g" onclick="$('taxiModal').classList.remove('show')" style="margin:0;flex:1;background:#e2e8f0;color:#0f172a;border:0">✕ 화면 닫기</button>
+      <a class="btn" href="${esc(getGMapDirLink(i))}" target="_blank" rel="noopener" style="text-decoration:none;flex:1"><span class="ms">explore</span>구글 길찾기 열기</a>
+      <button type="button" class="btn g" onclick="$('taxiModal').classList.remove('show')" style="margin:0;flex:1;background:#e2e8f0;color:#0f172a;border:0"><span class="ms">close</span>화면 닫기</button>
     </div>
   `;
         $("taxiModal").classList.add("show");
@@ -6003,7 +6057,7 @@
         try {
           await navigator.clipboard.writeText(out);
           toast(
-            `📋 총 ${items.length}곳의 여행 리스트가 깔끔하게 복사되었어요! 카톡에 붙여넣으세요.`,
+            `📋 총 ${items.length}곳의 여행 리스트가 복사되었어요! 카톡에 붙여넣으세요.`,
           );
         } catch (e) {
           $("bk").value = out;
@@ -6017,13 +6071,52 @@
         cur = null;
       }
 
+      /* 상세창 입력칸(장소명·주소·링크·메모)에 입력된 최신 값을 아이템 객체에 즉시 동기화 */
+      function syncSheetInputsToItem(item) {
+        if (!item || !$("sheet")?.classList.contains("on")) return false;
+        const places = ensureEditablePlaces(item);
+        let addrChanged = false;
+        $("sbody")
+          ?.querySelectorAll(".edit-place-name")
+          .forEach((el) => {
+            const idx = Number(el.dataset.idx);
+            const val = el.value.trim();
+            if (places[idx] && val && places[idx].name !== val) {
+              places[idx].name = val;
+              places[idx].localName = "";
+            }
+          });
+        $("sbody")
+          ?.querySelectorAll(".edit-place-address")
+          .forEach((el) => {
+            const idx = Number(el.dataset.idx);
+            const val = normalizeOcrAddr(el.value);
+            if (places[idx] && places[idx].address !== val) {
+              places[idx].address = val;
+              places[idx].localName = "";
+              places[idx].lat = null;
+              places[idx].lng = null;
+              addrChanged = true;
+            }
+          });
+        const vdEl = $("sh-vid");
+        if (vdEl) {
+          const rawV = vdEl.value.trim();
+          item.vid = normalizeVidUrl(rawV) || rawV;
+        }
+        const ntEl = $("sh-note");
+        if (ntEl) item.note = ntEl.value;
+        syncGroupedItem(item);
+        return addrChanged;
+      }
+
       function groupedPlacesSummaryHtml(item) {
         if (!Array.isArray(item.places) || item.places.length < 2) return "";
         return `
     <div id="groupedPlacesSummary" style="margin-top:14px;padding:16px;border-radius:20px;background:var(--s2);border:1px solid var(--bd)">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px">
-        <label style="margin:0;color:var(--tx);font-size:13.5px">📍 이 릴스에 통합된 장소 (${item.places.length}곳)</label>
-        <button type="button" class="mb pr" data-act="addSubPlace" style="padding:5px 12px;font-size:12px;min-height:34px">＋ 장소 추가</button>
+        <label style="margin:0;color:var(--tx);font-size:13.5px"><span class="ms" style="font-size:16px">pin_drop</span>이 릴스에 통합된 장소 (${item.places.length}곳)</label>
+        <button type="button" class="mb pr" data-act="addSubPlace" style="padding:5px 12px;font-size:12px;min-height:34px"><span class="ms">add</span>장소 추가</button>
       </div>
       <div style="display:flex;flex-direction:column;gap:10px">
         ${item.places
@@ -6034,11 +6127,11 @@
             <div class="ds" style="margin-top:3px">${esc(p.address || "주소 미입력")}</div>
             ${p.price || p.info ? `<div class="ds in" style="margin-top:3px">${esc([p.price, p.info].filter(Boolean).join(" · "))}</div>` : ""}
             <div style="display:flex;gap:6px;margin-top:9px;flex-wrap:wrap">
-              <a class="mb pr" href="${esc(getGMapDirLink(p))}" target="_blank" rel="noopener" style="padding:5px 11px;font-size:11.5px;min-height:34px">🧭 길찾기</a>
-              ${p.address ? `<button type="button" class="mb" data-act="copySubAddr" data-idx="${idx}" style="padding:5px 11px;font-size:11.5px;min-height:34px">📋 주소복사</button>` : ""}
-              <button type="button" class="mb" data-act="focusSubPin" data-idx="${idx}" style="padding:5px 11px;font-size:11.5px;min-height:34px">🎯 지도위치</button>
-              <button type="button" class="mb" data-act="taxiSub" data-idx="${idx}" style="padding:5px 11px;font-size:11.5px;min-height:34px">🚕 택시화면</button>
-              <button type="button" class="mb dg" data-act="delSubPlace" data-idx="${idx}" style="padding:5px 11px;font-size:11.5px;min-height:34px">삭제</button>
+              <a class="mb pr" href="${esc(getGMapDirLink(p))}" target="_blank" rel="noopener" style="padding:5px 11px;font-size:11.5px;min-height:34px"><span class="ms">explore</span>길찾기</a>
+              ${p.address ? `<button type="button" class="mb" data-act="copySubAddr" data-idx="${idx}" style="padding:5px 11px;font-size:11.5px;min-height:34px"><span class="ms">content_copy</span>주소복사</button>` : ""}
+              <button type="button" class="mb" data-act="focusSubPin" data-idx="${idx}" style="padding:5px 11px;font-size:11.5px;min-height:34px"><span class="ms">my_location</span>지도위치</button>
+              <button type="button" class="mb" data-act="taxiSub" data-idx="${idx}" style="padding:5px 11px;font-size:11.5px;min-height:34px"><span class="ms">local_taxi</span>택시화면</button>
+              <button type="button" class="mb dg" data-act="delSubPlace" data-idx="${idx}" style="padding:5px 11px;font-size:11.5px;min-height:34px"><span class="ms">delete</span>삭제</button>
             </div>
           </div>
         `,
@@ -6085,17 +6178,17 @@
         } else if (isMap) {
           if (view === "mymaps" && myEmbed)
             media = `<iframe class="big" src="${esc(myEmbed)}" allowfullscreen loading="lazy" style="min-height:300px"></iframe>`;
-          else if (searchTarget && gkey)
-            media = `<iframe class="big" src="https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(gkey)}&q=${q}&zoom=16" allowfullscreen loading="lazy" style="min-height:300px"></iframe>`;
           else if (lat && lng && gkey)
             media = `<iframe class="big" src="https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(gkey)}&q=${lat},${lng}&zoom=16" allowfullscreen loading="lazy" style="min-height:300px"></iframe>`;
+          else if (searchTarget && gkey)
+            media = `<iframe class="big" src="https://www.google.com/maps/embed/v1/place?key=${encodeURIComponent(gkey)}&q=${q}&zoom=16" allowfullscreen loading="lazy" style="min-height:300px"></iframe>`;
           else if (lat && lng)
             media = `<iframe class="big" src="https://www.openstreetmap.org/export/embed.html?bbox=${lng - 0.005},${lat - 0.005},${lng + 0.005},${lat + 0.005}&layer=mapnik&marker=${lat},${lng}" style="min-height:300px"></iframe>`;
           else
-            media = `<div class="empty"><i>🗺️</i>위치를 찾으려면 아래에 이름이나 주소를 입력 후 [📍 위치 다시 찾기]를 눌러주세요</div>`;
+            media = `<div class="empty"><i><span class="ms" style="font-size:40px">map</span></i>위치를 찾으려면 아래에 이름이나 주소를 입력 후 [위치 다시 찾기]를 눌러주세요</div>`;
         } else {
           media = ph(
-            CATS[i.category] ? CATS[i.category].e : "📍",
+            CATS[i.category] ? CATS[i.category].ic : "location_on",
             itemThumb(i),
             "big",
             i.img,
@@ -6123,10 +6216,10 @@
     <div style="padding:12px;border:1px solid var(--bd);border-radius:16px;background:var(--s)">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:8px">
         <label style="margin:0">${idx === 0 ? "대표 장소" : "추가 장소 " + (idx + 1)}</label>
-        ${idx > 0 ? `<button type="button" class="mb dg" data-act="removeEditAddress" data-idx="${idx}" style="padding:4px 10px;font-size:11.5px;min-height:32px">주소칸 삭제</button>` : ""}
+        ${idx > 0 ? `<button type="button" class="mb dg" data-act="removeEditAddress" data-idx="${idx}" style="padding:4px 10px;font-size:11.5px;min-height:32px"><span class="ms">delete</span>주소칸 삭제</button>` : ""}
       </div>
       <input type="text" class="edit-place-name" data-idx="${idx}" value="${esc(idx === 0 && isGenericSharedName(p.name) ? "" : p.name || "")}" placeholder="장소명 (선택)" style="margin-bottom:8px">
-      <input type="text" class="edit-place-address" data-idx="${idx}" value="${esc(p.address || "")}" placeholder="주소 / 지역" style="margin-bottom:0">
+      <input type="text" class="edit-place-address" data-idx="${idx}" value="${esc(p.address || "")}" placeholder="주소 / 지역 (수정 후 위치 다시 찾기 클릭)" style="margin-bottom:0">
     </div>
   `,
           )
@@ -6136,23 +6229,24 @@
     ${media}
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
       <div class="nm" style="font-size:20px;line-height:1.3;flex:1">${esc(i.name)}${i.localName && i.localName !== i.name ? ` <span style="font-size:13.5px;color:var(--sub);font-weight:600">(${esc(i.localName)})</span>` : ""}</div>
-      <button type="button" class="mb${i.star ? " pr" : ""}" data-act="toggleStarSheet" style="flex:none">${i.star ? "⭐ 중요됨" : "☆ 중요"}</button>
+      <button type="button" class="mb${i.star ? " pr" : ""}" data-act="toggleStarSheet" style="flex:none"><span class="ms${i.star ? " fill" : ""}">star</span>${i.star ? "중요됨" : "중요"}</button>
     </div>
 
     <div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap">
       <div class="ds" style="flex:1;min-width:160px;font-size:14px">${esc(i.address || "주소 미입력")}</div>
-      ${i.address ? `<button class="mb" data-act="copyAddr" style="flex:none">📋 주소복사</button>` : ""}
-      <button class="mb" data-act="openTaxi" style="flex:none">🚕 택시화면</button>
+      ${i.address ? `<button class="mb" data-act="copyAddr" style="flex:none"><span class="ms">content_copy</span>주소복사</button>` : ""}
+      <button class="mb" data-act="openTaxi" style="flex:none"><span class="ms">local_taxi</span>택시화면</button>
     </div>
 
     <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:10px">
       ${!(lat && lng) ? `<span class="bstat closed">🔴 좌표 미설정</span>` : `<span class="bstat open">🟢 좌표 (${lat.toFixed(4)}, ${lng.toFixed(4)})</span>`}
-      <span class="bstat ${isMapRegistered(i) ? "open" : "closed"}">${isMapRegistered(i) ? "🗺️ 지도 등록됨" : "🗺️ 지도 미등록"}</span>
-      ${biz ? `<span class="bstat ${biz.cls}">⏰ ${esc(biz.lbl)}</span>` : ""}
+      <span class="bstat ${isMapRegistered(i) ? "open" : "closed"}">${isMapRegistered(i) ? "지도 등록됨" : "지도 미등록"}</span>
+      ${biz ? `<span class="bstat ${biz.cls}">${esc(biz.lbl)}</span>` : ""}
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-      <button type="button" class="mb pr" data-act="registerMapItem">${isMapRegistered(i) ? "✓ 지도 등록됨" : "＋ 지도 등록"}</button>
-      <button type="button" class="mb dg" data-act="hideMapItem">지도에서 숨김</button>
+      <button type="button" class="mb pr" data-act="registerMapItem"><span class="ms">${isMapRegistered(i) ? "check_circle" : "add_location_alt"}</span>${isMapRegistered(i) ? "지도 위치 갱신·등록됨" : "지도 등록"}</button>
+      <button type="button" class="mb" data-act="regeo"><span class="ms">my_location</span>위치 다시 찾기</button>
+      <button type="button" class="mb dg" data-act="hideMapItem"><span class="ms">visibility_off</span>지도에서 숨김</button>
     </div>
 
     ${i.price ? `<div class="ds" style="color:var(--FOOD);font-weight:800;font-size:14.5px;margin-top:8px">${esc(i.price)}</div>` : ""}
@@ -6160,71 +6254,71 @@
     ${groupedPlacesSummaryHtml(i)}
 
     <div style="margin-top:16px">
-      <label>🗓️ 여행 일차 배정</label>
+      <label><span class="ms" style="font-size:16px">calendar_today</span>여행 일차 배정</label>
       <div class="lchips">${dayChips}</div>
     </div>
 
     <div style="margin:12px 0 14px;padding:16px;border-radius:20px;background:var(--s2);border:1px solid var(--bd)">
-      ${vUrl ? `<button class="btn reel-jump" data-act="openVid" data-id="${i.id}" style="margin-bottom:12px">${esc(vLabel)} (인스타/유튜브 앱 열기)</button>` : ""}
-      <label>${vUrl ? "🔗 연결된 릴스·쇼츠 링크" : "🎬 릴스·쇼츠 링크 연결"}</label>
+      ${vUrl ? `<button class="btn reel-jump" data-act="openVid" data-id="${i.id}" style="margin-bottom:12px"><span class="ms fill">play_circle</span>${esc(vLabel)} 열기</button>` : ""}
+      <label>${vUrl ? "연결된 릴스·쇼츠 링크" : "릴스·쇼츠 링크 연결"}</label>
       <div style="display:flex;gap:8px">
         <input type="text" id="sh-vid" value="${esc(vUrl)}" placeholder="https://www.instagram.com/reel/..." style="flex:1;margin-bottom:0">
-        <button class="mb pr" data-act="pasteVidInSheet" style="flex:none;white-space:nowrap;border-radius:16px;padding:0 16px">📋 붙여넣기</button>
+        <button class="mb pr" data-act="pasteVidInSheet" style="flex:none;white-space:nowrap;border-radius:16px;padding:0 16px"><span class="ms">content_paste</span>붙여넣기</button>
       </div>
     </div>
 
-    <details class="acc"><summary>⚙️ 상세 도구 (뷰어 전환·사진 변경·위치 재검색)</summary><div class="acc-in">
+    <details class="acc"><summary><span class="ms">tune</span>상세 도구 (뷰어 전환·사진 변경·캡션 분석)</summary><div class="acc-in">
     <div class="act">
-      ${vUrl ? `<button class="mb${view === "video" ? " pr" : ""}" data-act="vvideo">🎬 앱내영상</button><button class="mb${view === "caption" ? " pr" : ""}" data-act="vcap">📋 릴스캡션</button>` : ""}
-      <button class="mb${view === "photo" ? " pr" : ""}" data-act="vphoto">🖼️ 사진보기</button>
-      <button class="mb" data-act="chgpic">🔄 다른사진</button>
-      <button class="mb${view === "google" ? " pr" : ""}" data-act="vmap">🗺️ 지도보기</button>
-      ${myEmbed ? `<button class="mb${view === "mymaps" ? " pr" : ""}" data-act="vmymap">🗺️ 내지도</button>` : ""}
+      ${vUrl ? `<button class="mb${view === "video" ? " pr" : ""}" data-act="vvideo"><span class="ms">movie</span>앱내영상</button><button class="mb${view === "caption" ? " pr" : ""}" data-act="vcap"><span class="ms">notes</span>릴스캡션</button>` : ""}
+      <button class="mb${view === "photo" ? " pr" : ""}" data-act="vphoto"><span class="ms">image</span>사진보기</button>
+      <button class="mb" data-act="chgpic"><span class="ms">refresh</span>다른사진</button>
+      <button class="mb${view === "google" ? " pr" : ""}" data-act="vmap"><span class="ms">map</span>지도보기</button>
+      ${myEmbed ? `<button class="mb${view === "mymaps" ? " pr" : ""}" data-act="vmymap"><span class="ms">map</span>내지도</button>` : ""}
     </div>
     <div class="act">
-      <button class="mb" onclick="$('own').click()">📷 내 사진 등록</button>
-      <button class="mb pr" data-act="regeo">📍 위치 다시 찾기</button>
-      <button class="mb pr" data-act="recap">📋 캡션 재분석</button>
-      <button class="mb" data-act="share">🔗 장소 공유</button>
+      <button class="mb" onclick="$('own').click()"><span class="ms">photo_camera</span>내 사진 등록</button>
+      <button class="mb pr" data-act="recap"><span class="ms">auto_awesome</span>캡션 재분석</button>
+      <button class="mb" data-act="share"><span class="ms">share</span>장소 공유</button>
     </div>
     <div class="act">
-      <button class="mb pr" data-act="pastecap">📋 복사한 캡션 붙여넣어 추가</button>
-      <button class="mb" onclick="$('sheetShot').click()">📷 스샷으로 장소 추가</button>
+      <button class="mb pr" data-act="pastecap"><span class="ms">content_paste</span>복사한 캡션 붙여넣어 추가</button>
+      <button class="mb" onclick="$('sheetShot').click()"><span class="ms">add_photo_alternate</span>스샷으로 장소 추가</button>
     </div>
     </div></details>
 
-    <details class="acc"><summary>✏️ 직접 수정 (카테고리·이름·주소·메모)</summary><div class="acc-in">
+    <details class="acc" open><summary><span class="ms">edit</span>직접 수정 (카테고리·이름·주소·메모)</summary><div class="acc-in">
     <label style="margin-top:6px">카테고리 변경</label>
     <div class="seg">
       ${Object.keys(CATS)
         .map(
           (k) =>
-            `<div data-act="chcat" data-cat="${k}" class="${i.category === k ? "on" : ""}">${CATS[k].e} ${CATS[k].n}${i.category === k ? " ✓" : ""}</div>`,
+            `<div data-act="chcat" data-cat="${k}" class="${i.category === k ? "on" : ""}"><span class="ms">${CATS[k].ic}</span>${CATS[k].n}</div>`,
         )
         .join("")}
     </div>
-    <label>장소명과 주소</label>
+    <label>장소명과 주소 (주소 변경 후 상단의 [위치 다시 찾기] 또는 [지도 등록] 클릭)</label>
     <div id="editAddressList" style="display:flex;flex-direction:column;gap:10px">
       ${addressFields}
     </div>
-    <button type="button" class="mb pr" data-act="addEditAddress" style="margin:10px 0">＋ 주소 입력칸 추가</button>
+    <button type="button" class="mb pr" data-act="addEditAddress" style="margin:10px 0"><span class="ms">add</span>주소 입력칸 추가</button>
     <label>메모 (가격, 영업시간, 휴무일 등)</label>
     <textarea id="sh-note" placeholder="메모 (예: 영업시간 10:00~20:00, 화요일 휴무)">${esc(i.note || "")}</textarea>
     </div></details>
 
     <div class="act" style="justify-content:space-between;margin-top:14px">
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <a class="mb pr" href="${esc(dirHref)}" target="_blank" rel="noopener">🧭 길찾기 ↗</a>
-        <a class="mb" href="${esc(gmapHref)}" target="_blank" rel="noopener">🗺️ 구글지도 ↗</a>
-        <a class="mb" href="https://www.google.com/search?q=${q || encodeURIComponent(i.name || "")}" target="_blank" rel="noopener">🔎 웹검색 ↗</a>
-        <button class="mb dg" data-act="del">🗑️ 삭제</button>
+        <a class="mb pr" href="${esc(dirHref)}" target="_blank" rel="noopener"><span class="ms">explore</span>길찾기</a>
+        <a class="mb" href="${esc(gmapHref)}" target="_blank" rel="noopener"><span class="ms">map</span>구글지도</a>
+        <button class="mb dg" data-act="del"><span class="ms">delete</span>삭제</button>
       </div>
-      <button class="mb" data-act="close" style="padding:8px 18px">닫기</button>
+      <button class="mb" data-act="close" style="padding:8px 18px"><span class="ms">close</span>닫기</button>
     </div>
   `;
-        [...$("sbody").querySelectorAll("details.acc")].forEach((d, ix) => {
-          if (prevAcc[ix]) d.open = true;
-        });
+        if (prior && prevAcc.length) {
+          [...$("sbody").querySelectorAll("details.acc")].forEach((d, ix) => {
+            if (prevAcc[ix] !== undefined) d.open = prevAcc[ix];
+          });
+        }
         $("sheet").classList.add("on");
 
         const vdEl = $("sh-vid"),
@@ -6239,6 +6333,7 @@
               const place = editPlaceFields()[idx];
               if (place) {
                 place.name = el.value.trim();
+                place.localName = "";
                 syncEditedPlace();
                 refreshGroupedPlacesSummary(i);
                 persist();
@@ -6258,6 +6353,7 @@
               const place = editPlaceFields()[idx];
               if (place) {
                 place.address = normalizeOcrAddr(el.value);
+                place.localName = "";
                 syncEditedPlace();
                 refreshGroupedPlacesSummary(i);
                 persist();
@@ -6265,25 +6361,42 @@
             };
             el.onchange = async () => {
               const place = editPlaceFields()[idx];
-              if (!place || !place.address) return;
+              if (!place) return;
+              place.address = normalizeOcrAddr(el.value);
+              place.localName = "";
+              place.lat = null;
+              place.lng = null;
+              if (!place.address && !place.name) {
+                syncEditedPlace();
+                save();
+                return;
+              }
+              toastBusy("📍 변경된 주소로 위치를 다시 찾는 중...");
               const geo = await geocodePlace(
                 place,
                 ($("hint")?.value || "").trim(),
+                true,
               );
               if (geo) {
                 place.lat = geo.lat;
                 place.lng = geo.lng;
                 if (!place.address && geo.formatted)
                   place.address = geo.formatted;
+                i.mapVisible = true;
               }
               syncEditedPlace();
               save();
-              refreshGroupedPlacesSummary(i);
-              if (geo)
+              draw(true);
+              if (geo) {
+                focusMapOnItem(place);
+                showSheet();
                 toast(
-                  `📍 ${idx === 0 ? "대표 장소" : "추가 장소"} 위치를 설정했어요`,
+                  `📍 새 위치 설정 완료! (${geo.lat.toFixed(4)}, ${geo.lng.toFixed(4)})`,
                 );
-              else toast("주소는 저장했지만 좌표를 찾지 못했어요");
+              } else {
+                showSheet();
+                toast("주소는 저장했지만 좌표를 찾지 못했어요");
+              }
             };
           });
         if (vdEl) {
@@ -7067,7 +7180,8 @@
         return single.name || single.address ? [single] : [];
       }
 
-      async function geocodePlace(cand, hint = "") {
+      /* 지오코딩 엔진: ignoreCache=true 시 기존 캐시·이전 좌표를 무시하고 새 주소로 강제 재검색 */
+      async function geocodePlace(cand, hint = "", ignoreCache = false) {
         const gkey = (ls.get("TRAVEL_GMAP_KEY") || "").trim();
         const rawAddr = normalizeOcrAddr(cand.address || "");
         const stripFloorNoise = (s) =>
@@ -7082,16 +7196,16 @@
           ? ""
           : String(cand.name || "").trim();
         const localName = String(cand.localName || "").trim();
-        const aiLat = Number(cand.lat),
-          aiLng = Number(cand.lng);
-        const context = `${hint || ""} ${rawAddr}`.toLowerCase();
+        const aiLat = ignoreCache ? null : Number(cand.lat),
+          aiLng = ignoreCache ? null : Number(cand.lng);
+        const context = `${hint || ""} ${rawAddr} ${rawName}`.toLowerCase();
         const isJapan =
           /日本|北海道|東京|大阪|京都|福岡|札幌|名古屋|沖縄|千日前|難波|梅田|道頓堀|心斎橋|丁目|番地|〒|\b\d{3}-\d{4}\b|japan|osaka|tokyo|kyoto|fukuoka/i.test(
             context,
           );
 
         const cacheKey = `${localName}|${rawName}|${rawAddr}|${hint}`.trim();
-        if (cacheKey.length >= 3 && geoCache[cacheKey])
+        if (!ignoreCache && cacheKey.length >= 3 && geoCache[cacheKey])
           return geoCache[cacheKey];
 
         const zipM = (rawAddr + " " + (cand.postal || "")).match(
@@ -7125,12 +7239,12 @@
           if (cleaned) queries.push(cleaned);
           if (cleanAddr !== cleaned) queries.push(cleanAddr);
         }
-        if (localName && cleanAddr) queries.push(`${localName} ${cleanAddr}`);
         if (rawName && cleanAddr) queries.push(`${rawName} ${cleanAddr}`);
+        if (localName && cleanAddr) queries.push(`${localName} ${cleanAddr}`);
         if (jpTown && banchi) queries.push(`${jpTown}${banchi}`);
+        if (rawName) queries.push(`${rawName} ${hint || ""}`.trim());
         if (localName)
           queries.push(`${localName} ${jpTown || hint || ""}`.trim());
-        if (rawName) queries.push(`${rawName} ${hint || ""}`.trim());
 
         const uniq = [
           ...new Set(
@@ -7185,7 +7299,7 @@
           }
         }
 
-        for (const q of uniq.slice(0, 3)) {
+        for (const q of uniq.slice(0, 4)) {
           try {
             const r = await fetchTO(
               `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=3`,
@@ -7383,15 +7497,13 @@ ${caption || rawText}
                 category: r.category || cat,
               };
               return `<div class="item" data-act="pickRes" data-idx="${idx}" style="margin-bottom:10px">
-      ${ph(CATS[dummy.category] ? CATS[dummy.category].e : "📍", itemThumb(dummy), "", r.img, 0, itemThumbCandidates(dummy).slice(1).join("|"))}
+      ${ph(CATS[dummy.category] ? CATS[dummy.category].ic : "location_on", itemThumb(dummy), "", r.img, 0, itemThumbCandidates(dummy).slice(1).join("|"))}
       <div class="mid">
         <div class="nm">${esc(r.name || "장소")}${vUrl ? " 🎬" : ""}${r.lat && r.lng ? " 📍" : ""}</div>
         <div class="ds">${esc(r.address || "입력한 그대로 저장")}</div>
-        ${r.price ? `<div class="ds" style="color:var(--FOOD);font-weight:800">${esc(r.price)}</div>` : ""}
-        ${r.info ? `<div class="ds in">${esc(r.info)}</div>` : ""}
         <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
-          <button class="mb" data-act="resPic" data-idx="${idx}" style="padding:5px 11px;font-size:11.5px;min-height:34px">🔄 다른 사진</button>
-          ${vUrl ? `<button class="mb reel-jump" data-act="openResVid" data-idx="${idx}" style="padding:5px 11px;font-size:11.5px;min-height:34px">${esc(getVidBtnLabel(vUrl))}</button>` : ""}
+          <button class="mb" data-act="resPic" data-idx="${idx}" style="padding:5px 11px;font-size:11.5px;min-height:34px"><span class="ms">refresh</span>다른 사진</button>
+          ${vUrl ? `<button class="mb reel-jump" data-act="openResVid" data-idx="${idx}" style="padding:5px 11px;font-size:11.5px;min-height:34px"><span class="ms fill">play_circle</span>${esc(getVidBtnLabel(vUrl))}</button>` : ""}
         </div>
       </div>
       <div class="ok">${r._merged ? "✓ 병합됨" : r._saved ? "✓ 저장됨" : "선택"}</div>
@@ -7574,7 +7686,7 @@ ${caption || rawText}
           );
         } finally {
           btn.disabled = false;
-          btn.textContent = "🔥 분석·저장하기";
+          btn.innerHTML = `<span class="ms fill">bolt</span>분석·저장하기`;
           if (_toastBusy) {
             _toastBusy = false;
             $("toast").classList.remove("show");
@@ -7598,30 +7710,59 @@ ${caption || rawText}
         }
       }
 
+      /* 위치 다시 찾기: 입력칸의 새 주소를 반영하고 캐시를 무시해 좌표를 강제 갱신 */
       async function reGeoItem(i) {
-        if (!i) return;
-        toastBusy("📍 위치 검색 중...");
+        if (!i) return false;
+        syncSheetInputsToItem(i);
+        toastBusy("📍 새 주소로 위치 검색 중...");
         const hint = ($("hint")?.value || "").trim();
-        const g = await geocodePlace(i, hint);
-        if (g) {
-          i.lat = g.lat;
-          i.lng = g.lng;
-          if (Array.isArray(i.places) && i.places[0]) {
-            i.places[0].lat = g.lat;
-            i.places[0].lng = g.lng;
+        const places = ensureEditablePlaces(i);
+        let anyFound = false;
+
+        for (let idx = 0; idx < places.length; idx++) {
+          const p = places[idx];
+          if (!p.address && !p.name) continue;
+          const g = await geocodePlace(p, hint, true);
+          if (g) {
+            p.lat = g.lat;
+            p.lng = g.lng;
+            if (!p.address && g.formatted) p.address = g.formatted;
+            anyFound = true;
           }
+        }
+
+        if (!anyFound) {
+          const g = await geocodePlace(i, hint, true);
+          if (g) {
+            i.lat = g.lat;
+            i.lng = g.lng;
+            if (places[0]) {
+              places[0].lat = g.lat;
+              places[0].lng = g.lng;
+            }
+            anyFound = true;
+          }
+        }
+
+        syncGroupedItem(i);
+        if (anyFound) {
           if (isGenericSharedName(i.name) && i.address)
             i.name = i.address.split(",")[0].trim();
+          i.mapVisible = true;
           save();
+          draw(true);
           focusMapOnItem(i);
           if (cur === i.id) showSheet();
           toast(
-            `📍 위치 설정 완료! (${g.lat.toFixed(4)}, ${g.lng.toFixed(4)})`,
+            `📍 위치 변경 완료! (${Number(i.lat).toFixed(4)}, ${Number(i.lng).toFixed(4)})`,
           );
+          return true;
         } else {
           save();
+          draw(true);
           if (cur === i.id) showSheet();
-          toast("위치를 찾지 못했어요. 주소를 보완해 주세요.");
+          toast("위치를 찾지 못했어요. 시·구·번지나 지역명을 함께 적어주세요.");
+          return false;
         }
       }
 
@@ -7699,6 +7840,10 @@ ${caption || rawText}
           if (g) {
             i.lat = g.lat;
             i.lng = g.lng;
+            if (Array.isArray(i.places) && i.places[0]) {
+              i.places[0].lat = g.lat;
+              i.places[0].lng = g.lng;
+            }
             fixed++;
           }
         }
@@ -7735,6 +7880,11 @@ ${caption || rawText}
           id = actEl.dataset.id,
           c = actEl.dataset.cat;
 
+        if (act === "jumpToList") {
+          e.stopPropagation();
+          jumpToListItem(id);
+          return;
+        }
         if (act === "undoToast") {
           e.stopPropagation();
           if (_undoFn) {
@@ -7808,28 +7958,26 @@ ${caption || rawText}
         }
         if (act === "openTaxi") {
           const it = items.find((x) => x.id === cur);
-          if (it) openTaxiModal(it);
+          if (it) {
+            syncSheetInputsToItem(it);
+            openTaxiModal(it);
+          }
           return;
         }
         if (act === "registerMapItem") {
           const it = items.find((x) => x.id === cur);
           if (!it) return;
-          if (!hasMapCoordinates(it)) {
-            const hint = ($("hint")?.value || "").trim();
-            const geo = await geocodePlace(it, hint);
-            if (!geo) {
-              toast("지도 등록에 필요한 위치를 찾지 못했어요.");
-              return;
-            }
-            it.lat = geo.lat;
-            it.lng = geo.lng;
+          const addrChanged = syncSheetInputsToItem(it);
+          if (addrChanged || !hasMapCoordinates(it)) {
+            const ok = await reGeoItem(it);
+            if (!ok) return;
           }
           it.mapVisible = true;
           save();
           showSheet();
           draw(true);
-          fit();
-          toast("🗺️ 지도에 등록했어요");
+          focusMapOnItem(it);
+          toast("🗺️ 지도에 위치를 등록·갱신했어요");
           return;
         }
         if (act === "hideMapItem") {
@@ -7846,6 +7994,7 @@ ${caption || rawText}
         if (act === "addEditAddress") {
           const it = items.find((x) => x.id === cur);
           if (!it) return;
+          syncSheetInputsToItem(it);
           const places = ensureEditablePlaces(it);
           if (places.length >= MAX_MULTI_PLACES) {
             toast(
@@ -7871,6 +8020,7 @@ ${caption || rawText}
         if (act === "removeEditAddress") {
           const it = items.find((x) => x.id === cur);
           const idx = Number(actEl.dataset.idx);
+          syncSheetInputsToItem(it);
           const places = it ? ensureEditablePlaces(it) : [];
           if (idx > 0 && Number.isInteger(idx) && idx < places.length) {
             places.splice(idx, 1);
@@ -8353,7 +8503,11 @@ ${caption || rawText}
 
         const curItem = items.find((x) => x.id === cur);
         if (act === "close") {
-          save();
+          if (curItem) {
+            const changed = syncSheetInputsToItem(curItem);
+            if (changed) save();
+            else render(true);
+          }
           return closeSheet();
         }
         if (!curItem) return;
@@ -8449,31 +8603,11 @@ ${caption || rawText}
           return;
         }
         if (act === "regeo") {
-          const nmEl = $("sbody")?.querySelector(
-            '.edit-place-name[data-idx="0"]',
-          );
-          const adEl = $("sbody")?.querySelector(
-            '.edit-place-address[data-idx="0"]',
-          );
-          const nm = (nmEl?.value || "").trim();
-          const ad = normalizeOcrAddr(adEl?.value || "");
-          const vd = ($("sh-vid")?.value || "").trim();
-          const places = ensureEditablePlaces(curItem);
-          if (nm) {
-            curItem.name = nm;
-            if (places[0]) places[0].name = nm;
-          }
-          if (ad) {
-            curItem.address = ad;
-            if (places[0]) places[0].address = ad;
-          }
-          if (vd) {
-            curItem.vid = normalizeVidUrl(vd) || vd;
-          }
           await reGeoItem(curItem);
           return;
         }
         if (act === "recap") {
+          syncSheetInputsToItem(curItem);
           const src = [
             curItem.name,
             curItem.address,
@@ -8549,7 +8683,7 @@ ${caption || rawText}
         if (e.target && e.target.dataset && e.target.dataset.roomAlert)
           tab("set");
       };
-      $("planCopyTopBtn").onclick = copyFormattedPlan;
+      if ($("planCopyTopBtn")) $("planCopyTopBtn").onclick = copyFormattedPlan;
       $("exportPlanBtn").onclick = copyFormattedPlan;
       document.addEventListener("click", (e) => {
         const action = e.target.closest("[data-room-action]");
@@ -8569,7 +8703,8 @@ ${caption || rawText}
       });
       $("sheet").onclick = (e) => {
         if (e.target === $("sheet")) {
-          save();
+          const curItem = items.find((x) => x.id === cur);
+          if (curItem && syncSheetInputsToItem(curItem)) save();
           closeSheet();
         }
       };
@@ -9164,6 +9299,7 @@ ${caption || rawText}
       window.addEventListener("online", () => {
         updateNetworkStatus();
         if (hasOfflineQueue()) flushOfflineQueue().catch(() => {});
+        pollSharedRoomNow();
       });
       window.addEventListener("offline", () => {
         updateNetworkStatus();
