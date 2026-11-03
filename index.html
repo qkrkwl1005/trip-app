@@ -3644,6 +3644,7 @@
       }
       function sanitizeSharedItems(rawItems) {
         if (!Array.isArray(rawItems)) return [];
+        const codeNoiseRe = /allorigins\s*em|fetchTO\(|encodeURIComponent|throw\s+new\s+Error|async\s*\(\)/i;
         return rawItems
           .slice(0, 200)
           .filter((item) => item && typeof item === "object")
@@ -3652,6 +3653,9 @@
             item.id = /^[A-Za-z0-9_-]{1,100}$/.test(String(raw.id || ""))
               ? String(raw.id)
               : `shared_${Date.now()}_${index}`;
+            if (codeNoiseRe.test(String(item.name || ""))) item.name = "저장된 장소";
+            if (codeNoiseRe.test(String(item.info || ""))) item.info = "";
+            if (codeNoiseRe.test(String(item.note || ""))) item.note = "";
             item.category = CATS[raw.category] ? raw.category : "PLACE";
             item.done = raw.done === true;
             item.star = raw.star === true;
@@ -3670,18 +3674,21 @@
             if (
               typeof item.img === "string" &&
               item.img.startsWith("data:image") &&
-              item.img.length > 4000
+              item.img.length > 22000
             ) {
               item.img = "";
               item.useCustomImg = false;
             }
+            if (!item.img) item.useCustomImg = false;
             item.places = Array.isArray(raw.places)
               ? raw.places
                   .slice(0, 20)
                   .filter((place) => place && typeof place === "object")
                   .map((place) => ({
                     ...place,
-                    name: String(place.name || "").slice(0, 500),
+                    name: codeNoiseRe.test(String(place.name || ""))
+                      ? ""
+                      : String(place.name || "").slice(0, 500),
                     localName: String(place.localName || "").slice(0, 500),
                     address: String(place.address || "").slice(0, 1000),
                     lat: Number.isFinite(Number(place.lat))
@@ -3695,6 +3702,7 @@
             return item;
           });
       }
+
       function removeUndefined(value) {
         if (Array.isArray(value)) return value.map(removeUndefined);
         if (value && typeof value === "object") {
@@ -4538,13 +4546,17 @@
         const add = (u) => {
           if (u && !out.includes(u)) out.push(u);
         };
-        if (i.useCustomImg && i.img) add(i.img);
+        if (i.img) add(i.img);
+        if ((i.v || 0) > 0) {
+          const q = getValidSearchQuery(i) || i.name || i.address || "";
+          if (q && !isGenericSharedName(q)) add(pic(q, i.v));
+        }
         if (i.vid) {
           const meta = parseVideoMeta(i.vid);
           if (meta && meta.platform === "yt" && meta.id) {
             add(`https://i.ytimg.com/vi/${meta.id}/oar2.jpg`);
-            add(`https://i.ytimg.com/vi/${meta.id}/maxresdefault.jpg`);
             add(`https://i.ytimg.com/vi/${meta.id}/hqdefault.jpg`);
+            add(`https://i.ytimg.com/vi/${meta.id}/maxresdefault.jpg`);
           }
           if (meta && meta.platform === "ig" && meta.id) {
             const cached = reelThumbCache[meta.id];
@@ -4559,7 +4571,6 @@
                   `https://wsrv.nl/?url=${encodeURIComponent(raw)}&w=480&h=640&fit=cover&output=jpg`,
                 );
                 add(raw);
-                add(`https://corsproxy.io/?url=${encodeURIComponent(raw)}`);
               }
             }
           }
@@ -4567,8 +4578,9 @@
             const key = meta.id || meta.url;
             if (reelThumbCache[key]) add(reelThumbCache[key]);
           }
-          return out;
         }
+        const q = getValidSearchQuery(i) || i.name || i.address || "";
+        if (q && !isGenericSharedName(q)) add(pic(q, i.v || 0));
         return out;
       }
 
@@ -5480,12 +5492,16 @@
       function syncGroupedItem(item) {
         if (!Array.isArray(item.places) || !item.places.length) return;
         const first = item.places[0];
-        const firstName = first.name || item.name || "저장된 장소";
+        const cleanFirst = String(first.name || "").trim();
+        const fallbackName = !isGenericSharedName(item.name) && !/allorigins/i.test(item.name || "")
+          ? String(item.name || "").replace(/\s*외\s*\d+곳$/, "").trim()
+          : "";
+        const baseName = cleanFirst || fallbackName || (first.address || "").split(",")[0].trim() || "저장된 장소";
         item.name =
           item.places.length > 1
-            ? `${firstName.replace(/\s*외\s*\d+곳$/, "")} 외 ${item.places.length - 1}곳`
-            : firstName;
-        item.localName = first.localName ?? item.localName ?? "";
+            ? `${baseName.replace(/\s*외\s*\d+곳$/, "")} 외 ${item.places.length - 1}곳`
+            : baseName;
+        item.localName = first.localName ?? "";
         item.address = first.address ?? "";
         item.price = first.price || item.price || "";
         item.info = first.info || item.info || "";
@@ -6075,15 +6091,17 @@
       function syncSheetInputsToItem(item) {
         if (!item || !$("sheet")?.classList.contains("on")) return false;
         const places = ensureEditablePlaces(item);
-        let addrChanged = false;
+        let anyChanged = false;
         $("sbody")
           ?.querySelectorAll(".edit-place-name")
           .forEach((el) => {
             const idx = Number(el.dataset.idx);
             const val = el.value.trim();
-            if (places[idx] && val && places[idx].name !== val) {
+            if (places[idx] && places[idx].name !== val) {
               places[idx].name = val;
               places[idx].localName = "";
+              if (idx === 0 && val) item.name = val;
+              anyChanged = true;
             }
           });
         $("sbody")
@@ -6096,18 +6114,26 @@
               places[idx].localName = "";
               places[idx].lat = null;
               places[idx].lng = null;
-              addrChanged = true;
+              if (idx === 0) item.address = val;
+              anyChanged = true;
             }
           });
         const vdEl = $("sh-vid");
         if (vdEl) {
           const rawV = vdEl.value.trim();
-          item.vid = normalizeVidUrl(rawV) || rawV;
+          const normV = normalizeVidUrl(rawV) || rawV;
+          if (item.vid !== normV) {
+            item.vid = normV;
+            anyChanged = true;
+          }
         }
         const ntEl = $("sh-note");
-        if (ntEl) item.note = ntEl.value;
-        syncGroupedItem(item);
-        return addrChanged;
+        if (ntEl && item.note !== ntEl.value) {
+          item.note = ntEl.value;
+          anyChanged = true;
+        }
+        if (anyChanged) syncGroupedItem(item);
+        return anyChanged;
       }
 
       function groupedPlacesSummaryHtml(item) {
@@ -6324,7 +6350,15 @@
         const vdEl = $("sh-vid"),
           ntEl = $("sh-note");
         const editPlaceFields = () => ensureEditablePlaces(i);
-        const syncEditedPlace = () => syncGroupedItem(i);
+        const syncEditedPlace = () => {
+          syncGroupedItem(i);
+          const titleEl = $("sbody")?.querySelector(".nm");
+          if (titleEl) titleEl.textContent = i.name || "저장된 장소";
+          const addrDisplays = $("sbody")?.querySelectorAll(".ds");
+          if (addrDisplays && addrDisplays[0]) {
+            addrDisplays[0].textContent = i.address || "주소 미입력";
+          }
+        };
         $("sbody")
           .querySelectorAll(".edit-place-name")
           .forEach((el) => {
@@ -6334,8 +6368,10 @@
               if (place) {
                 place.name = el.value.trim();
                 place.localName = "";
+                if (idx === 0 && place.name) i.name = place.name;
                 syncEditedPlace();
                 refreshGroupedPlacesSummary(i);
+                render();
                 persist();
               }
             };
@@ -7103,9 +7139,12 @@
       }
 
       function parseCaptionLocally(rawText) {
-        const norm = normalizeOcrAddr(String(rawText || "").replace(/\r/g, ""));
-        const lines = String(rawText || "")
-          .split(/\r?\n/)
+        const cleanedRaw = String(rawText || "")
+          .replace(/\r/g, "")
+          .replace(/.*(?:allorigins|fetchTO|encodeURIComponent|throw new Error).*/gi, "");
+        const norm = normalizeOcrAddr(cleanedRaw);
+        const lines = cleanedRaw
+          .split(/\n/)
           .map((l) => l.trim())
           .filter(Boolean);
         let name = "",
@@ -7118,9 +7157,59 @@
         const zipM = norm.match(/(?:〒|T|\b)(\d{3}-\d{4})\b/);
         if (zipM) postal = zipM[1];
 
+        let section = "";
         for (const line of lines) {
           if (/^https?:\/\//i.test(line)) continue;
-          const cl = line.replace(/^[•·\-\*]\s*/, "").trim();
+          if (/^[~∼\-=*•·_]{3,}$/.test(line)) {
+            section = "";
+            continue;
+          }
+          const bracketM = line.match(/^[【\[\(]\s*([^】\]\)]+?)\s*[】\]\)]\s*(.*)$/);
+          if (bracketM) {
+            const hdr = bracketM[1].trim();
+            const rest = bracketM[2].replace(/^[○●•·\-*#\s]+/, "").trim();
+            if (/가게|상호|이름|장소|식당|카페|매장|점포|店名|name/i.test(hdr)) {
+              section = "name";
+              if (rest && !name) name = rest;
+            } else if (/주소|위치|장소|address|アクセス|住所/i.test(hdr)) {
+              section = "addr";
+              if (rest) addrParts.push(rest);
+            } else if (/영업|시간|운영|휴무|정기|hours|営業時間|定休日/i.test(hdr)) {
+              section = "info";
+              if (rest) info = info ? `${info} · ${rest}` : rest;
+            } else if (/예산|가격|금액|메뉴|요금|price|budget|予算|料金/i.test(hdr)) {
+              section = "price";
+              if (rest && !price) price = rest;
+            } else {
+              section = "";
+            }
+            continue;
+          }
+
+          const cl = line.replace(/^[○●•·\-*]+\s*/, "").trim();
+          if (!cl) continue;
+
+          if (section === "name" && !name) {
+            name = cl.replace(/^#+/, "").trim();
+            section = "";
+            continue;
+          }
+          if (section === "addr") {
+            if (!/^(?:다른\s*영상|여러분|제\s*영상)/.test(cl)) {
+              addrParts.push(cl.replace(/^일본\s+/, ""));
+              continue;
+            }
+          }
+          if (section === "info") {
+            info = info ? `${info} · ${cl}` : cl;
+            section = "";
+            continue;
+          }
+          if (section === "price" && !price) {
+            price = cl;
+            section = "";
+            continue;
+          }
 
           if (
             cl.startsWith("📍") ||
@@ -7188,7 +7277,7 @@
         if (addrParts.length) address = normalizeOcrAddr(addrParts.join(", "));
 
         if (!name) {
-          const qM = String(rawText || "").match(
+          const qM = cleanedRaw.match(
             /['"「『]([^'"」』\r\n]{2,30})['"」』]/,
           );
           if (
@@ -7207,19 +7296,14 @@
             (l) =>
               !l.startsWith("http") &&
               !l.startsWith("#") &&
+              !/^다른\s*영상|@/i.test(l) &&
               !isLikelyAddressLine(l) &&
               l.length >= 2 &&
-              l.length <= 45
+              l.length <= 45,
           );
           if (candLine) {
-            name = candLine.replace(/^[0-9]+[.)]\s*/, "").trim();
+            name = candLine.replace(/^[0-9○●•·\-*#.)]+\s*/, "").trim();
           }
-        }
-        if (!info && lines.length > 1) {
-          const bodyLines = lines
-            .filter((l) => l !== name && !l.startsWith("http") && !l.startsWith("#"))
-            .slice(0, 3);
-          if (bodyLines.length) info = bodyLines.join(" · ").slice(0, 140);
         }
 
         let category = cat || "PLACE";
@@ -7231,7 +7315,7 @@
           )
             category = "CAFE";
           else if (
-            /편의점|로손|세븐일레븐|패밀리마트|길거리음식|간식/.test(norm)
+            /편의점|로손|세븐일레븐|패밀리마트|길거리음식|간식|정식|스시|라멘|야키니쿠|이자카야|우동|소바|식당|맛집|조식/i.test(norm)
           )
             category = "FOOD";
           else if (
@@ -8913,7 +8997,7 @@ ${caption || rawText}
             return;
           }
         }
-        const b64 = await fileToBase64(f, 360, 0.55);
+        const b64 = await fileToBase64(f, 220, 0.48);
         i.img = `data:${b64.mime};base64,${b64.data}`;
         i.useCustomImg = true;
         view = "photo";
