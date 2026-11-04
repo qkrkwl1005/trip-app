@@ -1,14 +1,28 @@
-function cleanUrl(raw) {
+function cleanIgUrl(raw) {
   if (!raw || typeof raw !== "string") return "";
   return raw
-    .replace(/\\u0026/gi, "&")
-    .replace(/\\\//g, "/")
+    .replace(/\\+u0026/gi, "&")
+    .replace(/\\+u002f/gi, "/")
+    .replace(/\\+u003d/gi, "=")
+    .replace(/\\+u003f/gi, "?")
+    .replace(/\\+\//g, "/")
     .replace(/&amp;/gi, "&")
     .replace(/&#x26;/gi, "&")
     .replace(/&#38;/gi, "&")
     .replace(/\\+/g, "")
     .replace(/^["']+|["']+$/g, "")
     .trim();
+}
+
+// 인스타그램 프로필 사진(t51.2885-19) 및 로고/아이콘 완벽 차단 필터
+function isAvatarOrBadUrl(url) {
+  if (!url || typeof url !== "string") return true;
+  const u = cleanIgUrl(url);
+  if (!/^https?:\/\//i.test(u)) return true;
+  // t51.2885-19는 인스타그램의 프로필 아바타 전용 CDN 경로 (돌곰, 벌꿀오소리 등 프로필 사진)
+  if (/t51\.2885-19/i.test(u)) return true;
+  if (/profile_pic|s150x150|p150x150|150x150|s320x320|static\.cdninstagram|rsrc\.php|\.mp4/i.test(u)) return true;
+  return false;
 }
 
 function stripMetaNoise(text) {
@@ -22,128 +36,142 @@ function stripMetaNoise(text) {
     .trim();
 }
 
+function parseJsonMedia(obj) {
+  let thumb = "";
+  let caption = "";
+
+  function walk(node, depth) {
+    if (!node || typeof node !== "object" || depth > 10) return;
+
+    if (!thumb) {
+      const candidates = [
+        node.cover_media?.cropped_image_version?.url,
+        node.thumbnail_src,
+        node.display_url,
+        node.thumbnail_url,
+        node.cover_url,
+        ...(Array.isArray(node.display_resources) ? node.display_resources.map(r => r?.src) : []),
+        ...(Array.isArray(node.image_versions2?.candidates) ? node.image_versions2.candidates.map(c => c?.url) : [])
+      ];
+      for (const c of candidates) {
+        if (typeof c === "string" && !isAvatarOrBadUrl(c)) {
+          thumb = cleanIgUrl(c);
+          break;
+        }
+      }
+    }
+
+    if (!caption) {
+      if (typeof node.caption === "string" && node.caption.trim().length > 2) caption = node.caption.trim();
+      else if (typeof node.caption?.text === "string" && node.caption.text.trim().length > 2) caption = node.caption.text.trim();
+      else if (node.edge_media_to_caption?.edges?.[0]?.node?.text) caption = node.edge_media_to_caption.edges[0].node.text.trim();
+    }
+
+    for (const k of Object.keys(node)) {
+      if (k === "owner" || k === "user" || k === "profile_pic_url" || k === "hd_profile_pic_url_info" || k === "hd_profile_pic_versions") continue;
+      if (node[k] && typeof node[k] === "object") walk(node[k], depth + 1);
+    }
+  }
+
+  walk(obj, 0);
+  return { thumb, caption: stripMetaNoise(caption) };
+}
+
 function parseEmbedHtml(html) {
   let thumb = "";
   let caption = "";
   if (!html || typeof html !== "string") return { thumb, caption };
 
-  // 1) EmbeddedMediaImage 태그에서 추출
-  const imgTagMatch = html.match(/<img[^>]+class="[^"]*EmbeddedMediaImage[^"]*"[^>]*>/i)
-                   || html.match(/<img[^>]+EmbeddedMediaImage[^>]*>/i);
-  if (imgTagMatch) {
-    const srcMatch = imgTagMatch[0].match(/src="([^"]+)"/i);
-    if (srcMatch && srcMatch[1]) {
-      const u = cleanUrl(srcMatch[1]);
-      if (/^https?:\/\//i.test(u) && !u.includes("s150x150")) thumb = u;
-    }
+  // 1) contextJSON 언이스케이프 파싱 (릴스 인트로 썸네일 최우선 소스)
+  const ctxMatch = html.match(/contextJSON"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+  if (ctxMatch && ctxMatch[1]) {
+    try {
+      const unescapedStr = JSON.parse('"' + ctxMatch[1] + '"');
+      const ctxObj = JSON.parse(unescapedStr);
+      const parsedCtx = parseJsonMedia(ctxObj);
+      if (parsedCtx.thumb && !isAvatarOrBadUrl(parsedCtx.thumb)) thumb = parsedCtx.thumb;
+      if (parsedCtx.caption) caption = parsedCtx.caption;
+    } catch (_) {}
   }
 
-  // 2) JSON 내 display_url / thumbnail_src 추출
+  // 2) 상단 Header(프로필 사진 영역)를 제거한 본문 HTML에서 EmbeddedMediaImage 탐색
+  const bodyHtml = html.replace(/<div[^>]+class="[^"]*Header[^"]*"[\s\S]*?<\/div>\s*<\/div>/i, "");
+
   if (!thumb) {
-    const jsonPatterns = [
-      /(?:\\"|")display_url(?:\\"|")\s*:\s*(?:\\"|")(https?:[^"'\s]+?)(?:\\"|")/i,
-      /(?:\\"|")thumbnail_src(?:\\"|")\s*:\s*(?:\\"|")(https?:[^"'\s]+?)(?:\\"|")/i,
-      /<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i,
-      /<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i,
-      /<meta[^>]+name="twitter:image"[^>]+content="([^"]+)"/i
-    ];
-    for (const re of jsonPatterns) {
-      const m = html.match(re);
-      if (m && m[1]) {
-        const u = cleanUrl(m[1]);
-        if (/^https?:\/\//i.test(u) && !u.includes("s150x150") && !u.includes("profile_pic")) {
-          thumb = u;
-          break;
-        }
+    const mediaImgMatch = bodyHtml.match(/<img[^>]+class="[^"]*EmbeddedMediaImage[^"]*"[^>]*>/i)
+                       || bodyHtml.match(/<img[^>]+EmbeddedMediaImage[^>]*>/i);
+    if (mediaImgMatch) {
+      const srcM = mediaImgMatch[0].match(/src="([^"]+)"/i);
+      if (srcM && srcM[1] && !isAvatarOrBadUrl(srcM[1])) {
+        thumb = cleanIgUrl(srcM[1]);
       }
     }
   }
 
-  // 3) 캡션 추출
-  const capMatch = html.match(/class="Caption"[^>]*>([\s\S]*?)<div class="CaptionComments"/i)
-                || html.match(/class="Caption"[^>]*>([\s\S]*?)<\/div>/i);
-  if (capMatch && capMatch[1]) {
-    const rawCap = capMatch[1]
-      .replace(/<a class="CaptionUsername"[^>]*>[\s\S]*?<\/a>/i, "")
-      .replace(/<br\s*\/?>/gi, "\n")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/&nbsp;/g, " ")
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&#39;/g, "'")
-      .replace(/&quot;/g, '"')
-      .trim();
-    if (rawCap.length > 2) caption = stripMetaNoise(rawCap);
+  // 3) HTML/스크립트 내부에서 실제 게시물 미디어 버킷(-15 경로) URL 직접 스캔
+  if (!thumb) {
+    const rawReplaced = cleanIgUrl(bodyHtml);
+    const mediaBucketRegex = /https:\/\/[^\s"'<>\\]+?(?:cdninstagram\.com|fbcdn\.net)[^\s"'<>\\]+?\/t51\.(?:2885|29350|71878|75761)-15\/[^\s"'<>\\]+/gi;
+    const matches = rawReplaced.match(mediaBucketRegex) || [];
+    for (const mUrl of matches) {
+      if (!isAvatarOrBadUrl(mUrl)) {
+        thumb = cleanIgUrl(mUrl);
+        break;
+      }
+    }
   }
 
+  // 4) display_url / thumbnail_src 정규식 스캔 (프로필 아바타 제외)
+  if (!thumb) {
+    const fieldRegex = /(?:display_url|thumbnail_src|cover_url)(?:\\"|")\s*:\s*(?:\\"|")(https?:[^"'\s]+?)(?:\\"|")/gi;
+    let m;
+    while ((m = fieldRegex.exec(html)) !== null) {
+      const cand = cleanIgUrl(m[1]);
+      if (!isAvatarOrBadUrl(cand)) {
+        thumb = cand;
+        break;
+      }
+    }
+  }
+
+  // 5) 캡션 추출
   if (!caption) {
-    const ogDesc = html.match(/<meta[^>]+property="og:description"[^>]+content="([^"]+)"/i)
-                || html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:description"/i);
-    if (ogDesc && ogDesc[1]) {
-      caption = stripMetaNoise(
-        ogDesc[1]
-          .replace(/&amp;/g, "&")
-          .replace(/&quot;/g, '"')
-          .replace(/&#39;/g, "'")
-          .replace(/&#x27;/g, "'")
-      );
+    const capMatch = html.match(/class="Caption"[^>]*>([\s\S]*?)<div class="CaptionComments"/i)
+                  || html.match(/class="Caption"[^>]*>([\s\S]*?)<\/div>/i);
+    if (capMatch && capMatch[1]) {
+      const rawCap = capMatch[1]
+        .replace(/<a class="CaptionUsername"[^>]*>[\s\S]*?<\/a>/i, "")
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;/g, " ")
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&#39;/g, "'")
+        .replace(/&quot;/g, '"')
+        .trim();
+      if (rawCap.length > 2) caption = stripMetaNoise(rawCap);
     }
   }
 
   return { thumb, caption };
 }
 
-function parseJsonPayload(obj) {
-  let thumb = "";
-  let caption = "";
-  function walk(node, depth) {
-    if (!node || typeof node !== "object" || depth > 9) return;
-    if (!thumb) {
-      if (node.cover_media?.cropped_image_version?.url) {
-        thumb = node.cover_media.cropped_image_version.url;
-      } else if (Array.isArray(node.image_versions2?.candidates) && node.image_versions2.candidates.length > 0) {
-        const c = node.image_versions2.candidates.find(x => x?.url && !x.url.includes("s150x150")) || node.image_versions2.candidates[0];
-        if (c?.url) thumb = c.url;
-      } else {
-        for (const k of ["thumbnail_src", "display_url", "thumbnail_url", "cover_url"]) {
-          if (typeof node[k] === "string" && /^https?:\/\//i.test(cleanUrl(node[k])) && !node[k].includes(".mp4") && !node[k].includes("s150x150")) {
-            thumb = node[k];
-            break;
-          }
-        }
-      }
-    }
-    if (!caption) {
-      if (typeof node.caption === "string" && node.caption.trim().length > 2) caption = node.caption.trim();
-      else if (typeof node.caption?.text === "string" && node.caption.text.trim().length > 2) caption = node.caption.text.trim();
-      else if (node.edge_media_to_caption?.edges?.[0]?.node?.text) caption = node.edge_media_to_caption.edges[0].node.text.trim();
-    }
-    for (const k of Object.keys(node)) {
-      if (k === "owner" || k === "user" || k === "profile_pic_url") continue;
-      if (node[k] && typeof node[k] === "object") walk(node[k], depth + 1);
-    }
-  }
-  walk(obj, 0);
-  return { thumb: cleanUrl(thumb), caption: stripMetaNoise(caption) };
-}
-
 async function resolveIgData(code, rapidKey) {
   let thumb = "";
   let caption = "";
 
-  const embedUrls = [
+  // [Layer 1] Instagram Embed 페이지 직접 파싱
+  const embedTargets = [
     `https://www.instagram.com/p/${code}/embed/captioned/`,
     `https://www.instagram.com/reel/${code}/embed/captioned/`,
-    `https://www.instagram.com/p/${code}/embed/`
+    `https://www.instagram.com/reel/${code}/embed/`
   ];
-
-  // 1단계: Instagram Embed 페이지 직접 요청
-  for (const u of embedUrls) {
+  for (const u of embedTargets) {
     try {
       const r = await fetch(u, {
         headers: {
-          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+          "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1",
           "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
           "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8"
         }
@@ -151,54 +179,66 @@ async function resolveIgData(code, rapidKey) {
       if (r.ok) {
         const html = await r.text();
         const parsed = parseEmbedHtml(html);
-        if (parsed.thumb && !thumb) thumb = parsed.thumb;
+        if (parsed.thumb && !isAvatarOrBadUrl(parsed.thumb) && !thumb) thumb = parsed.thumb;
         if (parsed.caption && !caption) caption = parsed.caption;
         if (thumb && caption) break;
       }
     } catch (_) {}
   }
 
-  // 2단계: 크롤러 봇 User-Agent (Facebook / Telegram / Discord 미리보기 봇)로 OpenGraph og:image 추출
+  // [Layer 2] Instagram GraphQL API (doc_id)
   if (!thumb || !caption) {
-    const botAgents = [
-      "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
-      "TelegramBot (like TwitterBot)",
-      "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)"
-    ];
-    for (const ua of botAgents) {
+    try {
+      const body = new URLSearchParams({
+        av: "0",
+        variables: JSON.stringify({ shortcode: code, fetch_comment_count: 2, HRV: 1 }),
+        doc_id: "8845758582119845"
+      });
+      const r = await fetch("https://www.instagram.com/graphql/query", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "X-IG-App-ID": "936619743392459",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+          "Origin": "https://www.instagram.com",
+          "Referer": `https://www.instagram.com/reel/${code}/`
+        },
+        body: body.toString()
+      });
+      if (r.ok) {
+        const json = await r.json();
+        const parsed = parseJsonMedia(json);
+        if (parsed.thumb && !isAvatarOrBadUrl(parsed.thumb) && !thumb) thumb = parsed.thumb;
+        if (parsed.caption && !caption) caption = parsed.caption;
+      }
+    } catch (_) {}
+  }
+
+  // [Layer 3] Jina Headless Chrome 렌더러 (모든 이미지 중 첫 번째 프로필 아바타를 건너뛰고 -15 본문 커버만 선택)
+  if (!thumb || !caption) {
+    for (const target of [`https://www.instagram.com/p/${code}/embed/captioned/`, `https://www.instagram.com/reel/${code}/embed/`]) {
       try {
-        const r = await fetch(`https://www.instagram.com/reel/${code}/`, {
-          headers: { "User-Agent": ua, "Accept-Language": "ko-KR,ko;q=0.9" },
-          redirect: "follow"
+        const jr = await fetch(`https://r.jina.ai/${target}`, {
+          headers: { "Accept": "text/plain" }
         });
-        if (r.ok) {
-          const html = await r.text();
-          const parsed = parseEmbedHtml(html);
-          if (parsed.thumb && !thumb) thumb = parsed.thumb;
-          if (parsed.caption && !caption) caption = parsed.caption;
-          if (thumb && caption) break;
+        if (jr.ok) {
+          const jtxt = await jr.text();
+          const imgRegex = /!\[[^\]]*\]\((https:\/\/[^\s)]+)\)/gi;
+          let m;
+          while ((m = imgRegex.exec(jtxt)) !== null) {
+            const candidate = cleanIgUrl(m[1]);
+            if (!isAvatarOrBadUrl(candidate) && (candidate.includes("cdninstagram") || candidate.includes("fbcdn"))) {
+              if (!thumb) thumb = candidate;
+              break;
+            }
+          }
+          if (thumb) break;
         }
       } catch (_) {}
     }
   }
 
-  // 3단계: /p/{code}/media/?size=l 리디렉션 엔드포인트 확인
-  if (!thumb) {
-    try {
-      const r = await fetch(`https://www.instagram.com/p/${code}/media/?size=l`, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
-        },
-        redirect: "manual"
-      });
-      const loc = r.headers.get("location");
-      if (loc && /^https?:\/\//i.test(loc) && !loc.includes("login")) {
-        thumb = cleanUrl(loc);
-      }
-    } catch (_) {}
-  }
-
-  // 4단계: RapidAPI (키가 있는 경우)
+  // [Layer 4] RapidAPI
   if (rapidKey && (!thumb || !caption)) {
     const reelUrl = `https://www.instagram.com/reel/${code}/`;
     const endpoints = [
@@ -213,27 +253,13 @@ async function resolveIgData(code, rapidKey) {
         });
         if (r.ok) {
           const json = await r.json();
-          const parsed = parseJsonPayload(json);
-          if (parsed.thumb && !thumb) thumb = parsed.thumb;
+          const parsed = parseJsonMedia(json);
+          if (parsed.thumb && !isAvatarOrBadUrl(parsed.thumb) && !thumb) thumb = parsed.thumb;
           if (parsed.caption && !caption) caption = parsed.caption;
           if (thumb && caption) break;
         }
       } catch (_) {}
     }
-  }
-
-  // 5단계: Microlink 백업
-  if (!thumb || !caption) {
-    try {
-      const r = await fetch(`https://api.microlink.io/?url=${encodeURIComponent(`https://www.instagram.com/reel/${code}/`)}`);
-      if (r.ok) {
-        const json = await r.json();
-        const imgUrl = json?.data?.image?.url || "";
-        const desc = json?.data?.description || "";
-        if (imgUrl && !imgUrl.includes("s150x150") && !thumb) thumb = cleanUrl(imgUrl);
-        if (desc && !caption) caption = stripMetaNoise(desc);
-      }
-    } catch (_) {}
   }
 
   return { thumb, caption };
@@ -244,29 +270,24 @@ async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-rapidapi-key");
 
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
+  if (req.method === "OPTIONS") return res.status(200).end();
 
   const code = String(req.query.code || "").trim();
   const mode = String(req.query.mode || "").trim();
   const rapidKey = String(req.query.key || req.headers["x-rapidapi-key"] || "").trim();
 
-  if (!code) {
-    return res.status(400).json({ ok: false, error: "Missing shortcode" });
-  }
+  if (!code) return res.status(400).json({ ok: false, error: "Missing shortcode" });
 
   const data = await resolveIgData(code, rapidKey);
 
-  // mode=image 요청 시: 인스타 CDN 이미지를 서버에서 직접 다운로드해 JPEG 바이너리로 반환 (만료 및 CORS 원천 차단)
   if (mode === "image") {
-    if (!data.thumb) {
+    if (!data.thumb || isAvatarOrBadUrl(data.thumb)) {
       return res.status(404).end();
     }
     try {
       const imgRes = await fetch(data.thumb, {
         headers: {
-          "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
+          "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
           "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
           "Referer": "https://www.instagram.com/"
         }
@@ -274,21 +295,21 @@ async function handler(req, res) {
       if (imgRes.ok) {
         const buf = Buffer.from(await imgRes.arrayBuffer());
         res.setHeader("Content-Type", imgRes.headers.get("content-type") || "image/jpeg");
-        res.setHeader("Cache-Control", "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400");
+        res.setHeader("Cache-Control", "public, max-age=86400, s-maxage=604800");
         return res.status(200).send(buf);
       }
     } catch (_) {}
-    const weserv = `https://images.weserv.nl/?url=${encodeURIComponent(data.thumb)}&w=600&h=600&fit=cover&output=jpg`;
+    const weserv = `https://images.weserv.nl/?url=${encodeURIComponent(data.thumb)}&w=640&h=640&fit=cover&output=jpg`;
     res.writeHead(302, { Location: weserv });
     return res.end();
   }
 
-  const weservUrl = data.thumb
-    ? `https://images.weserv.nl/?url=${encodeURIComponent(data.thumb)}&w=600&h=600&fit=cover&output=jpg`
+  const weservUrl = (data.thumb && !isAvatarOrBadUrl(data.thumb))
+    ? `https://images.weserv.nl/?url=${encodeURIComponent(data.thumb)}&w=640&h=640&fit=cover&output=jpg`
     : "";
 
   return res.status(200).json({
-    ok: Boolean(data.thumb || data.caption),
+    ok: Boolean(weservUrl || data.caption),
     code,
     thumb: data.thumb,
     weservThumb: weservUrl,
