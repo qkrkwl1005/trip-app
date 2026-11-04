@@ -1399,7 +1399,99 @@
         }
       }
     </style>
-  </head>
+  
+    <!-- === JAKUB_SKILLS_UI_UPGRADE_START === -->
+    <style id="jakub-design-system">
+      :root {
+        --ui-primary: #007AFF;
+        --ui-bg: #F2F2F7;
+        --ui-surface: #FFFFFF;
+        --ui-text-main: #1C1C1E;
+        --ui-text-muted: #8E8E93;
+        --ui-border: rgba(0, 0, 0, 0.08);
+        --ui-radius-lg: 16px;
+        --ui-radius-md: 12px;
+        --ui-radius-sm: 8px;
+        --ui-shadow-sm: 0 2px 8px rgba(0,0,0,0.04);
+        --ui-shadow-hover: 0 8px 16px rgba(0,0,0,0.08);
+        --ui-transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+      }
+      
+      /* 1. Typography & Color (글꼴 및 색상 위계) */
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+        background-color: var(--ui-bg) !important;
+        color: var(--ui-text-main) !important;
+        -webkit-font-smoothing: antialiased;
+      }
+      
+      /* 2. Layout & Cards (카드 레이아웃 및 그림자) */
+      .item, .card, li {
+        background: var(--ui-surface) !important;
+        border-radius: var(--ui-radius-lg) !important;
+        box-shadow: var(--ui-shadow-sm) !important;
+        border: 1px solid var(--ui-border) !important;
+        transition: var(--ui-transition) !important;
+        margin-bottom: 16px !important;
+        padding: 16px !important;
+        overflow: hidden;
+      }
+      .item:hover, .card:hover, li:hover {
+        box-shadow: var(--ui-shadow-hover) !important;
+        transform: translateY(-2px);
+      }
+
+      /* 3. Accessibility & Touch Targets (버튼 접근성 및 크기) */
+      button, .btn {
+        border-radius: var(--ui-radius-md) !important;
+        font-weight: 600 !important;
+        letter-spacing: -0.01em;
+        transition: var(--ui-transition) !important;
+        padding: 12px 20px !important;
+        border: none !important;
+        cursor: pointer;
+        min-height: 44px; /* 모바일 터치 영역 최소 규격 */
+      }
+      button:active, .btn:active {
+        transform: scale(0.96);
+      }
+
+      /* 4. Focus States (입력창 포커스 및 시각적 피드백) */
+      input, select, textarea {
+        border-radius: var(--ui-radius-md) !important;
+        border: 1px solid #E5E5EA !important;
+        padding: 12px 16px !important;
+        font-size: 16px !important; /* iOS 자동 확대 방지 */
+        transition: border-color 0.2s, box-shadow 0.2s !important;
+        background: var(--ui-surface) !important;
+      }
+      input:focus, select:focus, textarea:focus {
+        border-color: var(--ui-primary) !important;
+        outline: none !important;
+        box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15) !important;
+      }
+
+      /* 5. Images (이미지 모서리 및 핏) */
+      img {
+        border-radius: var(--ui-radius-sm);
+        object-fit: cover;
+      }
+      
+      /* 6. Text Hierarchy (텍스트 계층) */
+      .title, h1, h2, h3 {
+        font-weight: 700 !important;
+        letter-spacing: -0.02em;
+        margin-bottom: 6px;
+      }
+      .desc, .info, .text-muted, p {
+        color: var(--ui-text-muted) !important;
+        line-height: 1.5;
+        font-size: 0.95em;
+      }
+    </style>
+    <!-- === JAKUB_SKILLS_UI_UPGRADE_END === -->
+
+</head>
   <body>
     <aside id="side">
       <!-- 상단 헤더(여행플래너/일정복사/온라인/테마) 완전 제거됨 -->
