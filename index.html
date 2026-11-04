@@ -9950,171 +9950,7 @@ ${caption || rawText}
         };
 
         // 아이템 변경 및 삭제 자동 감지 (중요, 방문완료, 일차변경, 삭제 모두 타임스탬프 기록)
-        // === IG_INTRO_THUMBNAIL_ENGINE_START ===
-        window.__lastIgThumbUrl = "";
-        window.__lastIgThumbTime = 0;
-        window.__igThumbByCode = JSON.parse(localStorage.getItem("TRIP_IG_THUMBS") || "{}") || {};
-
-        function toWeservProxyUrl(rawUrl) {
-          if (!rawUrl || typeof rawUrl !== "string") return "";
-          const clean = rawUrl
-            .replace(/\\u0026/g, "&")
-            .replace(/\\\//g, "/")
-            .replace(/&amp;/g, "&")
-            .trim();
-          if (!/^https?:\/\//i.test(clean)) return "";
-          if (clean.includes("images.weserv.nl")) return clean;
-          return `https://images.weserv.nl/?url=${encodeURIComponent(clean)}&w=400&h=400&fit=cover&output=jpg&q=82`;
-        }
-
-        function extractIgShortcode(str) {
-          if (!str || typeof str !== "string") return "";
-          const m = str.match(/(?:instagram\.com|instagr\.am)\/(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)/i);
-          return m && m[1] ? m[1] : "";
-        }
-
-        function findIgCoverFromJson(obj, depth = 0) {
-          if (!obj || typeof obj !== "object" || depth > 7) return "";
-          if (obj.cover_media?.cropped_image_version?.url) {
-            return obj.cover_media.cropped_image_version.url;
-          }
-          const priorityKeys = ["thumbnail_src", "thumbnail_url", "display_url", "display_src", "cover_url"];
-          for (const k of priorityKeys) {
-            if (typeof obj[k] === "string" && /^https?:\/\//i.test(obj[k]) && !obj[k].includes(".mp4") && !obj[k].includes("s150x150")) {
-              return obj[k];
-            }
-          }
-          if (Array.isArray(obj.image_versions2?.candidates) && obj.image_versions2.candidates.length > 0) {
-            const cand = obj.image_versions2.candidates[0];
-            if (cand && typeof cand.url === "string") return cand.url;
-          }
-          for (const key of Object.keys(obj)) {
-            if (key === "user" || key === "owner" || key === "profile_pic_url" || key === "hd_profile_pic_url_info") continue;
-            const val = obj[key];
-            if (val && typeof val === "object") {
-              const found = findIgCoverFromJson(val, depth + 1);
-              if (found) return found;
-            }
-          }
-          return "";
-        }
-
-        function findIgCoverFromHtml(html) {
-          if (!html || typeof html !== "string") return "";
-          const patterns = [
-            /class="EmbeddedMediaImage"[^>]+src="([^"]+)"/i,
-            /<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i,
-            /<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i,
-            /"display_url"\s*:\s*"([^"]+)"/i,
-            /"thumbnail_src"\s*:\s*"([^"]+)"/i,
-          ];
-          for (const re of patterns) {
-            const m = html.match(re);
-            if (m && m[1]) {
-              const candidate = m[1].replace(/\\u0026/g, "&").replace(/\\\//g, "/").replace(/&amp;/g, "&");
-              if (/^https?:\/\//i.test(candidate) && !candidate.includes("s150x150")) {
-                return candidate;
-              }
-            }
-          }
-          return "";
-        }
-
-        function registerCapturedIgThumb(rawUrl, shortcode = "") {
-          const proxied = toWeservProxyUrl(rawUrl);
-          if (!proxied) return "";
-          window.__lastIgThumbUrl = proxied;
-          window.__lastIgThumbTime = Date.now();
-          const code = shortcode || window.__activeIgShortcode || "";
-          if (code) {
-            window.__igThumbByCode[code] = proxied;
-            try {
-              localStorage.setItem("TRIP_IG_THUMBS", JSON.stringify(window.__igThumbByCode));
-            } catch (_) {}
-          }
-          return proxied;
-        }
-
-        // 입력창에서 인스타 링크 입력 감지 시 shortcode 기록 및 백업 썸네일 선제 확보
-        document.addEventListener("input", (e) => {
-          const val = e.target?.value || "";
-          const code = extractIgShortcode(val);
-          if (code) {
-            window.__activeIgShortcode = code;
-            if (window.__igThumbByCode[code]) {
-              window.__lastIgThumbUrl = window.__igThumbByCode[code];
-              window.__lastIgThumbTime = Date.now();
-            }
-          }
-        }, true);
-
-        // fetch 후킹: RapidAPI 및 인스타 임베드 응답에서 1초 차 인트로 커버 URL 자동 추출
-        if (!window.__igFetchHooked && typeof window.fetch === "function") {
-          window.__igFetchHooked = true;
-          const _origFetch = window.fetch;
-          window.fetch = async function (...args) {
-            const reqUrl = typeof args[0] === "string" ? args[0] : (args[0]?.url || "");
-            const codeInReq = extractIgShortcode(decodeURIComponent(reqUrl));
-            if (codeInReq) window.__activeIgShortcode = codeInReq;
-
-            const res = await _origFetch.apply(this, args);
-            try {
-              const isIgRelated = /rapidapi|instagram|instagr\.am|allorigins|corsproxy|codetabs/i.test(reqUrl);
-              if (isIgRelated && res && res.clone) {
-                res.clone().text().then((txt) => {
-                  if (!txt) return;
-                  let rawThumb = "";
-                  if (txt.trim().startsWith("{") || txt.trim().startsWith("[")) {
-                    try {
-                      const parsed = JSON.parse(txt);
-                      rawThumb = findIgCoverFromJson(parsed);
-                      if (!rawThumb && typeof parsed.contents === "string") {
-                        rawThumb = findIgCoverFromHtml(parsed.contents) || findIgCoverFromJson(JSON.parse(parsed.contents));
-                      }
-                    } catch (_) {}
-                  }
-                  if (!rawThumb) {
-                    rawThumb = findIgCoverFromHtml(txt);
-                  }
-                  if (rawThumb) {
-                    registerCapturedIgThumb(rawThumb, codeInReq);
-                  }
-                }).catch(() => {});
-              }
-            } catch (_) {}
-            return res;
-          };
-        }
-
-        function applyIgThumbToItems() {
-          if (!Array.isArray(items)) return;
-          const now = Date.now();
-          const hasRecentThumb = window.__lastIgThumbUrl && (now - window.__lastIgThumbTime < 300000);
-
-          for (const it of items) {
-            if (!it || typeof it !== "object") continue;
-            // 1) 아이템 내부 텍스트/링크에 인스타 shortcode가 있으면 매칭된 썸네일 강제 적용
-            const blob = `${it.url || ""} ${it.link || ""} ${it.snsUrl || ""} ${it.info || ""} ${it.note || ""}`;
-            const code = extractIgShortcode(blob);
-            if (code && window.__igThumbByCode[code]) {
-              it.img = window.__igThumbByCode[code];
-              it.useCustomImg = true;
-              continue;
-            }
-            // 2) 방금 인스타 링크 분석 직후 새로 추가된 아이템(60초 이내)에 인트로 사진 강제 지정
-            const itemAge = now - Number(it._localTouch || it.updatedAt || 0);
-            if (hasRecentThumb && (!it.img || !it.img.includes("images.weserv.nl")) && itemAge < 60000) {
-              it.img = window.__lastIgThumbUrl;
-              it.useCustomImg = true;
-            }
-            // 3) 만약 기존 item.img가 만료 위험이 있는 인스타 원본 CDN 주소라면 프록시 주소로 자동 변환
-            if (typeof it.img === "string" && /cdninstagram\.com|fbcdn\.net/i.test(it.img) && !it.img.includes("images.weserv.nl")) {
-              it.img = toWeservProxyUrl(it.img);
-              it.useCustomImg = true;
-            }
-          }
-        }
-        // === IG_INTRO_THUMBNAIL_ENGINE_END ===
+        
 
         let prevSnap = new Map();
         const recordItemDiffs = () => {
@@ -10471,5 +10307,602 @@ ${caption || rawText}
       })();
       // === SMART_CONFLICT_AND_FILTER_ENGINE_END ===
     </script>
-  </body>
+  <!-- === RAPID_AND_IG_MASTER_PATCH_START === -->
+<style>
+  .rapid-api-box {
+    margin: 12px 0;
+    padding: 12px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+  }
+  .rapid-api-box label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: #a5b4fc;
+    margin-bottom: 6px;
+  }
+  .rapid-api-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .rapid-api-row input {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(0, 0, 0, 0.35);
+    color: #fff;
+    font-size: 13px;
+  }
+  .rapid-api-row button {
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: none;
+    background: #6366f1;
+    color: #fff;
+    font-weight: 600;
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .rapid-api-status {
+    margin-top: 5px;
+    font-size: 11px;
+    color: #9ca3af;
+  }
+</style>
+<script>
+(function() {
+  const RAPID_STORAGE_KEYS = [
+    "RAPID_API_KEY", "rapidApiKey", "rapidapi_key", "TRIP_RAPID_API_KEY", "x_rapidapi_key"
+  ];
+
+  function getSavedRapidKey() {
+    for (const k of RAPID_STORAGE_KEYS) {
+      const v = (localStorage.getItem(k) || "").trim();
+      if (v) return v;
+    }
+    if (window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.rapidApiKey) {
+      return String(window.FIREBASE_CONFIG.rapidApiKey).trim();
+    }
+    return "";
+  }
+
+  function saveRapidKeyEverywhere(val) {
+    const clean = (val || "").trim();
+    for (const k of RAPID_STORAGE_KEYS) {
+      if (clean) localStorage.setItem(k, clean);
+      else localStorage.removeItem(k);
+    }
+    window.RAPID_API_KEY = clean;
+    try {
+      if (window.db && typeof window.db.collection === "function") {
+        window.db.collection("appConfig").doc("keys").set({ rapidApiKey: clean, updatedAt: Date.now() }, { merge: true }).catch(() => {});
+      }
+    } catch (_) {}
+  }
+
+  // 시작 시 키 동기화
+  const initKey = getSavedRapidKey();
+  if (initKey) saveRapidKeyEverywhere(initKey);
+
+  // URL에서 인스타 shortcode 추출
+  function getIgShortcode(text) {
+    if (!text || typeof text !== "string") return "";
+    const m = text.match(/(?:instagram\.com|instagr\.am)\/(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)/i);
+    return m && m[1] ? m[1] : "";
+  }
+
+  // weserv 프록시 URL 변환 (&ig_thumb=1 플래그로 진짜 인스타 썸네일임을 표시)
+  function toIgProxyUrl(rawUrl) {
+    if (!rawUrl || typeof rawUrl !== "string") return "";
+    let clean = rawUrl
+      .replace(/\\u0026/g, "&")
+      .replace(/\\\//g, "/")
+      .replace(/&amp;/g, "&")
+      .trim();
+    if (!/^https?:\/\//i.test(clean)) return "";
+    if (clean.includes("images.weserv.nl")) {
+      return clean.includes("ig_thumb=1") ? clean : (clean + "&ig_thumb=1");
+    }
+    return "https://images.weserv.nl/?url=" + encodeURIComponent(clean) + "&w=480&h=480&fit=cover&output=jpg&q=85&ig_thumb=1";
+  }
+
+  function isGenuineIgThumb(imgUrl) {
+    if (!imgUrl || typeof imgUrl !== "string") return false;
+    if (imgUrl.includes("ig_thumb=1")) return true;
+    if (imgUrl.includes("cdninstagram.com") || imgUrl.includes("fbcdn.net")) return true;
+    return false;
+  }
+
+  // JSON 객체에서 릴스 1초 차 커버 이미지와 캡션 동시 탐색 (프로필 사진 제외)
+  function parseIgJsonPayload(obj) {
+    let thumb = "";
+    let caption = "";
+
+    function walk(node, depth) {
+      if (!node || typeof node !== "object" || depth > 8) return;
+
+      if (!thumb) {
+        if (node.cover_media?.cropped_image_version?.url) {
+          thumb = node.cover_media.cropped_image_version.url;
+        } else if (node.clips_metadata?.original_sound_info && node.image_versions2?.candidates?.[0]?.url) {
+          thumb = node.image_versions2.candidates[0].url;
+        } else {
+          for (const k of ["thumbnail_src", "display_url", "thumbnail_url", "cover_url"]) {
+            if (typeof node[k] === "string" && /^https?:\/\//i.test(node[k]) && !node[k].includes(".mp4") && !node[k].includes("s150x150")) {
+              thumb = node[k];
+              break;
+            }
+          }
+          if (!thumb && Array.isArray(node.image_versions2?.candidates) && node.image_versions2.candidates.length > 0) {
+            const u = node.image_versions2.candidates[0]?.url;
+            if (u && !u.includes("s150x150")) thumb = u;
+          }
+        }
+      }
+
+      if (!caption) {
+        if (typeof node.caption === "string" && node.caption.trim().length > 2) {
+          caption = node.caption.trim();
+        } else if (typeof node.caption?.text === "string" && node.caption.text.trim().length > 2) {
+          caption = node.caption.text.trim();
+        } else if (node.edge_media_to_caption?.edges?.[0]?.node?.text) {
+          caption = node.edge_media_to_caption.edges[0].node.text.trim();
+        }
+      }
+
+      for (const k of Object.keys(node)) {
+        if (k === "owner" || k === "user" || k === "profile_pic_url" || k === "coauthor_producers") continue;
+        if (node[k] && typeof node[k] === "object") walk(node[k], depth + 1);
+      }
+    }
+
+    walk(obj, 0);
+    return { thumb, caption };
+  }
+
+  // Embed HTML에서 커버 이미지와 캡션 추출
+  function parseIgEmbedHtml(html) {
+    let thumb = "";
+    let caption = "";
+    if (!html || typeof html !== "string") return { thumb, caption };
+
+    // 1) contextJSON 내부 파싱
+    const ctxMatch = html.match(/contextJSON"\s*:\s*"(\{.*?\})"/);
+    if (ctxMatch && ctxMatch[1]) {
+      try {
+        const unescaped = JSON.parse('"' + ctxMatch[1] + '"');
+        const ctxObj = JSON.parse(unescaped);
+        const res = parseIgJsonPayload(ctxObj);
+        if (res.thumb) thumb = res.thumb;
+        if (res.caption) caption = res.caption;
+      } catch (_) {}
+    }
+
+    // 2) EmbeddedMediaImage 이미지 태그 추출
+    if (!thumb) {
+      const imgPatterns = [
+        /class="EmbeddedMediaImage"[^>]+src="([^"]+)"/i,
+        /src="([^"]+)"[^>]+class="EmbeddedMediaImage"/i,
+        /<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i,
+        /"display_url"\s*:\s*"([^"]+)"/i,
+        /"thumbnail_src"\s*:\s*"([^"]+)"/i
+      ];
+      for (const re of imgPatterns) {
+        const m = html.match(re);
+        if (m && m[1]) {
+          const cand = m[1].replace(/\\u0026/g, "&").replace(/\\\//g, "/").replace(/&amp;/g, "&");
+          if (/^https?:\/\//i.test(cand) && !cand.includes("s150x150")) {
+            thumb = cand;
+            break;
+          }
+        }
+      }
+    }
+
+    // 3) Caption 영역 텍스트 추출
+    if (!caption) {
+      const capMatch = html.match(/class="Caption"[^>]*>([\s\S]*?)<div class="CaptionComments"/i)
+                    || html.match(/class="Caption"[^>]*>([\s\S]*?)<\/div>/i);
+      if (capMatch && capMatch[1]) {
+        let rawText = capMatch[1]
+          .replace(/<a class="CaptionUsername"[^>]*>[\s\S]*?<\/a>/i, "")
+          .replace(/<br\s*\/?>/gi, "\n")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/&nbsp;/g, " ")
+          .replace(/&amp;/g, "&")
+          .replace(/&lt;/g, "<")
+          .replace(/&gt;/g, ">")
+          .replace(/&#39;/g, "'")
+          .replace(/&quot;/g, '"')
+          .trim();
+        if (rawText.length > 2) caption = rawText;
+      }
+    }
+
+    return { thumb, caption };
+  }
+
+  const igCache = JSON.parse(localStorage.getItem("TRIP_IG_FULL_CACHE") || "{}");
+  function saveIgCache(code, data) {
+    if (!code) return;
+    igCache[code] = {
+      thumb: data.thumb || igCache[code]?.thumb || "",
+      caption: data.caption || igCache[code]?.caption || "",
+      ts: Date.now()
+    };
+    try {
+      localStorage.setItem("TRIP_IG_FULL_CACHE", JSON.stringify(igCache));
+    } catch (_) {}
+  }
+
+  // 5중 우회 인스타그램 데이터(썸네일 + 캡션) 추출 함수
+  async function fetchIgDataMultiLayer(shortcodeOrUrl) {
+    const code = getIgShortcode(shortcodeOrUrl) || shortcodeOrUrl;
+    if (!code) return { thumb: "", caption: "" };
+
+    let finalThumb = igCache[code]?.thumb || "";
+    let finalCaption = igCache[code]?.caption || "";
+
+    const rapidKey = getSavedRapidKey();
+    const reelUrl = "https://www.instagram.com/reel/" + code + "/";
+    const embedUrl = "https://www.instagram.com/p/" + code + "/embed/captioned/";
+
+    // [Layer 1] RapidAPI 다중 엔드포인트 호출
+    if (rapidKey && (!finalThumb || !finalCaption)) {
+      const rapidEndpoints = [
+        {
+          host: "instagram-scraper-api2.p.rapidapi.com",
+          url: "https://instagram-scraper-api2.p.rapidapi.com/v1/post_info?code_or_id_or_url=" + encodeURIComponent(code)
+        },
+        {
+          host: "instagram-looter2.p.rapidapi.com",
+          url: "https://instagram-looter2.p.rapidapi.com/post?url=" + encodeURIComponent(reelUrl)
+        },
+        {
+          host: "instagram-scraper-stable-api.p.rapidapi.com",
+          url: "https://instagram-scraper-stable-api.p.rapidapi.com/get_media_data.php?reel_post_code_or_url=" + encodeURIComponent(reelUrl) + "&type=reel"
+        }
+      ];
+
+      for (const ep of rapidEndpoints) {
+        try {
+          const r = await fetch(ep.url, {
+            method: "GET",
+            headers: {
+              "x-rapidapi-key": rapidKey,
+              "x-rapidapi-host": ep.host
+            }
+          });
+          if (r.ok) {
+            const json = await r.json();
+            const parsed = parseIgJsonPayload(json);
+            if (parsed.thumb && !finalThumb) finalThumb = toIgProxyUrl(parsed.thumb);
+            if (parsed.caption && !finalCaption) finalCaption = parsed.caption;
+            if (finalThumb && finalCaption) break;
+          }
+        } catch (_) {}
+      }
+    }
+
+    // [Layer 2] CodeTabs / AllOrigins / CorsProxy로 /embed/captioned/ HTML 직접 파싱
+    if (!finalThumb || !finalCaption) {
+      const proxyUrls = [
+        "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(embedUrl),
+        "https://api.allorigins.win/raw?url=" + encodeURIComponent(embedUrl),
+        "https://corsproxy.io/?" + encodeURIComponent(embedUrl)
+      ];
+      for (const pUrl of proxyUrls) {
+        try {
+          const r = await fetch(pUrl);
+          if (r.ok) {
+            const html = await r.text();
+            const parsed = parseIgEmbedHtml(html);
+            if (parsed.thumb && !finalThumb) finalThumb = toIgProxyUrl(parsed.thumb);
+            if (parsed.caption && !finalCaption) finalCaption = parsed.caption;
+            if (finalThumb && finalCaption) break;
+          }
+        } catch (_) {}
+      }
+    }
+
+    // [Layer 3] Microlink 무료 오픈 API (릴스 썸네일 & 메타 설명 추출에 매우 강력)
+    if (!finalThumb || !finalCaption) {
+      try {
+        const mlRes = await fetch("https://api.microlink.io/?url=" + encodeURIComponent(reelUrl));
+        if (mlRes.ok) {
+          const mlJson = await mlRes.json();
+          const imgUrl = mlJson?.data?.image?.url || mlJson?.data?.logo?.url || "";
+          const desc = mlJson?.data?.description || "";
+          if (imgUrl && !imgUrl.includes("s150x150") && !finalThumb) {
+            finalThumb = toIgProxyUrl(imgUrl);
+          }
+          if (desc && !finalCaption) {
+            // "123 likes, 4 comments - username on Date: \"캡션내용\"" 형태에서 본문만 정리
+            const quoteMatch = desc.match(/:\s*["“]([\s\S]+)["”]\.?$/);
+            finalCaption = quoteMatch ? quoteMatch[1].trim() : desc.trim();
+          }
+        }
+      } catch (_) {}
+    }
+
+    // [Layer 4] Jina Reader API 우회 추출
+    if (!finalThumb || !finalCaption) {
+      try {
+        const jinaRes = await fetch("https://r.jina.ai/" + embedUrl, {
+          headers: { "Accept": "text/plain" }
+        });
+        if (jinaRes.ok) {
+          const jinaTxt = await jinaRes.text();
+          const imgMatch = jinaTxt.match(/!\[[^\]]*\]\((https:\/\/[^\s)]+(?:cdninstagram|fbcdn)[^\s)]+)\)/i);
+          if (imgMatch && imgMatch[1] && !finalThumb) {
+            finalThumb = toIgProxyUrl(imgMatch[1]);
+          }
+          if (!finalCaption && jinaTxt.length > 80) {
+            const cleaned = jinaTxt
+              .replace(/Title:[\s\S]*?Markdown Content:/i, "")
+              .replace(/!\[[^\]]*\]\([^)]+\)/g, "")
+              .replace(/\[[^\]]*\]\([^)]+\)/g, "")
+              .trim();
+            if (cleaned.length > 10) finalCaption = cleaned.slice(0, 1500);
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (finalThumb || finalCaption) {
+      saveIgCache(code, { thumb: finalThumb, caption: finalCaption });
+    }
+    return { thumb: finalThumb, caption: finalCaption };
+  }
+
+  window.fetchIgDataMultiLayer = fetchIgDataMultiLayer;
+
+  // 항목(items) 스캔 후 외부 건물 사진이거나 사진이 없는 인스타 항목을 인스타 인트로 썸네일로 자동 교체
+  const pendingCodes = new Set();
+  async function syncAllIgItemThumbnails(forceItem = null) {
+    if (typeof items === "undefined" || !Array.isArray(items)) return;
+
+    const targetList = forceItem ? [forceItem] : items;
+    let changed = false;
+
+    for (const it of targetList) {
+      if (!it || typeof it !== "object") continue;
+      const linkBlob = [it.url, it.snsUrl, it.link, it.reelUrl, it.sourceUrl, it.info].filter(Boolean).join(" ");
+      const code = getIgShortcode(linkBlob);
+      if (!code) continue;
+
+      // 캐시에 이미 진짜 인스타 썸네일이 있으면 즉시 교체
+      if (igCache[code]?.thumb && it.img !== igCache[code].thumb) {
+        it.img = igCache[code].thumb;
+        it.useCustomImg = true;
+        changed = true;
+        continue;
+      }
+
+      // 강제 복구 요청이거나, 현재 이미지가 인스타 진짜 썸네일이 아닌 경우(예: 컵누들 박물관 위키 사진 등) 백그라운드 추출
+      if (forceItem || !isGenuineIgThumb(it.img)) {
+        if (pendingCodes.has(code)) continue;
+        pendingCodes.add(code);
+        fetchIgDataMultiLayer(code).then((res) => {
+          pendingCodes.delete(code);
+          if (res.thumb) {
+            let updatedAny = false;
+            for (const itemObj of items) {
+              const b = [itemObj.url, itemObj.snsUrl, itemObj.link, itemObj.reelUrl, itemObj.sourceUrl, itemObj.info].filter(Boolean).join(" ");
+              if (getIgShortcode(b) === code) {
+                itemObj.img = res.thumb;
+                itemObj.useCustomImg = true;
+                updatedAny = true;
+              }
+            }
+            if (updatedAny) {
+              try { if (typeof save === "function") save(); } catch (_) {}
+              try { if (typeof render === "function") render(); } catch (_) {}
+            }
+          }
+        }).catch(() => pendingCodes.delete(code));
+      }
+    }
+
+    if (changed) {
+      try { if (typeof save === "function") save(); } catch (_) {}
+      try { if (typeof render === "function") render(); } catch (_) {}
+    }
+  }
+
+  // 주기적으로 친구가 등록한 항목 포함 전체 인스타 썸네일 자동 점검 (4초 간격)
+  setInterval(() => {
+    try { syncAllIgItemThumbnails(); } catch (_) {}
+  }, 4000);
+
+  // 현재 열려있는 모달의 인스타 링크 찾기
+  function findActiveModalIgUrl() {
+    const inputs = Array.from(document.querySelectorAll("input, textarea"));
+    for (const el of inputs) {
+      if (el.offsetParent !== null && getIgShortcode(el.value)) {
+        return el.value.trim();
+      }
+    }
+    if (typeof curItem !== "undefined" && curItem) {
+      const blob = [curItem.url, curItem.snsUrl, curItem.link, curItem.info].filter(Boolean).join(" ");
+      if (getIgShortcode(blob)) return blob;
+    }
+    return "";
+  }
+
+  // [캡션 재분석] 클릭 및 차단 토스트 가로채기: 차단 시 5중 엔진으로 캡션+썸네일 자동 해결
+  document.addEventListener("click", async (e) => {
+    const btn = e.target?.closest("button, .btn, [role='button']");
+    if (!btn) return;
+    const txt = (btn.innerText || btn.textContent || "").trim();
+
+    if (txt.includes("캡션 재분석") || txt.includes("썸네일 복구")) {
+      const igUrl = findActiveModalIgUrl();
+      const code = getIgShortcode(igUrl);
+      if (!code) return;
+
+      btn.dataset.origText = btn.dataset.origText || txt;
+      btn.innerText = "⏳ 인스타 추출 중...";
+
+      const res = await fetchIgDataMultiLayer(code);
+      btn.innerText = btn.dataset.origText;
+
+      if (res.thumb && typeof items !== "undefined" && Array.isArray(items)) {
+        for (const it of items) {
+          const b = [it.url, it.snsUrl, it.link, it.info].filter(Boolean).join(" ");
+          if (getIgShortcode(b) === code) {
+            it.img = res.thumb;
+            it.useCustomImg = true;
+          }
+        }
+        // 모달 상단 미리보기 이미지도 즉시 변경
+        const modalImgs = document.querySelectorAll("img");
+        modalImgs.forEach((im) => {
+          if (im.clientWidth > 120 && im.clientHeight > 100) {
+            im.src = res.thumb;
+          }
+        });
+        try { if (typeof save === "function") save(); } catch (_) {}
+        try { if (typeof render === "function") render(); } catch (_) {}
+      }
+
+      if (res.caption) {
+        // 2번 캡션 입력칸 또는 메모 입력칸에 자동 주입
+        const textareas = Array.from(document.querySelectorAll("textarea, input[type='text']"));
+        for (const ta of textareas) {
+          const ph = (ta.placeholder || "") + " " + (ta.id || "");
+          if (ph.includes("캡션") || ph.includes("붙여넣") || ph.includes("caption")) {
+            ta.value = res.caption;
+            ta.dispatchEvent(new Event("input", { bubbles: true }));
+          }
+        }
+      }
+    }
+  }, true);
+
+  // 설정 화면 및 상세 도구에 RapidAPI Key 입력 UI + [인스타 썸네일 강제 복구] 버튼 자동 주입
+  function injectRapidApiUi() {
+    // 1) 상세 도구 영역 내부에 주입
+    const allEls = Array.from(document.querySelectorAll("button, div, summary, span"));
+    const reanalyzeBtn = allEls.find(el => el.tagName === "BUTTON" && (el.innerText || "").includes("캡션 재분석"));
+
+    if (reanalyzeBtn && reanalyzeBtn.parentElement && !document.getElementById("ig-force-thumb-btn")) {
+      const fixBtn = document.createElement("button");
+      fixBtn.id = "ig-force-thumb-btn";
+      fixBtn.type = "button";
+      fixBtn.className = reanalyzeBtn.className;
+      fixBtn.style.cssText = reanalyzeBtn.style.cssText;
+      fixBtn.innerHTML = "🎬 인스타 썸네일 복구";
+      fixBtn.onclick = async (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const igUrl = findActiveModalIgUrl();
+        const code = getIgShortcode(igUrl);
+        if (!code) {
+          alert("연결된 인스타그램 릴스/게시물 링크를 찾을 수 없습니다.");
+          return;
+        }
+        fixBtn.innerText = "⏳ 썸네일 추출 중...";
+        const res = await fetchIgDataMultiLayer(code);
+        fixBtn.innerHTML = "🎬 인스타 썸네일 복구";
+        if (res.thumb) {
+          if (typeof items !== "undefined" && Array.isArray(items)) {
+            for (const it of items) {
+              const b = [it.url, it.snsUrl, it.link, it.info].filter(Boolean).join(" ");
+              if (getIgShortcode(b) === code) {
+                it.img = res.thumb;
+                it.useCustomImg = true;
+              }
+            }
+          }
+          document.querySelectorAll("img").forEach((im) => {
+            if (im.clientWidth > 120 && im.clientHeight > 100) im.src = res.thumb;
+          });
+          try { if (typeof save === "function") save(); } catch (_) {}
+          try { if (typeof render === "function") render(); } catch (_) {}
+          alert("인스타그램 인트로 썸네일로 대표 사진이 복구되었습니다!");
+        } else {
+          alert("썸네일을 가져오지 못했습니다. 아래 RapidAPI 키를 입력하면 100% 추출됩니다.");
+        }
+      };
+      reanalyzeBtn.parentElement.appendChild(fixBtn);
+
+      // 상세 도구 하단에 RapidAPI 키 입력 박스 추가
+      const container = reanalyzeBtn.closest("div")?.parentElement;
+      if (container && !document.getElementById("rapid-key-inline-box")) {
+        const box = document.createElement("div");
+        box.id = "rapid-key-inline-box";
+        box.className = "rapid-api-box";
+        const currentKey = getSavedRapidKey();
+        box.innerHTML = `
+          <label>🔑 RapidAPI Key 설정 (인스타 캡션·썸네일 차단 우회용)</label>
+          <div class="rapid-api-row">
+            <input type="password" id="rapid-key-inline-input" placeholder="X-RapidAPI-Key 입력" value="${currentKey}">
+            <button type="button" id="rapid-key-inline-save">저장</button>
+          </div>
+          <div class="rapid-api-status" id="rapid-key-inline-status">
+            ${currentKey ? "✅ RapidAPI 키가 적용되어 있습니다." : "ℹ️ 키가 없어도 기본 우회 엔진이 작동하며, 키 입력 시 100% 추출됩니다."}
+          </div>
+        `;
+        container.appendChild(box);
+        box.querySelector("#rapid-key-inline-save").onclick = () => {
+          const val = box.querySelector("#rapid-key-inline-input").value;
+          saveRapidKeyEverywhere(val);
+          box.querySelector("#rapid-key-inline-status").innerText = val.trim()
+            ? "✅ 저장 완료! 이제 캡션 재분석 및 썸네일 추출에 즉시 적용됩니다."
+            : "ℹ️ RapidAPI 키가 삭제되었습니다.";
+          syncAllIgItemThumbnails();
+        };
+      }
+    }
+
+    // 2) 설정(Settings) 모달/탭의 Google Maps API 키 입력칸 근처에도 RapidAPI 입력칸 추가
+    const apiInputs = Array.from(document.querySelectorAll("input")).filter(el => {
+      const ph = ((el.placeholder || "") + " " + (el.id || "") + " " + (el.name || "")).toLowerCase();
+      return ph.includes("api") || ph.includes("key") || ph.includes("키");
+    });
+    for (const inp of apiInputs) {
+      if (inp.id === "rapid-key-inline-input" || inp.id === "rapid-key-settings-input") continue;
+      const parentBlock = inp.closest("div")?.parentElement;
+      if (parentBlock && !parentBlock.querySelector("#rapid-key-settings-box")) {
+        const sBox = document.createElement("div");
+        sBox.id = "rapid-key-settings-box";
+        sBox.className = "rapid-api-box";
+        const currentKey = getSavedRapidKey();
+        sBox.innerHTML = `
+          <label>🔑 Instagram RapidAPI Key</label>
+          <div class="rapid-api-row">
+            <input type="password" id="rapid-key-settings-input" placeholder="RapidAPI Key 붙여넣기" value="${currentKey}">
+            <button type="button" id="rapid-key-settings-save">적용</button>
+          </div>
+          <div class="rapid-api-status" id="rapid-key-settings-status">
+            ${currentKey ? "✅ 저장됨 (모든 기기 자동 동기화)" : "인스타 차단 시 캡션/인트로 사진 추출에 사용됩니다."}
+          </div>
+        `;
+        parentBlock.appendChild(sBox);
+        sBox.querySelector("#rapid-key-settings-save").onclick = () => {
+          const val = sBox.querySelector("#rapid-key-settings-input").value;
+          saveRapidKeyEverywhere(val);
+          sBox.querySelector("#rapid-key-settings-status").innerText = val.trim()
+            ? "✅ RapidAPI 키가 저장 및 적용되었습니다!"
+            : "ℹ️ 키가 초기화되었습니다.";
+          syncAllIgItemThumbnails();
+        };
+        break;
+      }
+    }
+  }
+
+  setInterval(injectRapidApiUi, 1200);
+  setTimeout(() => { syncAllIgItemThumbnails(); }, 1800);
+})();
+</script>
+<!-- === RAPID_AND_IG_MASTER_PATCH_END === -->
+</body>
 </html>
