@@ -10320,9 +10320,21 @@ ${caption || rawText}
 
 
 
-<!-- === V5_STRICT_TARGET_PATCH_START === -->
+
+<!-- === V6_ULTIMATE_SHIELD_START === -->
 <script>
 (function() {
+  const IG_THUMB_MARKER = "ig_cover=2"; // 이전 꼬리표(ig_thumb=1)를 가진 오염 사진을 모두 박멸하기 위한 새 규격
+
+  function getRapidKey() {
+    const keys = ["RAPID_API_KEY", "rapidApiKey", "rapidapi_key", "TRIP_RAPID_API_KEY"];
+    for (const k of keys) {
+      const v = (localStorage.getItem(k) || "").trim();
+      if (v) return v;
+    }
+    return window.RAPID_API_KEY || "";
+  }
+
   function extractShortcode(input) {
     if (!input) return "";
     let s = typeof input === "string" ? input : JSON.stringify(input);
@@ -10335,10 +10347,10 @@ ${caption || rawText}
       if (typeof showToast === "function") { showToast(msg); return; }
       if (typeof toast === "function") { toast(msg); return; }
     } catch (_) {}
-    let el = document.getElementById("strict-ig-toast");
+    let el = document.getElementById("v6-ig-toast");
     if (!el) {
       el = document.createElement("div");
-      el.id = "strict-ig-toast";
+      el.id = "v6-ig-toast";
       el.style.cssText = "position:fixed;bottom:85px;left:50%;transform:translateX(-50%);background:rgba(18,18,26,0.96);color:#fff;padding:10px 18px;border-radius:999px;font-size:13px;font-weight:600;z-index:999999;border:1px solid rgba(255,255,255,0.2);box-shadow:0 8px 24px rgba(0,0,0,0.5);pointer-events:none;transition:opacity 0.2s;";
       document.body.appendChild(el);
     }
@@ -10351,35 +10363,38 @@ ${caption || rawText}
   function refreshMapAndDom() {
     try { if (typeof save === "function") save(); } catch (_) {}
     try { if (typeof render === "function") render(); } catch (_) {}
+    
+    // 지도의 마커를 강제로 다시 그리기 (지도 동시 반영의 핵심)
     try {
       if (typeof renderMap === "function") renderMap();
       else if (typeof updateMarkers === "function") updateMarkers();
     } catch (_) {}
     
-    // 강제 이미지 교체
+    // DOM 내 렌더링된 사진 강제 교체 (이전 ig_thumb=1 꼬리표 사진은 전부 화면에서 삭제)
     document.querySelectorAll("img").forEach(img => {
       const src = img.getAttribute("src") || "";
-      // 프로필 아바타나 맨홀 등 외부 사진이 남아있으면 삭제
-      if (src.includes("t51.2885-19") || src.includes("profile_pic") || (!src.includes("ig_thumb=1") && !src.includes("maps.googleapis"))) {
+      if (src && !src.includes("maps.google") && !src.includes("openstreetmap") && !src.includes("cartocdn")) {
          const card = img.closest("[data-id], .item, .card, li, div");
          if (card && extractShortcode(card.innerText)) {
-             img.src = "";
-             img.style.display = "none";
+             // ig_cover=2 꼬리표가 없으면 화면에서 강제 숨김 처리 (프로필 사진, 외부 맨홀 사진 등)
+             if (!src.includes(IG_THUMB_MARKER)) {
+                 img.src = "";
+                 img.style.display = "none";
+             } else {
+                 img.style.display = "block";
+             }
          }
       }
     });
   }
 
   // =========================================================================
-  // 완벽 방어막 (Strict Shield)
-  // - 인스타 링크가 있는 장소는 오직 'ig_thumb=1' 꼬리표가 붙은 썸네일만 허락합니다.
-  // - 위키피디아, 구글 장소 사진 등 외부 사진은 100% 튕겨냅니다. (사진 없음 유지)
+  // 완벽 방어막 (V6 Shield) - ig_cover=2 꼬리표가 없으면 절대 저장 불가
   // =========================================================================
-  function applyStrictShield(it) {
-    if (!it || typeof it !== "object" || it._strictShield) return;
-    it._strictShield = true;
+  function applyUltimateShield(it) {
+    if (!it || typeof it !== "object" || it._v6Shield) return;
+    it._v6Shield = true;
 
-    // 기존 getter/setter 삭제 및 초기화
     let current = it.img || "";
     delete it.img; 
 
@@ -10388,29 +10403,29 @@ ${caption || rawText}
       configurable: true,
       get() { return this._lockedImg || ""; },
       set(v) {
-        if (!v) { this._lockedImg = ""; return; }
-        // 인스타 전용 인증 꼬리표가 없으면 절대로 사진을 저장하지 않음 (빈칸 유지)
-        if (v.includes("ig_thumb=1")) {
-          this._lockedImg = v;
-        } else {
+        if (!v || !v.includes(IG_THUMB_MARKER)) {
           this._lockedImg = ""; 
+          return;
         }
+        this._lockedImg = v;
       }
     });
 
-    // 기존 사진이 인증 꼬리표가 없으면 날려버림
+    // 꼬리표가 없는 기존 사진(프로필, 맨홀 등)은 방어막을 거치면서 ""(빈칸)으로 폭파됨
     it.img = current;
     it.useCustomImg = true;
   }
 
   // =========================================================================
-  // 서버리스 핀포인트 추출 API 호출
+  // Vercel 서버 API 호출 (RapidAPI 키 전달)
   // =========================================================================
-  async function fetchStrictIntroCover(code) {
+  async function fetchTrueCoverV6(code) {
     if (!code) return "";
     const apiBase = location.hostname.includes("vercel.app") ? "" : "https://trip-app-psi-two.vercel.app";
+    const key = getRapidKey();
     try {
-      const res = await fetch(`${apiBase}/api/ig?code=${encodeURIComponent(code)}`);
+      // V6 핵심: 드디어 서버로 key가 전달됨!
+      const res = await fetch(`${apiBase}/api/ig?code=${encodeURIComponent(code)}&key=${encodeURIComponent(key)}`);
       if (res.ok) {
         const data = await res.json();
         if (data.weservThumb) return data.weservThumb;
@@ -10420,30 +10435,24 @@ ${caption || rawText}
   }
 
   // =========================================================================
-  // 시작 즉시 모든 오염된 사진(돌곰, 맨홀 등) 폭파 및 인트로 재추출
+  // 초기화: 앱 시작 시 오염된 사진 즉시 파괴 및 재추출
   // =========================================================================
   let isPurged = false;
   function purgeAndRebuildIgImages() {
     if (isPurged || typeof items === "undefined" || !Array.isArray(items)) return;
     isPurged = true;
 
-    // 이전 캐시 쓰레기 완전 삭제
-    localStorage.removeItem("TRIP_IG_THUMBS");
-    localStorage.removeItem("TRIP_IG_FULL_CACHE");
-    localStorage.removeItem("TRIP_IG_FULL_CACHE_V2");
-    localStorage.removeItem("TRIP_IG_VERIFIED_COVER_V3");
-
     for (const it of items) {
       const code = extractShortcode(it);
       if (!code) continue;
 
-      applyStrictShield(it);
+      applyUltimateShield(it);
       
-      // 현재 사진이 방어막에 의해 날아갔다면(빈칸) 새로 핀포인트 추출 실행
+      // 방어막에 의해 사진이 빈칸이 된 릴스(오염되었던 항목)만 서버에 재요청
       if (!it.img) {
-        fetchStrictIntroCover(code).then(url => {
+        fetchTrueCoverV6(code).then(url => {
           if (url) {
-            it.img = url; 
+            it.img = url; // 방어막 통과!
             refreshMapAndDom();
           }
         });
@@ -10452,10 +10461,10 @@ ${caption || rawText}
     refreshMapAndDom();
   }
 
-  setTimeout(purgeAndRebuildIgImages, 300);
+  setTimeout(purgeAndRebuildIgImages, 200);
 
   // =========================================================================
-  // [다른사진] 클릭 이벤트: 방어막 우회 금지
+  // [다른사진] 버튼 제어
   // =========================================================================
   document.addEventListener("click", async (e) => {
     const btn = e.target?.closest("button, .btn, [role='button'], a");
@@ -10484,7 +10493,7 @@ ${caption || rawText}
       btn.innerText = "⏳ 릴스 인트로 추출 중...";
       showNotice("⏳ 인스타그램 릴스 인트로 사진을 불러오는 중...");
 
-      const url = await fetchStrictIntroCover(code);
+      const url = await fetchTrueCoverV6(code);
       btn.innerHTML = origHtml;
       btn.dataset.igBusy = "0";
 
@@ -10492,19 +10501,18 @@ ${caption || rawText}
         if (targetItem) targetItem.img = url;
         items.filter(x => extractShortcode(x) === code).forEach(x => { x.img = url; });
         
-        // 사진보기 탭으로 자동 이동
         const photoBtn = Array.from(document.querySelectorAll("button")).find(b => (b.innerText || "").replace(/\s+/g, "") === "사진보기");
         if (photoBtn) { try { photoBtn.click(); } catch (_) {} }
 
         refreshMapAndDom();
-        showNotice("✅ 릴스 인트로 사진 적용 완료! (지도 마커 갱신)");
+        showNotice("✅ 릴스 인트로 사진 적용 완료! (지도 마커도 갱신됨)");
       } else {
-        showNotice("⚠️ 인트로 추출 실패. 외부 사진 유입을 막기 위해 사진 없음을 유지합니다.");
+        showNotice("⚠️ 인트로 추출 실패. 이상한 사진이 유입되는 것을 막기 위해 '사진 없음'을 유지합니다.");
       }
     }
   }, true);
 })();
 </script>
-<!-- === V5_STRICT_TARGET_PATCH_END === -->
+<!-- === V6_ULTIMATE_SHIELD_END === -->
 </body>
 </html>
