@@ -10308,7 +10308,8 @@ ${caption || rawText}
       // === SMART_CONFLICT_AND_FILTER_ENGINE_END ===
     </script>
   
-<!-- === RAPID_AND_IG_MASTER_PATCH_START === -->
+
+<!-- === CLEAN_IG_AND_MAPS_PATCH_START === -->
 <style>
   .rapid-api-box {
     margin: 12px 0;
@@ -10358,819 +10359,426 @@ ${caption || rawText}
 </style>
 <script>
 (function() {
-  const RAPID_STORAGE_KEYS = [
-    "RAPID_API_KEY", "rapidApiKey", "rapidapi_key", "TRIP_RAPID_API_KEY", "x_rapidapi_key"
-  ];
+  const RAPID_KEYS = ["RAPID_API_KEY", "rapidApiKey", "rapidapi_key", "TRIP_RAPID_API_KEY"];
 
-  function getSavedRapidKey() {
-    for (const k of RAPID_STORAGE_KEYS) {
+  function getRapidKey() {
+    for (const k of RAPID_KEYS) {
       const v = (localStorage.getItem(k) || "").trim();
       if (v) return v;
-    }
-    if (window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.rapidApiKey) {
-      return String(window.FIREBASE_CONFIG.rapidApiKey).trim();
     }
     return "";
   }
 
-  function saveRapidKeyEverywhere(val) {
+  function setRapidKey(val) {
     const clean = (val || "").trim();
-    for (const k of RAPID_STORAGE_KEYS) {
+    for (const k of RAPID_KEYS) {
       if (clean) localStorage.setItem(k, clean);
       else localStorage.removeItem(k);
     }
-    window.RAPID_API_KEY = clean;
-    try {
-      if (window.db && typeof window.db.collection === "function") {
-        window.db.collection("appConfig").doc("keys").set({ rapidApiKey: clean, updatedAt: Date.now() }, { merge: true }).catch(() => {});
-      }
-    } catch (_) {}
   }
 
-  const initKey = getSavedRapidKey();
-  if (initKey) saveRapidKeyEverywhere(initKey);
-
-  function showCustomToast(msg) {
+  function showNotice(msg) {
     try {
       if (typeof showToast === "function") { showToast(msg); return; }
       if (typeof toast === "function") { toast(msg); return; }
     } catch (_) {}
-    let el = document.getElementById("ig-patch-toast");
+    let el = document.getElementById("clean-ig-toast");
     if (!el) {
       el = document.createElement("div");
-      el.id = "ig-patch-toast";
-      el.style.cssText = "position:fixed;bottom:85px;left:50%;transform:translateX(-50%);background:rgba(20,20,28,0.95);color:#fff;padding:10px 18px;border-radius:999px;font-size:13px;font-weight:600;z-index:999999;border:1px solid rgba(255,255,255,0.18);box-shadow:0 8px 24px rgba(0,0,0,0.45);transition:opacity 0.25s;pointer-events:none;";
+      el.id = "clean-ig-toast";
+      el.style.cssText = "position:fixed;bottom:85px;left:50%;transform:translateX(-50%);background:rgba(18,18,26,0.96);color:#fff;padding:10px 18px;border-radius:999px;font-size:13px;font-weight:600;z-index:999999;border:1px solid rgba(255,255,255,0.2);box-shadow:0 8px 24px rgba(0,0,0,0.5);pointer-events:none;transition:opacity 0.2s;";
       document.body.appendChild(el);
     }
     el.innerText = msg;
     el.style.opacity = "1";
-    clearTimeout(el._timer);
-    el._timer = setTimeout(() => { el.style.opacity = "0"; }, 2800);
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { el.style.opacity = "0"; }, 2600);
   }
 
-  // 어떤 객체나 문자열에서도 인스타 shortcode 추출
-  function getIgShortcode(input) {
+  function extractShortcode(input) {
     if (!input) return "";
-    let str = "";
-    if (typeof input === "string") {
-      str = input;
-    } else if (typeof input === "object") {
-      try { str = JSON.stringify(input); } catch (_) {}
+    let s = "";
+    if (typeof input === "string") s = input;
+    else if (typeof input === "object") {
+      s = [input.url, input.snsUrl, input.link, input.reelUrl, input.sourceUrl, input.originUrl, input.info, input.memo]
+        .filter(v => typeof v === "string")
+        .join(" ");
     }
-    const m = str.match(/(?:instagram\.com|instagr\.am)\/(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)/i);
+    const m = s.match(/(?:instagram\.com|instagr\.am)\/(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)/i);
     return m && m[1] ? m[1] : "";
   }
 
-  // 이스케이프된 인스타 CDN URL을 완벽히 정제 후 weserv 프록시 URL로 변환
-  function cleanRawIgUrl(rawUrl) {
-    if (!rawUrl || typeof rawUrl !== "string") return "";
-    return rawUrl
-      .replace(/\\+u0026/gi, "&")
-      .replace(/\\+\//g, "/")
-      .replace(/&amp;/g, "&")
-      .replace(/\\+/g, "")
-      .replace(/^["']+|["']+$/g, "")
-      .trim();
-  }
-
-  function toIgProxyUrl(rawUrl) {
-    const clean = cleanRawIgUrl(rawUrl);
-    if (!/^https?:\/\//i.test(clean)) return "";
-    if (clean.includes("images.weserv.nl")) {
-      return clean.includes("ig_thumb=1") ? clean : (clean + "&ig_thumb=1");
-    }
-    return "https://images.weserv.nl/?url=" + encodeURIComponent(clean) + "&w=600&h=600&fit=cover&output=jpg&q=85&ig_thumb=1";
-  }
-
-  function isGenuineIgThumb(imgUrl) {
-    if (!imgUrl || typeof imgUrl !== "string") return false;
-    if (imgUrl.includes("ig_thumb=1")) return true;
-    if (imgUrl.includes("cdninstagram.com") || imgUrl.includes("fbcdn.net")) return true;
-    return false;
-  }
-
-  // =========================================================================
-  // 1. 인스타 캡션 노이즈(いいね！ 등) 제거 및 주소·상호명 정밀 추출기
-  // =========================================================================
-  function stripIgMetaNoise(text) {
-    if (!text || typeof text !== "string") return "";
-    let s = text
-      // 일본어/한국어/영어 인스타 메타 꼬리표 제거 (- 2025년 10월 29일, 「いいね！」11K件...)
-      .replace(/["”']?\s*-\s*\d{4}년\s*\d{1,2}월\s*\d{1,2}일[,\s]*「いいね！」[\s\S]*$/i, "")
-      .replace(/「いいね！」\s*[\d.,]+[KMB만천]?件[\s\S]*$/i, "")
-      .replace(/좋아요\s*[\d.,]+[만천개]*[,\s]*댓글\s*[\d.,]+[만천개]*[\s\S]*$/i, "")
-      .replace(/^[\s\S]{1,120}?(?:likes?|좋아요|いいね！|コメント)[^:："]*[:：]\s*["“]?/i, "")
-      .replace(/^["“]+|["”]+$/g, "")
-      .trim();
-    return s;
-  }
-
-  function extractSmartPlaceAndAddress(rawText) {
-    const cleaned = stripIgMetaNoise(rawText || "");
-    if (!cleaned) return { name: "", address: "", hours: "", cleanCaption: "" };
-
-    let address = "";
-    let name = "";
-    let hours = "";
-
-    // 1) 영업시간 추출 (⏰ 뒤 텍스트)
-    const hoursMatch = cleaned.match(/[⏰🕒]\s*([^\n📍📌#]+)/);
-    if (hoursMatch && hoursMatch[1]) {
-      hours = hoursMatch[1].replace(/\s*#[^\s#]+.*$/, "").trim();
-    }
-
-    // 2) 주소 추출: 📍 뒤 또는 일본 우편번호(〒) 또는 일본/영문 주소 패턴 (⏰, 영업시간, 해시태그 전까지 정확히 절단)
-    const addrPatterns = [
-      /📍\s*((?:일본\s*)?〒\s*\d{3}[-−–]\d{4}[^\n⏰🕒📞🗓#]+?)(?=\s*(?:[⏰🕒📞🗓#]|매일\s*\d|영업시간|휴무|예약방법|$))/i,
-      /((?:일본\s*)?〒\s*\d{3}[-−–]\d{4}\s*[^\n⏰🕒📞🗓#]+?)(?=\s*(?:[⏰🕒📞🗓#]|매일\s*\d|영업시간|휴무|예약방법|$))/i,
-      /📍\s*([^\n⏰🕒📞🗓#]{6,120}?)(?=\s*(?:[⏰🕒📞🗓#]|매일\s*\d|영업시간|휴무|$))/i,
-      /(?:주소|위치|Address)\s*[:：]\s*([^\n⏰🕒📞🗓#]{6,120}?)(?=\s*(?:[⏰🕒📞🗓#]|매일\s*\d|영업시간|$))/i,
-      /((?:大阪府|京都府|東京都|兵庫県|福岡県|奈良県|北海道|Osaka|Kyoto|Tokyo)[^\n📍⏰🕒📞🗓#]{8,110}?)(?=\s*(?:[⏰🕒📞🗓#]|매일\s*\d|영업시간|휴무|$))/i
-    ];
-
-    for (const re of addrPatterns) {
-      const m = cleaned.match(re);
-      if (m && m[1]) {
-        const candidate = m[1].trim().replace(/[,，\s]+$/, "");
-        if (candidate.length >= 6 && !candidate.includes("발견한 인생")) {
-          address = candidate;
-          break;
+  // 이미지가 실제로 브라우저에서 로드되는지 검증 (깨진 이미지 저장 원천 방지)
+  function verifyImageLoads(url, timeoutMs = 6000) {
+    return new Promise((resolve) => {
+      if (!url) return resolve(false);
+      const img = new Image();
+      let done = false;
+      const timer = setTimeout(() => {
+        if (!done) { done = true; resolve(false); }
+      }, timeoutMs);
+      img.onload = () => {
+        if (!done) {
+          done = true;
+          clearTimeout(timer);
+          resolve(img.naturalWidth > 10);
         }
-      }
-    }
-
-    // 3) 상호명(가게 이름) 추출
-    const namePatterns = [
-      /구글맵(?:에서|에)?\s*['"「『]?([가-힣A-Za-z0-9\s_&-]{2,24}?)['"」』]?\s*검색/i,
-      /(?:상호명|가게명|매장명|식당명|카페명|가게이름)\s*[:：]\s*['"「『]?([^\n📍⏰#]{2,28}?)['"」』]?(?=\s|$|\n|📍|⏰)/i,
-      /(?:커리맛집|라멘맛집|스시맛집|돈카츠맛집|우동맛집|카페맛집|맛집|카페)\s+([가-힣A-Za-z0-9]{2,20})\s*@([A-Za-z0-9._]+)/i,
-      /@([A-Za-z0-9._]{3,28})\s*(?:다녀왔|갔다왔|방문했)/i,
-      /[📌🏠🍽️]\s*([^\n📍⏰#]{2,28})/
-    ];
-
-    for (const re of namePatterns) {
-      const m = cleaned.match(re);
-      if (m && m[1]) {
-        let cand = m[1].trim();
-        if (cand && !/^(いいね|좋아요|오사카에서|교토에서|일본에서|여러분)/.test(cand)) {
-          name = cand;
-          break;
+      };
+      img.onerror = () => {
+        if (!done) {
+          done = true;
+          clearTimeout(timer);
+          resolve(false);
         }
-      }
-    }
-
-    // @멘션 아이디가 유명 상호명인 경우 보완 (예: @watanabecurry -> 와타나베커리 / watanabecurry)
-    if (!name) {
-      const mentionMatch = cleaned.match(/@([A-Za-z0-9._]{3,25})/);
-      if (mentionMatch && mentionMatch[1] && !/food|trip|travel|daily|official|japan|osaka/i.test(mentionMatch[1])) {
-        name = mentionMatch[1];
-      }
-    }
-
-    return { name, address, hours, cleanCaption: cleaned };
+      };
+      img.src = url;
+    });
   }
 
-  function isBadTitle(title) {
-    if (!title || typeof title !== "string") return true;
-    const t = title.trim();
-    if (!t) return true;
-    if (/いいね|コメント|좋아요|댓글|Likes?/i.test(t)) return true;
-    if (/^["“]/.test(t)) return true;
-    if (t.includes("발견한 인생") || t.includes("여러분 안녕하세요") || t.length > 36) return true;
-    return false;
-  }
+  // Vercel 서버리스(/api/ig) + 다중 백업을 통해 실제 로드 가능한 인스타 인트로 이미지 URL 반환
+  async function getVerifiedIgIntroPhoto(code) {
+    if (!code) return { thumbUrl: "", caption: "" };
+    const apiBase = location.hostname.includes("vercel.app")
+      ? ""
+      : "https://trip-app-psi-two.vercel.app";
 
-  function isBadAddress(addr) {
-    if (!addr || typeof addr !== "string") return true;
-    const a = addr.trim();
-    if (!a) return true;
-    if (/いいね|여러분 안녕하세요|발견한 인생|다녀왔어요|추천|맛집 🇯🇵/.test(a)) return true;
-    return false;
-  }
-
-  // 일본/영문 주소로 좌표(위도, 경도) 자동 지오코딩
-  const geocodeCache = JSON.parse(localStorage.getItem("TRIP_GEOCODE_CACHE") || "{}");
-  async function geocodeCleanAddress(addrStr) {
-    if (!addrStr) return null;
-    const query = addrStr
-      .replace(/^일본\s*/i, "")
-      .replace(/第\d+[^\s,]+/g, "") // 빌딩명 때문에 실패하는 경우 대비 정제용 백업과 병행
-      .trim();
-    if (geocodeCache[addrStr]) return geocodeCache[addrStr];
-
-    // 1) 브라우저 내 Google Maps Geocoder 사용 가능 시 우선 사용
-    if (window.google && window.google.maps && window.google.maps.Geocoder) {
-      try {
-        const geocoder = new window.google.maps.Geocoder();
-        const res = await new Promise((resolve) => {
-          geocoder.geocode({ address: addrStr.replace(/^일본\s*/, "") }, (results, status) => {
-            if (status === "OK" && results && results[0]) {
-              const loc = results[0].geometry.location;
-              resolve({ lat: loc.lat(), lng: loc.lng() });
-            } else {
-              resolve(null);
-            }
-          });
-        });
-        if (res) {
-          geocodeCache[addrStr] = res;
-          localStorage.setItem("TRIP_GEOCODE_CACHE", JSON.stringify(geocodeCache));
-          return res;
-        }
-      } catch (_) {}
-    }
-
-    // 2) OpenStreetMap Nominatim 우편번호/주소 지오코딩
-    const postalMatch = addrStr.match(/(\d{3}[-−]\d{4})/);
-    const queriesToTry = [
-      addrStr.replace(/^일본\s*/, ""),
-      query,
-      postalMatch ? (postalMatch[1] + " Osaka Japan") : ""
-    ].filter(Boolean);
-
-    for (const q of queriesToTry) {
-      try {
-        const r = await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" + encodeURIComponent(q));
-        if (r.ok) {
-          const arr = await r.json();
-          if (Array.isArray(arr) && arr[0] && arr[0].lat && arr[0].lon) {
-            const coords = { lat: parseFloat(arr[0].lat), lng: parseFloat(arr[0].lon) };
-            geocodeCache[addrStr] = coords;
-            localStorage.setItem("TRIP_GEOCODE_CACHE", JSON.stringify(geocodeCache));
-            return coords;
-          }
-        }
-      } catch (_) {}
-    }
-    return null;
-  }
-
-  // =========================================================================
-  // 2. 인스타그램 인트로 커버 사진 + 캡션 5중 추출기 (역슬래시 이스케이프 완벽 해결)
-  // =========================================================================
-  function parseIgJsonPayload(obj) {
-    let thumb = "";
+    const rapidKey = getRapidKey();
+    const directStreamUrl = `${apiBase}/api/ig?code=${encodeURIComponent(code)}&mode=image`;
     let caption = "";
+    let candidates = [directStreamUrl];
 
-    function walk(node, depth) {
-      if (!node || typeof node !== "object" || depth > 9) return;
-
-      if (!thumb) {
-        if (node.cover_media?.cropped_image_version?.url) {
-          thumb = node.cover_media.cropped_image_version.url;
-        } else if (Array.isArray(node.image_versions2?.candidates) && node.image_versions2.candidates.length > 0) {
-          const cand = node.image_versions2.candidates.find(c => c?.url && !c.url.includes("s150x150")) || node.image_versions2.candidates[0];
-          if (cand?.url) thumb = cand.url;
-        } else {
-          for (const k of ["thumbnail_src", "display_url", "thumbnail_url", "cover_url", "display_src"]) {
-            if (typeof node[k] === "string" && /^https?:\/\//i.test(cleanRawIgUrl(node[k])) && !node[k].includes(".mp4") && !node[k].includes("s150x150")) {
-              thumb = node[k];
-              break;
-            }
-          }
-        }
-      }
-
-      if (!caption) {
-        if (typeof node.caption === "string" && node.caption.trim().length > 2) {
-          caption = node.caption.trim();
-        } else if (typeof node.caption?.text === "string" && node.caption.text.trim().length > 2) {
-          caption = node.caption.text.trim();
-        } else if (node.edge_media_to_caption?.edges?.[0]?.node?.text) {
-          caption = node.edge_media_to_caption.edges[0].node.text.trim();
-        }
-      }
-
-      for (const k of Object.keys(node)) {
-        if (k === "owner" || k === "user" || k === "profile_pic_url" || k === "hd_profile_pic_url_info") continue;
-        if (node[k] && typeof node[k] === "object") walk(node[k], depth + 1);
-      }
-    }
-
-    walk(obj, 0);
-    return { thumb: cleanRawIgUrl(thumb), caption: stripIgMetaNoise(caption) };
-  }
-
-  function parseIgEmbedHtml(html) {
-    let thumb = "";
-    let caption = "";
-    if (!html || typeof html !== "string") return { thumb, caption };
-
-    // 1) EmbeddedMediaImage 태그 및 og:image, 이스케이프된 display_url / thumbnail_src 모두 탐색
-    const imgPatterns = [
-      /class="[^"]*EmbeddedMediaImage[^"]*"[^>]*src="([^"]+)"/i,
-      /src="([^"]+)"[^>]*class="[^"]*EmbeddedMediaImage[^"]*"/i,
-      /(?:\\"|")display_url(?:\\"|")\s*:\s*(?:\\"|")(https?:[^"'\s]+?)(?:\\"|")/i,
-      /(?:\\"|")thumbnail_src(?:\\"|")\s*:\s*(?:\\"|")(https?:[^"'\s]+?)(?:\\"|")/i,
-      /<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i,
-      /<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i
-    ];
-
-    for (const re of imgPatterns) {
-      const m = html.match(re);
-      if (m && m[1]) {
-        const cleaned = cleanRawIgUrl(m[1]);
-        if (/^https?:\/\//i.test(cleaned) && !cleaned.includes("s150x150") && !cleaned.includes("profile_pic")) {
-          thumb = cleaned;
-          break;
-        }
-      }
-    }
-
-    // 2) Caption 본문 추출
-    const capMatch = html.match(/class="Caption"[^>]*>([\s\S]*?)<div class="CaptionComments"/i)
-                  || html.match(/class="Caption"[^>]*>([\s\S]*?)<\/div>/i);
-    if (capMatch && capMatch[1]) {
-      let rawText = capMatch[1]
-        .replace(/<a class="CaptionUsername"[^>]*>[\s\S]*?<\/a>/i, "")
-        .replace(/<br\s*\/?>/gi, "\n")
-        .replace(/<[^>]+>/g, " ")
-        .replace(/&nbsp;/g, " ")
-        .replace(/&amp;/g, "&")
-        .replace(/&lt;/g, "<")
-        .replace(/&gt;/g, ">")
-        .replace(/&#39;/g, "'")
-        .replace(/&quot;/g, '"')
-        .trim();
-      if (rawText.length > 2) caption = stripIgMetaNoise(rawText);
-    }
-
-    // 3) edge_media_to_caption 이스케이프 텍스트 추출
-    if (!caption) {
-      const edgeCap = html.match(/(?:\\"|")edge_media_to_caption(?:\\"|")[\s\S]{1,200}?(?:\\"|")text(?:\\"|")\s*:\s*(?:\\"|")((?:[^"\\]|\\.)*)(?:\\"|")/i);
-      if (edgeCap && edgeCap[1]) {
-        try {
-          const decoded = JSON.parse('"' + edgeCap[1].replace(/\\"/g, '"').replace(/"/g, '\\"') + '"');
-          caption = stripIgMetaNoise(decoded);
-        } catch (_) {}
-      }
-    }
-
-    return { thumb, caption };
-  }
-
-  const igCache = JSON.parse(localStorage.getItem("TRIP_IG_FULL_CACHE_V2") || "{}");
-  function saveIgCache(code, data) {
-    if (!code) return;
-    igCache[code] = {
-      thumb: data.thumb || igCache[code]?.thumb || "",
-      caption: data.caption || igCache[code]?.caption || "",
-      ts: Date.now()
-    };
     try {
-      localStorage.setItem("TRIP_IG_FULL_CACHE_V2", JSON.stringify(igCache));
+      const metaRes = await fetch(`${apiBase}/api/ig?code=${encodeURIComponent(code)}&key=${encodeURIComponent(rapidKey)}`);
+      if (metaRes.ok) {
+        const meta = await metaRes.json();
+        if (meta.caption) caption = meta.caption;
+        if (meta.weservThumb) candidates.unshift(meta.weservThumb);
+        if (meta.thumb) {
+          candidates.push(`https://wsrv.nl/?url=${encodeURIComponent(meta.thumb)}&w=600&h=600&fit=cover&output=jpg`);
+        }
+      }
     } catch (_) {}
+
+    for (const cand of candidates) {
+      const ok = await verifyImageLoads(cand);
+      if (ok) {
+        return { thumbUrl: cand, caption };
+      }
+    }
+    return { thumbUrl: "", caption };
   }
 
-  async function fetchIgDataMultiLayer(shortcodeOrUrl, forceRefresh = false) {
-    const code = getIgShortcode(shortcodeOrUrl) || String(shortcodeOrUrl || "").trim();
-    if (!code) return { thumb: "", caption: "" };
-
-    let finalThumb = (!forceRefresh && igCache[code]?.thumb) ? igCache[code].thumb : "";
-    let finalCaption = (!forceRefresh && igCache[code]?.caption) ? igCache[code].caption : "";
-
-    const rapidKey = getSavedRapidKey();
-    const reelUrl = "https://www.instagram.com/reel/" + code + "/";
-    const postUrl = "https://www.instagram.com/p/" + code + "/";
-    const embedCapUrl = "https://www.instagram.com/p/" + code + "/embed/captioned/";
-    const embedReelUrl = "https://www.instagram.com/reel/" + code + "/embed/";
-
-    // [Layer 1] RapidAPI
-    if (rapidKey && (!finalThumb || !finalCaption)) {
-      const rapidEndpoints = [
-        {
-          host: "instagram-scraper-api2.p.rapidapi.com",
-          url: "https://instagram-scraper-api2.p.rapidapi.com/v1/post_info?code_or_id_or_url=" + encodeURIComponent(code)
-        },
-        {
-          host: "instagram-looter2.p.rapidapi.com",
-          url: "https://instagram-looter2.p.rapidapi.com/post?url=" + encodeURIComponent(reelUrl)
-        },
-        {
-          host: "instagram-scraper-stable-api.p.rapidapi.com",
-          url: "https://instagram-scraper-stable-api.p.rapidapi.com/get_media_data.php?reel_post_code_or_url=" + encodeURIComponent(reelUrl) + "&type=reel"
-        }
-      ];
-      for (const ep of rapidEndpoints) {
-        try {
-          const r = await fetch(ep.url, {
-            method: "GET",
-            headers: { "x-rapidapi-key": rapidKey, "x-rapidapi-host": ep.host }
-          });
-          if (r.ok) {
-            const json = await r.json();
-            const parsed = parseIgJsonPayload(json);
-            if (parsed.thumb && !finalThumb) finalThumb = toIgProxyUrl(parsed.thumb);
-            if (parsed.caption && !finalCaption) finalCaption = parsed.caption;
-            if (finalThumb && finalCaption) break;
-          }
-        } catch (_) {}
-      }
+  // 현재 열려있는 모달 또는 클릭된 카드에서 대상 아이템과 인스타 shortcode 찾기
+  function resolveTargetItem(clickedEl) {
+    if (typeof curItem !== "undefined" && curItem && typeof curItem === "object") {
+      const c = extractShortcode(curItem);
+      if (c) return { item: curItem, code: c };
     }
-
-    // [Layer 2] Embed HTML 프록시 다중 경로 (/p/{code}/embed/captioned/ 및 /reel/{code}/embed/)
-    if (!finalThumb || !finalCaption) {
-      const proxyTargets = [
-        "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(embedCapUrl),
-        "https://corsproxy.io/?" + encodeURIComponent(embedCapUrl),
-        "https://api.allorigins.win/raw?url=" + encodeURIComponent(embedCapUrl),
-        "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(embedReelUrl),
-        "https://api.allorigins.win/get?url=" + encodeURIComponent(embedCapUrl)
-      ];
-      for (const pUrl of proxyTargets) {
-        try {
-          const r = await fetch(pUrl);
-          if (r.ok) {
-            let html = await r.text();
-            if (html.trim().startsWith("{") && html.includes('"contents"')) {
-              try { html = JSON.parse(html).contents || html; } catch (_) {}
-            }
-            const parsed = parseIgEmbedHtml(html);
-            if (parsed.thumb && !finalThumb) finalThumb = toIgProxyUrl(parsed.thumb);
-            if (parsed.caption && !finalCaption) finalCaption = parsed.caption;
-            if (finalThumb && finalCaption) break;
-          }
-        } catch (_) {}
-      }
-    }
-
-    // [Layer 3] Microlink API (릴스 주소 & 포스트 주소 모두 시도)
-    if (!finalThumb || !finalCaption) {
-      for (const targetU of [reelUrl, postUrl, embedCapUrl]) {
-        try {
-          const mlRes = await fetch("https://api.microlink.io/?url=" + encodeURIComponent(targetU));
-          if (mlRes.ok) {
-            const mlJson = await mlRes.json();
-            const imgUrl = mlJson?.data?.image?.url || "";
-            const desc = mlJson?.data?.description || "";
-            if (imgUrl && !imgUrl.includes("s150x150") && !imgUrl.includes("instagram.com/static") && !finalThumb) {
-              finalThumb = toIgProxyUrl(imgUrl);
-            }
-            if (desc && !finalCaption) {
-              finalCaption = stripIgMetaNoise(desc);
-            }
-            if (finalThumb) break;
-          }
-        } catch (_) {}
-      }
-    }
-
-    // [Layer 4] Jina Reader
-    if (!finalThumb || !finalCaption) {
-      try {
-        const jinaRes = await fetch("https://r.jina.ai/" + embedCapUrl, { headers: { "Accept": "text/plain" } });
-        if (jinaRes.ok) {
-          const jinaTxt = await jinaRes.text();
-          const imgMatch = jinaTxt.match(/!\[[^\]]*\]\((https:\/\/[^\s)]+(?:cdninstagram|fbcdn)[^\s)]+)\)/i);
-          if (imgMatch && imgMatch[1] && !finalThumb) {
-            finalThumb = toIgProxyUrl(imgMatch[1]);
-          }
-          if (!finalCaption && jinaTxt.length > 60) {
-            const cleaned = stripIgMetaNoise(
-              jinaTxt
-                .replace(/Title:[\s\S]*?Markdown Content:/i, "")
-                .replace(/!\[[^\]]*\]\([^)]+\)/g, "")
-                .replace(/\[[^\]]*\]\([^)]+\)/g, "")
-                .trim()
-            );
-            if (cleaned.length > 10) finalCaption = cleaned.slice(0, 1500);
-          }
-        }
-      } catch (_) {}
-    }
-
-    if (finalThumb || finalCaption) {
-      saveIgCache(code, { thumb: finalThumb, caption: finalCaption });
-    }
-    return { thumb: finalThumb, caption: finalCaption };
-  }
-
-  // 아이템 객체에 인스타 썸네일 강제 덮어쓰기 (어떤 필드명을 쓰든 모두 반영)
-  function applyThumbToItemObject(it, thumbUrl) {
-    if (!it || typeof it !== "object" || !thumbUrl) return false;
-    let modified = false;
-    if (it.img !== thumbUrl) {
-      it.img = thumbUrl;
-      modified = true;
-    }
-    it.useCustomImg = true;
-    it.customImg = thumbUrl;
-    for (const k of Object.keys(it)) {
-      if (["url", "link", "snsUrl", "reelUrl", "sourceUrl", "originUrl"].includes(k)) continue;
-      if (typeof it[k] === "string" && /^https?:\/\//i.test(it[k]) && !getIgShortcode(it[k])) {
-        if (it[k] !== thumbUrl) {
-          it[k] = thumbUrl;
-          modified = true;
+    const inputs = Array.from(document.querySelectorAll("input, textarea"));
+    for (const inp of inputs) {
+      if (inp.offsetParent !== null) {
+        const c = extractShortcode(inp.value || "");
+        if (c) {
+          const found = (typeof items !== "undefined" && Array.isArray(items))
+            ? items.find(it => extractShortcode(it) === c)
+            : null;
+          return { item: found, code: c };
         }
       }
     }
-    return modified;
-  }
-
-  // 아이템 객체의 잘못된 장소명(いいね！)과 잘못된 주소("오사카에서 발견한...") 자동 교정
-  async function repairItemPlaceAndAddress(it) {
-    if (!it || typeof it !== "object") return false;
-    const allText = [it.memo, it.info, it.note, it.desc, it.caption, it.addr, it.address, it.sub, it.name, it.title]
-      .filter(v => typeof v === "string")
-      .join("\n");
-
-    const parsed = extractSmartPlaceAndAddress(allText);
-    let changed = false;
-
-    const currentName = it.name || it.title || "";
-    const currentAddr = it.addr || it.address || it.sub || "";
-
-    if (isBadTitle(currentName)) {
-      const newName = parsed.name || (parsed.address ? parsed.address.replace(/^일본\s*〒\s*\d{3}[-−]\d{4}\s*/, "").slice(0, 28) : "");
-      if (newName && newName !== currentName) {
-        if ("name" in it) it.name = newName;
-        if ("title" in it) it.title = newName;
-        if (!("name" in it) && !("title" in it)) it.name = newName;
-        changed = true;
-      }
-    }
-
-    if (parsed.address && (isBadAddress(currentAddr) || !currentAddr.includes(parsed.address.slice(0, 10)))) {
-      if ("addr" in it) it.addr = parsed.address;
-      if ("address" in it) it.address = parsed.address;
-      if ("sub" in it) it.sub = parsed.address;
-      if (!("addr" in it) && !("address" in it) && !("sub" in it)) it.addr = parsed.address;
-      if (Array.isArray(it.addrs) && it.addrs.length > 0) it.addrs[0] = parsed.address;
-      if (Array.isArray(it.places) && it.places[0] && typeof it.places[0] === "object") {
-        if (parsed.name && isBadTitle(it.places[0].name)) it.places[0].name = parsed.name;
-        it.places[0].addr = parsed.address;
-        it.places[0].address = parsed.address;
-      }
-      changed = true;
-
-      // 정확한 주소로 좌표 재계산
-      const coords = await geocodeCleanAddress(parsed.address);
-      if (coords && coords.lat && coords.lng) {
-        it.lat = coords.lat;
-        it.lng = coords.lng;
-      }
-    }
-
-    // 메모 내 [1] いいね！: 교정
-    for (const mk of ["memo", "info", "note", "desc"]) {
-      if (typeof it[mk] === "string" && it[mk].includes("いいね！")) {
-        const cleanTitle = it.name || it.title || parsed.name || "장소";
-        it[mk] = stripIgMetaNoise(it[mk]).replace(/いいね！/g, cleanTitle);
-        changed = true;
-      }
-    }
-
-    return changed;
-  }
-
-  // 전체 아이템 스캔 (친구 등록 항목 썸네일 & 잘못된 주소 자동 복구)
-  const inFlightCodes = new Set();
-  async function scanAndRepairAllItems() {
-    if (typeof items === "undefined" || !Array.isArray(items)) return;
-    let anyChanged = false;
-
-    for (const it of items) {
-      if (!it || typeof it !== "object") continue;
-
-      const addrFixed = await repairItemPlaceAndAddress(it);
-      if (addrFixed) anyChanged = true;
-
-      const code = getIgShortcode(it);
-      if (!code) continue;
-
-      if (igCache[code]?.thumb && !isGenuineIgThumb(it.img)) {
-        if (applyThumbToItemObject(it, igCache[code].thumb)) anyChanged = true;
-        continue;
-      }
-
-      if (!isGenuineIgThumb(it.img) && !inFlightCodes.has(code)) {
-        inFlightCodes.add(code);
-        fetchIgDataMultiLayer(code).then((res) => {
-          inFlightCodes.delete(code);
-          if (res.thumb) {
-            let updated = false;
-            for (const target of items) {
-              if (getIgShortcode(target) === code) {
-                if (applyThumbToItemObject(target, res.thumb)) updated = true;
-              }
-            }
-            if (updated) {
-              try { if (typeof save === "function") save(); } catch (_) {}
-              try { if (typeof render === "function") render(); } catch (_) {}
-            }
-          }
-        }).catch(() => inFlightCodes.delete(code));
-      }
-    }
-
-    if (anyChanged) {
-      try { if (typeof save === "function") save(); } catch (_) {}
-      try { if (typeof render === "function") render(); } catch (_) {}
-    }
-  }
-
-  // =========================================================================
-  // 3. [🔄 다른사진] / [다른 사진] 버튼 클릭 가로채기 -> 인스타 인트로 썸네일 즉시 적용
-  // =========================================================================
-  function findTargetItemAndCodeFromContext(clickedEl) {
-    // 1) 카드 토스트나 목록 카드 내부에서 눌렀을 때 해당 카드의 아이템 탐색
-    if (typeof items !== "undefined" && Array.isArray(items)) {
-      const cardEl = clickedEl.closest("[data-id], .item, .card, li, div");
-      if (cardEl) {
-        const cardText = (cardEl.innerText || "").trim();
+    if (clickedEl && typeof items !== "undefined" && Array.isArray(items)) {
+      const card = clickedEl.closest("[data-id], .item, .card, li, div");
+      if (card) {
+        const txt = (card.innerText || "").trim();
         for (const it of items) {
-          const title = (it.name || it.title || "").trim();
-          if (title && cardText.includes(title)) {
-            const c = getIgShortcode(it);
+          const name = (it.name || it.title || "").trim();
+          if (name && txt.includes(name)) {
+            const c = extractShortcode(it);
             if (c) return { item: it, code: c };
           }
         }
       }
     }
-    // 2) 열린 모달의 curItem 또는 모달 내 인스타 링크 input 탐색
-    if (typeof curItem !== "undefined" && curItem) {
-      const c = getIgShortcode(curItem);
-      if (c) return { item: curItem, code: c };
-    }
-    const inputs = Array.from(document.querySelectorAll("input, textarea"));
-    for (const inp of inputs) {
-      const c = getIgShortcode(inp.value || "");
-      if (c) {
-        const matched = (typeof items !== "undefined" && Array.isArray(items))
-          ? items.find(x => getIgShortcode(x) === c)
-          : null;
-        return { item: matched, code: c };
-      }
-    }
-    // 3) 가장 최근에 추가/수정된 인스타 아이템 반환
-    if (typeof items !== "undefined" && Array.isArray(items)) {
-      for (let i = items.length - 1; i >= 0; i--) {
-        const c = getIgShortcode(items[i]);
-        if (c) return { item: items[i], code: c };
-      }
-    }
     return { item: null, code: "" };
   }
 
+  // ============================================================================
+  // 1. 이전 패치로 인해 'Osaka 563-0041'로 잘못 변경된 친구 등록 항목 1회 정밀 복구
+  // ============================================================================
+  let oneTimeRestored = false;
+  async function restoreCorruptedItemsOnce() {
+    if (oneTimeRestored || typeof items === "undefined" || !Array.isArray(items) || items.length === 0) return;
+    oneTimeRestored = true;
+    let changed = false;
+
+    for (const it of items) {
+      if (!it || typeof it !== "object") continue;
+
+      // 친구가 등록한 8-25 Masumicho, Ikeda, Osaka 563-0041 복구
+      const combined = JSON.stringify(it);
+      if (combined.includes("Masumicho") || it.title === "Osaka 563-0041" || it.name === "Osaka 563-0041") {
+        const fullIkedaAddr = "8-25 Masumicho, Ikeda, Osaka 563-0041";
+        if (it.title === "Osaka 563-0041") { it.title = fullIkedaAddr; changed = true; }
+        if (it.name === "Osaka 563-0041") { it.name = fullIkedaAddr; changed = true; }
+        if (it.addr === "Osaka 563-0041") { it.addr = fullIkedaAddr; changed = true; }
+        if (it.address === "Osaka 563-0041") { it.address = fullIkedaAddr; changed = true; }
+        if (it.sub === "Osaka 563-0041") { it.sub = fullIkedaAddr; changed = true; }
+        // 이케다 컵누들 뮤지엄/라멘 정확한 좌표 복원 (34.8180, 135.4267)
+        if (Math.abs((it.lat || 0) - 34.6938) < 0.01) {
+          it.lat = 34.8180;
+          it.lng = 135.4267;
+          changed = true;
+        }
+        // 인스타 인트로 사진 적용
+        const code = extractShortcode(it);
+        if (code) {
+          getVerifiedIgIntroPhoto(code).then(({ thumbUrl }) => {
+            if (thumbUrl && it.img !== thumbUrl) {
+              it.img = thumbUrl;
+              it.useCustomImg = true;
+              try { if (typeof save === "function") save(); } catch (_) {}
+              try { if (typeof render === "function") render(); } catch (_) {}
+            }
+          });
+        }
+      }
+    }
+
+    if (changed) {
+      try { if (typeof save === "function") save(); } catch (_) {}
+      try { if (typeof render === "function") render(); } catch (_) {}
+    }
+  }
+
+  setTimeout(restoreCorruptedItemsOnce, 1500);
+  setTimeout(restoreCorruptedItemsOnce, 4000);
+
+  // ============================================================================
+  // 2. [🔄 다른사진] 클릭 가로채기 (중복 클릭 시에도 외부 맨홀/곰인형 사진 절대 차단)
+  // ============================================================================
   document.addEventListener("click", async (e) => {
     const btn = e.target?.closest("button, .btn, [role='button'], a");
     if (!btn) return;
-    const txt = (btn.innerText || btn.textContent || "").replace(/\s+/g, "");
 
-    // [다른사진] 버튼 클릭 시 기존 외부 사진 변경 동작을 차단하고 인스타 인트로 사진을 강제 적용
-    if (txt.includes("다른사진") || txt.includes("썸네일복구")) {
-      const { item, code } = findTargetItemAndCodeFromContext(btn);
-      if (!code) return; // 인스타 링크가 없는 일반 항목은 기본 동작 유지
+    const rawText = (btn.innerText || btn.textContent || "").replace(/\s+/g, "");
+    if (rawText.includes("다른사진") || rawText.includes("인트로추출중")) {
+      btn.dataset.igPhotoBtn = "1";
+    }
 
+    if (btn.dataset.igPhotoBtn === "1") {
+      const { item, code } = resolveTargetItem(btn);
+      if (!code) return; // 인스타 링크가 없는 일반 장소는 기본 동작 유지
+
+      // 기존 index.html의 "다른 외부 사진으로 변경했어요" 핸들러 완전 차단
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
 
-      const origHtml = btn.innerHTML;
+      if (btn.dataset.igBusy === "1") {
+        showNotice("⏳ 인스타그램 인트로 사진을 불러오는 중입니다...");
+        return;
+      }
+
+      btn.dataset.igBusy = "1";
+      const origHtml = btn.dataset.origHtml || btn.innerHTML;
+      btn.dataset.origHtml = origHtml;
       btn.innerText = "⏳ 인스타 인트로 추출 중...";
-      showCustomToast("⏳ 인스타그램 게시물 인트로 사진을 불러오는 중...");
+      showNotice("⏳ 인스타그램 게시물 인트로 사진을 불러오는 중...");
 
-      const res = await fetchIgDataMultiLayer(code, true);
+      const { thumbUrl } = await getVerifiedIgIntroPhoto(code);
       btn.innerHTML = origHtml;
+      btn.dataset.igBusy = "0";
 
-      if (res.thumb) {
+      if (thumbUrl) {
         if (typeof items !== "undefined" && Array.isArray(items)) {
           for (const it of items) {
-            if (getIgShortcode(it) === code) {
-              applyThumbToItemObject(it, res.thumb);
+            if (extractShortcode(it) === code) {
+              it.img = thumbUrl;
+              it.useCustomImg = true;
+              it.customImg = thumbUrl;
             }
           }
         }
-        if (item) applyThumbToItemObject(item, res.thumb);
+        if (item) {
+          item.img = thumbUrl;
+          item.useCustomImg = true;
+          item.customImg = thumbUrl;
+        }
 
-        // 현재 화면의 모달 사진 및 카드 썸네일 DOM 즉시 교체
-        document.querySelectorAll("img").forEach((imgEl) => {
-          if (imgEl.clientWidth >= 40) {
-            const parentTxt = (imgEl.closest("div, li")?.innerText || "");
-            const itemTitle = item ? (item.name || item.title || "") : "";
-            if (!itemTitle || parentTxt.includes(itemTitle) || imgEl.clientWidth > 140) {
-              imgEl.src = res.thumb;
+        // 모달이 [앱내영상] 모드여서 이미지가 안 보일 수 있으므로 [사진보기] 버튼이 있으면 활성화
+        const allModalBtns = Array.from(document.querySelectorAll("button"));
+        const photoViewBtn = allModalBtns.find(b => (b.innerText || "").replace(/\s+/g, "") === "사진보기");
+        if (photoViewBtn) {
+          try { photoViewBtn.click(); } catch (_) {}
+        }
+
+        // 화면 내 모달 상단 이미지 및 카드 이미지 즉시 갱신
+        setTimeout(() => {
+          document.querySelectorAll("img").forEach((imgEl) => {
+            if (imgEl.clientWidth > 140 && imgEl.clientHeight > 100) {
+              imgEl.src = thumbUrl;
             }
-          }
-        });
+          });
+        }, 80);
 
         try { if (typeof save === "function") save(); } catch (_) {}
         try { if (typeof render === "function") render(); } catch (_) {}
-        showCustomToast("✅ 인스타그램 게시물 인트로 사진으로 변경했어요!");
+        showNotice("✅ 인스타그램 게시물 인트로 사진으로 변경했어요!");
       } else {
-        showCustomToast("⚠️ 인스타 썸네일 추출 실패. 상세 도구의 RapidAPI 키를 확인해 주세요.");
+        showNotice("⚠️ 인스타 인트로 사진을 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.");
       }
       return;
     }
-
-    // [구글지도] 또는 [길찾기] 클릭 시 잘못된 검색어(いいね！ 등)가 넘어가지 않도록 정밀 주소로 교정
-    if (txt.includes("구글지도") || txt.includes("길찾기")) {
-      const { item } = findTargetItemAndCodeFromContext(btn);
-      if (item) {
-        await repairItemPlaceAndAddress(item);
-      }
-    }
   }, true);
 
-  // =========================================================================
-  // 4. 캡션 입력창 자동 정제 & 모달 내 [대표 장소 / 주소] 입력칸 실시간 교정
-  // =========================================================================
-  setInterval(() => {
-    // 1) 홈 화면 2번 캡션 텍스트박스에 いいね！ 메타 노이즈가 들어오면 즉시 제거
-    const textareas = document.querySelectorAll("textarea");
-    textareas.forEach((ta) => {
-      if (ta.value && (ta.value.includes("「いいね！」") || ta.value.includes("コメント"))) {
-        const cleaned = stripIgMetaNoise(ta.value);
-        if (cleaned && cleaned !== ta.value) {
-          ta.value = cleaned;
-          ta.dispatchEvent(new Event("input", { bubbles: true }));
-        }
-      }
-    });
+  // ============================================================================
+  // 3. 구글 지도 검색어 정제 (스폰서 장어집 광고 목록 방지 & 정확한 건물 핀 직행)
+  // ============================================================================
+  function cleanGoogleMapsQuery(rawQuery) {
+    if (!rawQuery || typeof rawQuery !== "string") return rawQuery;
+    let q = rawQuery.trim();
 
-    // 2) 상세 모달이 열려 있을 때 '대표 장소'의 상호명칸이 'いいね！'이거나 주소칸이 본문 첫줄이면 즉시 실제 주소로 교체
-    const inputs = Array.from(document.querySelectorAll("input[type='text'], input:not([type])"));
-    const nameInput = inputs.find(el => isBadTitle(el.value) && el.value.includes("いいね"));
-    if (nameInput) {
-      const modalRoot = nameInput.closest("div")?.parentElement?.parentElement || document.body;
-      const memoTa = modalRoot.querySelector("textarea");
-      const rawText = (memoTa?.value || "") + " " + (typeof curItem !== "undefined" && curItem ? JSON.stringify(curItem) : "");
-      const parsed = extractSmartPlaceAndAddress(rawText);
+    // 1) 'いいね！' 등 인스타 노이즈 제거
+    q = q.replace(/「?いいね！?」?/g, "").trim();
 
-      if (parsed.name || parsed.address) {
-        const newTitle = parsed.name || parsed.address.slice(0, 25);
-        nameInput.value = newTitle;
-        nameInput.dispatchEvent(new Event("input", { bubbles: true }));
-        nameInput.dispatchEvent(new Event("change", { bubbles: true }));
-      }
-
-      const idx = inputs.indexOf(nameInput);
-      const addrInput = inputs[idx + 1];
-      if (addrInput && parsed.address && isBadAddress(addrInput.value)) {
-        addrInput.value = parsed.address;
-        addrInput.dispatchEvent(new Event("input", { bubbles: true }));
-        addrInput.dispatchEvent(new Event("change", { bubbles: true }));
-      }
+    // 2) 상세 번지/우편번호가 포함된 경우: 앞의 상호명 + 자동번역 히라가나(わたなべカレー 등) + '일본' 접두사를 떼고 순수 주소만 추출
+    // 이유: 구글 지도에 '와타나베커리 わたなべカレー 일본 〒530-0002...'를 통째로 넣으면 키워드 검색으로 빠져 스폰서 광고가 상단에 뜸
+    const postalIdx = q.search(/〒\s*\d{3}[-−–]\d{4}/);
+    if (postalIdx !== -1) {
+      let addrOnly = q.slice(postalIdx)
+        .replace(/[−–—]/g, "-")
+        .replace(/\s+/g, " ")
+        .trim();
+      return addrOnly;
     }
-  }, 800);
 
-  // window.open 후킹: 구글지도 호출 시 'いいね！'나 홍보 문구가 섞여 있으면 실제 주소만 검색되도록 보정
-  const _origWindowOpen = window.open;
-  window.open = function(url, ...rest) {
-    if (typeof url === "string" && (url.includes("google.com/maps") || url.includes("maps.app.goo.gl"))) {
-      try {
-        const decoded = decodeURIComponent(url);
-        if (decoded.includes("いいね") || decoded.includes("발견한 인생") || decoded.includes("여러분 안녕하세요")) {
-          const parsed = extractSmartPlaceAndAddress(decoded);
-          const cleanQuery = [parsed.name, parsed.address].filter(Boolean).join(" ") || parsed.address || parsed.name;
-          if (cleanQuery) {
-            url = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(cleanQuery);
+    // 영문 상세 번지 (예: 8-25 Masumicho, Ikeda, Osaka 563-0041 또는 2 Chome-2-5...)
+    const enAddrMatch = q.match(/(\d+\s*[-−–]\s*\d+\s+[A-Za-z]+[\s,]+[A-Za-z\s,0-9-]+)/);
+    if (enAddrMatch && enAddrMatch[1] && enAddrMatch[1].length >= 15) {
+      return enAddrMatch[1].replace(/[−–—]/g, "-").trim();
+    }
+
+    // 일본어 번지 (예: 大阪府大阪市... 1丁目... 등)
+    const jpAddrMatch = q.match(/((?:大阪府|京都府|東京都|兵庫県|奈良県|福岡県|北海道)[^\s]+?(?:\d+丁目|\d+[-−]\d+)[^\n]*)/);
+    if (jpAddrMatch && jpAddrMatch[1]) {
+      return jpAddrMatch[1].replace(/[−–—]/g, "-").trim();
+    }
+
+    // 상세 번지가 없고 상호명으로만 검색할 때는 자동 생성된 부정확한 히라가나(괄호 병기)와 '일본 ' 접두사만 제거
+    return q
+      .replace(/^일본\s+/i, "")
+      .replace(/[−–—]/g, "-")
+      .trim();
+  }
+
+  function rewriteGoogleMapsUrl(url) {
+    if (typeof url !== "string") return url;
+    if (!url.includes("google.com/maps") && !url.includes("maps.google.")) return url;
+
+    try {
+      const u = new URL(url, location.origin);
+      for (const param of ["query", "q", "destination", "daddr"]) {
+        if (u.searchParams.has(param)) {
+          const orig = u.searchParams.get(param);
+          const cleaned = cleanGoogleMapsQuery(orig);
+          if (cleaned && cleaned !== orig) {
+            u.searchParams.set(param, cleaned);
           }
         }
-      } catch (_) {}
-    }
-    return _origWindowOpen.call(this, url, ...rest);
-  };
-
-  // 상세 도구에 RapidAPI Key 설정 박스 유지
-  function injectRapidApiUi() {
-    const allBtns = Array.from(document.querySelectorAll("button"));
-    const reanalyzeBtn = allBtns.find(el => (el.innerText || "").includes("캡션 재분석"));
-    if (reanalyzeBtn) {
-      const container = reanalyzeBtn.closest("div")?.parentElement;
-      if (container && !document.getElementById("rapid-key-inline-box")) {
-        const box = document.createElement("div");
-        box.id = "rapid-key-inline-box";
-        box.className = "rapid-api-box";
-        const currentKey = getSavedRapidKey();
-        box.innerHTML = `
-          <label>🔑 RapidAPI Key 설정 (인스타 캡션·인트로 사진 추출용)</label>
-          <div class="rapid-api-row">
-            <input type="password" id="rapid-key-inline-input" placeholder="X-RapidAPI-Key 입력" value="${currentKey}">
-            <button type="button" id="rapid-key-inline-save">저장</button>
-          </div>
-          <div class="rapid-api-status" id="rapid-key-inline-status">
-            ${currentKey ? "✅ RapidAPI 키가 적용되어 있습니다." : "ℹ️ 키 입력 시 차단 없이 인트로 사진과 캡션을 추출합니다."}
-          </div>
-        `;
-        container.appendChild(box);
-        box.querySelector("#rapid-key-inline-save").onclick = () => {
-          const val = box.querySelector("#rapid-key-inline-input").value;
-          saveRapidKeyEverywhere(val);
-          box.querySelector("#rapid-key-inline-status").innerText = val.trim()
-            ? "✅ 저장 완료! [다른사진] 클릭 시 인스타 인트로 사진이 즉시 적용됩니다."
-            : "ℹ️ RapidAPI 키가 초기화되었습니다.";
-          scanAndRepairAllItems();
-        };
       }
+      return u.toString();
+    } catch (_) {
+      return url;
     }
   }
 
-  setInterval(injectRapidApiUi, 1200);
-  setInterval(scanAndRepairAllItems, 3500);
-  setTimeout(scanAndRepairAllItems, 1200);
+  // window.open 후킹
+  const _origOpen = window.open;
+  window.open = function(url, ...rest) {
+    return _origOpen.call(this, rewriteGoogleMapsUrl(url), ...rest);
+  };
+
+  // <a href="...google.com/maps..."> 클릭 시에도 정제된 주소 적용
+  document.addEventListener("click", (e) => {
+    const a = e.target?.closest("a[href]");
+    if (a && a.href && (a.href.includes("google.com/maps") || a.href.includes("maps.google."))) {
+      a.href = rewriteGoogleMapsUrl(a.href);
+    }
+  }, true);
+
+  // ============================================================================
+  // 4. 새로 릴스 분석·저장 시 인스타 인트로 사진 자동 적용 (백그라운드 루프 없음)
+  // ============================================================================
+  let prevItemCount = (typeof items !== "undefined" && Array.isArray(items)) ? items.length : 0;
+  document.addEventListener("click", (e) => {
+    const btn = e.target?.closest("button, .btn");
+    if (!btn) return;
+    const t = (btn.innerText || "").replace(/\s+/g, "");
+    if (t.includes("분석·저장하기") || t.includes("분석중")) {
+      // 새 항목이 저장된 직후 1회만 해당 항목의 인스타 인트로 썸네일 적용
+      const checkNewItem = async (attempt = 0) => {
+        if (typeof items === "undefined" || !Array.isArray(items)) return;
+        if (items.length > prevItemCount || attempt >= 4) {
+          prevItemCount = items.length;
+          const newest = items[items.length - 1] || items[0];
+          const code = extractShortcode(newest);
+          if (code) {
+            const { thumbUrl } = await getVerifiedIgIntroPhoto(code);
+            if (thumbUrl) {
+              for (const it of items) {
+                if (extractShortcode(it) === code) {
+                  it.img = thumbUrl;
+                  it.useCustomImg = true;
+                  it.customImg = thumbUrl;
+                }
+              }
+              try { if (typeof save === "function") save(); } catch (_) {}
+              try { if (typeof render === "function") render(); } catch (_) {}
+            }
+          }
+          return;
+        }
+        setTimeout(() => checkNewItem(attempt + 1), 1500);
+      };
+      setTimeout(() => checkNewItem(0), 2000);
+    }
+  }, true);
+
+  // 상세 도구 열었을 때만 RapidAPI Key 입력칸 표시 (DOM 변화 시에만 가볍게 동작)
+  const observer = new MutationObserver(() => {
+    const reanalyzeBtn = Array.from(document.querySelectorAll("button")).find(
+      el => (el.innerText || "").includes("캡션 재분석")
+    );
+    if (reanalyzeBtn && !document.getElementById("rapid-key-inline-box")) {
+      const container = reanalyzeBtn.closest("div")?.parentElement;
+      if (!container) return;
+      const box = document.createElement("div");
+      box.id = "rapid-key-inline-box";
+      box.className = "rapid-api-box";
+      const curKey = getRapidKey();
+      box.innerHTML = `
+        <label>🔑 RapidAPI Key (선택사항 - 서버 기본 추출 외 백업용)</label>
+        <div class="rapid-api-row">
+          <input type="password" id="rapid-key-inline-input" placeholder="X-RapidAPI-Key 입력" value="${curKey}">
+          <button type="button" id="rapid-key-inline-save">저장</button>
+        </div>
+        <div class="rapid-api-status" id="rapid-key-inline-status">
+          ${curKey ? "✅ 백업용 RapidAPI 키가 저장되어 있습니다." : "ℹ️ 키 없이도 Vercel 서버(/api/ig)가 인트로 사진을 직접 추출합니다."}
+        </div>
+      `;
+      container.appendChild(box);
+      box.querySelector("#rapid-key-inline-save").onclick = () => {
+        const val = box.querySelector("#rapid-key-inline-input").value;
+        setRapidKey(val);
+        box.querySelector("#rapid-key-inline-status").innerText = val.trim()
+          ? "✅ 저장 완료 (자동 백그라운드 동작 없이 버튼 클릭 시에만 사용됩니다)."
+          : "ℹ️ RapidAPI 키가 삭제되었습니다.";
+      };
+    }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
 })();
 </script>
-<!-- === RAPID_AND_IG_MASTER_PATCH_END === -->
+<!-- === CLEAN_IG_AND_MAPS_PATCH_END === -->
 </body>
 </html>
