@@ -10319,20 +10319,10 @@ ${caption || rawText}
 
 
 
-<!-- === V4_SHIELD_PATCH_START === -->
+
+<!-- === V5_STRICT_TARGET_PATCH_START === -->
 <script>
 (function() {
-  const IG_THUMB_MARKER = "ig_thumb=1";
-
-  function isAvatarOrBadUrl(url) {
-    if (!url) return true;
-    let d = url;
-    try { d = decodeURIComponent(url); } catch (_) {}
-    if (/t51\.2885-19/i.test(d)) return true;
-    if (/profile_pic|s150x150|p150x150|150x150|s320x320|p320x320|320x320|static\.cdninstagram|rsrc\.php|\.mp4/i.test(d)) return true;
-    return false;
-  }
-
   function extractShortcode(input) {
     if (!input) return "";
     let s = typeof input === "string" ? input : JSON.stringify(input);
@@ -10345,10 +10335,10 @@ ${caption || rawText}
       if (typeof showToast === "function") { showToast(msg); return; }
       if (typeof toast === "function") { toast(msg); return; }
     } catch (_) {}
-    let el = document.getElementById("shield-ig-toast");
+    let el = document.getElementById("strict-ig-toast");
     if (!el) {
       el = document.createElement("div");
-      el.id = "shield-ig-toast";
+      el.id = "strict-ig-toast";
       el.style.cssText = "position:fixed;bottom:85px;left:50%;transform:translateX(-50%);background:rgba(18,18,26,0.96);color:#fff;padding:10px 18px;border-radius:999px;font-size:13px;font-weight:600;z-index:999999;border:1px solid rgba(255,255,255,0.2);box-shadow:0 8px 24px rgba(0,0,0,0.5);pointer-events:none;transition:opacity 0.2s;";
       document.body.appendChild(el);
     }
@@ -10358,57 +10348,6 @@ ${caption || rawText}
     el._t = setTimeout(() => { el.style.opacity = "0"; }, 2600);
   }
 
-  // =========================================================================
-  // 핵심: 외부 사진 차단 방어막 (Shield)
-  // 기존 앱의 위키/구글 사진 검색기가 인스타 항목에 외부 사진을 덮어씌우는 것을 원천 봉쇄
-  // =========================================================================
-  function applyIgPhotoShield(it) {
-    if (!it || typeof it !== "object" || it._igShieldApplied) return;
-    it._igShieldApplied = true;
-
-    // 현재 사진이 가짜(아바타)거나 마커가 없는 위키 사진이면 즉시 삭제
-    let currentImg = it.img || "";
-    if (currentImg && (!currentImg.includes(IG_THUMB_MARKER) || isAvatarOrBadUrl(currentImg))) {
-      currentImg = "";
-    }
-
-    // property 강제 고정: 앞으로 들어오는 모든 사진을 검사
-    Object.defineProperty(it, 'img', {
-      configurable: true,
-      enumerable: true,
-      get() { return this._rawImg || ""; },
-      set(val) {
-        if (!val) { this._rawImg = ""; return; }
-        // 조건에 안 맞으면(인증 꼬리표가 없거나 아바타면) 거부하고 빈칸 유지!
-        if (!val.includes(IG_THUMB_MARKER) || isAvatarOrBadUrl(val)) {
-          this._rawImg = "";
-          return;
-        }
-        this._rawImg = val;
-      }
-    });
-
-    it.img = currentImg; // 방어막 테스트 및 초기화
-  }
-
-  // =========================================================================
-  // 릴스 인트로 사진 서버리스 백그라운드 추출
-  // =========================================================================
-  async function getTrueIgIntroCover(code) {
-    if (!code) return "";
-    const apiBase = location.hostname.includes("vercel.app") ? "" : "https://trip-app-psi-two.vercel.app";
-    try {
-      const res = await fetch(`${apiBase}/api/ig?code=${encodeURIComponent(code)}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.weservThumb && !isAvatarOrBadUrl(data.weservThumb)) {
-          return data.weservThumb;
-        }
-      }
-    } catch (_) {}
-    return "";
-  }
-
   function refreshMapAndDom() {
     try { if (typeof save === "function") save(); } catch (_) {}
     try { if (typeof render === "function") render(); } catch (_) {}
@@ -10416,66 +10355,123 @@ ${caption || rawText}
       if (typeof renderMap === "function") renderMap();
       else if (typeof updateMarkers === "function") updateMarkers();
     } catch (_) {}
+    
+    // 강제 이미지 교체
+    document.querySelectorAll("img").forEach(img => {
+      const src = img.getAttribute("src") || "";
+      // 프로필 아바타나 맨홀 등 외부 사진이 남아있으면 삭제
+      if (src.includes("t51.2885-19") || src.includes("profile_pic") || (!src.includes("ig_thumb=1") && !src.includes("maps.googleapis"))) {
+         const card = img.closest("[data-id], .item, .card, li, div");
+         if (card && extractShortcode(card.innerText)) {
+             img.src = "";
+             img.style.display = "none";
+         }
+      }
+    });
   }
 
   // =========================================================================
-  // 앱 실행 시 오염된 사진 일괄 삭제 (빈칸 만들기) 및 백그라운드 재추출
+  // 완벽 방어막 (Strict Shield)
+  // - 인스타 링크가 있는 장소는 오직 'ig_thumb=1' 꼬리표가 붙은 썸네일만 허락합니다.
+  // - 위키피디아, 구글 장소 사진 등 외부 사진은 100% 튕겨냅니다. (사진 없음 유지)
+  // =========================================================================
+  function applyStrictShield(it) {
+    if (!it || typeof it !== "object" || it._strictShield) return;
+    it._strictShield = true;
+
+    // 기존 getter/setter 삭제 및 초기화
+    let current = it.img || "";
+    delete it.img; 
+
+    Object.defineProperty(it, "img", {
+      enumerable: true,
+      configurable: true,
+      get() { return this._lockedImg || ""; },
+      set(v) {
+        if (!v) { this._lockedImg = ""; return; }
+        // 인스타 전용 인증 꼬리표가 없으면 절대로 사진을 저장하지 않음 (빈칸 유지)
+        if (v.includes("ig_thumb=1")) {
+          this._lockedImg = v;
+        } else {
+          this._lockedImg = ""; 
+        }
+      }
+    });
+
+    // 기존 사진이 인증 꼬리표가 없으면 날려버림
+    it.img = current;
+    it.useCustomImg = true;
+  }
+
+  // =========================================================================
+  // 서버리스 핀포인트 추출 API 호출
+  // =========================================================================
+  async function fetchStrictIntroCover(code) {
+    if (!code) return "";
+    const apiBase = location.hostname.includes("vercel.app") ? "" : "https://trip-app-psi-two.vercel.app";
+    try {
+      const res = await fetch(`${apiBase}/api/ig?code=${encodeURIComponent(code)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.weservThumb) return data.weservThumb;
+      }
+    } catch (_) {}
+    return "";
+  }
+
+  // =========================================================================
+  // 시작 즉시 모든 오염된 사진(돌곰, 맨홀 등) 폭파 및 인트로 재추출
   // =========================================================================
   let isPurged = false;
-  async function purgeAndRestoreAllIgItems() {
+  function purgeAndRebuildIgImages() {
     if (isPurged || typeof items === "undefined" || !Array.isArray(items)) return;
     isPurged = true;
-    let changed = false;
+
+    // 이전 캐시 쓰레기 완전 삭제
+    localStorage.removeItem("TRIP_IG_THUMBS");
+    localStorage.removeItem("TRIP_IG_FULL_CACHE");
+    localStorage.removeItem("TRIP_IG_FULL_CACHE_V2");
+    localStorage.removeItem("TRIP_IG_VERIFIED_COVER_V3");
 
     for (const it of items) {
       const code = extractShortcode(it);
       if (!code) continue;
 
-      const before = it.img || "";
-      applyIgPhotoShield(it);
-      const after = it.img || "";
+      applyStrictShield(it);
       
-      if (before !== after) changed = true;
-
-      // 방어막에 의해 사진이 빈칸("")이 된 경우, 진짜 릴스 썸네일을 가져옴
+      // 현재 사진이 방어막에 의해 날아갔다면(빈칸) 새로 핀포인트 추출 실행
       if (!it.img) {
-        getTrueIgIntroCover(code).then(thumbUrl => {
-          if (thumbUrl) {
-            it.img = thumbUrl; // 방어막 통과 (ig_thumb=1 존재)
-            it.useCustomImg = true;
+        fetchStrictIntroCover(code).then(url => {
+          if (url) {
+            it.img = url; 
             refreshMapAndDom();
           }
         });
       }
     }
-    
-    if (changed) refreshMapAndDom();
+    refreshMapAndDom();
   }
 
-  setTimeout(purgeAndRestoreAllIgItems, 500);
+  setTimeout(purgeAndRebuildIgImages, 300);
 
   // =========================================================================
-  // [다른사진] 버튼 클릭 가로채기
+  // [다른사진] 클릭 이벤트: 방어막 우회 금지
   // =========================================================================
   document.addEventListener("click", async (e) => {
     const btn = e.target?.closest("button, .btn, [role='button'], a");
     if (!btn) return;
     const txt = (btn.innerText || btn.textContent || "").replace(/\s+/g, "");
 
-    // [다른사진] 클릭 시 방어
     if (txt.includes("다른사진") || txt.includes("인트로추출중")) {
       const card = btn.closest("[data-id], .item, .card, li, div");
       if (!card) return;
       
       let targetItem = null;
       if (typeof curItem !== "undefined" && curItem && extractShortcode(curItem)) targetItem = curItem;
-      else {
-        const cardTxt = card.innerText.trim();
-        targetItem = items.find(x => extractShortcode(x) && cardTxt.includes(x.name || x.title || ""));
-      }
+      else targetItem = items.find(x => extractShortcode(x) && card.innerText.includes(x.name || x.title || ""));
 
       const code = extractShortcode(targetItem);
-      if (!code) return; // 일반 장소는 건드리지 않음
+      if (!code) return; 
 
       e.preventDefault();
       e.stopPropagation();
@@ -10488,35 +10484,27 @@ ${caption || rawText}
       btn.innerText = "⏳ 릴스 인트로 추출 중...";
       showNotice("⏳ 인스타그램 릴스 인트로 사진을 불러오는 중...");
 
-      const coverUrl = await getTrueIgIntroCover(code);
+      const url = await fetchStrictIntroCover(code);
       btn.innerHTML = origHtml;
       btn.dataset.igBusy = "0";
 
-      if (coverUrl) {
-        if (targetItem) {
-          targetItem.img = coverUrl;
-          targetItem.useCustomImg = true;
-        }
-        items.filter(x => extractShortcode(x) === code).forEach(x => {
-          x.img = coverUrl;
-          x.useCustomImg = true;
-        });
+      if (url) {
+        if (targetItem) targetItem.img = url;
+        items.filter(x => extractShortcode(x) === code).forEach(x => { x.img = url; });
         
-        // 사진보기 모드로 강제 클릭
-        const allBtns = Array.from(document.querySelectorAll("button"));
-        const photoBtn = allBtns.find(b => (b.innerText || "").replace(/\s+/g, "") === "사진보기");
+        // 사진보기 탭으로 자동 이동
+        const photoBtn = Array.from(document.querySelectorAll("button")).find(b => (b.innerText || "").replace(/\s+/g, "") === "사진보기");
         if (photoBtn) { try { photoBtn.click(); } catch (_) {} }
 
         refreshMapAndDom();
         showNotice("✅ 릴스 인트로 사진 적용 완료! (지도 마커 갱신)");
       } else {
-        showNotice("⚠️ 인트로 추출 실패. 사진이 없는 상태로 유지됩니다.");
+        showNotice("⚠️ 인트로 추출 실패. 외부 사진 유입을 막기 위해 사진 없음을 유지합니다.");
       }
     }
   }, true);
-
 })();
 </script>
-<!-- === V4_SHIELD_PATCH_END === -->
+<!-- === V5_STRICT_TARGET_PATCH_END === -->
 </body>
 </html>
