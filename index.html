@@ -10318,108 +10318,26 @@ ${caption || rawText}
 
 
 
-<!-- === V3_IG_MAP_ICON_PATCH_START === -->
-<style>
-  .rapid-api-box {
-    margin: 12px 0;
-    padding: 12px;
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-  }
-  .rapid-api-box label {
-    display: block;
-    font-size: 12px;
-    font-weight: 700;
-    color: #a5b4fc;
-    margin-bottom: 6px;
-  }
-  .rapid-api-row {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-  }
-  .rapid-api-row input {
-    flex: 1;
-    min-width: 0;
-    padding: 8px 10px;
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    background: rgba(0, 0, 0, 0.35);
-    color: #fff;
-    font-size: 13px;
-  }
-  .rapid-api-row button {
-    padding: 8px 12px;
-    border-radius: 8px;
-    border: none;
-    background: #6366f1;
-    color: #fff;
-    font-weight: 600;
-    font-size: 12px;
-    cursor: pointer;
-    white-space: nowrap;
-  }
-  .rapid-api-status {
-    margin-top: 5px;
-    font-size: 11px;
-    color: #9ca3af;
-  }
-</style>
+
+<!-- === V4_SHIELD_PATCH_START === -->
 <script>
 (function() {
-  // 1. 이전에 잘못 저장된 프로필 사진(돌곰, 벌꿀오소리 등 t51.2885-19) 로컬 캐시 즉시 정리
-  try {
-    localStorage.removeItem("TRIP_IG_THUMBS");
-    localStorage.removeItem("TRIP_IG_FULL_CACHE");
-    localStorage.removeItem("TRIP_IG_FULL_CACHE_V2");
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (!k) continue;
-      const v = localStorage.getItem(k) || "";
-      if (v.includes("t51.2885-19")) {
-        try {
-          const parsed = JSON.parse(v);
-          if (parsed && typeof parsed === "object") {
-            let dirty = false;
-            for (const pk of Object.keys(parsed)) {
-              if (JSON.stringify(parsed[pk]).includes("t51.2885-19")) {
-                delete parsed[pk];
-                dirty = true;
-              }
-            }
-            if (dirty) localStorage.setItem(k, JSON.stringify(parsed));
-          }
-        } catch (_) {}
-      }
-    }
-  } catch (_) {}
+  const IG_THUMB_MARKER = "ig_thumb=1";
 
-  const VERIFIED_CACHE_KEY = "TRIP_IG_VERIFIED_COVER_V3";
-  const verifiedCoverByCode = JSON.parse(localStorage.getItem(VERIFIED_CACHE_KEY) || "{}");
-
-  function saveVerifiedCover(code, url) {
-    if (!code || !url || isAvatarOrBadUrl(url)) return;
-    verifiedCoverByCode[code] = url;
-    try {
-      localStorage.setItem(VERIFIED_CACHE_KEY, JSON.stringify(verifiedCoverByCode));
-    } catch (_) {}
+  function isAvatarOrBadUrl(url) {
+    if (!url) return true;
+    let d = url;
+    try { d = decodeURIComponent(url); } catch (_) {}
+    if (/t51\.2885-19/i.test(d)) return true;
+    if (/profile_pic|s150x150|p150x150|150x150|s320x320|p320x320|320x320|static\.cdninstagram|rsrc\.php|\.mp4/i.test(d)) return true;
+    return false;
   }
 
-  const RAPID_KEYS = ["RAPID_API_KEY", "rapidApiKey", "rapidapi_key", "TRIP_RAPID_API_KEY"];
-  function getRapidKey() {
-    for (const k of RAPID_KEYS) {
-      const v = (localStorage.getItem(k) || "").trim();
-      if (v) return v;
-    }
-    return "";
-  }
-  function setRapidKey(val) {
-    const clean = (val || "").trim();
-    for (const k of RAPID_KEYS) {
-      if (clean) localStorage.setItem(k, clean);
-      else localStorage.removeItem(k);
-    }
+  function extractShortcode(input) {
+    if (!input) return "";
+    let s = typeof input === "string" ? input : JSON.stringify(input);
+    const m = s.match(/(?:instagram\.com|instagr\.am)\/(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)/i);
+    return m && m[1] ? m[1] : "";
   }
 
   function showNotice(msg) {
@@ -10427,10 +10345,10 @@ ${caption || rawText}
       if (typeof showToast === "function") { showToast(msg); return; }
       if (typeof toast === "function") { toast(msg); return; }
     } catch (_) {}
-    let el = document.getElementById("v3-ig-toast");
+    let el = document.getElementById("shield-ig-toast");
     if (!el) {
       el = document.createElement("div");
-      el.id = "v3-ig-toast";
+      el.id = "shield-ig-toast";
       el.style.cssText = "position:fixed;bottom:85px;left:50%;transform:translateX(-50%);background:rgba(18,18,26,0.96);color:#fff;padding:10px 18px;border-radius:999px;font-size:13px;font-weight:600;z-index:999999;border:1px solid rgba(255,255,255,0.2);box-shadow:0 8px 24px rgba(0,0,0,0.5);pointer-events:none;transition:opacity 0.2s;";
       document.body.appendChild(el);
     }
@@ -10440,371 +10358,124 @@ ${caption || rawText}
     el._t = setTimeout(() => { el.style.opacity = "0"; }, 2600);
   }
 
-  function cleanIgUrl(raw) {
-    if (!raw || typeof raw !== "string") return "";
-    return raw
-      .replace(/\\+u0026/gi, "&")
-      .replace(/\\+u002f/gi, "/")
-      .replace(/\\+u003d/gi, "=")
-      .replace(/\\+u003f/gi, "?")
-      .replace(/\\+\//g, "/")
-      .replace(/&amp;/gi, "&")
-      .replace(/&#x26;/gi, "&")
-      .replace(/&#38;/gi, "&")
-      .replace(/\\+/g, "")
-      .replace(/^["']+|["']+$/g, "")
-      .trim();
-  }
+  // =========================================================================
+  // 핵심: 외부 사진 차단 방어막 (Shield)
+  // 기존 앱의 위키/구글 사진 검색기가 인스타 항목에 외부 사진을 덮어씌우는 것을 원천 봉쇄
+  // =========================================================================
+  function applyIgPhotoShield(it) {
+    if (!it || typeof it !== "object" || it._igShieldApplied) return;
+    it._igShieldApplied = true;
 
-  // 작성자 프로필 사진(t51.2885-19)인지 판별 (weserv로 감싸진 URL 내부까지 검사)
-  function isAvatarOrBadUrl(url) {
-    if (!url || typeof url !== "string") return true;
-    let decoded = url;
-    try { decoded = decodeURIComponent(url); } catch (_) {}
-    if (/t51\.2885-19/i.test(url) || /t51\.2885-19/i.test(decoded)) return true;
-    if (/profile_pic|s150x150|p150x150|150x150|static\.cdninstagram|rsrc\.php|\.mp4/i.test(decoded)) return true;
-    return false;
-  }
-
-  function toWeservUrl(rawUrl) {
-    const clean = cleanIgUrl(rawUrl);
-    if (!/^https?:\/\//i.test(clean) || isAvatarOrBadUrl(clean)) return "";
-    if (clean.includes("images.weserv.nl")) return clean;
-    return `https://images.weserv.nl/?url=${encodeURIComponent(clean)}&w=640&h=640&fit=cover&output=jpg&q=85`;
-  }
-
-  function extractShortcode(input) {
-    if (!input) return "";
-    let s = "";
-    if (typeof input === "string") s = input;
-    else if (typeof input === "object") {
-      s = [input.url, input.snsUrl, input.link, input.reelUrl, input.sourceUrl, input.originUrl, input.info, input.memo]
-        .filter(v => typeof v === "string")
-        .join(" ");
+    // 현재 사진이 가짜(아바타)거나 마커가 없는 위키 사진이면 즉시 삭제
+    let currentImg = it.img || "";
+    if (currentImg && (!currentImg.includes(IG_THUMB_MARKER) || isAvatarOrBadUrl(currentImg))) {
+      currentImg = "";
     }
-    const m = s.match(/(?:instagram\.com|instagr\.am)\/(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)/i);
-    return m && m[1] ? m[1] : "";
-  }
 
-  function verifyImageLoads(url, timeoutMs = 6500) {
-    return new Promise((resolve) => {
-      if (!url || isAvatarOrBadUrl(url)) return resolve(false);
-      const img = new Image();
-      let done = false;
-      const timer = setTimeout(() => {
-        if (!done) { done = true; resolve(false); }
-      }, timeoutMs);
-      img.onload = () => {
-        if (!done) {
-          done = true;
-          clearTimeout(timer);
-          resolve(img.naturalWidth > 20);
+    // property 강제 고정: 앞으로 들어오는 모든 사진을 검사
+    Object.defineProperty(it, 'img', {
+      configurable: true,
+      enumerable: true,
+      get() { return this._rawImg || ""; },
+      set(val) {
+        if (!val) { this._rawImg = ""; return; }
+        // 조건에 안 맞으면(인증 꼬리표가 없거나 아바타면) 거부하고 빈칸 유지!
+        if (!val.includes(IG_THUMB_MARKER) || isAvatarOrBadUrl(val)) {
+          this._rawImg = "";
+          return;
         }
-      };
-      img.onerror = () => {
-        if (!done) {
-          done = true;
-          clearTimeout(timer);
-          resolve(false);
-        }
-      };
-      img.src = url;
+        this._rawImg = val;
+      }
     });
+
+    it.img = currentImg; // 방어막 테스트 및 초기화
   }
 
-  // 클라이언트 측 임베드 HTML 파서 (상단 프로필 아바타 제거 + contextJSON & -15 미디어 버킷 추출)
-  function extractMediaFromEmbedHtml(html) {
-    if (!html || typeof html !== "string") return "";
-
-    // 1) contextJSON 파싱
-    const ctxMatch = html.match(/contextJSON"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-    if (ctxMatch && ctxMatch[1]) {
-      try {
-        const unescaped = JSON.parse('"' + ctxMatch[1] + '"');
-        const mediaMatches = unescaped.match(/https?:\\?\/\\?\/[^\s"'<>\\]+?(?:cdninstagram\.com|fbcdn\.net)[^\s"'<>\\]+/gi) || [];
-        for (const rawM of mediaMatches) {
-          const c = cleanIgUrl(rawM);
-          if (!isAvatarOrBadUrl(c)) return c;
-        }
-      } catch (_) {}
-    }
-
-    // 2) Header 영역 제거 후 EmbeddedMediaImage 또는 -15 미디어 경로 추출
-    const bodyOnly = html.replace(/<div[^>]+class="[^"]*Header[^"]*"[\s\S]*?<\/div>\s*<\/div>/i, "");
-    const imgMatch = bodyOnly.match(/<img[^>]+class="[^"]*EmbeddedMediaImage[^"]*"[^>]*>/i);
-    if (imgMatch) {
-      const srcM = imgMatch[0].match(/src="([^"]+)"/i);
-      if (srcM && srcM[1] && !isAvatarOrBadUrl(srcM[1])) return cleanIgUrl(srcM[1]);
-    }
-
-    const cleanedHtml = cleanIgUrl(bodyOnly);
-    const bucketMatches = cleanedHtml.match(/https:\/\/[^\s"'<>\\]+?(?:cdninstagram\.com|fbcdn\.net)[^\s"'<>\\]+?\/t51\.(?:2885|29350|71878|75761)-15\/[^\s"'<>\\]+/gi) || [];
-    for (const bUrl of bucketMatches) {
-      if (!isAvatarOrBadUrl(bUrl)) return cleanIgUrl(bUrl);
-    }
-
-    return "";
-  }
-
-  // 다중 레이어 인스타 인트로 커버 추출 (프로필 사진 100% 배제)
-  async function getTrueIgIntroCover(code, forceRefresh = false) {
+  // =========================================================================
+  // 릴스 인트로 사진 서버리스 백그라운드 추출
+  // =========================================================================
+  async function getTrueIgIntroCover(code) {
     if (!code) return "";
-    if (!forceRefresh && verifiedCoverByCode[code] && !isAvatarOrBadUrl(verifiedCoverByCode[code])) {
-      const ok = await verifyImageLoads(verifiedCoverByCode[code]);
-      if (ok) return verifiedCoverByCode[code];
-    }
-
     const apiBase = location.hostname.includes("vercel.app") ? "" : "https://trip-app-psi-two.vercel.app";
-    const rapidKey = getRapidKey();
-    const candidates = [];
-
-    // 1) Vercel 서버리스 API (/api/ig) 호출
     try {
-      const res = await fetch(`${apiBase}/api/ig?code=${encodeURIComponent(code)}&key=${encodeURIComponent(rapidKey)}`);
+      const res = await fetch(`${apiBase}/api/ig?code=${encodeURIComponent(code)}`);
       if (res.ok) {
         const data = await res.json();
-        if (data.weservThumb && !isAvatarOrBadUrl(data.weservThumb)) candidates.push(data.weservThumb);
-        if (data.thumb && !isAvatarOrBadUrl(data.thumb)) candidates.push(toWeservUrl(data.thumb));
+        if (data.weservThumb && !isAvatarOrBadUrl(data.weservThumb)) {
+          return data.weservThumb;
+        }
       }
     } catch (_) {}
-
-    // 2) 브라우저 측에서 직접 임베드 프록시 & Jina Reader 호출 (백업)
-    if (candidates.length === 0) {
-      const embedUrl = `https://www.instagram.com/p/${code}/embed/captioned/`;
-      const proxyList = [
-        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(embedUrl)}`,
-        `https://corsproxy.io/?${encodeURIComponent(embedUrl)}`,
-        `https://api.allorigins.win/raw?url=${encodeURIComponent(embedUrl)}`
-      ];
-      for (const pUrl of proxyList) {
-        try {
-          const r = await fetch(pUrl);
-          if (r.ok) {
-            const html = await r.text();
-            const found = extractMediaFromEmbedHtml(html);
-            if (found && !isAvatarOrBadUrl(found)) {
-              candidates.push(toWeservUrl(found));
-              break;
-            }
-          }
-        } catch (_) {}
-      }
-    }
-
-    if (candidates.length === 0) {
-      try {
-        const jr = await fetch(`https://r.jina.ai/https://www.instagram.com/p/${code}/embed/captioned/`, {
-          headers: { "Accept": "text/plain" }
-        });
-        if (jr.ok) {
-          const jtxt = await jr.text();
-          const re = /!\[[^\]]*\]\((https:\/\/[^\s)]+)\)/gi;
-          let m;
-          while ((m = re.exec(jtxt)) !== null) {
-            const c = cleanIgUrl(m[1]);
-            if (!isAvatarOrBadUrl(c) && (c.includes("cdninstagram") || c.includes("fbcdn"))) {
-              candidates.push(toWeservUrl(c));
-              break;
-            }
-          }
-        }
-      } catch (_) {}
-    }
-
-    for (const cand of candidates) {
-      if (!cand || isAvatarOrBadUrl(cand)) continue;
-      const ok = await verifyImageLoads(cand);
-      if (ok) {
-        saveVerifiedCover(code, cand);
-        return cand;
-      }
-    }
     return "";
   }
 
-  // ============================================================================
-  // 2. 아이템 사진 영구 고정(Lock) 및 목록 + 모달 + 지도(마커·하단카드) 동시 갱신
-  // ============================================================================
-  function lockAndApplyPhotoToItem(it, coverUrl) {
-    if (!it || typeof it !== "object" || !coverUrl || isAvatarOrBadUrl(coverUrl)) return;
-
-    const oldImg = it._rawImg || it.img || "";
-    it._lockedIgCover = coverUrl;
-    it.useCustomImg = true;
-    it.customImg = coverUrl;
-    it.photo = coverUrl;
-    it.thumb = coverUrl;
-
-    // index.html 내부의 외부 사진 로더가 it.img를 돌곰/벌꿀오소리/위키사진으로 덮어쓰지 못하도록 프로퍼티 Lock 설정
-    try {
-      Object.defineProperty(it, "img", {
-        configurable: true,
-        enumerable: true,
-        get() {
-          return this._lockedIgCover || this._rawImg || "";
-        },
-        set(val) {
-          if (this._lockedIgCover && (!val || isAvatarOrBadUrl(val) || !val.includes("weserv.nl"))) {
-            return;
-          }
-          this._rawImg = val;
-        }
-      });
-      it._rawImg = coverUrl;
-    } catch (_) {
-      it.img = coverUrl;
-    }
-
-    // index.html 내부 전역 사진 캐시 객체가 있으면 함께 갱신
-    for (const cacheName of ["photoCache", "imgCache", "thumbCache", "placePhotoCache"]) {
-      try {
-        const cObj = window[cacheName];
-        if (cObj && typeof cObj === "object") {
-          if (it.id) cObj[it.id] = coverUrl;
-          if (it.name) cObj[it.name] = coverUrl;
-          if (it.title) cObj[it.title] = coverUrl;
-        }
-      } catch (_) {}
-    }
-
-    return oldImg;
-  }
-
-  function refreshAllViewsAndMap(targetItem, newCoverUrl, oldImgUrl) {
-    const itemTitle = (targetItem?.name || targetItem?.title || "").trim();
-
-    // 1) 기본 저장 및 렌더링 함수 호출
+  function refreshMapAndDom() {
     try { if (typeof save === "function") save(); } catch (_) {}
     try { if (typeof render === "function") render(); } catch (_) {}
-
-    // 2) index.html 내부의 지도 마커 갱신 함수가 있으면 모두 호출
-    for (const fnName of ["renderMap", "updateMap", "drawMap", "refreshMap", "renderMapMarkers", "updateMarkers", "renderBottomCards"]) {
-      try {
-        if (typeof window[fnName] === "function") window[fnName]();
-      } catch (_) {}
-    }
-
-    // 3) 현재 DOM에 렌더링된 모든 이미지(모달 상단, 목록 카드, 지도 위 마커, 지도 하단 슬라이드 카드) 즉시 교체
-    const applyDomUpdate = () => {
-      document.querySelectorAll("img").forEach((imgEl) => {
-        const src = imgEl.getAttribute("src") || "";
-        const cardNode = imgEl.closest("[data-id], .item, .card, li, div");
-        const cardText = (cardNode?.innerText || "").trim();
-
-        const isOldMatch = oldImgUrl && src === oldImgUrl;
-        const isAvatarMatch = isAvatarOrBadUrl(src) && itemTitle && cardText.includes(itemTitle);
-        const isTitleMatch = itemTitle && cardText.includes(itemTitle) && imgEl.clientWidth >= 32;
-
-        if (isOldMatch || isAvatarMatch || isTitleMatch) {
-          imgEl.src = newCoverUrl;
-          imgEl.style.display = "block";
-          imgEl.style.objectFit = "cover";
-        }
-      });
-
-      // 지도 마커나 카드 중 background-image로 렌더링된 요소도 즉시 교체
-      document.querySelectorAll("[style*='background']").forEach((el) => {
-        const bg = el.style.backgroundImage || "";
-        if (!bg) return;
-        const txt = (el.innerText || el.parentElement?.innerText || "").trim();
-        if ((oldImgUrl && bg.includes(oldImgUrl)) || (itemTitle && txt.includes(itemTitle)) || isAvatarOrBadUrl(bg)) {
-          el.style.backgroundImage = `url("${newCoverUrl}")`;
-        }
-      });
-    };
-
-    applyDomUpdate();
-    setTimeout(applyDomUpdate, 150);
-    setTimeout(applyDomUpdate, 500);
+    try {
+      if (typeof renderMap === "function") renderMap();
+      else if (typeof updateMarkers === "function") updateMarkers();
+    } catch (_) {}
   }
 
-  function resolveTargetItem(clickedEl) {
-    if (typeof curItem !== "undefined" && curItem && typeof curItem === "object") {
-      const c = extractShortcode(curItem);
-      if (c) return { item: curItem, code: c };
-    }
-    const inputs = Array.from(document.querySelectorAll("input, textarea"));
-    for (const inp of inputs) {
-      if (inp.offsetParent !== null) {
-        const c = extractShortcode(inp.value || "");
-        if (c) {
-          const found = (typeof items !== "undefined" && Array.isArray(items))
-            ? items.find(it => extractShortcode(it) === c)
-            : null;
-          return { item: found, code: c };
-        }
-      }
-    }
-    if (clickedEl && typeof items !== "undefined" && Array.isArray(items)) {
-      const card = clickedEl.closest("[data-id], .item, .card, li, div");
-      if (card) {
-        const txt = (card.innerText || "").trim();
-        for (const it of items) {
-          const name = (it.name || it.title || "").trim();
-          if (name && txt.includes(name)) {
-            const c = extractShortcode(it);
-            if (c) return { item: it, code: c };
+  // =========================================================================
+  // 앱 실행 시 오염된 사진 일괄 삭제 (빈칸 만들기) 및 백그라운드 재추출
+  // =========================================================================
+  let isPurged = false;
+  async function purgeAndRestoreAllIgItems() {
+    if (isPurged || typeof items === "undefined" || !Array.isArray(items)) return;
+    isPurged = true;
+    let changed = false;
+
+    for (const it of items) {
+      const code = extractShortcode(it);
+      if (!code) continue;
+
+      const before = it.img || "";
+      applyIgPhotoShield(it);
+      const after = it.img || "";
+      
+      if (before !== after) changed = true;
+
+      // 방어막에 의해 사진이 빈칸("")이 된 경우, 진짜 릴스 썸네일을 가져옴
+      if (!it.img) {
+        getTrueIgIntroCover(code).then(thumbUrl => {
+          if (thumbUrl) {
+            it.img = thumbUrl; // 방어막 통과 (ig_thumb=1 존재)
+            it.useCustomImg = true;
+            refreshMapAndDom();
           }
-        }
+        });
       }
     }
-    return { item: null, code: "" };
+    
+    if (changed) refreshMapAndDom();
   }
 
-  // ============================================================================
-  // 3. [🔄 다른사진] 및 [🖼️ 사진보기] 클릭 처리 (화면 깜빡임·원복 현상 완전 제거)
-  // ============================================================================
+  setTimeout(purgeAndRestoreAllIgItems, 500);
+
+  // =========================================================================
+  // [다른사진] 버튼 클릭 가로채기
+  // =========================================================================
   document.addEventListener("click", async (e) => {
     const btn = e.target?.closest("button, .btn, [role='button'], a");
     if (!btn) return;
+    const txt = (btn.innerText || btn.textContent || "").replace(/\s+/g, "");
 
-    const rawText = (btn.innerText || btn.textContent || "").replace(/\s+/g, "");
-
-    // [지도] 탭을 누를 때 변경된 사진이 마커에 즉시 반영되도록 동기화
-    if (rawText === "지도" || rawText === "내지도" || rawText === "지도보기") {
-      setTimeout(() => {
-        if (typeof items !== "undefined" && Array.isArray(items)) {
-          for (const it of items) {
-            const code = extractShortcode(it);
-            if (code && verifiedCoverByCode[code]) {
-              const old = lockAndApplyPhotoToItem(it, verifiedCoverByCode[code]);
-              refreshAllViewsAndMap(it, verifiedCoverByCode[code], old);
-            }
-          }
-        }
-      }, 120);
-      return;
-    }
-
-    // [사진보기] 클릭 시: 만약 현재 사진이 프로필 아바타(돌곰/벌꿀오소리)라면 진짜 릴스 인트로로 즉시 교체
-    if (rawText === "사진보기") {
-      const { item, code } = resolveTargetItem(btn);
-      if (code) {
-        const cached = verifiedCoverByCode[code];
-        if (cached && !isAvatarOrBadUrl(cached)) {
-          setTimeout(() => {
-            document.querySelectorAll("img").forEach((im) => {
-              if (im.clientWidth > 140 && im.clientHeight > 100) im.src = cached;
-            });
-          }, 50);
-        } else if (item && isAvatarOrBadUrl(item.img)) {
-          const coverUrl = await getTrueIgIntroCover(code, true);
-          if (coverUrl) {
-            const old = lockAndApplyPhotoToItem(item, coverUrl);
-            refreshAllViewsAndMap(item, coverUrl, old);
-          }
-        }
+    // [다른사진] 클릭 시 방어
+    if (txt.includes("다른사진") || txt.includes("인트로추출중")) {
+      const card = btn.closest("[data-id], .item, .card, li, div");
+      if (!card) return;
+      
+      let targetItem = null;
+      if (typeof curItem !== "undefined" && curItem && extractShortcode(curItem)) targetItem = curItem;
+      else {
+        const cardTxt = card.innerText.trim();
+        targetItem = items.find(x => extractShortcode(x) && cardTxt.includes(x.name || x.title || ""));
       }
-      return;
-    }
 
-    if (rawText.includes("다른사진") || rawText.includes("인트로추출중")) {
-      btn.dataset.igPhotoBtn = "1";
-    }
-
-    if (btn.dataset.igPhotoBtn === "1") {
-      const { item, code } = resolveTargetItem(btn);
-      if (!code) return;
+      const code = extractShortcode(targetItem);
+      if (!code) return; // 일반 장소는 건드리지 않음
 
       e.preventDefault();
       e.stopPropagation();
@@ -10814,173 +10485,38 @@ ${caption || rawText}
       btn.dataset.igBusy = "1";
       const origHtml = btn.dataset.origHtml || btn.innerHTML;
       btn.dataset.origHtml = origHtml;
-      btn.innerText = "⏳ 인스타 인트로 추출 중...";
+      btn.innerText = "⏳ 릴스 인트로 추출 중...";
       showNotice("⏳ 인스타그램 릴스 인트로 사진을 불러오는 중...");
 
-      const coverUrl = await getTrueIgIntroCover(code, true);
+      const coverUrl = await getTrueIgIntroCover(code);
       btn.innerHTML = origHtml;
       btn.dataset.igBusy = "0";
 
       if (coverUrl) {
-        let oldUrl = "";
-        if (typeof items !== "undefined" && Array.isArray(items)) {
-          for (const it of items) {
-            if (extractShortcode(it) === code) {
-              oldUrl = lockAndApplyPhotoToItem(it, coverUrl) || oldUrl;
-            }
-          }
+        if (targetItem) {
+          targetItem.img = coverUrl;
+          targetItem.useCustomImg = true;
         }
-        if (item) {
-          oldUrl = lockAndApplyPhotoToItem(item, coverUrl) || oldUrl;
-        }
-
-        // 모달 상단 뷰어를 [사진보기] 모드로 고정 후 새 인트로 사진 표시
+        items.filter(x => extractShortcode(x) === code).forEach(x => {
+          x.img = coverUrl;
+          x.useCustomImg = true;
+        });
+        
+        // 사진보기 모드로 강제 클릭
         const allBtns = Array.from(document.querySelectorAll("button"));
         const photoBtn = allBtns.find(b => (b.innerText || "").replace(/\s+/g, "") === "사진보기");
-        if (photoBtn) {
-          try { photoBtn.click(); } catch (_) {}
-        }
+        if (photoBtn) { try { photoBtn.click(); } catch (_) {} }
 
-        refreshAllViewsAndMap(item, coverUrl, oldUrl);
-
-        setTimeout(() => {
-          document.querySelectorAll("img").forEach((im) => {
-            if (im.clientWidth > 140 && im.clientHeight > 100) {
-              im.src = coverUrl;
-              im.style.objectFit = "cover";
-            }
-          });
-        }, 60);
-
-        showNotice("✅ 인스타그램 릴스 인트로 사진으로 적용되었습니다!");
+        refreshMapAndDom();
+        showNotice("✅ 릴스 인트로 사진 적용 완료! (지도 마커 갱신)");
       } else {
-        showNotice("⚠️ 인스타 인트로 사진을 가져오지 못했습니다. RapidAPI 키를 확인해 주세요.");
+        showNotice("⚠️ 인트로 추출 실패. 사진이 없는 상태로 유지됩니다.");
       }
-      return;
     }
   }, true);
 
-  // ============================================================================
-  // 4. 앱 시작 시 잘못 저장된 프로필 사진(돌곰/벌꿀오소리 등 t51.2885-19) 1회 자동 교체
-  // ============================================================================
-  let startupChecked = false;
-  async function autoFixAvatarItemsOnce() {
-    if (startupChecked || typeof items === "undefined" || !Array.isArray(items) || items.length === 0) return;
-    startupChecked = true;
-
-    for (const it of items) {
-      if (!it || typeof it !== "object") continue;
-      const code = extractShortcode(it);
-      if (!code) continue;
-
-      // 이미 검증된 커버가 캐시에 있으면 즉시 Lock 적용
-      if (verifiedCoverByCode[code] && !isAvatarOrBadUrl(verifiedCoverByCode[code])) {
-        const old = lockAndApplyPhotoToItem(it, verifiedCoverByCode[code]);
-        refreshAllViewsAndMap(it, verifiedCoverByCode[code], old);
-        continue;
-      }
-
-      // 현재 사진이 작성자 프로필 사진(t51.2885-19: 돌곰, 벌꿀오소리 등)이거나 비어있으면 실제 인트로 커버로 교체
-      if (!it.img || isAvatarOrBadUrl(it.img)) {
-        getTrueIgIntroCover(code, true).then((coverUrl) => {
-          if (coverUrl) {
-            const old = lockAndApplyPhotoToItem(it, coverUrl);
-            refreshAllViewsAndMap(it, coverUrl, old);
-          }
-        });
-      }
-    }
-  }
-
-  setTimeout(autoFixAvatarItemsOnce, 1200);
-  setTimeout(autoFixAvatarItemsOnce, 3500);
-
-  // ============================================================================
-  // 5. 구글 지도 검색어 정제 (스폰서 광고 목록 방지)
-  // ============================================================================
-  function cleanGoogleMapsQuery(rawQuery) {
-    if (!rawQuery || typeof rawQuery !== "string") return rawQuery;
-    let q = rawQuery.replace(/「?いいね！?」?/g, "").trim();
-    const postalIdx = q.search(/〒\s*\d{3}[-−–]\d{4}/);
-    if (postalIdx !== -1) {
-      return q.slice(postalIdx).replace(/[−–—]/g, "-").replace(/\s+/g, " ").trim();
-    }
-    const enAddrMatch = q.match(/(\d+\s*[-−–]\s*\d+\s+[A-Za-z]+[\s,]+[A-Za-z\s,0-9-]+)/);
-    if (enAddrMatch && enAddrMatch[1] && enAddrMatch[1].length >= 15) {
-      return enAddrMatch[1].replace(/[−–—]/g, "-").trim();
-    }
-    const jpAddrMatch = q.match(/((?:大阪府|京都府|東京都|兵庫県|奈良県|福岡県|北海道)[^\s]+?(?:\d+丁目|\d+[-−]\d+)[^\n]*)/);
-    if (jpAddrMatch && jpAddrMatch[1]) {
-      return jpAddrMatch[1].replace(/[−–—]/g, "-").trim();
-    }
-    return q.replace(/^일본\s+/i, "").replace(/[−–—]/g, "-").trim();
-  }
-
-  function rewriteGoogleMapsUrl(url) {
-    if (typeof url !== "string") return url;
-    if (!url.includes("google.com/maps") && !url.includes("maps.google.")) return url;
-    try {
-      const u = new URL(url, location.origin);
-      for (const param of ["query", "q", "destination", "daddr"]) {
-        if (u.searchParams.has(param)) {
-          const orig = u.searchParams.get(param);
-          const cleaned = cleanGoogleMapsQuery(orig);
-          if (cleaned && cleaned !== orig) u.searchParams.set(param, cleaned);
-        }
-      }
-      return u.toString();
-    } catch (_) {
-      return url;
-    }
-  }
-
-  const _origOpen = window.open;
-  window.open = function(url, ...rest) {
-    return _origOpen.call(this, rewriteGoogleMapsUrl(url), ...rest);
-  };
-
-  document.addEventListener("click", (e) => {
-    const a = e.target?.closest("a[href]");
-    if (a && a.href && (a.href.includes("google.com/maps") || a.href.includes("maps.google."))) {
-      a.href = rewriteGoogleMapsUrl(a.href);
-    }
-  }, true);
-
-  // 상세 도구 RapidAPI Key 입력칸 유지
-  const observer = new MutationObserver(() => {
-    const reanalyzeBtn = Array.from(document.querySelectorAll("button")).find(
-      el => (el.innerText || "").includes("캡션 재분석")
-    );
-    if (reanalyzeBtn && !document.getElementById("rapid-key-inline-box")) {
-      const container = reanalyzeBtn.closest("div")?.parentElement;
-      if (!container) return;
-      const box = document.createElement("div");
-      box.id = "rapid-key-inline-box";
-      box.className = "rapid-api-box";
-      const curKey = getRapidKey();
-      box.innerHTML = `
-        <label>🔑 RapidAPI Key (선택사항)</label>
-        <div class="rapid-api-row">
-          <input type="password" id="rapid-key-inline-input" placeholder="X-RapidAPI-Key 입력" value="${curKey}">
-          <button type="button" id="rapid-key-inline-save">저장</button>
-        </div>
-        <div class="rapid-api-status" id="rapid-key-inline-status">
-          ${curKey ? "✅ 백업용 RapidAPI 키가 저장되어 있습니다." : "ℹ️ 프로필 사진(돌곰/벌꿀오소리 등)을 제외하고 실제 릴스 인트로만 추출합니다."}
-        </div>
-      `;
-      container.appendChild(box);
-      box.querySelector("#rapid-key-inline-save").onclick = () => {
-        const val = box.querySelector("#rapid-key-inline-input").value;
-        setRapidKey(val);
-        box.querySelector("#rapid-key-inline-status").innerText = val.trim()
-          ? "✅ 저장 완료!"
-          : "ℹ️ RapidAPI 키가 초기화되었습니다.";
-      };
-    }
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
 })();
 </script>
-<!-- === V3_IG_MAP_ICON_PATCH_END === -->
+<!-- === V4_SHIELD_PATCH_END === -->
 </body>
 </html>
