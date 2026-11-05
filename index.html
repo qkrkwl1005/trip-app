@@ -12380,5 +12380,305 @@ ${caption || rawText}
 })();
 </script>
 <!-- === UX_SUPER_PATCH_V8_END === -->
+<!-- === V9_TOOLBAR_AND_ICONS_START === -->
+<style>
+  /* 1. 빨간 박스 영역(전체일차/일차미정 줄, 정렬 셀렉트, 날짜 입력칸, 원터치 일차바) 완전 제거 */
+  #sfb-days,
+  #sfb-sort,
+  #sfb-apply-order,
+  #v8QuickDayBar,
+  #smartFilterBar input[type="date"],
+  #smartFilterBar select {
+    display: none !important;
+  }
+
+  /* 2. 하단 3개 기능 버튼(좌표완료만, 수동 순서편집, 중복 찾기) 최적 3열 배치 */
+  #smartFilterBar {
+    margin: 4px 0 8px 0 !important;
+    padding: 8px !important;
+    border-radius: 16px !important;
+    background: var(--s) !important;
+    border: 1px solid var(--bd) !important;
+  }
+  #v9ActionGrid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    width: 100%;
+  }
+  .v9-tool-btn {
+    min-height: 40px;
+    padding: 8px 6px;
+    border-radius: 12px;
+    border: 1px solid var(--bd2);
+    background: var(--s2);
+    color: var(--tx);
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+  }
+  .v9-tool-btn:active {
+    transform: scale(0.96);
+  }
+  .v9-tool-btn .ms {
+    font-size: 17px;
+  }
+  .v9-tool-btn.on {
+    background: var(--pr);
+    color: #fff;
+    border-color: var(--pr);
+    box-shadow: 0 3px 10px rgba(59, 130, 246, 0.28);
+  }
+
+  /* 수동 순서편집 모드가 켜졌을 때만 드래그 핸들 노출 */
+  .v8-drag-handle {
+    display: none !important;
+  }
+  body.v9-manual-sort-on .v8-drag-handle {
+    display: inline-flex !important;
+    color: var(--pr);
+    padding: 6px 4px 6px 0;
+  }
+</style>
+
+<script>
+(function initV9ToolbarAndIcons() {
+  let manualSortMode = false;
+  let onlyCoordMode = false;
+
+  /* 이모지 -> Google Material Symbols Outlined 매핑 테이블 */
+  const EMOJI_TO_MS = [
+    [/🟢/g, '<span class="ms fill" style="color:var(--ok);font-size:15px">check_circle</span>'],
+    [/🔴/g, '<span class="ms fill" style="color:var(--dg);font-size:15px">error</span>'],
+    [/⚪/g, '<span class="ms" style="font-size:15px">radio_button_unchecked</span>'],
+    [/📍|📌/g, '<span class="ms" style="font-size:16px">location_on</span>'],
+    [/☕/g, '<span class="ms" style="font-size:16px">local_cafe</span>'],
+    [/🍙|🍜|🥣/g, '<span class="ms" style="font-size:16px">restaurant</span>'],
+    [/🛍️/g, '<span class="ms" style="font-size:16px">shopping_bag</span>'],
+    [/⭐/g, '<span class="ms fill" style="color:#fbbf24;font-size:16px">star</span>'],
+    [/🎬/g, '<span class="ms" style="font-size:16px">movie</span>'],
+    [/🗓️|📅/g, '<span class="ms" style="font-size:16px">calendar_today</span>'],
+    [/⏳/g, '<span class="ms" style="font-size:16px">hourglass_empty</span>'],
+    [/🕒|⏰/g, '<span class="ms" style="font-size:16px">schedule</span>'],
+    [/🏨/g, '<span class="ms" style="font-size:16px">hotel</span>'],
+    [/⛩️/g, '<span class="ms" style="font-size:16px">temple_buddhist</span>'],
+    [/🌊/g, '<span class="ms" style="font-size:16px">waves</span>'],
+    [/🧭/g, '<span class="ms" style="font-size:16px">explore</span>'],
+    [/⚡/g, '<span class="ms fill" style="font-size:16px">bolt</span>'],
+    [/🔥/g, '<span class="ms fill" style="font-size:16px">local_fire_department</span>'],
+    [/🔒/g, '<span class="ms" style="font-size:16px">lock</span>'],
+    [/🔓/g, '<span class="ms" style="font-size:16px">lock_open</span>'],
+    [/🙋/g, '<span class="ms" style="font-size:16px">person_raised_hand</span>'],
+    [/👥/g, '<span class="ms" style="font-size:16px">group</span>'],
+    [/👑/g, '<span class="ms fill" style="color:#fbbf24;font-size:16px">workspace_premium</span>'],
+    [/👤/g, '<span class="ms" style="font-size:16px">person</span>'],
+    [/✅/g, '<span class="ms fill" style="color:var(--ok);font-size:16px">check_circle</span>'],
+    [/⚠️/g, '<span class="ms" style="color:#f59e0b;font-size:16px">warning</span>'],
+    [/🗑️/g, '<span class="ms" style="font-size:16px">delete</span>'],
+    [/📋/g, '<span class="ms" style="font-size:16px">content_paste</span>'],
+    [/🗺️|🗺/g, '<span class="ms" style="font-size:16px">map</span>'],
+    [/🚕/g, '<span class="ms" style="font-size:16px">local_taxi</span>'],
+    [/✈️/g, '<span class="ms" style="font-size:16px">flight_takeoff</span>'],
+    [/🔄|↻/g, '<span class="ms" style="font-size:16px">sync</span>'],
+    [/↩️/g, '<span class="ms" style="font-size:16px">undo</span>'],
+    [/↕️/g, '<span class="ms" style="font-size:16px">swap_vert</span>'],
+    [/📴/g, '<span class="ms" style="font-size:16px">cloud_off</span>'],
+    [/☁️/g, '<span class="ms" style="font-size:16px">cloud_upload</span>'],
+    [/💾/g, '<span class="ms" style="font-size:16px">save</span>'],
+    [/📂/g, '<span class="ms" style="font-size:16px">folder_open</span>'],
+    [/🚪/g, '<span class="ms" style="font-size:16px">logout</span>'],
+    [/🔍/g, '<span class="ms" style="font-size:16px">search</span>'],
+    [/💡/g, '<span class="ms" style="font-size:16px">lightbulb</span>'],
+    [/🎯/g, '<span class="ms" style="font-size:16px">center_focus_strong</span>'],
+    [/🔗/g, '<span class="ms" style="font-size:16px">link</span>'],
+    [/👁️/g, '<span class="ms" style="font-size:16px">visibility</span>']
+  ];
+
+  function replaceEmojisInElement(root) {
+    if (!root) return;
+    // select option 내부의 이모지는 깔끔하게 텍스트만 남김
+    root.querySelectorAll("option").forEach(opt => {
+      EMOJI_TO_MS.forEach(([regex]) => {
+        opt.textContent = opt.textContent.replace(regex, "").trim();
+      });
+    });
+
+    // 텍스트 노드를 순회하며 이모지가 포함된 경우 Material Symbols span으로 변환
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+    const targets = [];
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+      const parent = node.parentElement;
+      if (!parent || ["SCRIPT", "STYLE", "TEXTAREA", "INPUT", "OPTION"].includes(parent.tagName)) continue;
+      if (EMOJI_TO_MS.some(([re]) => re.test(node.nodeValue))) {
+        targets.push(node);
+      }
+    }
+    targets.forEach(node => {
+      let html = node.nodeValue
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+      EMOJI_TO_MS.forEach(([re, replacement]) => {
+        html = html.replace(re, replacement);
+      });
+      const wrap = document.createElement("span");
+      wrap.style.display = "inline-flex";
+      wrap.style.alignItems = "center";
+      wrap.style.gap = "3px";
+      wrap.innerHTML = html;
+      node.parentNode?.replaceChild(wrap, node);
+    });
+  }
+
+  /* 중복 장소 검사 및 병합 함수 */
+  function findAndMergeDuplicates() {
+    if (!Array.isArray(items) || items.length < 2) {
+      toast("중복을 검사할 장소가 충분하지 않아요");
+      return;
+    }
+    const kept = [];
+    let mergedCount = 0;
+    const norm = (s) => String(s || "").replace(/\s+/g, "").toLowerCase();
+
+    for (const curItem of items) {
+      if (!curItem) continue;
+      const dupTarget = kept.find(k => {
+        if (typeof samePlace === "function" && samePlace(k, curItem)) return true;
+        const n1 = norm(k.name), n2 = norm(curItem.name);
+        if (n1 && n2 && n1.length >= 2 && n1 === n2) return true;
+        const a1 = norm(k.address), a2 = norm(curItem.address);
+        if (a1 && a2 && a1.length >= 5 && a1 === a2) return true;
+        return false;
+      });
+
+      if (dupTarget) {
+        mergedCount++;
+        if (!dupTarget.address && curItem.address) dupTarget.address = curItem.address;
+        if ((!dupTarget.lat || !dupTarget.lng) && curItem.lat && curItem.lng) {
+          dupTarget.lat = curItem.lat;
+          dupTarget.lng = curItem.lng;
+        }
+        if (!dupTarget.vid && curItem.vid) dupTarget.vid = curItem.vid;
+        if (!dupTarget.note && curItem.note) dupTarget.note = curItem.note;
+        if (curItem.star) dupTarget.star = true;
+      } else {
+        kept.push(curItem);
+      }
+    }
+
+    if (mergedCount > 0) {
+      items = kept;
+      save();
+      draw(true);
+      toast(`중복된 장소 ${mergedCount}건을 찾아 병합했어요`);
+    } else {
+      toast("중복된 장소가 없어요");
+    }
+  }
+
+  /* 스마트 필터바 재구성: 빨간 영역 제거 + 3열 액션 그리드 배치 */
+  function rebuildSmartFilterBar() {
+    const bar = document.getElementById("smartFilterBar");
+    if (!bar) return;
+
+    // 기존 내부 요소 중 빨간 박스 해당 요소 모두 숨김
+    Array.from(bar.children).forEach(ch => {
+      if (ch.id !== "v9ActionGrid") ch.style.display = "none";
+    });
+
+    if (!document.getElementById("v9ActionGrid")) {
+      const grid = document.createElement("div");
+      grid.id = "v9ActionGrid";
+      grid.innerHTML = `
+        <button type="button" class="v9-tool-btn" id="v9BtnCoordOnly">
+          <span class="ms">where_to_vote</span><span>좌표완료만</span>
+        </button>
+        <button type="button" class="v9-tool-btn" id="v9BtnManualSort">
+          <span class="ms">drag_indicator</span><span>수동 순서편집</span>
+        </button>
+        <button type="button" class="v9-tool-btn" id="v9BtnDedup">
+          <span class="ms">join_inner</span><span>중복 찾기</span>
+        </button>
+      `;
+      bar.appendChild(grid);
+
+      const btnCoord = document.getElementById("v9BtnCoordOnly");
+      const btnSort = document.getElementById("v9BtnManualSort");
+      const btnDedup = document.getElementById("v9BtnDedup");
+
+      btnCoord.onclick = () => {
+        onlyCoordMode = !onlyCoordMode;
+        btnCoord.classList.toggle("on", onlyCoordMode);
+        const origCoordBtn = document.getElementById("sfb-coord-only");
+        if (origCoordBtn && origCoordBtn.classList.contains("on") !== onlyCoordMode) {
+          origCoordBtn.click();
+        } else {
+          applyCoordFilterToDom();
+        }
+      };
+
+      btnSort.onclick = () => {
+        manualSortMode = !manualSortMode;
+        btnSort.classList.toggle("on", manualSortMode);
+        document.body.classList.toggle("v9-manual-sort-on", manualSortMode);
+        toast(manualSortMode ? "카드 왼쪽 핸들(⋮⋮)을 끌어 순서를 변경하세요" : "수동 순서편집을 마쳤어요");
+      };
+
+      btnDedup.onclick = () => {
+        findAndMergeDuplicates();
+      };
+    }
+  }
+
+  function applyCoordFilterToDom() {
+    const listEl = document.getElementById("list-LIST");
+    if (!listEl || !Array.isArray(items)) return;
+    const itemMap = new Map(items.map(it => [String(it.id), it]));
+    listEl.querySelectorAll(".item[data-id]").forEach(cardEl => {
+      const it = itemMap.get(String(cardEl.dataset.id));
+      if (!it) return;
+      if (onlyCoordMode && (!Number(it.lat) || !Number(it.lng))) {
+        cardEl.style.display = "none";
+      } else if (!onlyCoordMode && cardEl.style.display === "none") {
+        cardEl.style.display = "";
+      }
+    });
+  }
+
+  if (typeof renderListTab === "function") {
+    const _prevRender = renderListTab;
+    renderListTab = function(...args) {
+      const r = _prevRender.apply(this, args);
+      rebuildSmartFilterBar();
+      applyCoordFilterToDom();
+      replaceEmojisInElement(document.getElementById("side"));
+      return r;
+    };
+  }
+
+  if (typeof showSheet === "function") {
+    const _prevSheet = showSheet;
+    showSheet = function(...args) {
+      const r = _prevSheet.apply(this, args);
+      replaceEmojisInElement(document.getElementById("sbody"));
+      return r;
+    };
+  }
+
+  setTimeout(() => {
+    rebuildSmartFilterBar();
+    replaceEmojisInElement(document.body);
+  }, 350);
+})();
+</script>
+<!-- === V9_TOOLBAR_AND_ICONS_END === -->
 </body>
 </html>
