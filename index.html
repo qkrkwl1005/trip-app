@@ -10014,8 +10014,8 @@ ${caption || rawText}
           if (mode === "OSAKA") return BASE_COORDS.osaka;
           if (mode === "KYOTO") return BASE_COORDS.kyoto;
           if (mode === "INE") return BASE_COORDS.ine;
-          if (mode === "GPS" && typeof myPos === "object" && myPos && myPos.lat && myPos.lng) {
-            return { label: "내 위치", lat: Number(myPos.lat), lng: Number(myPos.lng) };
+          if (mode === "GPS" && typeof userPos === "object" && userPos && myPos.lat && myPos.lng) {
+            return { label: "내 위치", lat: Number(userPos.lat), lng: Number(userPos.lng) };
           }
           return BASE_COORDS.osaka;
         }
@@ -10084,7 +10084,7 @@ ${caption || rawText}
         }
 
         function ensureSmartFilterBar() {
-          const listEl = $("list");
+          const listEl = $("list-LIST") || $("list");
           if (!listEl || !listEl.parentElement) return;
           if ($("smartFilterBar")) return;
 
@@ -10230,7 +10230,7 @@ ${caption || rawText}
               const res = _origRender.apply(this, args);
 
               // 렌더링된 카드에 일차·좌표·다중 키워드 필터 및 거리 배지 적용
-              const listEl = $("list");
+              const listEl = $("list-LIST") || $("list");
               if (listEl && Array.isArray(items)) {
                 const qInput = document.querySelector('input[placeholder*="이름"], input[placeholder*="검색"]');
                 const rawQuery = (qInput?.value || "").trim().toLowerCase();
@@ -10404,7 +10404,7 @@ ${caption || rawText}
       configurable: true,
       get() { return this._lockedImg || ""; },
       set(v) {
-        if (!v || !v.includes(IG_THUMB_MARKER)) {
+        if (!v || (!v.includes(IG_THUMB_MARKER) && !String(v).startsWith("data:image") && !String(v).includes("firebasestorage.googleapis.com") && !this.useCustomImg)) {
           this._lockedImg = ""; 
           return;
         }
@@ -11085,5 +11085,398 @@ ${caption || rawText}
 })();
 </script>
 <!-- === UX_UPGRADE_1_TO_5_END === -->
+
+<!-- === UX_SUPER_PATCH_V7_START === -->
+<style>
+  /* 목록 카드 서브 정보 배지 및 빠른 일차 선택기 */
+  .ux7-meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    align-items: center;
+    margin-top: 5px;
+    font-size: 12px;
+    color: var(--sub);
+  }
+  .ux7-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 7px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    background: var(--s2);
+    border: 1px solid var(--bd2);
+    color: var(--tx);
+  }
+  .ux7-badge.places {
+    background: var(--pr-soft);
+    color: var(--pr);
+    border-color: rgba(59, 130, 246, 0.3);
+  }
+  .ux7-day-select {
+    appearance: none;
+    -webkit-appearance: none;
+    padding: 3px 8px;
+    border-radius: 8px;
+    font: inherit;
+    font-size: 11.5px;
+    font-weight: 800;
+    background: var(--s2);
+    color: var(--pr);
+    border: 1px solid var(--bd2);
+    cursor: pointer;
+  }
+  /* 빠른 수동 장소 추가 모달/박스 */
+  #ux7QuickManualBox {
+    margin-top: 10px;
+    padding: 14px;
+    border-radius: 16px;
+    background: var(--s2);
+    border: 1px solid var(--bd2);
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+  }
+  #ux7QuickManualBox.on {
+    display: flex;
+  }
+  /* 상단 플로팅 빠른 도구바 (테마 토글 + 일정 복사 + 빈 좌표 일괄 복구) */
+  #ux7TopUtilBar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 10px 16px 4px;
+    flex-shrink: 0;
+  }
+  #ux7TopUtilBar .ux7-title {
+    font-size: 15px;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  #ux7TopUtilBar .ux7-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  #ux7TopUtilBar .mb {
+    min-height: 32px;
+    padding: 5px 10px;
+    font-size: 11.5px;
+  }
+</style>
+
+<script>
+(function initUxSuperPatchV7() {
+  /* -----------------------------------------------------------------------
+   * 1. 상단 미니 유틸리티 바 추가 (테마 즉시 전환 + 카톡 리스트 복사 + 좌표 일괄 복구)
+   * ----------------------------------------------------------------------- */
+  function injectTopUtilBar() {
+    const side = document.getElementById("side");
+    const nav = document.getElementById("nav");
+    if (!side || !nav || document.getElementById("ux7TopUtilBar")) return;
+
+    const bar = document.createElement("div");
+    bar.id = "ux7TopUtilBar";
+    bar.innerHTML = `
+      <div class="ux7-title">
+        <span class="ms fill" style="color:var(--pr)">flight_takeoff</span>
+        <span>여행플래너</span>
+      </div>
+      <div class="ux7-actions">
+        <button type="button" class="mb" id="ux7FixAllCoordsBtn" title="좌표 없는 장소 일괄 찾기">
+          <span class="ms">my_location</span>좌표복구
+        </button>
+        <button type="button" class="mb" id="ux7QuickCopyPlanBtn" title="카톡용 일정 복사">
+          <span class="ms">content_copy</span>일정복사
+        </button>
+        <button type="button" class="mb" id="ux7QuickThemeBtn" title="다크/라이트 테마 전환">
+          <span class="ms">contrast</span>
+        </button>
+      </div>
+    `;
+    side.insertBefore(bar, nav);
+
+    document.getElementById("ux7QuickThemeBtn").onclick = () => {
+      const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+      if (typeof setTheme === "function") setTheme(next);
+    };
+    document.getElementById("ux7QuickCopyPlanBtn").onclick = () => {
+      if (typeof copyFormattedPlan === "function") copyFormattedPlan();
+    };
+    document.getElementById("ux7FixAllCoordsBtn").onclick = async () => {
+      const missing = (items || []).filter(i => !Number(i.lat) || !Number(i.lng));
+      if (!missing.length) return toast("🟢 모든 장소에 이미 지도 좌표가 설정되어 있어요!");
+      toastBusy(`📍 좌표 미설정 장소 ${missing.length}곳을 일괄 검색 중...`);
+      let fixed = 0;
+      for (const it of missing) {
+        const g = await geocodePlace(it, "", true);
+        if (g && g.lat && g.lng) {
+          it.lat = g.lat;
+          it.lng = g.lng;
+          it.mapVisible = true;
+          if (Array.isArray(it.places) && it.places[0]) {
+            it.places[0].lat = g.lat;
+            it.places[0].lng = g.lng;
+          }
+          fixed++;
+        }
+      }
+      save();
+      draw(true);
+      toast(`✅ 총 ${fixed}곳의 좌표를 복구해 지도에 표시했어요!`);
+    };
+  }
+
+  /* -----------------------------------------------------------------------
+   * 2. 홈 탭: 영상 없이 1초 만에 장소/숙소 직접 등록하는 수동 입력 폼 추가
+   * ----------------------------------------------------------------------- */
+  function injectQuickManualAdd() {
+    const addTab = document.getElementById("tab-add");
+    const firstCard = addTab?.querySelector(".card");
+    if (!firstCard || document.getElementById("ux7ToggleManualBtn")) return;
+
+    const toggleBtn = document.createElement("button");
+    toggleBtn.type = "button";
+    toggleBtn.id = "ux7ToggleManualBtn";
+    toggleBtn.className = "btn g";
+    toggleBtn.style.cssText = "margin-top:8px;margin-bottom:0";
+    toggleBtn.innerHTML = `<span class="ms">edit_location_alt</span>릴스 없이 장소·숙소 직접 1건 등록`;
+
+    const box = document.createElement("div");
+    box.id = "ux7QuickManualBox";
+    box.innerHTML = `
+      <label style="margin:0;color:var(--tx)">빠른 장소 직접 등록</label>
+      <input type="text" id="ux7ManName" placeholder="장소명 (예: 이치란 본점, 교토 숙소)" style="margin:0">
+      <input type="text" id="ux7ManAddr" placeholder="주소 또는 지역명 (예: 도톤보리, 〒542-0071 ...)" style="margin:0">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <input type="text" id="ux7ManNote" placeholder="메모·영업시간·가격 (선택)" style="margin:0">
+        <select id="ux7ManDay" class="btn g" style="margin:0;min-height:44px;padding:8px 12px">
+          <option value="0">일차 미정</option>
+          <option value="1">Day 1</option>
+          <option value="2">Day 2</option>
+          <option value="3">Day 3</option>
+          <option value="4">Day 4</option>
+          <option value="5">Day 5</option>
+          <option value="6">Day 6</option>
+          <option value="7">Day 7</option>
+        </select>
+      </div>
+      <button type="button" class="btn" id="ux7ManSaveBtn"><span class="ms">add_circle</span>좌표 찾고 바로 저장</button>
+    `;
+
+    firstCard.appendChild(toggleBtn);
+    firstCard.appendChild(box);
+
+    toggleBtn.onclick = () => box.classList.toggle("on");
+    document.getElementById("ux7ManSaveBtn").onclick = async () => {
+      const name = document.getElementById("ux7ManName").value.trim();
+      const address = document.getElementById("ux7ManAddr").value.trim();
+      const note = document.getElementById("ux7ManNote").value.trim();
+      const day = Number(document.getElementById("ux7ManDay").value) || 0;
+      if (!name && !address) return toast("장소명이나 주소 중 하나는 입력해 주세요");
+
+      toastBusy("📍 위치를 검색하고 저장하는 중...");
+      const cand = { name: name || address, address, note, category: cat || "PLACE" };
+      const geo = await geocodePlace(cand, "", true);
+      const newItem = {
+        id: "id_" + Date.now(),
+        name: name || (geo?.formatted ? geo.formatted.split(",")[0] : address),
+        address: address || geo?.formatted || "",
+        note,
+        day,
+        category: cat || "PLACE",
+        lat: geo?.lat || null,
+        lng: geo?.lng || null,
+        mapVisible: true,
+        places: [{
+          name: name || address,
+          address: address || geo?.formatted || "",
+          lat: geo?.lat || null,
+          lng: geo?.lng || null
+        }],
+        done: false,
+        star: false,
+        updatedAt: Date.now()
+      };
+      items.unshift(newItem);
+      save();
+      draw(true);
+      document.getElementById("ux7ManName").value = "";
+      document.getElementById("ux7ManAddr").value = "";
+      document.getElementById("ux7ManNote").value = "";
+      box.classList.remove("on");
+      toast(`✅ '${newItem.name}' 등록 완료!`);
+    };
+  }
+
+  /* -----------------------------------------------------------------------
+   * 3. 목록 카드(card) 고도화: 주소·메모 요약, 다중장소 배지, 원터치 일차 변경 드롭다운
+   * ----------------------------------------------------------------------- */
+  function enhanceListCards() {
+    const listEl = document.getElementById("list-LIST");
+    if (!listEl || !Array.isArray(items)) return;
+
+    const itemMap = new Map(items.map(it => [String(it.id), it]));
+    listEl.querySelectorAll(".item[data-id]").forEach(cardEl => {
+      if (cardEl.dataset.ux7Enhanced === "1") return;
+      cardEl.dataset.ux7Enhanced = "1";
+
+      const id = cardEl.dataset.id;
+      const it = itemMap.get(String(id));
+      if (!it) return;
+
+      const mid = cardEl.querySelector(".mid");
+      const nmRow = mid?.querySelector(".nm");
+      if (!mid || !nmRow) return;
+
+      // 3-1. 카드 우측 상단에 원터치 일차(Day) 변경 셀렉트 삽입
+      const daySel = document.createElement("select");
+      daySel.className = "ux7-day-select";
+      daySel.title = "일차 바로 변경";
+      daySel.innerHTML = `<option value="0">일차미정</option>` +
+        [1,2,3,4,5,6,7,8,9,10].map(d => `<option value="${d}" ${Number(it.day) === d ? "selected" : ""}>D${d}</option>`).join("");
+      daySel.onclick = (e) => e.stopPropagation();
+      daySel.onchange = (e) => {
+        e.stopPropagation();
+        it.day = Number(daySel.value) || 0;
+        it.updatedAt = Date.now();
+        save();
+        draw(true);
+        toast(it.day ? `🗓️ '${it.name}' → Day ${it.day} 배정됨` : "일차 배정 해제됨");
+      };
+      nmRow.appendChild(daySel);
+
+      // 3-2. 주소·가격·묶음 장소 수·좌표 상태 요약 줄 삽입
+      const metaRow = document.createElement("div");
+      metaRow.className = "ux7-meta-row";
+      const badges = [];
+      if (Array.isArray(it.places) && it.places.length > 1) {
+        badges.push(`<span class="ux7-badge places">📍 ${it.places.length}곳 묶음</span>`);
+      }
+      if (!Number(it.lat) || !Number(it.lng)) {
+        badges.push(`<span class="ux7-badge" style="color:var(--dg)">🔴 좌표미설정</span>`);
+      }
+      const shortAddr = (it.address || "").replace(/^일본\s*/, "").slice(0, 28);
+      const summaryTxt = [shortAddr, it.price, it.info || it.note].filter(Boolean).join(" · ").slice(0, 52);
+      metaRow.innerHTML = `${badges.join("")}<span>${esc(summaryTxt || "상세 정보 보기")}</span>`;
+
+      nmRow.insertAdjacentElement("afterend", metaRow);
+    });
+  }
+
+  /* -----------------------------------------------------------------------
+   * 4. 스마트 필터바 일차 호환성 패치 ("Day 1" 문자열과 숫자 1 모두 매칭)
+   * ----------------------------------------------------------------------- */
+  function fixSmartDayComparison() {
+    const dayBtns = document.querySelectorAll("#sfb-days .sfb-chip");
+    dayBtns.forEach(btn => {
+      if (btn.dataset.day && btn.dataset.day.startsWith("Day ")) {
+        btn.dataset.day = btn.dataset.day.replace("Day ", "").trim();
+      }
+    });
+  }
+
+  if (typeof renderListTab === "function") {
+    const _origRenderListTab = renderListTab;
+    renderListTab = function (...args) {
+      const r = _origRenderListTab.apply(this, args);
+      enhanceListCards();
+      fixSmartDayComparison();
+      return r;
+    };
+  }
+
+  /* -----------------------------------------------------------------------
+   * 5. 다중 장소(groupedPlaces)에서 원하는 장소를 '대표 장소로 승격'하는 버튼
+   * ----------------------------------------------------------------------- */
+  if (typeof groupedPlacesSummaryHtml === "function") {
+    const _origGroupHtml = groupedPlacesSummaryHtml;
+    groupedPlacesSummaryHtml = function(item) {
+      const html = _origGroupHtml(item);
+      if (!html) return html;
+      return html.replace(
+        /data-act="delSubPlace" data-idx="(\d+)"/g,
+        (m, idx) => Number(idx) > 0
+          ? `data-act="promoteSubPlace" data-idx="${idx}" style="padding:5px 10px;font-size:11.5px;min-height:34px"><span class="ms">vertical_align_top</span>대표지정</button><button type="button" class="mb dg" data-act="delSubPlace" data-idx="${idx}"`
+          : m
+      );
+    };
+  }
+
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest('[data-act="promoteSubPlace"]');
+    if (!btn) return;
+    e.stopPropagation();
+    const it = items.find(x => x.id === cur);
+    const idx = Number(btn.dataset.idx);
+    if (it && Array.isArray(it.places) && idx > 0 && idx < it.places.length) {
+      const [picked] = it.places.splice(idx, 1);
+      it.places.unshift(picked);
+      syncGroupedItem(it);
+      save();
+      showSheet();
+      draw(true);
+      toast(`⭐ '${picked.name}' 장소를 이 카드의 대표 장소로 변경했어요!`);
+    }
+  });
+
+  /* -----------------------------------------------------------------------
+   * 6. 모바일 하드웨어 '뒤로가기(popstate)' 시 앱이 종료되지 않고 열린 모달만 닫기
+   * ----------------------------------------------------------------------- */
+  let _modalHistoryPushed = false;
+  const pushModalState = () => {
+    if (!_modalHistoryPushed) {
+      history.pushState({ ux7Modal: true }, "");
+      _modalHistoryPushed = true;
+    }
+  };
+
+  if (typeof showSheet === "function") {
+    const _prevShowSheet = showSheet;
+    showSheet = function (...args) {
+      pushModalState();
+      return _prevShowSheet.apply(this, args);
+    };
+  }
+  if (typeof openTaxiModal === "function") {
+    const _prevTaxi = openTaxiModal;
+    openTaxiModal = function (...args) {
+      pushModalState();
+      return _prevTaxi.apply(this, args);
+    };
+  }
+
+  window.addEventListener("popstate", () => {
+    _modalHistoryPushed = false;
+    if (document.getElementById("taxiModal")?.classList.contains("show")) {
+      document.getElementById("taxiModal").classList.remove("show");
+      return;
+    }
+    if (document.getElementById("myMapsOverlay")?.classList.contains("show")) {
+      closeMyMapsOverlay();
+      return;
+    }
+    if (document.getElementById("sheet")?.classList.contains("on")) {
+      closeSheet();
+      return;
+    }
+  });
+
+  setTimeout(() => {
+    injectTopUtilBar();
+    injectQuickManualAdd();
+    enhanceListCards();
+    fixSmartDayComparison();
+  }, 250);
+})();
+</script>
+<!-- === UX_SUPER_PATCH_V7_END === -->
+
 </body>
 </html>
