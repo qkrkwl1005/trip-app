@@ -26,3 +26,5 @@ self.addEventListener('fetch',e=>{
   }
   e.respondWith(caches.match(req).then(c=>c||fetch(req).then(res=>{const copy=res.clone();caches.open(CACHE).then(cache=>cache.put(req,copy)).catch(()=>{});return res}).catch(()=>caches.match('./index.html'))));
 });
+
+// FORCE UPDATE CACHE V9: 1793909314.067733
