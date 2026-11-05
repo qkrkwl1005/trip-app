@@ -10515,5 +10515,575 @@ ${caption || rawText}
 })();
 </script>
 <!-- === V6_ULTIMATE_SHIELD_END === -->
+<!-- === UX_UPGRADE_1_TO_5_START === -->
+<style>
+  /* [개선 2] 홈 탭: 온보딩 배너, 통합 입력창, 버튼 위계 개선 */
+  .ux-guide-steps {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-bottom: 14px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    background: var(--s2);
+    border: 1px solid var(--bd);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--sub);
+    text-align: center;
+  }
+  .ux-guide-steps b {
+    display: block;
+    color: var(--pr);
+    font-size: 11px;
+    margin-bottom: 2px;
+  }
+  #uxDetectedLinkBadge {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    border-radius: 12px;
+    background: var(--pr-soft);
+    color: var(--pr);
+    font-size: 12.5px;
+    font-weight: 800;
+  }
+  #uxDetectedLinkBadge.on {
+    display: flex;
+  }
+  #pcShare.ux-ocr-hero {
+    background: rgba(124, 58, 237, 0.14);
+    color: #c4b5fd;
+    border: 1.5px solid rgba(167, 139, 250, 0.45);
+    font-weight: 800;
+  }
+  [data-theme="light"] #pcShare.ux-ocr-hero {
+    background: rgba(124, 58, 237, 0.08);
+    color: #6d28d9;
+    border-color: rgba(124, 58, 237, 0.35);
+  }
+
+  /* [개선 3] 상세 바텀 시트: 3탭 구조 및 하단 Sticky 액션바 */
+  .ux-sheet-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    padding: 5px;
+    margin: 14px 0 12px;
+    background: var(--s2);
+    border: 1px solid var(--bd);
+    border-radius: 16px;
+    position: sticky;
+    top: 12px;
+    z-index: 9;
+  }
+  .ux-stab-btn {
+    min-height: 38px;
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--sub);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+  }
+  .ux-stab-btn.on {
+    background: var(--pr);
+    color: #fff;
+    box-shadow: 0 3px 10px rgba(59, 130, 246, 0.3);
+  }
+  .ux-stab-pane {
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .ux-stab-pane.on {
+    display: flex;
+  }
+  .ux-tabbed-sheet details.acc {
+    border: 0;
+    background: transparent;
+    margin: 0;
+  }
+  .ux-tabbed-sheet details.acc > summary {
+    display: none;
+  }
+  .ux-tabbed-sheet details.acc > .acc-in {
+    padding: 0;
+  }
+  .ux-sheet-footer {
+    position: sticky;
+    bottom: -24px;
+    margin: 16px -20px -24px;
+    padding: 12px 20px calc(14px + env(safe-area-inset-bottom));
+    background: var(--s);
+    border-top: 1px solid var(--bd2);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 11;
+  }
+
+  /* [개선 4] 지도 드래그 시 상/하단 오버레이 자동 숨김 */
+  #mapChips, #mapStrip, #locBtn, #myMapsBtn {
+    transition: opacity 0.22s ease, transform 0.22s ease, bottom 0.15s ease;
+  }
+  #map-wrap.ux-map-interacting #mapChips {
+    opacity: 0.12;
+    transform: translateY(-8px);
+    pointer-events: none;
+  }
+  #map-wrap.ux-map-interacting #mapStrip,
+  #map-wrap.ux-map-interacting #locBtn,
+  #map-wrap.ux-map-interacting #myMapsBtn {
+    opacity: 0.12;
+    transform: translateY(8px);
+    pointer-events: none;
+  }
+
+  /* [개선 5] 동시 수정 충돌 비교 카드 */
+  .ux-diff-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .ux-diff-box {
+    padding: 10px;
+    border-radius: 12px;
+    background: var(--s2);
+    border: 1px solid var(--bd);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .ux-diff-box b {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 12.5px;
+  }
+</style>
+
+<script>
+(function initUxUpgrade1To5() {
+  /* =========================================================================
+   * [개선 1] 설정 탭(#tab-set): 일반 설정과 개발자/고급 설정 분리
+   * ========================================================================= */
+  function upgradeSettingsTab() {
+    const setTab = document.getElementById("tab-set");
+    if (!setTab || document.getElementById("uxAdvSettings")) return;
+
+    const cards = Array.from(setTab.querySelectorAll(":scope > .card"));
+    if (cards.length < 4) return;
+
+    const advDetails = document.createElement("details");
+    advDetails.className = "acc card";
+    advDetails.id = "uxAdvSettings";
+    advDetails.style.cssText = "padding: 6px 16px; margin-bottom: 0;";
+    advDetails.innerHTML = `
+      <summary style="font-size:14.5px">
+        <span class="ms">settings_applications</span>개발자 및 고급 설정 (API 키 · 지도 엔진 · 파일 백업)
+      </summary>
+      <div class="acc-in" id="uxAdvSettingsBody" style="display:flex;flex-direction:column;gap:14px;padding:10px 0 6px">
+        <div class="ds" style="padding:10px 12px;border-radius:12px;background:var(--pr-soft);color:var(--tx);font-weight:600">
+          💡 별도의 API 키를 입력하지 않아도 기본 지도(OpenStreetMap)와 내장 분석기로 모든 기본 기능을 사용할 수 있습니다.
+        </div>
+      </div>
+    `;
+
+    const advBody = advDetails.querySelector("#uxAdvSettingsBody");
+    // AI 분석 엔진 카드(cards[3])와 지도/백업 카드(cards[4])를 고급 설정 내부로 이동
+    cards.slice(3).forEach((c) => {
+      c.style.boxShadow = "none";
+      c.style.padding = "16px";
+      advBody.appendChild(c);
+    });
+
+    // 공유 방 카드 내부의 로그인 진단 로그도 고급 설정으로 이동
+    const diagBtn = document.getElementById("loginDiagCopyBtn");
+    const diagOut = document.getElementById("loginDiagOut");
+    if (diagBtn && diagOut) {
+      const diagWrap = document.createElement("div");
+      diagWrap.className = "card";
+      diagWrap.style.cssText = "padding:14px;box-shadow:none";
+      diagWrap.innerHTML = `<div class="sec-title" style="font-size:14px;margin-bottom:8px"><span><span class="ms">bug_report</span>로그인 진단 도구</span></div>`;
+      diagWrap.appendChild(diagBtn);
+      diagWrap.appendChild(diagOut);
+      advBody.appendChild(diagWrap);
+    }
+
+    setTab.appendChild(advDetails);
+  }
+
+  /* =========================================================================
+   * [개선 2] 홈 탭(#tab-add): 링크·캡션 입력창 통합 및 스샷 OCR 버튼 강조
+   * ========================================================================= */
+  function upgradeHomeTab() {
+    const addTab = document.getElementById("tab-add");
+    const reelBox = document.getElementById("reelLinkBox");
+    const shareBox = document.getElementById("shareBox");
+    const pasteReelBtn = document.getElementById("pasteReelLink");
+    const pcShareBtn = document.getElementById("pcShare");
+    const pasteShareBtn = document.getElementById("pasteShare");
+    if (!addTab || !reelBox || !shareBox || document.getElementById("uxGuideSteps")) return;
+
+    // 1번 링크 입력칸 행 숨김 (DOM 유지로 기존 로직 호환성 100% 보장)
+    const reelRow = reelBox.parentElement;
+    const reelLabel = reelRow ? reelRow.previousElementSibling : null;
+    if (reelRow) reelRow.style.display = "none";
+    if (reelLabel && reelLabel.tagName === "LABEL") reelLabel.style.display = "none";
+
+    // 2번 라벨 문구를 통합 안내 문구로 변경
+    const shareLabel = shareBox.previousElementSibling;
+    if (shareLabel && shareLabel.tagName === "LABEL") {
+      shareLabel.textContent = "릴스·쇼츠 링크 또는 캡션·고정댓글 붙여넣기 (최대 10곳 동시 분석)";
+    }
+    shareBox.placeholder = "인스타그램 릴스/유튜브 쇼츠 링크나 복사한 캡션·고정댓글을 여기에 바로 붙여넣으세요.";
+
+    // 3단계 요약 가이드 삽입
+    const seg = document.getElementById("seg");
+    if (seg) {
+      const guide = document.createElement("div");
+      guide.id = "uxGuideSteps";
+      guide.className = "ux-guide-steps";
+      guide.innerHTML = `
+        <div><b>STEP 1</b>릴스 링크·캡션 복사</div>
+        <div><b>STEP 2</b>아래 칸에 붙여넣기</div>
+        <div><b>STEP 3</b>자동 분석·저장</div>
+      `;
+      seg.insertAdjacentElement("afterend", guide);
+    }
+
+    // 링크 자동 감지 배지 추가
+    const badge = document.createElement("div");
+    badge.id = "uxDetectedLinkBadge";
+    badge.innerHTML = `
+      <span id="uxDetectedLinkTxt" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🎬 영상 링크 자동 인식됨</span>
+      <button type="button" class="mb" id="uxClearDetectedLink" style="padding:2px 8px;min-height:26px;font-size:11px">링크 지우기</button>
+    `;
+    shareBox.insertAdjacentElement("beforebegin", badge);
+
+    function syncUnifiedInput() {
+      const text = shareBox.value || "";
+      const meta = typeof parseVideoMeta === "function" ? parseVideoMeta(text) : null;
+      if (meta && meta.url) {
+        reelBox.value = meta.url;
+        if (typeof lastSharedVid !== "undefined") lastSharedVid = meta.url;
+      } else if (!text.trim()) {
+        reelBox.value = "";
+        if (typeof lastSharedVid !== "undefined") lastSharedVid = "";
+      }
+      const activeUrl = (reelBox.value || "").trim();
+      badge.classList.toggle("on", Boolean(activeUrl));
+      const txtEl = document.getElementById("uxDetectedLinkTxt");
+      if (txtEl && activeUrl) {
+        txtEl.textContent = `🎬 연결된 영상: ${activeUrl}`;
+      }
+    }
+
+    shareBox.addEventListener("input", syncUnifiedInput);
+    document.getElementById("uxClearDetectedLink").onclick = () => {
+      reelBox.value = "";
+      if (typeof lastSharedVid !== "undefined") lastSharedVid = "";
+      shareBox.value = (shareBox.value || "").replace(/https?:\/\/[^\s]+/g, "").trim();
+      syncUnifiedInput();
+    };
+
+    if (pasteShareBtn) {
+      pasteShareBtn.innerHTML = `<span class="ms">content_paste</span>붙여넣고 바로 분석`;
+    }
+    if (pcShareBtn) {
+      pcShareBtn.classList.add("ux-ocr-hero");
+      pcShareBtn.innerHTML = `<span class="ms">add_photo_alternate</span>스샷 여러 장으로 찾기`;
+    }
+  }
+
+  /* =========================================================================
+   * [개선 3] 장소 상세 바텀 시트(#sheet): 3탭 분리(정보/일정/관리) 및 하단 고정 바
+   * ========================================================================= */
+  let _activeSheetTab = "info";
+  if (typeof showSheet === "function") {
+    const _origShowSheet = showSheet;
+    showSheet = function (...args) {
+      _origShowSheet.apply(this, args);
+      const sbody = document.getElementById("sbody");
+      if (!sbody || sbody.classList.contains("ux-tabbed-sheet")) return;
+      sbody.classList.add("ux-tabbed-sheet");
+
+      const children = Array.from(sbody.children);
+      if (children.length < 6) return;
+
+      const mediaEl = children[0];
+      const titleRow = children[1];
+      const addrRow = children[2];
+      const statusRow = children[3];
+      const mapBtnRow = children[4];
+
+      const detailsList = Array.from(sbody.querySelectorAll(":scope > details.acc"));
+      const viewerDetails = detailsList[0] || null;
+      const editDetails = detailsList[1] || null;
+      if (viewerDetails) viewerDetails.open = true;
+      if (editDetails) editDetails.open = true;
+
+      const bottomActRow = children[children.length - 1];
+      const groupedSummary = document.getElementById("groupedPlacesSummary");
+
+      // 일차 배정 블록과 릴스 링크 블록 식별
+      const dayBlock = Array.from(sbody.querySelectorAll(":scope > div")).find(
+        (d) => d.querySelector('[data-act="setDay"]')
+      );
+      const vidBlock = Array.from(sbody.querySelectorAll(":scope > div")).find(
+        (d) => d.querySelector("#sh-vid")
+      );
+      const extraInfoEls = children.filter(
+        (el) =>
+          ![
+            mediaEl,
+            titleRow,
+            addrRow,
+            statusRow,
+            mapBtnRow,
+            groupedSummary,
+            dayBlock,
+            vidBlock,
+            viewerDetails,
+            editDetails,
+            bottomActRow,
+          ].includes(el)
+      );
+
+      // 탭 바 생성
+      const tabBar = document.createElement("div");
+      tabBar.className = "ux-sheet-tabs";
+      tabBar.innerHTML = `
+        <button type="button" class="ux-stab-btn" data-stab="info"><span class="ms">info</span>정보</button>
+        <button type="button" class="ux-stab-btn" data-stab="plan"><span class="ms">calendar_month</span>일정·영상</button>
+        <button type="button" class="ux-stab-btn" data-stab="manage"><span class="ms">edit_square</span>관리·수정</button>
+      `;
+
+      const paneInfo = document.createElement("div");
+      paneInfo.className = "ux-stab-pane";
+      paneInfo.dataset.pane = "info";
+
+      const panePlan = document.createElement("div");
+      panePlan.className = "ux-stab-pane";
+      panePlan.dataset.pane = "plan";
+
+      const paneManage = document.createElement("div");
+      paneManage.className = "ux-stab-pane";
+      paneManage.dataset.pane = "manage";
+
+      // [정보 탭] 구성: 주소, 가격/영업정보, 다중 장소 요약, 뷰어 전환, 메모
+      if (addrRow) paneInfo.appendChild(addrRow);
+      extraInfoEls.forEach((el) => paneInfo.appendChild(el));
+      if (groupedSummary) paneInfo.appendChild(groupedSummary);
+      if (viewerDetails) paneInfo.appendChild(viewerDetails);
+
+      // [일정·영상 탭] 구성: 일차 배정 칩, 연결된 릴스/쇼츠 링크
+      if (dayBlock) panePlan.appendChild(dayBlock);
+      if (vidBlock) panePlan.appendChild(vidBlock);
+
+      // [관리·수정 탭] 구성: 지도 등록/위치 재검색 버튼, 카테고리·이름·주소·메모 수정
+      if (mapBtnRow) paneManage.appendChild(mapBtnRow);
+      if (editDetails) paneManage.appendChild(editDetails);
+
+      // 하단 Sticky 푸터 구성
+      if (bottomActRow) {
+        bottomActRow.classList.add("ux-sheet-footer");
+      }
+
+      // sbody 재배치 (기존 이벤트 리스너 100% 보존)
+      sbody.appendChild(tabBar);
+      sbody.appendChild(paneInfo);
+      sbody.appendChild(panePlan);
+      sbody.appendChild(paneManage);
+      if (bottomActRow) sbody.appendChild(bottomActRow);
+
+      const switchSheetTab = (target) => {
+        _activeSheetTab = target;
+        tabBar.querySelectorAll(".ux-stab-btn").forEach((b) => {
+          b.classList.toggle("on", b.dataset.stab === target);
+        });
+        [paneInfo, panePlan, paneManage].forEach((p) => {
+          p.classList.toggle("on", p.dataset.pane === target);
+        });
+      };
+
+      tabBar.querySelectorAll(".ux-stab-btn").forEach((btn) => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          switchSheetTab(btn.dataset.stab);
+        };
+      });
+
+      switchSheetTab(_activeSheetTab);
+    };
+
+    // 주소칸 추가/삭제 클릭 시 관리 탭 유지
+    document.addEventListener(
+      "click",
+      (e) => {
+        const actEl = e.target.closest("[data-act]");
+        if (!actEl) return;
+        const act = actEl.dataset.act;
+        if (["addEditAddress", "removeEditAddress", "chcat", "regeo", "registerMapItem", "hideMapItem"].includes(act)) {
+          _activeSheetTab = "manage";
+        } else if (["setDay", "pasteVidInSheet"].includes(act)) {
+          _activeSheetTab = "plan";
+        }
+      },
+      true
+    );
+  }
+
+  /* =========================================================================
+   * [개선 4] 지도 탭(#map-wrap): 일차별 동선 자동 분리 및 드래그 시 오버레이 숨김
+   * ========================================================================= */
+  function upgradeMapUsability() {
+    // 4-1. 동선선 클릭 시 전체 일차가 섞이지 않도록 첫 배정 일차 자동 선택
+    document.addEventListener(
+      "click",
+      (e) => {
+        const btn = e.target.closest('[data-act="mapRouteToggle"]');
+        if (!btn) return;
+        if (typeof mapRouteOn !== "undefined" && !mapRouteOn && typeof mapDay !== "undefined" && mapDay === 0) {
+          const activeDays = [
+            ...new Set(
+              (items || [])
+                .filter((i) => isMapRegistered(i) && hasMapCoordinates(i) && Number(i.day) > 0)
+                .map((i) => Number(i.day))
+            ),
+          ].sort((a, b) => a - b);
+          if (activeDays.length > 1) {
+            mapDay = activeDays[0];
+            setTimeout(() => {
+              toast(`🗓️ 동선이 섞이지 않도록 Day ${mapDay} 코스를 먼저 표시합니다. 상단 칩에서 일차를 전환하세요.`);
+            }, 60);
+          }
+        }
+      },
+      true
+    );
+
+    // 4-2. 지도 드래그/패닝 중 상단 칩과 하단 스트립 반투명 숨김
+    const mapEl = document.getElementById("map");
+    const mapWrap = document.getElementById("map-wrap");
+    if (!mapEl || !mapWrap) return;
+
+    let dragging = false;
+    let startX = 0, startY = 0;
+    let idleTimer = null;
+
+    const endInteract = () => {
+      dragging = false;
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        mapWrap.classList.remove("ux-map-interacting");
+      }, 380);
+    };
+
+    mapEl.addEventListener(
+      "pointerdown",
+      (e) => {
+        dragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        clearTimeout(idleTimer);
+      },
+      { passive: true }
+    );
+    mapEl.addEventListener(
+      "pointermove",
+      (e) => {
+        if (!dragging) return;
+        if (Math.abs(e.clientX - startX) > 10 || Math.abs(e.clientY - startY) > 10) {
+          mapWrap.classList.add("ux-map-interacting");
+        }
+      },
+      { passive: true }
+    );
+    window.addEventListener("pointerup", endInteract, { passive: true });
+    window.addEventListener("pointercancel", endInteract, { passive: true });
+  }
+
+  /* =========================================================================
+   * [개선 5] 실시간 공유 방 충돌 해결(renderRoomConflict): 친근한 문구 + 변경점 비교 표
+   * ========================================================================= */
+  if (typeof renderRoomConflict === "function") {
+    renderRoomConflict = function () {
+      const el = document.getElementById("roomConflict");
+      if (!el) return;
+      if (!sharedConflict) {
+        el.innerHTML = "";
+        el.style.display = "none";
+        return;
+      }
+      const { localItems, remoteItems } = sharedConflict;
+      const localMap = new Map(localItems.map((item) => [String(item.id), item]));
+      const remoteMap = new Map(remoteItems.map((item) => [String(item.id), item]));
+      const ids = [...new Set([...localMap.keys(), ...remoteMap.keys()])].filter((id) => {
+        return JSON.stringify(localMap.get(id) || null) !== JSON.stringify(remoteMap.get(id) || null);
+      });
+
+      const describeItem = (it) => {
+        if (!it) return "<em>(삭제됨 또는 없음)</em>";
+        const rows = [];
+        if (it.name) rows.push(`• 이름: ${esc(it.name)}`);
+        if (it.day) rows.push(`• 일정: Day ${esc(it.day)}`);
+        if (it.address) rows.push(`• 주소: ${esc(it.address.slice(0, 36))}`);
+        if (it.note) rows.push(`• 메모: ${esc(it.note.slice(0, 40))}`);
+        rows.push(`• 상태: ${it.done ? "방문완료" : "미방문"}${it.star ? " · ⭐중요" : ""}`);
+        return rows.join("<br>");
+      };
+
+      el.innerHTML =
+        `<b>😲 앗! 친구와 동시에 같은 장소를 수정했어요 (${ids.length}건)</b><br>` +
+        `<small>겹치지 않는 다른 장소들은 이미 자동으로 합쳐졌어요. 아래에서 어떤 내용을 남길지 선택해 주세요.</small>` +
+        `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+          <button class="mb pr" data-room-action="conflict-all-local">🙋 내 수정 내용으로 모두 적용</button>
+          <button class="mb" data-room-action="conflict-all-remote">👥 친구 수정 내용으로 모두 유지</button>
+        </div>` +
+        ids
+          .map((id) => {
+            const local = localMap.get(id);
+            const remote = remoteMap.get(id);
+            return `<div style="margin-top:10px;padding:12px;border:1px solid var(--bd2);border-radius:16px;background:var(--s)">
+              <b>📍 ${esc(itemLabel(local || remote, id))}</b>
+              <div class="ux-diff-grid">
+                <div class="ux-diff-box">
+                  <b style="color:var(--pr)">🙋 내가 수정한 내용</b>
+                  ${describeItem(local)}
+                </div>
+                <div class="ux-diff-box">
+                  <b style="color:var(--ok)">👥 친구가 수정한 내용</b>
+                  ${describeItem(remote)}
+                </div>
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+                ${local ? `<button class="mb pr" data-room-action="conflict-local" data-id="${esc(id)}">내 내용 선택</button>` : ""}
+                ${remote ? `<button class="mb" data-room-action="conflict-remote" data-id="${esc(id)}">친구 내용 선택</button>` : ""}
+              </div>
+            </div>`;
+          })
+          .join("");
+      el.style.display = "block";
+      if (typeof updateRoomAlert === "function") updateRoomAlert();
+    };
+  }
+
+  upgradeSettingsTab();
+  upgradeHomeTab();
+  upgradeMapUsability();
+})();
+</script>
+<!-- === UX_UPGRADE_1_TO_5_END === -->
 </body>
 </html>
