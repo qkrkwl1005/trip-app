@@ -12380,81 +12380,59 @@ ${caption || rawText}
 })();
 </script>
 <!-- === UX_SUPER_PATCH_V8_END === -->
-<!-- === V9_TOOLBAR_AND_ICONS_START === -->
+<!-- === V10_FINAL_UI_PATCH_START === -->
 <style>
-  /* 1. 빨간 박스 영역(전체일차/일차미정 줄, 정렬 셀렉트, 날짜 입력칸, 원터치 일차바) 완전 제거 */
-  #sfb-days,
-  #sfb-sort,
-  #sfb-apply-order,
-  #v8QuickDayBar,
-  #smartFilterBar input[type="date"],
-  #smartFilterBar select {
-    display: none !important;
+  /* 재배치된 3열 핵심 도구 바 스타일 */
+  .v10-action-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 8px !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
-
-  /* 2. 하단 3개 기능 버튼(좌표완료만, 수동 순서편집, 중복 찾기) 최적 3열 배치 */
-  #smartFilterBar {
-    margin: 4px 0 8px 0 !important;
-    padding: 8px !important;
-    border-radius: 16px !important;
-    background: var(--s) !important;
-    border: 1px solid var(--bd) !important;
-  }
-  #v9ActionGrid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-    width: 100%;
-  }
-  .v9-tool-btn {
-    min-height: 40px;
-    padding: 8px 6px;
-    border-radius: 12px;
-    border: 1px solid var(--bd2);
-    background: var(--s2);
-    color: var(--tx);
-    font: inherit;
-    font-size: 12.5px;
-    font-weight: 800;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
-  }
-  .v9-tool-btn:active {
-    transform: scale(0.96);
-  }
-  .v9-tool-btn .ms {
-    font-size: 17px;
-  }
-  .v9-tool-btn.on {
-    background: var(--pr);
-    color: #fff;
-    border-color: var(--pr);
-    box-shadow: 0 3px 10px rgba(59, 130, 246, 0.28);
-  }
-
-  /* 수동 순서편집 모드가 켜졌을 때만 드래그 핸들 노출 */
-  .v8-drag-handle {
-    display: none !important;
-  }
-  body.v9-manual-sort-on .v8-drag-handle {
+  .v10-action-grid > button,
+  .v10-action-grid > .mb,
+  .v10-action-grid > .sfb-chip {
+    width: 100% !important;
+    min-height: 42px !important;
+    margin: 0 !important;
+    padding: 8px 6px !important;
+    border-radius: 12px !important;
+    font-size: 12.5px !important;
+    font-weight: 800 !important;
     display: inline-flex !important;
-    color: var(--pr);
-    padding: 6px 4px 6px 0;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 5px !important;
+    white-space: nowrap !important;
+  }
+  .v10-hidden {
+    display: none !important;
+  }
+  #v8QuickDayBar {
+    display: none !important;
   }
 </style>
 
 <script>
-(function initV9ToolbarAndIcons() {
-  let manualSortMode = false;
-  let onlyCoordMode = false;
+(function initV10FinalUiPatch() {
+  /* 1. 구버전 Service Worker 캐시 강제 삭제 (최초 1회) */
+  const V10_CACHE_KEY = "TRIP_V10_CACHE_CLEARED";
+  if (localStorage.getItem(V10_CACHE_KEY) !== "1") {
+    localStorage.setItem(V10_CACHE_KEY, "1");
+    if ("caches" in window) {
+      caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).catch(() => {});
+    }
+    if (navigator.serviceWorker) {
+      navigator.serviceWorker.getRegistrations().then(regs => {
+        regs.forEach(r => r.update());
+      }).catch(() => {});
+    }
+  }
 
-  /* 이모지 -> Google Material Symbols Outlined 매핑 테이블 */
-  const EMOJI_TO_MS = [
+  /* 2. 이모지 및 특수기호 -> Google Material Symbols Outlined 매핑 */
+  const EMOJI_MAP = [
     [/🟢/g, '<span class="ms fill" style="color:var(--ok);font-size:15px">check_circle</span>'],
     [/🔴/g, '<span class="ms fill" style="color:var(--dg);font-size:15px">error</span>'],
     [/⚪/g, '<span class="ms" style="font-size:15px">radio_button_unchecked</span>'],
@@ -12489,196 +12467,144 @@ ${caption || rawText}
     [/🔄|↻/g, '<span class="ms" style="font-size:16px">sync</span>'],
     [/↩️/g, '<span class="ms" style="font-size:16px">undo</span>'],
     [/↕️/g, '<span class="ms" style="font-size:16px">swap_vert</span>'],
-    [/📴/g, '<span class="ms" style="font-size:16px">cloud_off</span>'],
-    [/☁️/g, '<span class="ms" style="font-size:16px">cloud_upload</span>'],
-    [/💾/g, '<span class="ms" style="font-size:16px">save</span>'],
-    [/📂/g, '<span class="ms" style="font-size:16px">folder_open</span>'],
-    [/🚪/g, '<span class="ms" style="font-size:16px">logout</span>'],
-    [/🔍/g, '<span class="ms" style="font-size:16px">search</span>'],
-    [/💡/g, '<span class="ms" style="font-size:16px">lightbulb</span>'],
-    [/🎯/g, '<span class="ms" style="font-size:16px">center_focus_strong</span>'],
-    [/🔗/g, '<span class="ms" style="font-size:16px">link</span>'],
-    [/👁️/g, '<span class="ms" style="font-size:16px">visibility</span>']
+    [/⋮⋮/g, '<span class="ms" style="font-size:17px">drag_indicator</span>'],
+    [/⚭|⚯/g, '<span class="ms" style="font-size:17px">join_inner</span>']
   ];
 
-  function replaceEmojisInElement(root) {
-    if (!root) return;
-    // select option 내부의 이모지는 깔끔하게 텍스트만 남김
-    root.querySelectorAll("option").forEach(opt => {
-      EMOJI_TO_MS.forEach(([regex]) => {
-        opt.textContent = opt.textContent.replace(regex, "").trim();
-      });
-    });
+  let isConverting = false;
 
-    // 텍스트 노드를 순회하며 이모지가 포함된 경우 Material Symbols span으로 변환
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
-    const targets = [];
-    while (walker.nextNode()) {
-      const node = walker.currentNode;
-      const parent = node.parentElement;
-      if (!parent || ["SCRIPT", "STYLE", "TEXTAREA", "INPUT", "OPTION"].includes(parent.tagName)) continue;
-      if (EMOJI_TO_MS.some(([re]) => re.test(node.nodeValue))) {
-        targets.push(node);
-      }
-    }
-    targets.forEach(node => {
-      let html = node.nodeValue
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
-      EMOJI_TO_MS.forEach(([re, replacement]) => {
-        html = html.replace(re, replacement);
-      });
-      const wrap = document.createElement("span");
-      wrap.style.display = "inline-flex";
-      wrap.style.alignItems = "center";
-      wrap.style.gap = "3px";
-      wrap.innerHTML = html;
-      node.parentNode?.replaceChild(wrap, node);
-    });
-  }
-
-  /* 중복 장소 검사 및 병합 함수 */
-  function findAndMergeDuplicates() {
-    if (!Array.isArray(items) || items.length < 2) {
-      toast("중복을 검사할 장소가 충분하지 않아요");
-      return;
-    }
-    const kept = [];
-    let mergedCount = 0;
-    const norm = (s) => String(s || "").replace(/\s+/g, "").toLowerCase();
-
-    for (const curItem of items) {
-      if (!curItem) continue;
-      const dupTarget = kept.find(k => {
-        if (typeof samePlace === "function" && samePlace(k, curItem)) return true;
-        const n1 = norm(k.name), n2 = norm(curItem.name);
-        if (n1 && n2 && n1.length >= 2 && n1 === n2) return true;
-        const a1 = norm(k.address), a2 = norm(curItem.address);
-        if (a1 && a2 && a1.length >= 5 && a1 === a2) return true;
-        return false;
-      });
-
-      if (dupTarget) {
-        mergedCount++;
-        if (!dupTarget.address && curItem.address) dupTarget.address = curItem.address;
-        if ((!dupTarget.lat || !dupTarget.lng) && curItem.lat && curItem.lng) {
-          dupTarget.lat = curItem.lat;
-          dupTarget.lng = curItem.lng;
+  function convertEmojisToGoogleIcons(root) {
+    if (!root || isConverting) return;
+    isConverting = true;
+    try {
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+      const nodes = [];
+      while (walker.nextNode()) {
+        const n = walker.currentNode;
+        const p = n.parentElement;
+        if (!p || ["SCRIPT", "STYLE", "TEXTAREA", "INPUT", "OPTION"].includes(p.tagName)) continue;
+        if (EMOJI_MAP.some(([re]) => re.test(n.nodeValue))) {
+          nodes.push(n);
         }
-        if (!dupTarget.vid && curItem.vid) dupTarget.vid = curItem.vid;
-        if (!dupTarget.note && curItem.note) dupTarget.note = curItem.note;
-        if (curItem.star) dupTarget.star = true;
-      } else {
-        kept.push(curItem);
       }
-    }
-
-    if (mergedCount > 0) {
-      items = kept;
-      save();
-      draw(true);
-      toast(`중복된 장소 ${mergedCount}건을 찾아 병합했어요`);
-    } else {
-      toast("중복된 장소가 없어요");
+      nodes.forEach(node => {
+        let html = node.nodeValue
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+        EMOJI_MAP.forEach(([re, rep]) => {
+          html = html.replace(re, rep);
+        });
+        const span = document.createElement("span");
+        span.style.display = "inline-flex";
+        span.style.alignItems = "center";
+        span.style.gap = "3px";
+        span.innerHTML = html;
+        node.parentNode?.replaceChild(span, node);
+      });
+    } finally {
+      isConverting = false;
     }
   }
 
-  /* 스마트 필터바 재구성: 빨간 영역 제거 + 3열 액션 그리드 배치 */
-  function rebuildSmartFilterBar() {
-    const bar = document.getElementById("smartFilterBar");
-    if (!bar) return;
+  /* 3. 목록 탭 필터 영역: 빨간 박스 요소 제거 + 3개 버튼 1줄 그리드 배치 */
+  function restructureListFilterBox() {
+    const listTab = document.getElementById("tab-list") || document.getElementById("side");
+    if (!listTab) return;
 
-    // 기존 내부 요소 중 빨간 박스 해당 요소 모두 숨김
-    Array.from(bar.children).forEach(ch => {
-      if (ch.id !== "v9ActionGrid") ch.style.display = "none";
-    });
+    const allBtns = Array.from(listTab.querySelectorAll("button, .sfb-chip, .lchip, .mb"));
+    const normTxt = (el) => (el.textContent || "").replace(/\s+/g, "");
 
-    if (!document.getElementById("v9ActionGrid")) {
-      const grid = document.createElement("div");
-      grid.id = "v9ActionGrid";
-      grid.innerHTML = `
-        <button type="button" class="v9-tool-btn" id="v9BtnCoordOnly">
-          <span class="ms">where_to_vote</span><span>좌표완료만</span>
-        </button>
-        <button type="button" class="v9-tool-btn" id="v9BtnManualSort">
-          <span class="ms">drag_indicator</span><span>수동 순서편집</span>
-        </button>
-        <button type="button" class="v9-tool-btn" id="v9BtnDedup">
-          <span class="ms">join_inner</span><span>중복 찾기</span>
-        </button>
-      `;
-      bar.appendChild(grid);
+    const btnCoord = allBtns.find(b => normTxt(b).includes("좌표완료만"));
+    const btnManualSort = allBtns.find(b => normTxt(b).includes("수동순서편집"));
+    const btnDedup = allBtns.find(b => normTxt(b).includes("중복찾기"));
 
-      const btnCoord = document.getElementById("v9BtnCoordOnly");
-      const btnSort = document.getElementById("v9BtnManualSort");
-      const btnDedup = document.getElementById("v9BtnDedup");
-
-      btnCoord.onclick = () => {
-        onlyCoordMode = !onlyCoordMode;
-        btnCoord.classList.toggle("on", onlyCoordMode);
-        const origCoordBtn = document.getElementById("sfb-coord-only");
-        if (origCoordBtn && origCoordBtn.classList.contains("on") !== onlyCoordMode) {
-          origCoordBtn.click();
-        } else {
-          applyCoordFilterToDom();
+    // 빨간 박스 내부의 전체일차 / 일차미정 버튼 숨김 (단, 상단 lchips-LIST 바는 제외)
+    allBtns.forEach(b => {
+      if (b.closest("#lchips-LIST")) return;
+      const t = normTxt(b);
+      if (t === "전체일차" || t === "일차미정" || /^Day\d+$/i.test(t)) {
+        b.classList.add("v10-hidden");
+        if (b.parentElement && b.parentElement !== listTab) {
+          const visibleSiblings = Array.from(b.parentElement.children).filter(
+            c => !c.classList.contains("v10-hidden") && c.style.display !== "none"
+          );
+          if (!visibleSiblings.length) b.parentElement.classList.add("v10-hidden");
         }
-      };
+      }
+    });
 
-      btnSort.onclick = () => {
-        manualSortMode = !manualSortMode;
-        btnSort.classList.toggle("on", manualSortMode);
-        document.body.classList.toggle("v9-manual-sort-on", manualSortMode);
-        toast(manualSortMode ? "카드 왼쪽 핸들(⋮⋮)을 끌어 순서를 변경하세요" : "수동 순서편집을 마쳤어요");
-      };
+    // 정렬 셀렉트 박스 및 날짜(달력) 입력칸 숨김
+    listTab.querySelectorAll("select").forEach(sel => {
+      if (sel.classList.contains("ux7-day-select")) return; // 카드 내부 D1~D10 드롭다운은 유지
+      const optText = Array.from(sel.options || []).map(o => o.textContent).join(" ");
+      if (optText.includes("정렬") || optText.includes("기본") || sel.id === "sfb-sort") {
+        sel.classList.add("v10-hidden");
+        if (sel.parentElement && !sel.parentElement.contains(btnCoord)) {
+          sel.parentElement.classList.add("v10-hidden");
+        }
+      }
+    });
 
-      btnDedup.onclick = () => {
-        findAndMergeDuplicates();
+    listTab.querySelectorAll('input[type="date"], input[placeholder*="날짜"], input[placeholder*="연도"]').forEach(inp => {
+      inp.classList.add("v10-hidden");
+      if (inp.parentElement && !inp.parentElement.contains(btnCoord)) {
+        inp.parentElement.classList.add("v10-hidden");
+      }
+    });
+
+    // 하단 3개 기능 버튼(좌표완료만, 수동 순서편집, 중복 찾기)을 1줄 3열 그리드로 배치 및 구글 폰트 아이콘 적용
+    if (btnCoord && btnManualSort && btnDedup) {
+      const setBtnIconAndLabel = (btn, iconName, labelText) => {
+        if (btn.dataset.v10IconSet === "1") return;
+        btn.dataset.v10IconSet = "1";
+        btn.innerHTML = `<span class="ms" style="font-size:17px">${iconName}</span><span>${labelText}</span>`;
       };
+      setBtnIconAndLabel(btnCoord, "where_to_vote", "좌표완료만");
+      setBtnIconAndLabel(btnManualSort, "drag_indicator", "수동 순서편집");
+      setBtnIconAndLabel(btnDedup, "join_inner", "중복 찾기");
+
+      const container = btnCoord.closest("#smartFilterBar, .card, div");
+      if (container) {
+        let grid = container.querySelector(".v10-action-grid");
+        if (!grid) {
+          grid = document.createElement("div");
+          grid.className = "v10-action-grid";
+          container.appendChild(grid);
+        }
+        if (btnCoord.parentElement !== grid) grid.appendChild(btnCoord);
+        if (btnManualSort.parentElement !== grid) grid.appendChild(btnManualSort);
+        if (btnDedup.parentElement !== grid) grid.appendChild(btnDedup);
+
+        // 컨테이너 안의 다른 빈 행들 숨김 처리
+        Array.from(container.children).forEach(ch => {
+          if (ch !== grid) ch.classList.add("v10-hidden");
+        });
+      }
     }
   }
 
-  function applyCoordFilterToDom() {
-    const listEl = document.getElementById("list-LIST");
-    if (!listEl || !Array.isArray(items)) return;
-    const itemMap = new Map(items.map(it => [String(it.id), it]));
-    listEl.querySelectorAll(".item[data-id]").forEach(cardEl => {
-      const it = itemMap.get(String(cardEl.dataset.id));
-      if (!it) return;
-      if (onlyCoordMode && (!Number(it.lat) || !Number(it.lng))) {
-        cardEl.style.display = "none";
-      } else if (!onlyCoordMode && cardEl.style.display === "none") {
-        cardEl.style.display = "";
-      }
-    });
+  function runAllV10Updates() {
+    restructureListFilterBox();
+    convertEmojisToGoogleIcons(document.body);
   }
 
-  if (typeof renderListTab === "function") {
-    const _prevRender = renderListTab;
-    renderListTab = function(...args) {
-      const r = _prevRender.apply(this, args);
-      rebuildSmartFilterBar();
-      applyCoordFilterToDom();
-      replaceEmojisInElement(document.getElementById("side"));
-      return r;
-    };
-  }
+  // DOM 변화 감지하여 동적 렌더링 시에도 즉시 적용
+  const obs = new MutationObserver(() => {
+    restructureListFilterBox();
+    convertEmojisToGoogleIcons(document.body);
+  });
+  obs.observe(document.body, { childList: true, subtree: true });
 
-  if (typeof showSheet === "function") {
-    const _prevSheet = showSheet;
-    showSheet = function(...args) {
-      const r = _prevSheet.apply(this, args);
-      replaceEmojisInElement(document.getElementById("sbody"));
-      return r;
-    };
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", runAllV10Updates);
+  } else {
+    runAllV10Updates();
   }
-
-  setTimeout(() => {
-    rebuildSmartFilterBar();
-    replaceEmojisInElement(document.body);
-  }, 350);
+  setTimeout(runAllV10Updates, 200);
+  setTimeout(runAllV10Updates, 700);
 })();
 </script>
-<!-- === V9_TOOLBAR_AND_ICONS_END === -->
+<!-- === V10_FINAL_UI_PATCH_END === -->
 </body>
 </html>
