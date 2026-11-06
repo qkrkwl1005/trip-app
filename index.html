@@ -1,40 +1,11 @@
 <!doctype html>
 <html lang="ko" data-theme="dark">
   <head>
-<!-- === V14_HEAD_CACHE_START === -->
-<style>
-  /* [1번] 로딩창: 모든 텍스트·프로그레스 바 숨기고 중앙 로고만 단독 표시 */
-  #v8Splash {
-    background: #05070b !important;
-  }
-  [data-theme="light"] #v8Splash {
-    background: #ffffff !important;
-  }
-  #v8Splash .v8-sp-title,
-  #v8Splash .v8-sp-step,
-  #v8Splash .v8-sp-bar-wrap,
-  #v8Splash .v8-sp-pct {
-    display: none !important;
-  }
-  #v8Splash .v8-sp-logo {
-    width: 76px !important;
-    height: 76px !important;
-    border-radius: 24px !important;
-    margin: 0 !important;
-    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.45) !important;
-    overflow: hidden !important;
-  }
-  #v8Splash .v8-sp-logo img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-</style>
+<!-- === V16_HEAD_CACHE_START === -->
 <script>
 window.Sortable = null;
-(function bustCacheV14() {
-  const VER = "TRIP_V14_BUST_1793995527";
+(function bustCacheV16() {
+  const VER = "TRIP_V16_BUST_1793996659";
   if (localStorage.getItem("TRIP_LAST_CACHE_BUST") !== VER) {
     localStorage.setItem("TRIP_LAST_CACHE_BUST", VER);
     if ("caches" in window) {
@@ -46,7 +17,8 @@ window.Sortable = null;
   }
 })();
 </script>
-<!-- === V14_HEAD_CACHE_END === -->
+<!-- === V16_HEAD_CACHE_END === -->
+
 
     <meta charset="UTF-8" />
     <meta
@@ -69,10 +41,7 @@ window.Sortable = null;
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preconnect" href="https://tse1.mm.bing.net" crossorigin />
-    <link
-      rel="apple-touch-icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='112' fill='%231e3a8a'/%3E%3Cpath d='M256 96 L416 224 L256 208 L96 224 Z' fill='white'/%3E%3Cpath d='M256 208 L256 384 L224 416 L288 416 L256 384' fill='white'/%3E%3Cpath d='M256 208 L320 320 L288 320 L256 288 L224 320 L192 320 Z' fill='white'/%3E%3C/svg%3E"
-    />
+    
     <title>여행플래너</title>
     <link
       rel="stylesheet"
@@ -1465,17 +1434,14 @@ window.Sortable = null;
     inset: 0;
     z-index: 9999999;
     background: #080a0f;
-    color: #f8fafc;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
     padding: 24px;
-    transition: opacity 0.38s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.38s;
+    transition: opacity 0.32s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.32s;
   }
   [data-theme="light"] #v8Splash {
     background: #f1f5f9;
-    color: #0f172a;
   }
   #v8Splash.hide {
     opacity: 0;
@@ -1483,62 +1449,30 @@ window.Sortable = null;
     pointer-events: none;
   }
   .v8-sp-logo {
-    width: 68px;
-    height: 68px;
+    width: 84px;
+    height: 84px;
     border-radius: 22px;
-    background: linear-gradient(135deg, #2563eb, #4f46e5);
+    overflow: hidden;
     display: grid;
     place-items: center;
-    box-shadow: 0 12px 32px rgba(37, 99, 235, 0.45);
-    margin-bottom: 18px;
-    animation: v8Pulse 1.6s ease-in-out infinite;
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.5);
+    animation: v8Pulse 1.4s ease-in-out infinite;
+  }
+  .v8-sp-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
   }
   @keyframes v8Pulse {
     0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.06); }
-  }
-  .v8-sp-title {
-    font-size: 20px;
-    font-weight: 900;
-    letter-spacing: -0.02em;
-    margin-bottom: 6px;
-  }
-  .v8-sp-step {
-    font-size: 13px;
-    font-weight: 600;
-    color: #94a3b8;
-    margin-bottom: 18px;
-    min-height: 20px;
-  }
-  .v8-sp-bar-wrap {
-    width: 240px;
-    height: 8px;
-    border-radius: 999px;
-    background: rgba(148, 163, 184, 0.2);
-    overflow: hidden;
-    margin-bottom: 8px;
-  }
-  .v8-sp-bar {
-    width: 8%;
-    height: 100%;
-    border-radius: 999px;
-    background: linear-gradient(90deg, #3b82f6, #60a5fa);
-    transition: width 0.25s cubic-bezier(0.22, 1, 0.36, 1);
-  }
-  .v8-sp-pct {
-    font-size: 13px;
-    font-weight: 800;
-    color: #3b82f6;
+    50% { transform: scale(1.05); }
   }
 </style>
 <div id="v8Splash" role="status" aria-live="polite">
   <div class="v8-sp-logo">
-    <svg width="34" height="34" viewBox="0 0 24 24" fill="white"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>
+    <img src="/icon-192.png?v=8" onerror="this.onerror=null;this.src='/apple-touch-icon.png?v=8';" alt="앱 로고" />
   </div>
-  <div class="v8-sp-title">여행플래너</div>
-  <div class="v8-sp-step" id="v8SpStep">앱 리소스 준비 중...</div>
-  <div class="v8-sp-bar-wrap"><div class="v8-sp-bar" id="v8SpBar"></div></div>
-  <div class="v8-sp-pct" id="v8SpPct">8%</div>
 </div>
 <!-- === V8_SPLASH_END === -->
     <aside id="side">
@@ -11315,7 +11249,7 @@ ${caption || rawText}
     bar.id = "ux7TopUtilBar";
     bar.innerHTML = `
       <div class="ux7-title">
-        <span class="ms fill" style="color:var(--pr)">flight_takeoff</span>
+        <img src="/icon-192.png?v=8" alt="" style="width:22px;height:22px;border-radius:6px;object-fit:cover;display:block">
         <span>여행플래너</span>
       </div>
       <div class="ux7-actions">
@@ -12430,9 +12364,10 @@ ${caption || rawText}
 
 
 
-<!-- === V14_CLEAN_UI_PATCH_START === -->
+
+<!-- === V16_ALL_IN_ONE_PATCH_START === -->
 <style>
-  /* 불필요 요소 및 별표(즐겨찾기) 완전 숨김 */
+  /* 1. 별표(즐겨찾기) 버튼 및 불필요 상단 필터 바 숨김 */
   .item .star-btn,
   #lchips-LIST .lchip[data-f="STAR"],
   #smartFilterBar,
@@ -12441,7 +12376,7 @@ ${caption || rawText}
     display: none !important;
   }
 
-  /* 드래그 시 파란 선택 테두리 차단 */
+  /* 드래그 시 파란색 선택 테두리(outline) 차단 */
   #list-LIST .item,
   #list-LIST .item.selected {
     outline: none !important;
@@ -12450,8 +12385,8 @@ ${caption || rawText}
     -webkit-touch-callout: none !important;
   }
 
-  /* 좌표 완료 초록색 체크 표시 */
-  .v14-coord-check {
+  /* 2. 좌표 완료 초록색 체크 표시 */
+  .v16-coord-check {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -12461,12 +12396,12 @@ ${caption || rawText}
     flex: none;
     pointer-events: none;
   }
-  .v14-coord-check .ms {
+  .v16-coord-check .ms {
     font-size: 21px;
     color: #10b981;
   }
 
-  /* 드래그 손잡이(⋮⋮) 터치 영역 */
+  /* 3. 드래그 손잡이(⋮⋮) 터치 영역 */
   .v8-drag-handle {
     cursor: grab;
     color: var(--sub);
@@ -12493,15 +12428,15 @@ ${caption || rawText}
     transform: scale(1.15);
   }
 
-  /* 드래그 빈 슬롯 & 플로팅 카드 */
-  .item.v14-drag-placeholder {
+  /* 4. 드래그 빈 슬롯 & 손가락을 따라다니는 플로팅 카드 */
+  .item.v16-drag-placeholder {
     opacity: 0.16 !important;
     background: var(--pr-soft) !important;
     border: 2px dashed var(--pr) !important;
     box-shadow: none !important;
     transform: scale(0.98) !important;
   }
-  .v14-floating-card {
+  .v16-floating-card {
     position: fixed !important;
     z-index: 2147483647 !important;
     pointer-events: none !important;
@@ -12514,8 +12449,82 @@ ${caption || rawText}
     will-change: transform;
   }
 
-  /* [2번] Wanderlog 스타일 '가져오기' UI */
-  .v14-url-bar {
+  /* 5. 우측 하단 고정 [+] 플로팅 액션 버튼 (스크롤해도 고정) */
+  #v16FabBtn {
+    position: fixed;
+    right: 20px;
+    bottom: calc(86px + env(safe-area-inset-bottom));
+    width: 58px;
+    height: 58px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #2563eb, #4f46e5);
+    color: #fff;
+    border: 0;
+    box-shadow: 0 10px 26px rgba(37, 99, 235, 0.48);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 205;
+    transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s;
+  }
+  @media (min-width: 821px) {
+    #v16FabBtn {
+      left: 362px;
+      right: auto;
+      bottom: 24px;
+    }
+  }
+  #v16FabBtn.show {
+    display: flex;
+  }
+  #v16FabBtn:active {
+    transform: scale(0.92);
+  }
+  #v16FabBtn .ms {
+    font-size: 30px;
+    transition: transform 0.25s ease;
+  }
+  #v16FabBtn.open .ms {
+    transform: rotate(45deg);
+  }
+
+  /* 6. 가져오기 바텀 시트 (Wanderlog 스타일) */
+  #v16ImportSheetWrap {
+    position: fixed;
+    inset: 0;
+    z-index: 230;
+    background: rgba(5, 6, 9, 0.74);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  #v16ImportSheetWrap.on {
+    display: flex;
+  }
+  #v16ImportSheet {
+    width: 100%;
+    max-width: 520px;
+    max-height: 90dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    background: var(--s);
+    border-top: 1px solid var(--bd2);
+    border-radius: 28px 28px 0 0;
+    padding: 14px 20px calc(28px + env(safe-area-inset-bottom));
+    box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.55);
+    animation: shUp 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .v16-sheet-handle {
+    width: 44px;
+    height: 5px;
+    border-radius: 999px;
+    background: var(--bd2);
+    margin: 2px auto 14px;
+  }
+  .v16-url-bar {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -12523,9 +12532,9 @@ ${caption || rawText}
     border-radius: 999px;
     background: var(--s2);
     border: 1px solid var(--bd2);
-    margin-bottom: 12px;
+    margin-bottom: 10px;
   }
-  .v14-url-bar input {
+  .v16-url-bar input {
     flex: 1;
     border: 0 !important;
     background: transparent !important;
@@ -12535,7 +12544,7 @@ ${caption || rawText}
     font-size: 14px !important;
     box-shadow: none !important;
   }
-  .v14-url-bar .v14-paste-pill {
+  .v16-url-bar .v16-paste-pill {
     flex: none;
     min-height: 36px;
     padding: 0 14px;
@@ -12548,14 +12557,14 @@ ${caption || rawText}
     font-weight: 800;
     cursor: pointer;
   }
-  .v14-platforms {
+  .v16-platforms {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 8px;
-    margin: 16px 0;
+    margin: 14px 0;
     text-align: center;
   }
-  .v14-plat-item {
+  .v16-plat-item {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -12564,34 +12573,33 @@ ${caption || rawText}
     font-weight: 700;
     color: var(--sub);
     cursor: pointer;
-    user-select: none;
   }
-  .v14-plat-ico {
-    width: 48px;
-    height: 48px;
+  .v16-plat-ico {
+    width: 46px;
+    height: 46px;
     border-radius: 50%;
     background: var(--s2);
     border: 1px solid var(--bd);
     display: grid;
     place-items: center;
-    transition: transform 0.12s ease, border-color 0.15s ease;
+    transition: transform 0.12s, border-color 0.15s;
   }
-  .v14-plat-item:active .v14-plat-ico {
+  .v16-plat-item:active .v16-plat-ico {
     transform: scale(0.92);
     border-color: var(--pr);
   }
-  .v14-import-list {
+  .v16-import-list {
     display: flex;
     flex-direction: column;
     gap: 10px;
     margin-top: 6px;
   }
-  .v14-import-card {
+  .v16-import-card {
     display: flex;
     align-items: center;
     gap: 14px;
     width: 100%;
-    padding: 15px 16px;
+    padding: 14px 16px;
     border-radius: 18px;
     background: var(--s2);
     border: 1px solid var(--bd);
@@ -12599,31 +12607,30 @@ ${caption || rawText}
     font: inherit;
     text-align: left;
     cursor: pointer;
-    transition: transform 0.12s ease, border-color 0.15s ease, background 0.15s ease;
   }
-  .v14-import-card:active {
+  .v16-import-card:active {
     transform: scale(0.985);
     border-color: var(--pr);
   }
-  .v14-import-card .v14-ic-box {
-    width: 44px;
-    height: 44px;
+  .v16-import-card .v16-ic-box {
+    width: 42px;
+    height: 42px;
     border-radius: 12px;
     display: grid;
     place-items: center;
     flex: none;
   }
-  .v14-import-card .v14-ic-txt {
+  .v16-import-card .v16-ic-txt {
     flex: 1;
     min-width: 0;
   }
-  .v14-import-card .v14-ic-txt b {
+  .v16-import-card .v16-ic-txt b {
     display: block;
-    font-size: 14.5px;
+    font-size: 14px;
     font-weight: 800;
     margin-bottom: 2px;
   }
-  .v14-import-card .v14-ic-txt small {
+  .v16-import-card .v16-ic-txt small {
     display: block;
     font-size: 12px;
     color: var(--sub);
@@ -12631,7 +12638,7 @@ ${caption || rawText}
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .v14-collapse-pane {
+  .v16-collapse-pane {
     display: none;
     padding: 14px;
     border-radius: 16px;
@@ -12639,146 +12646,232 @@ ${caption || rawText}
     border: 1px solid var(--bd2);
     margin-top: 6px;
   }
-  .v14-collapse-pane.on {
+  .v16-collapse-pane.on {
     display: block;
   }
+
+  /* 7. 홈 탭 대시보드 UI */
+  #v16Dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .v16-hero-card {
+    position: relative;
+    border-radius: 24px;
+    background: linear-gradient(145deg, var(--s), var(--s2));
+    padding: 22px 20px;
+    overflow: hidden;
+    border: 1px solid var(--bd);
+    box-shadow: var(--sh-card);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .v16-hero-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .v16-hero-logo {
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+    object-fit: cover;
+    border: 1px solid var(--bd2);
+    flex: none;
+  }
+  .v16-hero-title {
+    font-size: 21px;
+    font-weight: 900;
+    color: var(--tx);
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+  }
+  .v16-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .v16-stat-box {
+    background: var(--s);
+    padding: 15px 16px;
+    border-radius: 20px;
+    border: 1px solid var(--bd);
+    box-shadow: var(--sh-card);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    cursor: pointer;
+  }
+  .v16-stat-box:active {
+    transform: scale(0.98);
+  }
+  .v16-stat-num {
+    font-size: 24px;
+    font-weight: 900;
+    color: var(--tx);
+    line-height: 1.1;
+  }
+  .v16-stat-lbl {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--sub);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .v16-day-pills {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+  .v16-day-pills::-webkit-scrollbar { display: none; }
 </style>
 
 <script>
-(function initV14CleanApp() {
+(function initV16AllInOne() {
   /* =========================================================================
-   * [1번] 스플래시 화면: 앱 아이콘(/icon-192.png) 로고만 깔끔하게 표시 후 빠른 진입
+   * 1. 스플래시 화면 빠른 페이드아웃 (비행기 없이 내 앱 로고만 표시 후 진입)
    * ========================================================================= */
-  function upgradeMinimalSplash() {
-    const spEl = document.getElementById("v8Splash");
-    if (!spEl) return;
-    const logoBox = spEl.querySelector(".v8-sp-logo");
-    if (logoBox && !logoBox.dataset.v14Logo) {
-      logoBox.dataset.v14Logo = "1";
-      const img = new Image();
-      img.src = "/icon-192.png?v=8";
-      img.alt = "Logo";
-      img.onload = () => {
-        logoBox.innerHTML = "";
-        logoBox.appendChild(img);
-      };
-    }
-    setTimeout(() => {
-      spEl.classList.add("hide");
-    }, 550);
+  const spEl = document.getElementById("v8Splash");
+  if (spEl) {
+    setTimeout(() => spEl.classList.add("hide"), 500);
   }
 
   /* =========================================================================
-   * [2번] 홈 탭(#tab-add)을 Wanderlog 스타일 '가져오기' 화면으로 깔끔하게 재구성
+   * 2. 우측 하단 [+] 버튼 & Wanderlog 스타일 가져오기 바텀 시트 구성
+   *    (기존 분석용 DOM 요소를 파괴하지 않고 시트 내부로 이동하여 100% 호환)
    * ========================================================================= */
-  function buildWanderlogImportUI() {
-    const addTab = document.getElementById("tab-add");
-    const firstCard = addTab?.querySelector(".card");
+  function setupImportBottomSheetAndDashboard() {
+    const homeTab = document.getElementById("tab-add");
+    if (!homeTab || document.getElementById("v16ImportSheetWrap")) return;
+
+    const origCard = homeTab.querySelector(".card");
+    const rsEl = document.getElementById("rs");
+    const segEl = document.getElementById("seg");
     const reelBox = document.getElementById("reelLinkBox");
     const shareBox = document.getElementById("shareBox");
     const analyzeBtn = document.getElementById("analyzeShare");
     const shareFile = document.getElementById("shareFile");
     const manualBox = document.getElementById("ux7QuickManualBox");
-    if (!firstCard || !reelBox || !shareBox || !analyzeBtn || document.getElementById("v14ImportRoot")) return;
+    const stepperEl = document.getElementById("v8AiStepper");
 
-    // 기존 흩어져 있던 버튼·라벨 숨김 (DOM은 유지하여 기존 분석 로직 100% 호환)
-    Array.from(firstCard.children).forEach(ch => {
-      if (ch.classList.contains("sec-title") || ch.id === "seg" || ch.id === "v8AiStepper") return;
-      ch.style.display = "none";
-    });
+    if (origCard) origCard.style.display = "none";
 
-    const titleSpan = firstCard.querySelector(".sec-title span");
-    if (titleSpan) {
-      titleSpan.innerHTML = '<span class="ms fill" style="color:var(--pr)">download</span>가져오기';
-    }
+    // 홈 탭에 대시보드 컨테이너 생성
+    const dashEl = document.createElement("div");
+    dashEl.id = "v16Dashboard";
+    homeTab.insertBefore(dashEl, homeTab.firstChild);
 
-    const root = document.createElement("div");
-    root.id = "v14ImportRoot";
-    root.innerHTML = `
-      <div class="v14-url-bar">
-        <input type="text" id="v14UnifiedUrlInput" placeholder="소셜 미디어, 릴스·쇼츠 등의 URL" autocomplete="off" />
-        <button type="button" class="v14-paste-pill" id="v14QuickPasteBtn">붙여넣기</button>
-      </div>
-      <button type="button" class="btn" id="v14PrimaryFetchBtn" style="border-radius:999px;min-height:46px">
-        <span class="ms fill">bolt</span>링크에서 가져오기
-      </button>
+    // 우측 하단 고정 [+] 버튼 생성
+    const fab = document.createElement("button");
+    fab.type = "button";
+    fab.id = "v16FabBtn";
+    fab.title = "장소 가져오기 / 추가";
+    fab.innerHTML = '<span class="ms">add</span>';
+    document.body.appendChild(fab);
 
-      <div class="v14-platforms">
-        <div class="v14-plat-item" data-plat="yt">
-          <div class="v14-plat-ico"><span class="ms fill" style="color:#ef4444;font-size:22px">smart_display</span></div>
-          <span>유튜브</span>
-        </div>
-        <div class="v14-plat-item" data-plat="ig">
-          <div class="v14-plat-ico"><span class="ms fill" style="color:#ec4899;font-size:22px">photo_camera</span></div>
-          <span>인스타그램</span>
-        </div>
-        <div class="v14-plat-item" data-plat="tt">
-          <div class="v14-plat-ico"><span class="ms fill" style="color:#38bdf8;font-size:22px">music_note</span></div>
-          <span>틱톡</span>
-        </div>
-        <div class="v14-plat-item" data-plat="etc">
-          <div class="v14-plat-ico"><span class="ms" style="color:var(--sub);font-size:22px">language</span></div>
-          <span>기타 링크</span>
-        </div>
-      </div>
-
-      <div class="v14-import-list">
-        <button type="button" class="v14-import-card" id="v14CardImage">
-          <div class="v14-ic-box" style="background:rgba(16,185,129,0.14);color:#10b981">
-            <span class="ms fill" style="font-size:24px">imagesmode</span>
+    // 가져오기 바텀 시트 생성
+    const sheetWrap = document.createElement("div");
+    sheetWrap.id = "v16ImportSheetWrap";
+    sheetWrap.innerHTML = `
+      <div id="v16ImportSheet">
+        <div class="v16-sheet-handle"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div style="font-size:18px;font-weight:900;color:var(--tx);display:flex;align-items:center;gap:6px">
+            <span class="ms fill" style="color:var(--pr)">download</span>장소 가져오기
           </div>
-          <div class="v14-ic-txt">
-            <b>이미지에서 가져오기</b>
-            <small>소셜 게시물의 스크린샷 또는 장소 목록</small>
-          </div>
-          <span class="ms" style="color:var(--sub)">chevron_right</span>
+          <button type="button" class="mb" id="v16CloseImportBtn" style="min-height:32px;padding:4px 12px;font-size:12px">닫기</button>
+        </div>
+
+        <div id="v16SegMount"></div>
+        <div id="v16StepperMount"></div>
+
+        <div class="v16-url-bar">
+          <input type="text" id="v16UnifiedUrlInput" placeholder="소셜 미디어, 릴스·쇼츠 등의 URL" autocomplete="off" />
+          <button type="button" class="v16-paste-pill" id="v16QuickPasteBtn">붙여넣기</button>
+        </div>
+        <button type="button" class="btn" id="v16PrimaryFetchBtn" style="border-radius:999px;min-height:46px">
+          <span class="ms fill">bolt</span>링크에서 가져오기
         </button>
 
-        <button type="button" class="v14-import-card" id="v14CardText">
-          <div class="v14-ic-box" style="background:rgba(245,158,11,0.14);color:#f59e0b">
-            <span class="ms fill" style="font-size:24px">description</span>
+        <div class="v16-platforms">
+          <div class="v16-plat-item" data-plat="yt">
+            <div class="v16-plat-ico"><span class="ms fill" style="color:#ef4444;font-size:22px">smart_display</span></div>
+            <span>유튜브</span>
           </div>
-          <div class="v14-ic-txt">
-            <b>텍스트에서 가져오기</b>
-            <small>장소가 포함된 메모, 고정댓글 또는 복사된 텍스트</small>
+          <div class="v16-plat-item" data-plat="ig">
+            <div class="v16-plat-ico"><span class="ms fill" style="color:#ec4899;font-size:22px">photo_camera</span></div>
+            <span>인스타그램</span>
           </div>
-          <span class="ms" style="color:var(--sub)">expand_more</span>
-        </button>
-        <div class="v14-collapse-pane" id="v14TextPane"></div>
+          <div class="v16-plat-item" data-plat="tt">
+            <div class="v16-plat-ico"><span class="ms fill" style="color:#38bdf8;font-size:22px">music_note</span></div>
+            <span>틱톡</span>
+          </div>
+          <div class="v16-plat-item" data-plat="etc">
+            <div class="v16-plat-ico"><span class="ms" style="color:var(--sub);font-size:22px">language</span></div>
+            <span>기타</span>
+          </div>
+        </div>
 
-        <button type="button" class="v14-import-card" id="v14CardManual">
-          <div class="v14-ic-box" style="background:rgba(59,130,246,0.14);color:#3b82f6">
-            <span class="ms fill" style="font-size:24px">add_location_alt</span>
-          </div>
-          <div class="v14-ic-txt">
-            <b>직접 장소 등록하기</b>
-            <small>링크 없이 장소명·주소로 1초 만에 직접 추가</small>
-          </div>
-          <span class="ms" style="color:var(--sub)">expand_more</span>
-        </button>
-        <div class="v14-collapse-pane" id="v14ManualPane"></div>
+        <div class="v16-import-list">
+          <button type="button" class="v16-import-card" id="v16CardImage">
+            <div class="v16-ic-box" style="background:rgba(16,185,129,0.14);color:#10b981"><span class="ms fill" style="font-size:22px">imagesmode</span></div>
+            <div class="v16-ic-txt"><b>이미지에서 가져오기</b><small>소셜 게시물의 스크린샷 또는 장소 목록</small></div>
+            <span class="ms" style="color:var(--sub)">chevron_right</span>
+          </button>
+
+          <button type="button" class="v16-import-card" id="v16CardText">
+            <div class="v16-ic-box" style="background:rgba(245,158,11,0.14);color:#f59e0b"><span class="ms fill" style="font-size:22px">description</span></div>
+            <div class="v16-ic-txt"><b>텍스트에서 가져오기</b><small>장소가 포함된 메모, 고정댓글 또는 복사된 텍스트</small></div>
+            <span class="ms" style="color:var(--sub)">expand_more</span>
+          </button>
+          <div class="v16-collapse-pane" id="v16TextPane"></div>
+
+          <button type="button" class="v16-import-card" id="v16CardManual">
+            <div class="v16-ic-box" style="background:rgba(59,130,246,0.14);color:#3b82f6"><span class="ms fill" style="font-size:22px">edit_location_alt</span></div>
+            <div class="v16-ic-txt"><b>직접 장소 등록하기</b><small>링크 없이 장소명·주소로 빠르게 1건 등록</small></div>
+            <span class="ms" style="color:var(--sub)">expand_more</span>
+          </button>
+          <div class="v16-collapse-pane" id="v16ManualPane"></div>
+        </div>
+
+        <div id="v16RsMount" style="margin-top:12px"></div>
       </div>
     `;
+    document.body.appendChild(sheetWrap);
 
-    firstCard.appendChild(root);
+    // 기존 DOM 요소들을 바텀 시트 내부 슬롯으로 이동 (이벤트 및 ID 완벽 보존)
+    if (segEl) {
+      segEl.style.marginBottom = "12px";
+      document.getElementById("v16SegMount").appendChild(segEl);
+    }
+    if (stepperEl) {
+      document.getElementById("v16StepperMount").appendChild(stepperEl);
+    }
+    if (rsEl) {
+      document.getElementById("v16RsMount").appendChild(rsEl);
+    }
+    if (shareBox) {
+      const textPane = document.getElementById("v16TextPane");
+      shareBox.style.display = "block";
+      shareBox.style.marginBottom = "8px";
+      shareBox.placeholder = "복사한 릴스·쇼츠 캡션이나 고정댓글 맛집 리스트를 붙여넣으세요 (최대 10곳)";
+      textPane.appendChild(shareBox);
 
-    // 텍스트 패널 안에 기존 shareBox 이동 및 실행 버튼 연결
-    const textPane = document.getElementById("v14TextPane");
-    shareBox.style.display = "block";
-    shareBox.style.marginBottom = "8px";
-    shareBox.placeholder = "복사한 릴스·쇼츠 캡션이나 고정댓글 맛집 리스트를 여기에 붙여넣으세요 (최대 10곳 동시 분석)";
-    textPane.appendChild(shareBox);
-
-    const textAnalyzeBtn = document.createElement("button");
-    textAnalyzeBtn.type = "button";
-    textAnalyzeBtn.className = "btn";
-    textAnalyzeBtn.innerHTML = '<span class="ms fill">bolt</span>텍스트 분석·저장하기';
-    textAnalyzeBtn.onclick = () => analyzeBtn.click();
-    textPane.appendChild(textAnalyzeBtn);
-
-    // 수동 등록 패널 안에 기존 수동 입력 박스 연결
-    const manualPane = document.getElementById("v14ManualPane");
+      const tBtn = document.createElement("button");
+      tBtn.type = "button";
+      tBtn.className = "btn";
+      tBtn.innerHTML = '<span class="ms fill">bolt</span>텍스트 분석·저장하기';
+      tBtn.onclick = () => analyzeBtn?.click();
+      textPane.appendChild(tBtn);
+    }
     if (manualBox) {
+      const manualPane = document.getElementById("v16ManualPane");
       manualBox.style.display = "flex";
       manualBox.style.marginTop = "0";
       manualBox.style.padding = "0";
@@ -12786,30 +12879,61 @@ ${caption || rawText}
       manualPane.appendChild(manualBox);
     }
 
-    const urlInp = document.getElementById("v14UnifiedUrlInput");
-    const syncUrlToOrig = (val) => {
+    window.openV16ImportSheet = function(mode) {
+      if (typeof window.v8Haptic === "function") window.v8Haptic(12);
+      sheetWrap.classList.add("on");
+      fab.classList.add("open");
+      const textPane = document.getElementById("v16TextPane");
+      const manualPane = document.getElementById("v16ManualPane");
+      if (mode === "text") {
+        textPane.classList.add("on");
+        manualPane.classList.remove("on");
+        setTimeout(() => shareBox?.focus(), 80);
+      } else if (mode === "manual") {
+        manualPane.classList.add("on");
+        textPane.classList.remove("on");
+        setTimeout(() => document.getElementById("ux7ManName")?.focus(), 80);
+      }
+    };
+
+    window.closeV16ImportSheet = function() {
+      sheetWrap.classList.remove("on");
+      fab.classList.remove("open");
+    };
+
+    fab.onclick = () => {
+      if (sheetWrap.classList.contains("on")) window.closeV16ImportSheet();
+      else window.openV16ImportSheet();
+    };
+    document.getElementById("v16CloseImportBtn").onclick = window.closeV16ImportSheet;
+    sheetWrap.addEventListener("click", (e) => {
+      if (e.target === sheetWrap) window.closeV16ImportSheet();
+    });
+
+    const urlInp = document.getElementById("v16UnifiedUrlInput");
+    const syncUrl = (val) => {
       const v = String(val || "").trim();
       urlInp.value = v;
       const meta = typeof parseVideoMeta === "function" ? parseVideoMeta(v) : null;
       if (meta && meta.url) {
-        reelBox.value = meta.url;
+        if (reelBox) reelBox.value = meta.url;
         if (typeof lastSharedVid !== "undefined") lastSharedVid = meta.url;
-      } else {
+      } else if (reelBox) {
         reelBox.value = v;
       }
-      if (!shareBox.value.trim()) shareBox.value = v;
+      if (shareBox && !shareBox.value.trim()) shareBox.value = v;
     };
 
-    urlInp.addEventListener("input", () => syncUrlToOrig(urlInp.value));
+    urlInp.addEventListener("input", () => syncUrl(urlInp.value));
 
-    document.getElementById("v14QuickPasteBtn").onclick = async () => {
+    document.getElementById("v16QuickPasteBtn").onclick = async () => {
       try {
         const clip = await navigator.clipboard.readText();
         if (clip && clip.trim()) {
-          syncUrlToOrig(clip.trim());
-          shareBox.value = clip.trim();
+          syncUrl(clip.trim());
+          if (shareBox) shareBox.value = clip.trim();
           toast("클립보드 내용을 붙여넣었습니다. 바로 분석합니다.");
-          analyzeBtn.click();
+          analyzeBtn?.click();
           return;
         }
       } catch (_) {}
@@ -12817,33 +12941,183 @@ ${caption || rawText}
       toast("입력창을 길게 눌러 붙여넣어 주세요");
     };
 
-    document.getElementById("v14PrimaryFetchBtn").onclick = () => {
-      if (urlInp.value.trim()) syncUrlToOrig(urlInp.value);
-      analyzeBtn.click();
-      setTimeout(() => { urlInp.value = ""; }, 800);
+    document.getElementById("v16PrimaryFetchBtn").onclick = () => {
+      if (urlInp.value.trim()) syncUrl(urlInp.value);
+      analyzeBtn?.click();
+      setTimeout(() => { urlInp.value = ""; }, 700);
     };
 
-    root.querySelectorAll(".v14-plat-item").forEach(item => {
-      item.onclick = () => document.getElementById("v14QuickPasteBtn").click();
+    sheetWrap.querySelectorAll(".v16-plat-item").forEach(el => {
+      el.onclick = () => document.getElementById("v16QuickPasteBtn").click();
     });
 
-    document.getElementById("v14CardImage").onclick = () => shareFile?.click();
-    document.getElementById("v14CardText").onclick = () => {
+    document.getElementById("v16CardImage").onclick = () => shareFile?.click();
+    document.getElementById("v16CardText").onclick = () => {
+      const textPane = document.getElementById("v16TextPane");
+      const manualPane = document.getElementById("v16ManualPane");
       const on = textPane.classList.toggle("on");
       manualPane.classList.remove("on");
-      if (on) setTimeout(() => shareBox.focus(), 80);
+      if (on) setTimeout(() => shareBox?.focus(), 80);
     };
-    document.getElementById("v14CardManual").onclick = () => {
+    document.getElementById("v16CardManual").onclick = () => {
+      const textPane = document.getElementById("v16TextPane");
+      const manualPane = document.getElementById("v16ManualPane");
       const on = manualPane.classList.toggle("on");
       textPane.classList.remove("on");
       if (on) setTimeout(() => document.getElementById("ux7ManName")?.focus(), 80);
     };
   }
 
+  function updateFabVisibility() {
+    const fab = document.getElementById("v16FabBtn");
+    if (!fab) return;
+    const isMap = document.body.classList.contains("show-map");
+    const curTab = typeof activeTab !== "undefined" ? activeTab : "add";
+    fab.classList.toggle("show", !isMap && (curTab === "list" || curTab === "add"));
+  }
+
   /* =========================================================================
-   * [3번] 목록-지도 실시간 동선(Polyline) 연동 & FLIP 스무스 드래그 + 초록 체크
+   * 3. 홈 탭(대시보드) 렌더링 함수
    * ========================================================================= */
-  // 지도 동선(Polyline)이 임의 거리순이 아닌 '사용자가 드래그한 목록 순서'를 그대로 따르도록 오버라이드
+  window.renderV16Dashboard = function() {
+    const dashEl = document.getElementById("v16Dashboard");
+    if (!dashEl) return;
+
+    const list = typeof items !== "undefined" && Array.isArray(items) ? items : [];
+    const total = list.length;
+    const coords = list.filter(i => typeof hasMapCoordinates === "function" ? hasMapCoordinates(i) : (Number(i.lat) && Number(i.lng))).length;
+    const scheduled = list.filter(i => Number(i.day) > 0).length;
+    const done = list.filter(i => i.done).length;
+
+    let topRegion = "나의 여행 플랜";
+    if (total > 0 && typeof REGION_TAGS !== "undefined") {
+      const counts = {};
+      list.forEach(it => {
+        REGION_TAGS.forEach(([lbl, re]) => {
+          if (re.test(`${it.name || ""} ${it.address || ""}`)) {
+            counts[lbl] = (counts[lbl] || 0) + 1;
+          }
+        });
+      });
+      const best = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0];
+      if (best) topRegion = `${best} 여행 플랜`;
+    }
+
+    const activeDays = [...new Set(list.filter(x => Number(x.day) > 0).map(x => Number(x.day)))].sort((a, b) => a - b);
+    const dayPillsHtml = activeDays.length
+      ? `<div class="v16-day-pills">
+          ${activeDays.map(d => {
+            const c = list.filter(x => Number(x.day) === d).length;
+            return `<button type="button" class="lchip on" data-v16-day="${d}">Day ${d} (${c}곳)</button>`;
+          }).join("")}
+        </div>`
+      : "";
+
+    const recentHtml = list.slice(0, 4).map(i => {
+      const thumb = typeof itemThumb === "function" ? itemThumb(i) : (i.img || "");
+      const hasC = typeof hasMapCoordinates === "function" ? hasMapCoordinates(i) : (Number(i.lat) && Number(i.lng));
+      return `
+        <div class="item" data-v16-open="${esc(i.id)}" style="padding:12px 14px">
+          <div class="pic" style="width:52px;height:52px;border-radius:14px">
+            ${i.day ? `<span class="dayTag">D${i.day}</span>` : ""}
+            <span class="ms">location_on</span>
+            ${thumb ? `<img src="${esc(thumb)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}
+          </div>
+          <div class="mid">
+            <div class="nm" style="font-size:15px">
+              <span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(i.name || "장소")}</span>
+              ${hasC ? '<span class="v16-coord-check"><span class="ms fill" style="font-size:18px">check_circle</span></span>' : ""}
+            </div>
+            <div class="ds" style="font-size:12px;margin-top:2px">${esc(i.address || "주소 미입력")}</div>
+          </div>
+          <span class="ms" style="color:var(--sub)">chevron_right</span>
+        </div>
+      `;
+    }).join("") || `<div class="empty" style="padding:32px 16px">아직 등록된 장소가 없습니다.<br>아래 버튼을 눌러 첫 장소를 추가해 보세요.</div>`;
+
+    dashEl.innerHTML = `
+      <div class="v16-hero-card">
+        <div class="v16-hero-top">
+          <div>
+            <div style="font-size:11.5px;font-weight:800;color:var(--pr);margin-bottom:4px">REGISTERED PLAN</div>
+            <div class="v16-hero-title">${esc(topRegion)}</div>
+          </div>
+          <img src="/icon-192.png?v=8" class="v16-hero-logo" onerror="this.style.display='none'" alt="앱 로고" />
+        </div>
+        <div class="ds" style="margin:0">릴스·쇼츠·스크린샷에서 장소를 추출하고 지도 동선을 관리하세요.</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
+          <button type="button" class="btn" id="v16HeroAddBtn" style="min-height:44px;padding:10px 14px;font-size:13.5px">
+            <span class="ms">add_circle</span>장소 가져오기
+          </button>
+          <button type="button" class="btn g" id="v16HeroMapBtn" style="margin:0;min-height:44px;padding:10px 14px;font-size:13.5px">
+            <span class="ms">map</span>지도 동선 보기
+          </button>
+        </div>
+      </div>
+
+      <div class="v16-stats-grid">
+        <div class="v16-stat-box" data-v16- filter="ALL">
+          <div class="v16-stat-num">${total}</div>
+          <div class="v16-stat-lbl"><span class="ms" style="font-size:16px;color:var(--pr)">format_list_bulleted</span>전체 저장 장소</div>
+        </div>
+        <div class="v16-stat-box" data-v16-filter="COORD">
+          <div class="v16-stat-num" style="color:#10b981">${coords}</div>
+          <div class="v16-stat-lbl"><span class="ms fill" style="font-size:16px;color:#10b981">check_circle</span>좌표 설정 완료</div>
+        </div>
+        <div class="v16-stat-box" data-v16-filter="DAY">
+          <div class="v16-stat-num">${scheduled}</div>
+          <div class="v16-stat-lbl"><span class="ms" style="font-size:16px;color:#3b82f6">calendar_month</span>일차 배정 완료</div>
+        </div>
+        <div class="v16-stat-box" data-v16-filter="DONE">
+          <div class="v16-stat-num">${done}</div>
+          <div class="v16-stat-lbl"><span class="ms" style="font-size:16px;color:#8b5cf6">task_alt</span>방문 완료</div>
+        </div>
+      </div>
+
+      ${dayPillsHtml}
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">
+        <b style="font-size:15px">최근 등록한 장소</b>
+        <button type="button" class="mb" id="v16ViewAllBtn" style="min-height:30px;padding:4px 12px;font-size:12px">목록 전체보기</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">${recentHtml}</div>
+    `;
+
+    document.getElementById("v16HeroAddBtn").onclick = () => window.openV16ImportSheet();
+    document.getElementById("v16HeroMapBtn").onclick = () => {
+      if (innerWidth <= 820) tab("map");
+      else if (typeof fit === "function") fit();
+    };
+    document.getElementById("v16ViewAllBtn").onclick = () => tab("list");
+
+    dashEl.querySelectorAll("[data-v16-day]").forEach(btn => {
+      btn.onclick = () => {
+        const d = btn.dataset.v16Day;
+        listCat = "ALL";
+        listFilter.ALL = "DAY:" + d;
+        tab("list");
+      };
+    });
+
+    dashEl.querySelectorAll(".v16-stat-box").forEach(box => {
+      box.onclick = () => {
+        listCat = "ALL";
+        listFilter.ALL = "ALL";
+        tab("list");
+      };
+    });
+
+    dashEl.querySelectorAll("[data-v16-open]").forEach(row => {
+      row.onclick = () => {
+        cur = row.dataset.v16Open;
+        if (typeof showSheet === "function") showSheet();
+      };
+    });
+  };
+
+  /* =========================================================================
+   * 4. 목록-지도 실시간 동선(Polyline) 연동 & FLIP 스무스 드래그 + 초록 체크
+   * ========================================================================= */
   if (typeof buildOrderedRoutePoints === "function") {
     buildOrderedRoutePoints = function(valid) {
       if (!Array.isArray(valid) || valid.length < 2) return { pts: [], totalKm: 0 };
@@ -12876,7 +13150,7 @@ ${caption || rawText}
     };
   }
 
-  function decorateV14Cards() {
+  function decorateV16Cards() {
     const listEl = document.getElementById("list-LIST");
     if (!listEl || !Array.isArray(items)) return;
 
@@ -12902,17 +13176,17 @@ ${caption || rawText}
       const nmRow = cardEl.querySelector(".mid .nm");
       if (!nmRow) return;
 
-      nmRow.querySelectorAll(".star-btn, .v11-coord-check, .v12-coord-check, .v13-coord-check").forEach(el => el.remove());
+      nmRow.querySelectorAll(".star-btn, .v11-coord-check, .v12-coord-check, .v13-coord-check, .v14-coord-check").forEach(el => el.remove());
 
       const hasCoord = typeof hasMapCoordinates === "function"
         ? hasMapCoordinates(it)
         : Boolean(Number(it.lat) && Number(it.lng));
 
-      let checkEl = nmRow.querySelector(".v14-coord-check");
+      let checkEl = nmRow.querySelector(".v16-coord-check");
       if (hasCoord) {
         if (!checkEl) {
           checkEl = document.createElement("span");
-          checkEl.className = "v14-coord-check";
+          checkEl.className = "v16-coord-check";
           checkEl.title = "좌표 설정 완료";
           checkEl.innerHTML = '<span class="ms fill">check_circle</span>';
           const daySel = nmRow.querySelector(".ux7-day-select");
@@ -12957,8 +13231,8 @@ ${caption || rawText}
         void el.offsetHeight;
         el.style.transition = "transform 250ms cubic-bezier(0.22, 1, 0.36, 1)";
         el.style.transform = "translate3d(0, 0, 0)";
-        clearTimeout(el._v14FlipTimer);
-        el._v14FlipTimer = setTimeout(() => {
+        clearTimeout(el._v16FlipTimer);
+        el._v16FlipTimer = setTimeout(() => {
           el.style.transition = "";
           el.style.transform = "";
         }, 260);
@@ -13023,7 +13297,7 @@ ${caption || rawText}
     const scrollEl = document.getElementById("tab-list") || listEl.parentElement;
 
     const cloneEl = card.cloneNode(true);
-    cloneEl.className = card.className + " v14-floating-card";
+    cloneEl.className = card.className + " v16-floating-card";
     cloneEl.style.width = rect.width + "px";
     cloneEl.style.height = rect.height + "px";
     cloneEl.style.left = rect.left + "px";
@@ -13038,7 +13312,7 @@ ${caption || rawText}
       }
     }, 125);
 
-    card.classList.add("v14-drag-placeholder");
+    card.classList.add("v16-drag-placeholder");
     card.classList.remove("selected");
     if (typeof selected !== "undefined" && selected.clear) selected.clear();
     if (typeof window.v8Haptic === "function") window.v8Haptic(18);
@@ -13086,7 +13360,7 @@ ${caption || rawText}
     state.cloneEl.style.boxShadow = "0 4px 16px rgba(0, 0, 0, 0.2)";
 
     setTimeout(() => {
-      state.card.classList.remove("v14-drag-placeholder");
+      state.card.classList.remove("v16-drag-placeholder");
       state.cloneEl.remove();
       dragState = null;
 
@@ -13112,8 +13386,8 @@ ${caption || rawText}
       if (typeof window.v8Haptic === "function") window.v8Haptic(15);
       if (typeof pushLocalHistory === "function") pushLocalHistory();
       if (typeof persistNow === "function") persistNow();
-      // 지도 동선(Polyline) 즉시 재계산 및 렌더링
       if (typeof draw === "function") draw(true);
+      if (window.renderV16Dashboard) window.renderV16Dashboard();
       if (typeof toast === "function") toast("순서 및 지도 동선이 갱신되었습니다");
     }, 195);
   }
@@ -13181,30 +13455,54 @@ ${caption || rawText}
     }
   }, { capture: true });
 
+  /* =========================================================================
+   * 5. 탭 전환·렌더링 훅 연동
+   * ========================================================================= */
+  if (typeof tab === "function") {
+    const _origTab = tab;
+    tab = function(...args) {
+      const r = _origTab.apply(this, args);
+      updateFabVisibility();
+      if (window.renderV16Dashboard) window.renderV16Dashboard();
+      return r;
+    };
+  }
+
+  if (typeof renderListTab === "function") {
+    const _origRenderList = renderListTab;
+    renderListTab = function(...args) {
+      const r = _origRenderList.apply(this, args);
+      decorateV16Cards();
+      if (window.renderV16Dashboard) window.renderV16Dashboard();
+      return r;
+    };
+  }
+
   const listObserver = new MutationObserver(() => {
-    decorateV14Cards();
+    decorateV16Cards();
   });
 
-  function bootV14() {
-    upgradeMinimalSplash();
-    buildWanderlogImportUI();
+  function bootV16() {
+    setupImportBottomSheetAndDashboard();
+    updateFabVisibility();
+    if (window.renderV16Dashboard) window.renderV16Dashboard();
     const listEl = document.getElementById("list-LIST");
-    if (listEl && !listEl._v14Observed) {
-      listEl._v14Observed = true;
+    if (listEl && !listEl._v16Observed) {
+      listEl._v16Observed = true;
       listObserver.observe(listEl, { childList: true });
     }
-    decorateV14Cards();
+    decorateV16Cards();
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", bootV14);
+    document.addEventListener("DOMContentLoaded", bootV16);
   } else {
-    bootV14();
+    bootV16();
   }
-  setTimeout(bootV14, 250);
-  setTimeout(bootV14, 700);
+  setTimeout(bootV16, 250);
+  setTimeout(bootV16, 700);
 })();
 </script>
-<!-- === V14_CLEAN_UI_PATCH_END === -->
+<!-- === V16_ALL_IN_ONE_PATCH_END === -->
 </body>
 </html>
