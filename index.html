@@ -1,6 +1,23 @@
 <!doctype html>
 <html lang="ko" data-theme="dark">
   <head>
+<!-- === V13_HEAD_CAPTURE_START === -->
+<script>
+window.Sortable = null;
+(function clearOldCachesV13() {
+  const KEY = "TRIP_V13_CACHE_BUST_1793994116";
+  if (localStorage.getItem("TRIP_LAST_CACHE_BUST") !== KEY) {
+    localStorage.setItem("TRIP_LAST_CACHE_BUST", KEY);
+    if ("caches" in window) {
+      caches.keys().then(ks => Promise.all(ks.map(k => caches.delete(k)))).catch(() => {});
+    }
+    if (navigator.serviceWorker) {
+      navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.update())).catch(() => {});
+    }
+  }
+})();
+</script>
+<!-- === V13_HEAD_CAPTURE_END === -->
     <meta charset="UTF-8" />
     <meta
       name="viewport"
@@ -11562,7 +11579,7 @@ ${caption || rawText}
 <!-- === UX_SUPER_PATCH_V7_END === -->
 
 <!-- === UX_SUPER_PATCH_V8_START === -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
+<!-- SortableJS removed for V13 Native Smooth Drag -->
 <style>
   /* 드래그 핸들 및 스와이프 액션 스타일 */
   .v8-drag-handle {
@@ -12101,7 +12118,7 @@ ${caption || rawText}
 
     // SortableJS 연결
     if (window.Sortable && !sortableInst) {
-      sortableInst = Sortable.create(listEl, {
+      sortableInst = (function(){return null;})(listEl, {
         handle: ".v8-drag-handle",
         animation: 180,
         ghostClass: "sortable-ghost",
@@ -12381,9 +12398,10 @@ ${caption || rawText}
 </script>
 <!-- === UX_SUPER_PATCH_V8_END === -->
 
-<!-- === V11_DRAG_AND_CHECK_PATCH_START === -->
+
+<!-- === V13_ULTRA_SMOOTH_DRAG_PATCH_START === -->
 <style>
-  /* 1. 즐겨찾기(별표) 버튼 및 상단 불필요 필터 박스 완전 숨김 */
+  /* 1. 별표(즐겨찾기) 버튼 및 불필요 상단 필터 바 숨김 */
   .item .star-btn,
   #lchips-LIST .lchip[data-f="STAR"],
   #smartFilterBar,
@@ -12391,30 +12409,39 @@ ${caption || rawText}
     display: none !important;
   }
 
-  /* 2. 좌표 완료 초록색 체크 아이콘 (기존 별표 위치) */
-  .v11-coord-check {
+  /* 드래그 시 파란색 선택 테두리(outline) 강제 제거 */
+  #list-LIST .item,
+  #list-LIST .item.selected {
+    outline: none !important;
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    -webkit-touch-callout: none !important;
+  }
+
+  /* 2. 좌표 완료 초록색 체크 표시 */
+  .v13-coord-check {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 28px;
-    min-height: 28px;
+    min-width: 26px;
+    min-height: 26px;
     color: #10b981;
     flex: none;
     pointer-events: none;
   }
-  .v11-coord-check .ms {
+  .v13-coord-check .ms {
     font-size: 21px;
     color: #10b981;
   }
 
-  /* 3. 드래그 핸들 터치 영역 확대 및 부드러운 드래그 스타일 */
+  /* 3. 드래그 손잡이(⋮⋮) 터치 영역 최적화 */
   .v8-drag-handle {
     cursor: grab;
     color: var(--sub);
-    min-width: 32px;
-    min-height: 52px;
-    padding: 8px 4px;
-    margin: -6px 2px -6px -8px;
+    min-width: 42px;
+    min-height: 68px;
+    padding: 12px 8px;
+    margin: -12px 4px -12px -12px;
     display: inline-flex !important;
     align-items: center;
     justify-content: center;
@@ -12422,45 +12449,48 @@ ${caption || rawText}
     -webkit-user-select: none !important;
     user-select: none !important;
     -webkit-touch-callout: none !important;
+    position: relative;
+    z-index: 10;
   }
   .v8-drag-handle .ms {
-    font-size: 22px;
+    font-size: 23px;
+    pointer-events: none;
+    transition: transform 0.15s ease, color 0.15s ease;
   }
-  .v8-drag-handle:active {
-    cursor: grabbing;
+  .v8-drag-handle:active .ms {
     color: var(--pr);
+    transform: scale(1.15);
   }
 
-  /* 드래그 중 기존 카드의 transform 트랜지션 간섭 차단 */
-  body.v11-sorting .item {
-    transition: none !important;
-    -webkit-user-select: none !important;
-    user-select: none !important;
-  }
-
-  /* 빈 슬롯(Ghost)과 손가락을 따라다니는 카드(Drag Fallback) 분리 */
-  .v11-sortable-ghost {
-    opacity: 0.22 !important;
+  /* 4. 드래그 중 원래 카드가 있던 빈 슬롯 스타일 */
+  .item.v13-drag-placeholder {
+    opacity: 0.16 !important;
     background: var(--pr-soft) !important;
     border: 2px dashed var(--pr) !important;
+    box-shadow: none !important;
+    transform: scale(0.98) !important;
   }
-  .v11-sortable-drag {
-    opacity: 0.96 !important;
+
+  /* 5. 손가락을 따라다니는 플로팅 카드 (60fps GPU 가속) */
+  .v13-floating-card {
+    position: fixed !important;
+    z-index: 2147483647 !important;
+    pointer-events: none !important;
+    margin: 0 !important;
     background: var(--s) !important;
     border: 1.5px solid var(--pr) !important;
-    box-shadow: 0 18px 38px rgba(0, 0, 0, 0.55) !important;
-    transform: scale(1.02);
-    z-index: 99999 !important;
-    pointer-events: none !important;
+    border-radius: var(--r-card) !important;
+    box-shadow: 0 22px 48px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(59, 130, 246, 0.3) !important;
+    opacity: 0.97 !important;
+    will-change: transform;
+    transform-origin: center center;
   }
 </style>
 
 <script>
-(function initV11DragAndCheckPatch() {
-  let v11Sortable = null;
-
-  /* 1. 각 카드에서 별표를 제거하고 좌표 완료 시 초록색 체크 표시 삽입 */
-  function applyCoordCheckAndHandle() {
+(function initV13UltraSmoothDrag() {
+  /* 1. 각 카드에 드래그 핸들 보장 및 별표 -> 초록색 좌표 체크 교체 */
+  function decorateV13Cards() {
     const listEl = document.getElementById("list-LIST");
     if (!listEl || !Array.isArray(items)) return;
 
@@ -12471,39 +12501,36 @@ ${caption || rawText}
       const it = itemMap.get(id);
       if (!it) return;
 
-      // 드래그 핸들 보장
+      // 드래그 핸들 생성 또는 유지
       let handle = cardEl.querySelector(".v8-drag-handle");
       if (!handle) {
         handle = document.createElement("span");
         handle.className = "v8-drag-handle";
-        handle.title = "길게 누르거나 끌어서 순서 변경";
+        handle.title = "잡고 끌어서 순서 변경";
         handle.innerHTML = '<span class="ms">drag_indicator</span>';
-        handle.onclick = (e) => e.stopPropagation();
         cardEl.insertBefore(handle, cardEl.firstChild);
       }
 
-      // 카드 내 이미지 기본 드래그 방지 (iOS 고스트 잔상 차단)
-      cardEl.querySelectorAll("img, a").forEach(el => {
-        el.setAttribute("draggable", "false");
-      });
+      // iOS 네이티브 이미지/링크 드래그 잔상 방지
+      cardEl.setAttribute("draggable", "false");
+      cardEl.querySelectorAll("img, a").forEach(el => el.setAttribute("draggable", "false"));
 
       const nmRow = cardEl.querySelector(".mid .nm");
       if (!nmRow) return;
 
-      // 기존 별표 버튼 제거
-      const starBtn = nmRow.querySelector(".star-btn");
-      if (starBtn) starBtn.remove();
+      // 기존 별표 및 이전 체크 아이콘 정리
+      nmRow.querySelectorAll(".star-btn, .v11-coord-check, .v12-coord-check").forEach(el => el.remove());
 
-      // 좌표 완료 여부 확인
+      // 좌표 완료 여부 판단 후 초록색 체크 표시
       const hasCoord = typeof hasMapCoordinates === "function"
         ? hasMapCoordinates(it)
         : Boolean(Number(it.lat) && Number(it.lng));
 
-      let checkEl = nmRow.querySelector(".v11-coord-check");
+      let checkEl = nmRow.querySelector(".v13-coord-check");
       if (hasCoord) {
         if (!checkEl) {
           checkEl = document.createElement("span");
-          checkEl.className = "v11-coord-check";
+          checkEl.className = "v13-coord-check";
           checkEl.title = "좌표 설정 완료";
           checkEl.innerHTML = '<span class="ms fill">check_circle</span>';
           const daySel = nmRow.querySelector(".ux7-day-select");
@@ -12519,98 +12546,294 @@ ${caption || rawText}
     });
   }
 
-  /* 2. 모바일(iOS/Android) 최적화 SortableJS 재연결 */
-  function setupSmoothSortable() {
-    const listEl = document.getElementById("list-LIST");
-    if (!listEl || !window.Sortable) return;
+  /* 2. FLIP 애니메이션 기반 초고속·초슬릭 드래그 엔진 */
+  let dragState = null;
 
-    // 기존 V8 Sortable 인스턴스가 있으면 안전하게 해제
-    if (v11Sortable) return;
-    try {
-      const existing = Sortable.get(listEl);
-      if (existing) existing.destroy();
-    } catch (_) {}
+  function getVisibleSiblingCards(listEl, excludeCard) {
+    return Array.from(listEl.querySelectorAll(".item[data-id]")).filter(
+      el => el !== excludeCard && el.style.display !== "none"
+    );
+  }
 
-    const scrollContainer = document.getElementById("tab-list") || listEl.parentElement;
+  /* 카드가 자리를 바꿀 때 주변 카드들이 스르륵 밀려나는 FLIP 모션 */
+  function movePlaceholderWithFlip(listEl, placeholder, insertBeforeNode) {
+    const siblings = getVisibleSiblingCards(listEl, placeholder);
+    const firstRects = new Map();
+    siblings.forEach(el => firstRects.set(el, el.getBoundingClientRect().top));
 
-    v11Sortable = Sortable.create(listEl, {
-      handle: ".v8-drag-handle",
-      draggable: ".item",
-      animation: 200,
-      easing: "cubic-bezier(0.22, 1, 0.36, 1)",
-      // iOS 네이티브 이중 잔상 버그를 막기 위해 Touch Fallback 강제 사용
-      forceFallback: true,
-      fallbackOnBody: true,
-      fallbackTolerance: 3,
-      touchStartThreshold: 3,
-      ghostClass: "v11-sortable-ghost",
-      chosenClass: "v11-sortable-chosen",
-      dragClass: "v11-sortable-drag",
-      scroll: scrollContainer,
-      scrollSensitivity: 85,
-      scrollSpeed: 16,
-      bubbleScroll: true,
-      onStart: () => {
-        document.body.classList.add("v11-sorting");
-        if (typeof window.v8Haptic === "function") window.v8Haptic(15);
-      },
-      onEnd: (evt) => {
-        document.body.classList.remove("v11-sorting");
-        if (evt.oldIndex === evt.newIndex) return;
-        if (typeof window.v8Haptic === "function") window.v8Haptic(20);
+    if (insertBeforeNode) {
+      listEl.insertBefore(placeholder, insertBeforeNode);
+    } else {
+      listEl.appendChild(placeholder);
+    }
 
-        // DOM을 다시 그리지 않고(깜빡임 방지) 현재 배열 순서만 즉시 동기화
-        const domIds = Array.from(listEl.querySelectorAll(".item[data-id]")).map(el => String(el.dataset.id));
-        const posMap = new Map();
-        domIds.forEach((id, idx) => posMap.set(id, idx));
-
-        // 현재 화면에 표시된 항목들의 상대 순서만 교체하고 숨겨진 카테고리 항목은 유지
-        const visibleIndices = [];
-        const visibleItems = [];
-        items.forEach((it, idx) => {
-          if (posMap.has(String(it.id))) {
-            visibleIndices.push(idx);
-            visibleItems.push(it);
-          }
-        });
-        visibleItems.sort((a, b) => posMap.get(String(a.id)) - posMap.get(String(b.id)));
-        visibleIndices.forEach((origIdx, i) => {
-          items[origIdx] = visibleItems[i];
-        });
-
-        if (typeof pushLocalHistory === "function") pushLocalHistory();
-        if (typeof persistNow === "function") persistNow();
-        if (typeof draw === "function") draw(true);
-        if (typeof toast === "function") toast("순서가 변경되었습니다");
+    siblings.forEach(el => {
+      const oldTop = firstRects.get(el);
+      const newTop = el.getBoundingClientRect().top;
+      const deltaY = oldTop - newTop;
+      if (Math.abs(deltaY) > 1) {
+        el.style.transition = "none";
+        el.style.transform = `translate3d(0, ${deltaY}px, 0)`;
+        void el.offsetHeight; // 강제 리플로우
+        el.style.transition = "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)";
+        el.style.transform = "translate3d(0, 0, 0)";
+        clearTimeout(el._v13FlipTimer);
+        el._v13FlipTimer = setTimeout(() => {
+          el.style.transition = "";
+          el.style.transform = "";
+        }, 270);
       }
     });
   }
 
-  /* 3. 드래그 중 카드 좌우 스와이프 간섭 차단 */
+  function updateReorderByCenterY(centerY) {
+    if (!dragState) return;
+    const { listEl, card } = dragState;
+    const siblings = getVisibleSiblingCards(listEl, card);
+    if (!siblings.length) return;
+
+    for (const target of siblings) {
+      // 애니메이션 중인 카드는 레이아웃 기준점 보정
+      const rect = target.getBoundingClientRect();
+      const midY = rect.top + rect.height / 2;
+      if (centerY < midY) {
+        if (card.nextElementSibling !== target) {
+          movePlaceholderWithFlip(listEl, card, target);
+          dragState.orderChanged = true;
+          if (typeof window.v8Haptic === "function") window.v8Haptic(10);
+        }
+        return;
+      }
+    }
+
+    const last = siblings[siblings.length - 1];
+    if (last && card.previousElementSibling !== last) {
+      movePlaceholderWithFlip(listEl, card, null);
+      dragState.orderChanged = true;
+      if (typeof window.v8Haptic === "function") window.v8Haptic(10);
+    }
+  }
+
+  function startAutoScrollLoop() {
+    if (!dragState) return;
+    const { scrollEl } = dragState;
+    if (scrollEl) {
+      const rect = scrollEl.getBoundingClientRect();
+      const edge = 85;
+      const maxSpeed = 15;
+      const cy = dragState.currentY;
+
+      if (cy < rect.top + edge) {
+        const intensity = Math.min(1, (rect.top + edge - cy) / edge);
+        scrollEl.scrollTop -= Math.ceil(maxSpeed * intensity);
+        updateReorderByCenterY(dragState.cardStartTop + (cy - dragState.startY) + dragState.cardHeight / 2);
+      } else if (cy > rect.bottom - edge) {
+        const intensity = Math.min(1, (cy - (rect.bottom - edge)) / edge);
+        scrollEl.scrollTop += Math.ceil(maxSpeed * intensity);
+        updateReorderByCenterY(dragState.cardStartTop + (cy - dragState.startY) + dragState.cardHeight / 2);
+      }
+    }
+    dragState.rafId = requestAnimationFrame(startAutoScrollLoop);
+  }
+
+  function beginDrag(card, startClientX, startClientY) {
+    const listEl = document.getElementById("list-LIST");
+    if (!listEl || dragState) return;
+
+    const rect = card.getBoundingClientRect();
+    const scrollEl = document.getElementById("tab-list") || listEl.parentElement;
+
+    const cloneEl = card.cloneNode(true);
+    cloneEl.className = card.className + " v13-floating-card";
+    cloneEl.style.width = rect.width + "px";
+    cloneEl.style.height = rect.height + "px";
+    cloneEl.style.left = rect.left + "px";
+    cloneEl.style.top = rect.top + "px";
+    cloneEl.style.transition = "transform 120ms cubic-bezier(0.22, 1, 0.36, 1)";
+    cloneEl.style.transform = "translate3d(0, 0, 0) scale(1.028)";
+    document.body.appendChild(cloneEl);
+
+    setTimeout(() => {
+      if (dragState && dragState.cloneEl === cloneEl && !dragState.finishing) {
+        cloneEl.style.transition = "none";
+      }
+    }, 125);
+
+    card.classList.add("v13-drag-placeholder");
+    card.classList.remove("selected");
+    if (typeof selected !== "undefined" && selected.clear) selected.clear();
+
+    if (typeof window.v8Haptic === "function") window.v8Haptic(18);
+
+    dragState = {
+      listEl,
+      scrollEl,
+      card,
+      cloneEl,
+      startX: startClientX,
+      startY: startClientY,
+      currentY: startClientY,
+      cardStartTop: rect.top,
+      cardStartLeft: rect.left,
+      cardHeight: rect.height,
+      orderChanged: false,
+      finishing: false,
+      rafId: null
+    };
+
+    dragState.rafId = requestAnimationFrame(startAutoScrollLoop);
+  }
+
+  function moveDrag(clientY) {
+    if (!dragState || dragState.finishing) return;
+    dragState.currentY = clientY;
+    const dy = clientY - dragState.startY;
+    dragState.cloneEl.style.transition = "none";
+    dragState.cloneEl.style.transform = `translate3d(0, ${dy}px, 0) scale(1.028)`;
+
+    const floatingCenterY = dragState.cardStartTop + dy + dragState.cardHeight / 2;
+    updateReorderByCenterY(floatingCenterY);
+  }
+
+  function endDrag() {
+    if (!dragState || dragState.finishing) return;
+    const state = dragState;
+    state.finishing = true;
+    cancelAnimationFrame(state.rafId);
+
+    // 놓는 순간 빈 슬롯 위치로 스르륵 안착하는 애니메이션 (200ms)
+    const targetRect = state.card.getBoundingClientRect();
+    const finalDy = targetRect.top - state.cardStartTop;
+    state.cloneEl.style.transition = "transform 200ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 200ms ease";
+    state.cloneEl.style.transform = `translate3d(0, ${finalDy}px, 0) scale(1)`;
+    state.cloneEl.style.boxShadow = "0 4px 16px rgba(0, 0, 0, 0.2)";
+
+    setTimeout(() => {
+      state.card.classList.remove("v13-drag-placeholder");
+      state.cloneEl.remove();
+      dragState = null;
+
+      if (!state.orderChanged) return;
+
+      // DOM 재렌더링 없이 items 배열 순서만 매끄럽게 동기화
+      const domIds = Array.from(state.listEl.querySelectorAll(".item[data-id]")).map(el => String(el.dataset.id));
+      const posMap = new Map();
+      domIds.forEach((id, idx) => posMap.set(id, idx));
+
+      const visibleIndices = [];
+      const visibleItems = [];
+      items.forEach((it, idx) => {
+        if (posMap.has(String(it.id))) {
+          visibleIndices.push(idx);
+          visibleItems.push(it);
+        }
+      });
+      visibleItems.sort((a, b) => posMap.get(String(a.id)) - posMap.get(String(b.id)));
+      visibleIndices.forEach((origIdx, i) => {
+        items[origIdx] = visibleItems[i];
+      });
+
+      if (typeof window.v8Haptic === "function") window.v8Haptic(15);
+      if (typeof pushLocalHistory === "function") pushLocalHistory();
+      if (typeof persistNow === "function") persistNow();
+      if (typeof draw === "function") draw(true);
+      if (typeof toast === "function") toast("순서가 저장되었습니다");
+    }, 200);
+  }
+
+  /* 3. 최우선 캡처 단계(window capture) 터치 & 마우스 이벤트 바인딩 */
+  window.addEventListener("touchstart", (e) => {
+    const handle = e.target.closest?.(".v8-drag-handle");
+    if (!handle) return;
+    const card = handle.closest(".item[data-id]");
+    if (!card || e.touches.length !== 1) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+
+    const t = e.touches[0];
+    beginDrag(card, t.clientX, t.clientY);
+  }, { capture: true, passive: false });
+
   window.addEventListener("touchmove", (e) => {
-    if (document.body.classList.contains("v11-sorting")) {
-      e.stopPropagation();
+    if (!dragState) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    if (e.touches[0]) {
+      moveDrag(e.touches[0].clientY);
     }
   }, { capture: true, passive: false });
 
-  /* 4. renderListTab 후킹 */
-  if (typeof renderListTab === "function") {
-    const _origRenderList = renderListTab;
-    renderListTab = function(...args) {
-      const res = _origRenderList.apply(this, args);
-      applyCoordCheckAndHandle();
-      setupSmoothSortable();
-      return res;
-    };
+  window.addEventListener("touchend", (e) => {
+    if (!dragState) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    endDrag();
+  }, { capture: true, passive: false });
+
+  window.addEventListener("touchcancel", () => {
+    if (dragState) endDrag();
+  }, { capture: true, passive: false });
+
+  // PC 마우스 환경 지원
+  window.addEventListener("mousedown", (e) => {
+    if (e.button !== 0) return;
+    const handle = e.target.closest?.(".v8-drag-handle");
+    if (!handle) return;
+    const card = handle.closest(".item[data-id]");
+    if (!card) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    beginDrag(card, e.clientX, e.clientY);
+  }, { capture: true });
+
+  window.addEventListener("mousemove", (e) => {
+    if (!dragState) return;
+    e.preventDefault();
+    moveDrag(e.clientY);
+  }, { capture: true });
+
+  window.addEventListener("mouseup", () => {
+    if (dragState) endDrag();
+  }, { capture: true });
+
+  // 드래그 핸들 클릭 시 카드 선택/상세창 열림 원천 차단
+  window.addEventListener("click", (e) => {
+    if (e.target.closest?.(".v8-drag-handle")) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+    }
+  }, { capture: true });
+
+  /* 4. 리스트 렌더링 감지 후 자동 적용 */
+  const listObserver = new MutationObserver(() => {
+    decorateV13Cards();
+  });
+
+  function startObservingList() {
+    const listEl = document.getElementById("list-LIST");
+    if (listEl && !listEl._v13Observed) {
+      listEl._v13Observed = true;
+      listObserver.observe(listEl, { childList: true });
+    }
+    decorateV13Cards();
   }
 
-  setTimeout(() => {
-    applyCoordCheckAndHandle();
-    setupSmoothSortable();
-    if (typeof renderListTab === "function") renderListTab();
-  }, 250);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", startObservingList);
+  } else {
+    startObservingList();
+  }
+  setTimeout(startObservingList, 250);
+  setTimeout(startObservingList, 800);
 })();
 </script>
-<!-- === V11_DRAG_AND_CHECK_PATCH_END === -->
+<!-- === V13_ULTRA_SMOOTH_DRAG_PATCH_END === -->
 </body>
 </html>
