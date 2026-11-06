@@ -1,23 +1,53 @@
 <!doctype html>
 <html lang="ko" data-theme="dark">
   <head>
-<!-- === V13_HEAD_CAPTURE_START === -->
+<!-- === V14_HEAD_CACHE_START === -->
+<style>
+  /* [1번] 로딩창: 모든 텍스트·프로그레스 바 숨기고 중앙 로고만 단독 표시 */
+  #v8Splash {
+    background: #05070b !important;
+  }
+  [data-theme="light"] #v8Splash {
+    background: #ffffff !important;
+  }
+  #v8Splash .v8-sp-title,
+  #v8Splash .v8-sp-step,
+  #v8Splash .v8-sp-bar-wrap,
+  #v8Splash .v8-sp-pct {
+    display: none !important;
+  }
+  #v8Splash .v8-sp-logo {
+    width: 76px !important;
+    height: 76px !important;
+    border-radius: 24px !important;
+    margin: 0 !important;
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.45) !important;
+    overflow: hidden !important;
+  }
+  #v8Splash .v8-sp-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+</style>
 <script>
 window.Sortable = null;
-(function clearOldCachesV13() {
-  const KEY = "TRIP_V13_CACHE_BUST_1793994116";
-  if (localStorage.getItem("TRIP_LAST_CACHE_BUST") !== KEY) {
-    localStorage.setItem("TRIP_LAST_CACHE_BUST", KEY);
+(function bustCacheV14() {
+  const VER = "TRIP_V14_BUST_1793995527";
+  if (localStorage.getItem("TRIP_LAST_CACHE_BUST") !== VER) {
+    localStorage.setItem("TRIP_LAST_CACHE_BUST", VER);
     if ("caches" in window) {
       caches.keys().then(ks => Promise.all(ks.map(k => caches.delete(k)))).catch(() => {});
     }
     if (navigator.serviceWorker) {
-      navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.update())).catch(() => {});
+      navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.update())).catch(() => {});
     }
   }
 })();
 </script>
-<!-- === V13_HEAD_CAPTURE_END === -->
+<!-- === V14_HEAD_CACHE_END === -->
+
     <meta charset="UTF-8" />
     <meta
       name="viewport"
@@ -12399,17 +12429,19 @@ ${caption || rawText}
 <!-- === UX_SUPER_PATCH_V8_END === -->
 
 
-<!-- === V13_ULTRA_SMOOTH_DRAG_PATCH_START === -->
+
+<!-- === V14_CLEAN_UI_PATCH_START === -->
 <style>
-  /* 1. 별표(즐겨찾기) 버튼 및 불필요 상단 필터 바 숨김 */
+  /* 불필요 요소 및 별표(즐겨찾기) 완전 숨김 */
   .item .star-btn,
   #lchips-LIST .lchip[data-f="STAR"],
   #smartFilterBar,
-  #v8QuickDayBar {
+  #v8QuickDayBar,
+  #uxGuideSteps {
     display: none !important;
   }
 
-  /* 드래그 시 파란색 선택 테두리(outline) 강제 제거 */
+  /* 드래그 시 파란 선택 테두리 차단 */
   #list-LIST .item,
   #list-LIST .item.selected {
     outline: none !important;
@@ -12418,8 +12450,8 @@ ${caption || rawText}
     -webkit-touch-callout: none !important;
   }
 
-  /* 2. 좌표 완료 초록색 체크 표시 */
-  .v13-coord-check {
+  /* 좌표 완료 초록색 체크 표시 */
+  .v14-coord-check {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -12429,12 +12461,12 @@ ${caption || rawText}
     flex: none;
     pointer-events: none;
   }
-  .v13-coord-check .ms {
+  .v14-coord-check .ms {
     font-size: 21px;
     color: #10b981;
   }
 
-  /* 3. 드래그 손잡이(⋮⋮) 터치 영역 최적화 */
+  /* 드래그 손잡이(⋮⋮) 터치 영역 */
   .v8-drag-handle {
     cursor: grab;
     color: var(--sub);
@@ -12448,7 +12480,6 @@ ${caption || rawText}
     touch-action: none !important;
     -webkit-user-select: none !important;
     user-select: none !important;
-    -webkit-touch-callout: none !important;
     position: relative;
     z-index: 10;
   }
@@ -12462,17 +12493,15 @@ ${caption || rawText}
     transform: scale(1.15);
   }
 
-  /* 4. 드래그 중 원래 카드가 있던 빈 슬롯 스타일 */
-  .item.v13-drag-placeholder {
+  /* 드래그 빈 슬롯 & 플로팅 카드 */
+  .item.v14-drag-placeholder {
     opacity: 0.16 !important;
     background: var(--pr-soft) !important;
     border: 2px dashed var(--pr) !important;
     box-shadow: none !important;
     transform: scale(0.98) !important;
   }
-
-  /* 5. 손가락을 따라다니는 플로팅 카드 (60fps GPU 가속) */
-  .v13-floating-card {
+  .v14-floating-card {
     position: fixed !important;
     z-index: 2147483647 !important;
     pointer-events: none !important;
@@ -12483,14 +12512,371 @@ ${caption || rawText}
     box-shadow: 0 22px 48px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(59, 130, 246, 0.3) !important;
     opacity: 0.97 !important;
     will-change: transform;
-    transform-origin: center center;
+  }
+
+  /* [2번] Wanderlog 스타일 '가져오기' UI */
+  .v14-url-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 6px 6px 16px;
+    border-radius: 999px;
+    background: var(--s2);
+    border: 1px solid var(--bd2);
+    margin-bottom: 12px;
+  }
+  .v14-url-bar input {
+    flex: 1;
+    border: 0 !important;
+    background: transparent !important;
+    margin: 0 !important;
+    padding: 6px 0 !important;
+    min-height: 36px !important;
+    font-size: 14px !important;
+    box-shadow: none !important;
+  }
+  .v14-url-bar .v14-paste-pill {
+    flex: none;
+    min-height: 36px;
+    padding: 0 14px;
+    border-radius: 999px;
+    border: 0;
+    background: var(--pr);
+    color: #fff;
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  .v14-platforms {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin: 16px 0;
+    text-align: center;
+  }
+  .v14-plat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--sub);
+    cursor: pointer;
+    user-select: none;
+  }
+  .v14-plat-ico {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--s2);
+    border: 1px solid var(--bd);
+    display: grid;
+    place-items: center;
+    transition: transform 0.12s ease, border-color 0.15s ease;
+  }
+  .v14-plat-item:active .v14-plat-ico {
+    transform: scale(0.92);
+    border-color: var(--pr);
+  }
+  .v14-import-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 6px;
+  }
+  .v14-import-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    padding: 15px 16px;
+    border-radius: 18px;
+    background: var(--s2);
+    border: 1px solid var(--bd);
+    color: var(--tx);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: transform 0.12s ease, border-color 0.15s ease, background 0.15s ease;
+  }
+  .v14-import-card:active {
+    transform: scale(0.985);
+    border-color: var(--pr);
+  }
+  .v14-import-card .v14-ic-box {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    flex: none;
+  }
+  .v14-import-card .v14-ic-txt {
+    flex: 1;
+    min-width: 0;
+  }
+  .v14-import-card .v14-ic-txt b {
+    display: block;
+    font-size: 14.5px;
+    font-weight: 800;
+    margin-bottom: 2px;
+  }
+  .v14-import-card .v14-ic-txt small {
+    display: block;
+    font-size: 12px;
+    color: var(--sub);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .v14-collapse-pane {
+    display: none;
+    padding: 14px;
+    border-radius: 16px;
+    background: var(--s2);
+    border: 1px solid var(--bd2);
+    margin-top: 6px;
+  }
+  .v14-collapse-pane.on {
+    display: block;
   }
 </style>
 
 <script>
-(function initV13UltraSmoothDrag() {
-  /* 1. 각 카드에 드래그 핸들 보장 및 별표 -> 초록색 좌표 체크 교체 */
-  function decorateV13Cards() {
+(function initV14CleanApp() {
+  /* =========================================================================
+   * [1번] 스플래시 화면: 앱 아이콘(/icon-192.png) 로고만 깔끔하게 표시 후 빠른 진입
+   * ========================================================================= */
+  function upgradeMinimalSplash() {
+    const spEl = document.getElementById("v8Splash");
+    if (!spEl) return;
+    const logoBox = spEl.querySelector(".v8-sp-logo");
+    if (logoBox && !logoBox.dataset.v14Logo) {
+      logoBox.dataset.v14Logo = "1";
+      const img = new Image();
+      img.src = "/icon-192.png?v=8";
+      img.alt = "Logo";
+      img.onload = () => {
+        logoBox.innerHTML = "";
+        logoBox.appendChild(img);
+      };
+    }
+    setTimeout(() => {
+      spEl.classList.add("hide");
+    }, 550);
+  }
+
+  /* =========================================================================
+   * [2번] 홈 탭(#tab-add)을 Wanderlog 스타일 '가져오기' 화면으로 깔끔하게 재구성
+   * ========================================================================= */
+  function buildWanderlogImportUI() {
+    const addTab = document.getElementById("tab-add");
+    const firstCard = addTab?.querySelector(".card");
+    const reelBox = document.getElementById("reelLinkBox");
+    const shareBox = document.getElementById("shareBox");
+    const analyzeBtn = document.getElementById("analyzeShare");
+    const shareFile = document.getElementById("shareFile");
+    const manualBox = document.getElementById("ux7QuickManualBox");
+    if (!firstCard || !reelBox || !shareBox || !analyzeBtn || document.getElementById("v14ImportRoot")) return;
+
+    // 기존 흩어져 있던 버튼·라벨 숨김 (DOM은 유지하여 기존 분석 로직 100% 호환)
+    Array.from(firstCard.children).forEach(ch => {
+      if (ch.classList.contains("sec-title") || ch.id === "seg" || ch.id === "v8AiStepper") return;
+      ch.style.display = "none";
+    });
+
+    const titleSpan = firstCard.querySelector(".sec-title span");
+    if (titleSpan) {
+      titleSpan.innerHTML = '<span class="ms fill" style="color:var(--pr)">download</span>가져오기';
+    }
+
+    const root = document.createElement("div");
+    root.id = "v14ImportRoot";
+    root.innerHTML = `
+      <div class="v14-url-bar">
+        <input type="text" id="v14UnifiedUrlInput" placeholder="소셜 미디어, 릴스·쇼츠 등의 URL" autocomplete="off" />
+        <button type="button" class="v14-paste-pill" id="v14QuickPasteBtn">붙여넣기</button>
+      </div>
+      <button type="button" class="btn" id="v14PrimaryFetchBtn" style="border-radius:999px;min-height:46px">
+        <span class="ms fill">bolt</span>링크에서 가져오기
+      </button>
+
+      <div class="v14-platforms">
+        <div class="v14-plat-item" data-plat="yt">
+          <div class="v14-plat-ico"><span class="ms fill" style="color:#ef4444;font-size:22px">smart_display</span></div>
+          <span>유튜브</span>
+        </div>
+        <div class="v14-plat-item" data-plat="ig">
+          <div class="v14-plat-ico"><span class="ms fill" style="color:#ec4899;font-size:22px">photo_camera</span></div>
+          <span>인스타그램</span>
+        </div>
+        <div class="v14-plat-item" data-plat="tt">
+          <div class="v14-plat-ico"><span class="ms fill" style="color:#38bdf8;font-size:22px">music_note</span></div>
+          <span>틱톡</span>
+        </div>
+        <div class="v14-plat-item" data-plat="etc">
+          <div class="v14-plat-ico"><span class="ms" style="color:var(--sub);font-size:22px">language</span></div>
+          <span>기타 링크</span>
+        </div>
+      </div>
+
+      <div class="v14-import-list">
+        <button type="button" class="v14-import-card" id="v14CardImage">
+          <div class="v14-ic-box" style="background:rgba(16,185,129,0.14);color:#10b981">
+            <span class="ms fill" style="font-size:24px">imagesmode</span>
+          </div>
+          <div class="v14-ic-txt">
+            <b>이미지에서 가져오기</b>
+            <small>소셜 게시물의 스크린샷 또는 장소 목록</small>
+          </div>
+          <span class="ms" style="color:var(--sub)">chevron_right</span>
+        </button>
+
+        <button type="button" class="v14-import-card" id="v14CardText">
+          <div class="v14-ic-box" style="background:rgba(245,158,11,0.14);color:#f59e0b">
+            <span class="ms fill" style="font-size:24px">description</span>
+          </div>
+          <div class="v14-ic-txt">
+            <b>텍스트에서 가져오기</b>
+            <small>장소가 포함된 메모, 고정댓글 또는 복사된 텍스트</small>
+          </div>
+          <span class="ms" style="color:var(--sub)">expand_more</span>
+        </button>
+        <div class="v14-collapse-pane" id="v14TextPane"></div>
+
+        <button type="button" class="v14-import-card" id="v14CardManual">
+          <div class="v14-ic-box" style="background:rgba(59,130,246,0.14);color:#3b82f6">
+            <span class="ms fill" style="font-size:24px">add_location_alt</span>
+          </div>
+          <div class="v14-ic-txt">
+            <b>직접 장소 등록하기</b>
+            <small>링크 없이 장소명·주소로 1초 만에 직접 추가</small>
+          </div>
+          <span class="ms" style="color:var(--sub)">expand_more</span>
+        </button>
+        <div class="v14-collapse-pane" id="v14ManualPane"></div>
+      </div>
+    `;
+
+    firstCard.appendChild(root);
+
+    // 텍스트 패널 안에 기존 shareBox 이동 및 실행 버튼 연결
+    const textPane = document.getElementById("v14TextPane");
+    shareBox.style.display = "block";
+    shareBox.style.marginBottom = "8px";
+    shareBox.placeholder = "복사한 릴스·쇼츠 캡션이나 고정댓글 맛집 리스트를 여기에 붙여넣으세요 (최대 10곳 동시 분석)";
+    textPane.appendChild(shareBox);
+
+    const textAnalyzeBtn = document.createElement("button");
+    textAnalyzeBtn.type = "button";
+    textAnalyzeBtn.className = "btn";
+    textAnalyzeBtn.innerHTML = '<span class="ms fill">bolt</span>텍스트 분석·저장하기';
+    textAnalyzeBtn.onclick = () => analyzeBtn.click();
+    textPane.appendChild(textAnalyzeBtn);
+
+    // 수동 등록 패널 안에 기존 수동 입력 박스 연결
+    const manualPane = document.getElementById("v14ManualPane");
+    if (manualBox) {
+      manualBox.style.display = "flex";
+      manualBox.style.marginTop = "0";
+      manualBox.style.padding = "0";
+      manualBox.style.border = "0";
+      manualPane.appendChild(manualBox);
+    }
+
+    const urlInp = document.getElementById("v14UnifiedUrlInput");
+    const syncUrlToOrig = (val) => {
+      const v = String(val || "").trim();
+      urlInp.value = v;
+      const meta = typeof parseVideoMeta === "function" ? parseVideoMeta(v) : null;
+      if (meta && meta.url) {
+        reelBox.value = meta.url;
+        if (typeof lastSharedVid !== "undefined") lastSharedVid = meta.url;
+      } else {
+        reelBox.value = v;
+      }
+      if (!shareBox.value.trim()) shareBox.value = v;
+    };
+
+    urlInp.addEventListener("input", () => syncUrlToOrig(urlInp.value));
+
+    document.getElementById("v14QuickPasteBtn").onclick = async () => {
+      try {
+        const clip = await navigator.clipboard.readText();
+        if (clip && clip.trim()) {
+          syncUrlToOrig(clip.trim());
+          shareBox.value = clip.trim();
+          toast("클립보드 내용을 붙여넣었습니다. 바로 분석합니다.");
+          analyzeBtn.click();
+          return;
+        }
+      } catch (_) {}
+      urlInp.focus();
+      toast("입력창을 길게 눌러 붙여넣어 주세요");
+    };
+
+    document.getElementById("v14PrimaryFetchBtn").onclick = () => {
+      if (urlInp.value.trim()) syncUrlToOrig(urlInp.value);
+      analyzeBtn.click();
+      setTimeout(() => { urlInp.value = ""; }, 800);
+    };
+
+    root.querySelectorAll(".v14-plat-item").forEach(item => {
+      item.onclick = () => document.getElementById("v14QuickPasteBtn").click();
+    });
+
+    document.getElementById("v14CardImage").onclick = () => shareFile?.click();
+    document.getElementById("v14CardText").onclick = () => {
+      const on = textPane.classList.toggle("on");
+      manualPane.classList.remove("on");
+      if (on) setTimeout(() => shareBox.focus(), 80);
+    };
+    document.getElementById("v14CardManual").onclick = () => {
+      const on = manualPane.classList.toggle("on");
+      textPane.classList.remove("on");
+      if (on) setTimeout(() => document.getElementById("ux7ManName")?.focus(), 80);
+    };
+  }
+
+  /* =========================================================================
+   * [3번] 목록-지도 실시간 동선(Polyline) 연동 & FLIP 스무스 드래그 + 초록 체크
+   * ========================================================================= */
+  // 지도 동선(Polyline)이 임의 거리순이 아닌 '사용자가 드래그한 목록 순서'를 그대로 따르도록 오버라이드
+  if (typeof buildOrderedRoutePoints === "function") {
+    buildOrderedRoutePoints = function(valid) {
+      if (!Array.isArray(valid) || valid.length < 2) return { pts: [], totalKm: 0 };
+      const orderMap = new Map();
+      (items || []).forEach((it, idx) => orderMap.set(String(it.id), idx));
+
+      const ordered = [...valid].sort((a, b) => {
+        const da = Number(a.day) || 99;
+        const db = Number(b.day) || 99;
+        if (da !== db) return da - db;
+        const ia = orderMap.has(String(a.id)) ? orderMap.get(String(a.id)) : 9999;
+        const ib = orderMap.has(String(b.id)) ? orderMap.get(String(b.id)) : 9999;
+        if (ia !== ib) return ia - ib;
+        return (Number(a._placeIndex) || 0) - (Number(b._placeIndex) || 0);
+      });
+
+      let totalKm = 0;
+      for (let k = 1; k < ordered.length; k++) {
+        totalKm += distKm(
+          Number(ordered[k - 1].lat),
+          Number(ordered[k - 1].lng),
+          Number(ordered[k].lat),
+          Number(ordered[k].lng)
+        );
+      }
+      return {
+        pts: ordered.map(x => [Number(x.lat), Number(x.lng)]),
+        totalKm
+      };
+    };
+  }
+
+  function decorateV14Cards() {
     const listEl = document.getElementById("list-LIST");
     if (!listEl || !Array.isArray(items)) return;
 
@@ -12501,7 +12887,6 @@ ${caption || rawText}
       const it = itemMap.get(id);
       if (!it) return;
 
-      // 드래그 핸들 생성 또는 유지
       let handle = cardEl.querySelector(".v8-drag-handle");
       if (!handle) {
         handle = document.createElement("span");
@@ -12511,26 +12896,23 @@ ${caption || rawText}
         cardEl.insertBefore(handle, cardEl.firstChild);
       }
 
-      // iOS 네이티브 이미지/링크 드래그 잔상 방지
       cardEl.setAttribute("draggable", "false");
       cardEl.querySelectorAll("img, a").forEach(el => el.setAttribute("draggable", "false"));
 
       const nmRow = cardEl.querySelector(".mid .nm");
       if (!nmRow) return;
 
-      // 기존 별표 및 이전 체크 아이콘 정리
-      nmRow.querySelectorAll(".star-btn, .v11-coord-check, .v12-coord-check").forEach(el => el.remove());
+      nmRow.querySelectorAll(".star-btn, .v11-coord-check, .v12-coord-check, .v13-coord-check").forEach(el => el.remove());
 
-      // 좌표 완료 여부 판단 후 초록색 체크 표시
       const hasCoord = typeof hasMapCoordinates === "function"
         ? hasMapCoordinates(it)
         : Boolean(Number(it.lat) && Number(it.lng));
 
-      let checkEl = nmRow.querySelector(".v13-coord-check");
+      let checkEl = nmRow.querySelector(".v14-coord-check");
       if (hasCoord) {
         if (!checkEl) {
           checkEl = document.createElement("span");
-          checkEl.className = "v13-coord-check";
+          checkEl.className = "v14-coord-check";
           checkEl.title = "좌표 설정 완료";
           checkEl.innerHTML = '<span class="ms fill">check_circle</span>';
           const daySel = nmRow.querySelector(".ux7-day-select");
@@ -12546,7 +12928,6 @@ ${caption || rawText}
     });
   }
 
-  /* 2. FLIP 애니메이션 기반 초고속·초슬릭 드래그 엔진 */
   let dragState = null;
 
   function getVisibleSiblingCards(listEl, excludeCard) {
@@ -12555,7 +12936,6 @@ ${caption || rawText}
     );
   }
 
-  /* 카드가 자리를 바꿀 때 주변 카드들이 스르륵 밀려나는 FLIP 모션 */
   function movePlaceholderWithFlip(listEl, placeholder, insertBeforeNode) {
     const siblings = getVisibleSiblingCards(listEl, placeholder);
     const firstRects = new Map();
@@ -12574,14 +12954,14 @@ ${caption || rawText}
       if (Math.abs(deltaY) > 1) {
         el.style.transition = "none";
         el.style.transform = `translate3d(0, ${deltaY}px, 0)`;
-        void el.offsetHeight; // 강제 리플로우
-        el.style.transition = "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)";
+        void el.offsetHeight;
+        el.style.transition = "transform 250ms cubic-bezier(0.22, 1, 0.36, 1)";
         el.style.transform = "translate3d(0, 0, 0)";
-        clearTimeout(el._v13FlipTimer);
-        el._v13FlipTimer = setTimeout(() => {
+        clearTimeout(el._v14FlipTimer);
+        el._v14FlipTimer = setTimeout(() => {
           el.style.transition = "";
           el.style.transform = "";
-        }, 270);
+        }, 260);
       }
     });
   }
@@ -12593,7 +12973,6 @@ ${caption || rawText}
     if (!siblings.length) return;
 
     for (const target of siblings) {
-      // 애니메이션 중인 카드는 레이아웃 기준점 보정
       const rect = target.getBoundingClientRect();
       const midY = rect.top + rect.height / 2;
       if (centerY < midY) {
@@ -12644,7 +13023,7 @@ ${caption || rawText}
     const scrollEl = document.getElementById("tab-list") || listEl.parentElement;
 
     const cloneEl = card.cloneNode(true);
-    cloneEl.className = card.className + " v13-floating-card";
+    cloneEl.className = card.className + " v14-floating-card";
     cloneEl.style.width = rect.width + "px";
     cloneEl.style.height = rect.height + "px";
     cloneEl.style.left = rect.left + "px";
@@ -12659,10 +13038,9 @@ ${caption || rawText}
       }
     }, 125);
 
-    card.classList.add("v13-drag-placeholder");
+    card.classList.add("v14-drag-placeholder");
     card.classList.remove("selected");
     if (typeof selected !== "undefined" && selected.clear) selected.clear();
-
     if (typeof window.v8Haptic === "function") window.v8Haptic(18);
 
     dragState = {
@@ -12701,21 +13079,19 @@ ${caption || rawText}
     state.finishing = true;
     cancelAnimationFrame(state.rafId);
 
-    // 놓는 순간 빈 슬롯 위치로 스르륵 안착하는 애니메이션 (200ms)
     const targetRect = state.card.getBoundingClientRect();
     const finalDy = targetRect.top - state.cardStartTop;
-    state.cloneEl.style.transition = "transform 200ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 200ms ease";
+    state.cloneEl.style.transition = "transform 190ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 190ms ease";
     state.cloneEl.style.transform = `translate3d(0, ${finalDy}px, 0) scale(1)`;
     state.cloneEl.style.boxShadow = "0 4px 16px rgba(0, 0, 0, 0.2)";
 
     setTimeout(() => {
-      state.card.classList.remove("v13-drag-placeholder");
+      state.card.classList.remove("v14-drag-placeholder");
       state.cloneEl.remove();
       dragState = null;
 
       if (!state.orderChanged) return;
 
-      // DOM 재렌더링 없이 items 배열 순서만 매끄럽게 동기화
       const domIds = Array.from(state.listEl.querySelectorAll(".item[data-id]")).map(el => String(el.dataset.id));
       const posMap = new Map();
       domIds.forEach((id, idx) => posMap.set(id, idx));
@@ -12736,12 +13112,12 @@ ${caption || rawText}
       if (typeof window.v8Haptic === "function") window.v8Haptic(15);
       if (typeof pushLocalHistory === "function") pushLocalHistory();
       if (typeof persistNow === "function") persistNow();
+      // 지도 동선(Polyline) 즉시 재계산 및 렌더링
       if (typeof draw === "function") draw(true);
-      if (typeof toast === "function") toast("순서가 저장되었습니다");
-    }, 200);
+      if (typeof toast === "function") toast("순서 및 지도 동선이 갱신되었습니다");
+    }, 195);
   }
 
-  /* 3. 최우선 캡처 단계(window capture) 터치 & 마우스 이벤트 바인딩 */
   window.addEventListener("touchstart", (e) => {
     const handle = e.target.closest?.(".v8-drag-handle");
     if (!handle) return;
@@ -12751,9 +13127,7 @@ ${caption || rawText}
     e.preventDefault();
     e.stopPropagation();
     e.stopImmediatePropagation();
-
-    const t = e.touches[0];
-    beginDrag(card, t.clientX, t.clientY);
+    beginDrag(card, e.touches[0].clientX, e.touches[0].clientY);
   }, { capture: true, passive: false });
 
   window.addEventListener("touchmove", (e) => {
@@ -12761,9 +13135,7 @@ ${caption || rawText}
     e.preventDefault();
     e.stopPropagation();
     e.stopImmediatePropagation();
-    if (e.touches[0]) {
-      moveDrag(e.touches[0].clientY);
-    }
+    if (e.touches[0]) moveDrag(e.touches[0].clientY);
   }, { capture: true, passive: false });
 
   window.addEventListener("touchend", (e) => {
@@ -12778,7 +13150,6 @@ ${caption || rawText}
     if (dragState) endDrag();
   }, { capture: true, passive: false });
 
-  // PC 마우스 환경 지원
   window.addEventListener("mousedown", (e) => {
     if (e.button !== 0) return;
     const handle = e.target.closest?.(".v8-drag-handle");
@@ -12802,7 +13173,6 @@ ${caption || rawText}
     if (dragState) endDrag();
   }, { capture: true });
 
-  // 드래그 핸들 클릭 시 카드 선택/상세창 열림 원천 차단
   window.addEventListener("click", (e) => {
     if (e.target.closest?.(".v8-drag-handle")) {
       e.preventDefault();
@@ -12811,29 +13181,30 @@ ${caption || rawText}
     }
   }, { capture: true });
 
-  /* 4. 리스트 렌더링 감지 후 자동 적용 */
   const listObserver = new MutationObserver(() => {
-    decorateV13Cards();
+    decorateV14Cards();
   });
 
-  function startObservingList() {
+  function bootV14() {
+    upgradeMinimalSplash();
+    buildWanderlogImportUI();
     const listEl = document.getElementById("list-LIST");
-    if (listEl && !listEl._v13Observed) {
-      listEl._v13Observed = true;
+    if (listEl && !listEl._v14Observed) {
+      listEl._v14Observed = true;
       listObserver.observe(listEl, { childList: true });
     }
-    decorateV13Cards();
+    decorateV14Cards();
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", startObservingList);
+    document.addEventListener("DOMContentLoaded", bootV14);
   } else {
-    startObservingList();
+    bootV14();
   }
-  setTimeout(startObservingList, 250);
-  setTimeout(startObservingList, 800);
+  setTimeout(bootV14, 250);
+  setTimeout(bootV14, 700);
 })();
 </script>
-<!-- === V13_ULTRA_SMOOTH_DRAG_PATCH_END === -->
+<!-- === V14_CLEAN_UI_PATCH_END === -->
 </body>
 </html>
