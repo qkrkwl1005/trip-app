@@ -1474,7 +1474,7 @@
     50% { transform: scale(1.05); }
   }
 </style>
-<div id="v8Splash" style="display:none!important" style="display:none!important" role="status" aria-live="polite">
+<div id="v8Splash" style="display:none!important" style="display:none!important" style="display:none!important" role="status" aria-live="polite">
   <div class="v8-sp-logo">
     <img src="./icon-192.png?v=8" onerror="this.onerror=null;this.src='./apple-touch-icon.png?v=8';" alt="앱 로고" />
   </div>
@@ -12366,7 +12366,7 @@ ${caption || rawText}
 })();
 </script>
 <!-- === UX_SUPER_PATCH_V8_END === -->
-<!-- === V31_CLEAN_PATCH_START === -->
+<!-- === V32_FINAL_UX_PATCH_START === -->
 <style>
   :root {
     --pastel-blue-bg: rgba(96, 165, 250, 0.14);
@@ -12388,110 +12388,340 @@ ${caption || rawText}
     --pastel-amber-bg: #fffbeb; --pastel-amber-tx: #b45309; --pastel-amber-bd: #fde68a;
     --pastel-purple-bg: #f5f3ff; --pastel-purple-tx: #6d28d9; --pastel-purple-bd: #ddd6fe;
   }
+
+  /* 불필요 요소 및 구간 경로 배지 숨김 */
   #v8Splash, .item .star-btn, #lchips-LIST .lchip[data-f="STAR"],
   #mapChips [data-act="mapStarToggle"], #mapChips [data-act="mapDayCycle"],
   #smartFilterBar, #v8QuickDayBar, #uxGuideSteps,
-  #tab-list .search-row > #q-LIST, #tab-list .search-row > .clear-search {
+  #tab-list .search-row > #q-LIST, #tab-list .search-row > .clear-search,
+  .v31-route-connector, .v28-route-connector, .v27-route-connector {
     display: none !important;
   }
-  #lchips-LIST.sticky {
-    position: sticky !important;
-    top: calc(-16px - env(safe-area-inset-top)) !important;
-    z-index: 18 !important;
-    margin: -8px -16px 4px -16px !important;
-    padding: calc(12px + env(safe-area-inset-top)) 16px 10px 16px !important;
-    background: var(--bg) !important;
+
+  /* 모바일 상단 유틸리티 바: 노치/다이내믹 아일랜드 아래로 명확히 표시 + 온라인 배지 가시성 확보 */
+  #ux7TopUtilBar {
+    padding: calc(10px + env(safe-area-inset-top)) 16px 10px !important;
+    background: var(--s) !important;
     border-bottom: 1px solid var(--bd) !important;
+    z-index: 35 !important;
   }
+  #v32TopOnlineBadge, #netStatus {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11.5px !important;
+    font-weight: 800 !important;
+    background: rgba(16, 185, 129, 0.16);
+    color: #34d399 !important;
+    border: 1px solid rgba(16, 185, 129, 0.38);
+    white-space: nowrap;
+  }
+  #v32TopOnlineBadge.offline, #netStatus.offline {
+    background: rgba(239, 68, 68, 0.16);
+    color: #f87171 !important;
+    border-color: rgba(239, 68, 68, 0.38);
+  }
+
   @media (max-width: 820px) {
-    #tab-list, #tab-add, #tab-set {
+    .tab-content {
+      padding-top: 14px !important;
       padding-bottom: calc(150px + env(safe-area-inset-bottom)) !important;
     }
+    #lchips-LIST.sticky {
+      position: sticky !important;
+      top: -14px !important;
+      z-index: 18 !important;
+      margin: -6px -16px 4px -16px !important;
+      padding: 10px 16px !important;
+      background: var(--bg) !important;
+      border-bottom: 1px solid var(--bd) !important;
+    }
   }
-  .v31-coord-check { display:inline-flex; align-items:center; color:#34d399; pointer-events:none; }
-  .v31-time-select {
-    padding: 3px 7px; border-radius: 8px; font: inherit; font-size: 11px; font-weight: 800;
-    background: var(--pastel-purple-bg); color: var(--pastel-purple-tx); border: 1px solid var(--pastel-purple-bd);
+
+  /* 목록 카드: 롱프레스 텍스트 선택(복사하기/찾아보기) 완벽 차단 */
+  #list-LIST .item,
+  #list-LIST .item * {
+    -webkit-user-select: none !important;
+    user-select: none !important;
+    -webkit-touch-callout: none !important;
   }
-  .v31-station-badge {
-    display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 8px;
-    font-size: 11.5px; font-weight: 800; background: var(--pastel-blue-bg); color: var(--pastel-blue-tx); border: 1px solid var(--pastel-blue-bd);
+  #list-LIST .item {
+    padding: 15px 16px !important;
+    border-radius: 22px !important;
+    outline: none !important;
   }
-  .v31-route-connector { display: flex; align-items: center; gap: 8px; padding: 0 18px; margin: -2px 0; }
-  .v31-rc-line { width: 2px; height: 20px; margin-left: 18px; background: var(--pr); opacity: 0.5; }
-  .v31-rc-pill {
-    display: inline-flex; align-items: center; gap: 5px; padding: 3.5px 11px; border-radius: 999px;
-    background: var(--s2); border: 1px dashed var(--bd2); color: var(--sub); font-size: 11px; font-weight: 800; cursor: pointer;
+
+  .v32-coord-check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #34d399;
+    flex: none;
+    pointer-events: none;
   }
-  #v31ListBudgetBar {
-    flex: 1; min-width: 0; min-height: 40px; display: flex; align-items: center; justify-content: space-between;
-    gap: 6px; padding: 6px 12px; border-radius: 14px; background: var(--s2); border: 1px solid var(--bd2); cursor: pointer;
+  .v32-time-select {
+    appearance: none;
+    -webkit-appearance: none;
+    padding: 3px 8px;
+    border-radius: 8px;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 800;
+    background: var(--pastel-purple-bg);
+    color: var(--pastel-purple-tx);
+    border: 1px solid var(--pastel-purple-bd);
+    cursor: pointer;
+    flex: none;
   }
-  #v31ListBudgetDrawer { display: none; margin-top: 10px; padding: 12px; border-radius: 16px; background: var(--s2); border: 1px solid var(--bd2); }
-  #v31ListBudgetDrawer.on { display: block; }
-  #v31FabBtn {
-    position: fixed; right: 20px; bottom: calc(86px + env(safe-area-inset-bottom));
-    width: 56px; height: 56px; border-radius: 999px; background: linear-gradient(135deg, #2563eb, #4f46e5);
-    color: #fff; border: 0; box-shadow: 0 10px 26px rgba(37, 99, 235, 0.48);
-    display: none; align-items: center; justify-content: center; cursor: pointer; z-index: 205;
+  .v32-station-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px;
+    border-radius: 8px;
+    font-size: 11.5px;
+    font-weight: 800;
+    background: var(--pastel-blue-bg);
+    color: var(--pastel-blue-tx);
+    border: 1px solid var(--pastel-blue-bd);
+    flex: none;
   }
-  @media (min-width: 821px) { #v31FabBtn { left: 362px; right: auto; bottom: 24px; } }
-  #v31FabBtn.show { display: flex; }
-  #v31ImportSheetWrap {
-    position: fixed; inset: 0; z-index: 230; background: rgba(5, 6, 9, 0.74);
-    backdrop-filter: blur(8px); display: none; align-items: flex-end; justify-content: center;
+
+  /* 목록 1/N 정산 바 */
+  #v32ListBudgetBar {
+    flex: 1;
+    min-width: 0;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 14px;
+    background: var(--s2);
+    border: 1px solid var(--bd2);
+    cursor: pointer;
+    user-select: none;
   }
-  #v31ImportSheetWrap.on { display: flex; }
-  #v31ImportSheet {
-    width: 100%; max-width: 520px; max-height: 88dvh; overflow-y: auto; background: var(--s);
-    border-top: 1px solid var(--bd2); border-radius: 28px 28px 0 0; padding: 16px 20px calc(28px + env(safe-area-inset-bottom));
+  #v32ListBudgetDrawer {
+    display: none;
+    margin-top: 10px;
+    padding: 12px;
+    border-radius: 16px;
+    background: var(--s2);
+    border: 1px solid var(--bd2);
   }
-  #v31Dashboard { display: flex; flex-direction: column; gap: 14px; }
-  .v31-hero {
-    position: relative; border-radius: 24px; min-height: 200px; padding: 20px; overflow: hidden;
-    display: flex; flex-direction: column; justify-content: space-between; color: #fff;
+  #v32ListBudgetDrawer.on { display: block; }
+
+  /* 우측 하단 [+] 버튼 & 가져오기 시트 */
+  #v32FabBtn {
+    position: fixed;
+    right: 20px;
+    bottom: calc(86px + env(safe-area-inset-bottom));
+    width: 56px;
+    height: 56px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #2563eb, #4f46e5);
+    color: #fff;
+    border: 0;
+    box-shadow: 0 10px 26px rgba(37, 99, 235, 0.48);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 205;
+  }
+  @media (min-width: 821px) { #v32FabBtn { left: 362px; right: auto; bottom: 24px; } }
+  #v32FabBtn.show { display: flex; }
+
+  #v32ImportSheetWrap {
+    position: fixed;
+    inset: 0;
+    z-index: 230;
+    background: rgba(5, 6, 9, 0.74);
+    backdrop-filter: blur(8px);
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  #v32ImportSheetWrap.on { display: flex; }
+  #v32ImportSheet {
+    width: 100%;
+    max-width: 520px;
+    max-height: 88dvh;
+    overflow-y: auto;
+    background: var(--s);
+    border-top: 1px solid var(--bd2);
+    border-radius: 28px 28px 0 0;
+    padding: 16px 20px calc(28px + env(safe-area-inset-bottom));
+  }
+
+  /* 홈 대시보드 */
+  #v32Dashboard { display: flex; flex-direction: column; gap: 14px; }
+  .v32-hero {
+    position: relative;
+    border-radius: 24px;
+    min-height: 200px;
+    padding: 20px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    color: #fff;
     background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #312e81 100%);
   }
-  .v31-hero-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.58; pointer-events: none; }
-  .v31-hero-grad { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(8,10,15,0.2) 0%, rgba(8,10,15,0.88) 100%); pointer-events: none; }
-  .v31-bento-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-  .v31-bento-card { padding: 14px 16px; border-radius: 18px; border: 1px solid var(--bd); display: flex; flex-direction: column; gap: 4px; cursor: pointer; }
-  .v31-bento-card.b-blue { background: var(--pastel-blue-bg); border-color: var(--pastel-blue-bd); }
-  .v31-bento-card.b-green { background: var(--pastel-green-bg); border-color: var(--pastel-green-bd); }
-  .v31-bento-card.b-purple { background: var(--pastel-purple-bg); border-color: var(--pastel-purple-bd); }
-  .v31-bento-card.b-amber { background: var(--pastel-amber-bg); border-color: var(--pastel-amber-bd); }
-  .v31-bento-card b { font-size: 20px; font-weight: 900; color: var(--tx); }
-  .v31-bento-card span { font-size: 11.5px; font-weight: 800; color: var(--sub); display: flex; align-items: center; gap: 4px; }
-  .v31-sec-card { background: var(--s); border: 1px solid var(--bd); border-radius: 22px; padding: 16px; }
-  .v31-base-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .v31-base-btn {
-    padding: 12px 8px; border-radius: 14px; background: var(--s2); border: 1px solid var(--bd);
-    color: var(--tx); font: inherit; font-size: 12px; font-weight: 800; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer;
+  .v32-hero-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.58; pointer-events: none; }
+  .v32-hero-grad { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(8,10,15,0.2) 0%, rgba(8,10,15,0.88) 100%); pointer-events: none; }
+  .v32-bento-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .v32-bento-card { padding: 14px 16px; border-radius: 18px; border: 1px solid var(--bd); display: flex; flex-direction: column; gap: 4px; cursor: pointer; }
+  .v32-bento-card.b-blue { background: var(--pastel-blue-bg); border-color: var(--pastel-blue-bd); }
+  .v32-bento-card.b-green { background: var(--pastel-green-bg); border-color: var(--pastel-green-bd); }
+  .v32-bento-card.b-purple { background: var(--pastel-purple-bg); border-color: var(--pastel-purple-bd); }
+  .v32-bento-card.b-amber { background: var(--pastel-amber-bg); border-color: var(--pastel-amber-bd); }
+  .v32-bento-card b { font-size: 20px; font-weight: 900; color: var(--tx); }
+  .v32-bento-card span { font-size: 11.5px; font-weight: 800; color: var(--sub); display: flex; align-items: center; gap: 4px; }
+  .v32-sec-card { background: var(--s); border: 1px solid var(--bd); border-radius: 22px; padding: 16px; }
+  .v32-base-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .v32-base-btn {
+    padding: 12px 8px;
+    border-radius: 14px;
+    background: var(--s2);
+    border: 1px solid var(--bd);
+    color: var(--tx);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 800;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
   }
-  .v31-hotel-pill {
-    display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 999px;
-    background: #059669; color: #fff; font-weight: 900; font-size: 12.5px; border: 2px solid #fff;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.5); white-space: nowrap; transform: translate(-50%, -100%);
+
+  /* 지도 위 숙소 고정 마커 (Google Maps / Leaflet / Naver 공통) */
+  .v32-hotel-anchor {
+    position: absolute;
+    width: 0;
+    height: 0;
+    cursor: pointer;
+    z-index: 9999;
+  }
+  .v32-hotel-pulse {
+    position: absolute;
+    left: -24px;
+    top: -24px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(16, 185, 129, 0.35);
+    border: 2px solid #10b981;
+    animation: v32Pulse 1.6s ease-out infinite;
+    pointer-events: none;
+  }
+  @keyframes v32Pulse {
+    0% { transform: scale(0.4); opacity: 1; }
+    100% { transform: scale(1.7); opacity: 0; }
+  }
+  .v32-hotel-pill {
+    position: absolute;
+    left: 0;
+    bottom: 10px;
+    transform: translateX(-50%);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 13px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #059669, #10b981);
+    color: #fff;
+    font: 900 13px/1.2 "Pretendard Variable", system-ui, sans-serif;
+    border: 2.5px solid #fff;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.6);
+    white-space: nowrap;
+  }
+  .v32-hotel-pill::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: -8px;
+    transform: translateX(-50%);
+    border-width: 8px 7px 0;
+    border-style: solid;
+    border-color: #fff transparent transparent;
   }
 </style>
 
 <script>
-(function initV31CleanApp() {
+(function initV32FinalUX() {
   const sp = document.getElementById("v8Splash");
   if (sp) sp.remove();
 
-  function cleanText(s) {
-    if (!s || typeof s !== "string") return "";
-    return s.split("\n").map(l => (l.includes("(?:[") || l.includes("][a|5|")) ? "" : l.replace(/#[가-힣A-Za-z0-9_]+/g, "")).join(" ").replace(/\s{2,}/g, " ").trim();
+  /* =========================================================================
+   * 1. 상단 온라인 상태 배지 주입 및 실시간 네트워크 연동
+   * ========================================================================= */
+  function syncOnlineBadge() {
+    const topTitle = document.querySelector("#ux7TopUtilBar .ux7-title");
+    if (topTitle && !document.getElementById("v32TopOnlineBadge")) {
+      const b = document.createElement("span");
+      b.id = "v32TopOnlineBadge";
+      topTitle.appendChild(b);
+    }
+    const badge = document.getElementById("v32TopOnlineBadge");
+    const netEl = document.getElementById("netStatus");
+    const online = navigator.onLine !== false;
+    if (badge) {
+      badge.textContent = online ? "● 온라인" : "● 오프라인";
+      badge.classList.toggle("offline", !online);
+    }
+    if (netEl) {
+      netEl.classList.toggle("offline", !online);
+    }
+  }
+  window.addEventListener("online", syncOnlineBadge);
+  window.addEventListener("offline", syncOnlineBadge);
+  setTimeout(syncOnlineBadge, 300);
+
+  /* =========================================================================
+   * 2. 목록 스크롤 위치 기억(탭 이동 시 유지) & 활성 탭 재터치 시 관성 제동 최상단 이동
+   * ========================================================================= */
+  let savedListScrollTop = 0;
+  const listTabEl = document.getElementById("tab-list");
+  if (listTabEl) {
+    listTabEl.addEventListener("scroll", () => {
+      if (listTabEl.classList.contains("active")) {
+        savedListScrollTop = listTabEl.scrollTop;
+      }
+    }, { passive: true });
   }
 
-  function scrollTopNow(k) {
-    try {
-      [document.getElementById("tab-" + k), document.getElementById("side")].forEach(el => { if (el) el.scrollTop = 0; });
-      window.scrollTo(0, 0);
-    } catch (_) {}
+  function killMomentumAndScrollToTop(tabKey) {
+    const targets = [
+      document.getElementById("tab-" + tabKey),
+      document.getElementById("side")
+    ].filter(Boolean);
+
+    targets.forEach(el => {
+      el.style.overflowY = "hidden";
+      el.style.webkitOverflowScrolling = "auto";
+      el.scrollTop = 0;
+      void el.offsetHeight; // iOS 관성 스크롤 즉시 중단
+      requestAnimationFrame(() => {
+        el.scrollTop = 0;
+        el.style.overflowY = "auto";
+        el.style.webkitOverflowScrolling = "touch";
+        el.scrollTop = 0;
+      });
+      setTimeout(() => { el.scrollTop = 0; }, 40);
+    });
+    if (tabKey === "list") savedListScrollTop = 0;
+    window.scrollTo(0, 0);
   }
 
+  /* =========================================================================
+   * 3. 외부 앱(구글맵·인스타) 연결 시 빈 하얀 창 방지 & 상세 시트 기본 뷰를 사진(photo)으로 고정
+   * ========================================================================= */
   function openExtClean(url) {
     const u = String(url || "").trim();
     if (!u) return;
@@ -12505,6 +12735,202 @@ ${caption || rawText}
   }
   window.openExternalCleanNoBlank = openExtClean;
 
+  // 목록 카드 클릭 시 검은 빈 영상 iframe 대신 썸네일 사진(photo)이 먼저 뜨도록 고정
+  document.addEventListener("click", (e) => {
+    const openEl = e.target.closest('[data-act="open"]');
+    if (openEl && !e.target.closest("button, a, select, input")) {
+      setTimeout(() => {
+        if (typeof view !== "undefined" && view === "video") {
+          view = "photo";
+          if (document.getElementById("sheet")?.classList.contains("on") && typeof showSheet === "function") {
+            showSheet();
+          }
+        }
+      }, 0);
+    }
+  }, true);
+
+  // 상세 시트 하단 액션 바(.ux-sheet-footer)가 항상 맨 아래에만 오도록 보정
+  if (typeof showSheet === "function") {
+    const _origShowSheetV32 = showSheet;
+    showSheet = function(...args) {
+      if (typeof view !== "undefined" && view === "video") view = "photo";
+      const r = _origShowSheetV32.apply(this, args);
+      const sbody = document.getElementById("sbody");
+      if (sbody) {
+        const footers = sbody.querySelectorAll(".ux-sheet-footer, .act:last-of-type");
+        footers.forEach(f => {
+          if (f.querySelector('[data-act="close"]')) {
+            f.classList.add("ux-sheet-footer");
+            sbody.appendChild(f);
+          }
+        });
+      }
+      return r;
+    };
+  }
+
+  /* =========================================================================
+   * 4. 주요 거점 숙소 3곳: 구글맵(gmap)·Leaflet(lm)·네이버(nmap) 마커 핀 + 원터치 복사/구글맵 팝업
+   * ========================================================================= */
+  const HOTELS = {
+    kyoto: {
+      key: "kyoto",
+      title: "교토 숙소",
+      sub: "도후쿠지역 도보 4분 · 히가시야마구",
+      address: "〒605-0981 京都府京都市東山区本町15丁目",
+      lat: 34.97859,
+      lng: 135.76631,
+      emoji: "🏨"
+    },
+    ine: {
+      key: "ine",
+      title: "이네후나야 숙소",
+      sub: "아마노하시다테 북측 · 미야즈시",
+      address: "京都府宮津市中野",
+      lat: 35.53836,
+      lng: 135.19021,
+      emoji: "🌊"
+    },
+    osaka: {
+      key: "osaka",
+      title: "오사카 숙소",
+      sub: "닛폰바시·난바역 도보 6분",
+      address: "〒542-0073 大阪府大阪市中央区日本橋2丁目",
+      lat: 34.661784,
+      lng: 135.508406,
+      emoji: "🏢"
+    }
+  };
+
+  let _skipFitUntil = 0;
+  if (typeof fit === "function") {
+    const _origFitV32 = fit;
+    fit = function(...args) {
+      if (Date.now() < _skipFitUntil) return;
+      return _origFitV32.apply(this, args);
+    };
+  }
+
+  let gHotelOverlays = [], lHotelMarkers = [];
+  let GHotelOverlayClass = null;
+
+  function hotelPinHtml(h) {
+    return `<div class="v32-hotel-anchor"><div class="v32-hotel-pulse"></div><div class="v32-hotel-pill">${h.emoji} ${esc(h.title)}</div></div>`;
+  }
+
+  function hotelPopupHtml(h) {
+    const gmapCoordUrl = `https://www.google.com/maps/search/?api=1&query=${h.lat},${h.lng}`;
+    return `
+      <div class="mapPinPopup" style="min-width:225px;color:#0f172a;padding:2px">
+        <strong style="font-size:15px;color:#059669">${h.emoji} ${esc(h.title)}</strong>
+        <div style="font-size:12px;font-weight:800;color:#2563eb;margin:3px 0">${esc(h.sub)}</div>
+        <div style="font-size:12px;color:#475569;margin-bottom:8px;word-break:break-all">${esc(h.address)}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button type="button" class="mb pr" onclick="window.openExternalCleanNoBlank('${gmapCoordUrl}')" style="min-height:32px;padding:4px 10px;font-size:11.5px"><span class="ms">map</span>구글맵 열기</button>
+          <button type="button" class="mb" onclick="navigator.clipboard?.writeText('${esc(h.address)}');toast('📋 숙소 주소를 복사했습니다')" style="min-height:32px;padding:4px 10px;font-size:11.5px"><span class="ms">content_copy</span>주소복사</button>
+          <button type="button" class="mb" onclick="window.openHotelTaxiV32('${h.key}')" style="min-height:32px;padding:4px 10px;font-size:11.5px"><span class="ms">local_taxi</span>택시화면</button>
+        </div>
+      </div>
+    `;
+  }
+
+  window.openHotelTaxiV32 = function(key) {
+    const h = HOTELS[key];
+    if (h && typeof openTaxiModal === "function") {
+      openTaxiModal({ name: h.title, localName: h.sub, address: h.address, lat: h.lat, lng: h.lng });
+    }
+  };
+
+  function openHotelPopupOnMap(h) {
+    if (!h) return;
+    if (typeof gmap !== "undefined" && gmap && window.google?.maps) {
+      if (!mapInfoWindow) mapInfoWindow = new google.maps.InfoWindow();
+      mapInfoWindow.setOptions({ pixelOffset: new google.maps.Size(0, -42) });
+      mapInfoWindow.setContent(hotelPopupHtml(h));
+      mapInfoWindow.setPosition({ lat: h.lat, lng: h.lng });
+      mapInfoWindow.open({ map: gmap });
+    } else if (typeof lm !== "undefined" && lm && h._lMarker) {
+      h._lMarker.setPopupContent(hotelPopupHtml(h));
+      try { h._lMarker.openPopup(); } catch (_) {}
+    }
+  }
+
+  function renderHotelPinsAll() {
+    try {
+      // 1) Google Maps (gmap)
+      if (typeof gmap !== "undefined" && gmap && window.google?.maps?.OverlayView) {
+        gHotelOverlays.forEach(o => { try { o.setMap(null); } catch (_) {} });
+        gHotelOverlays = [];
+        if (!GHotelOverlayClass) {
+          GHotelOverlayClass = class extends google.maps.OverlayView {
+            constructor(map, hotel) { super(); this.hotel = hotel; this.div = null; this.setMap(map); }
+            onAdd() {
+              this.div = document.createElement("div");
+              this.div.style.cssText = "position:absolute;width:0;height:0;cursor:pointer;z-index:9999";
+              this.div.innerHTML = hotelPinHtml(this.hotel);
+              const tap = (e) => { e.stopPropagation(); openHotelPopupOnMap(this.hotel); };
+              this.div.addEventListener("click", tap);
+              this.div.addEventListener("touchend", tap);
+              this.getPanes().overlayMouseTarget.appendChild(this.div);
+            }
+            draw() {
+              if (!this.div) return;
+              const proj = this.getProjection();
+              if (!proj) return;
+              const p = proj.fromLatLngToDivPixel(new google.maps.LatLng(this.hotel.lat, this.hotel.lng));
+              if (p) { this.div.style.left = p.x + "px"; this.div.style.top = p.y + "px"; }
+            }
+            onRemove() { if (this.div) { this.div.remove(); this.div = null; } }
+          };
+        }
+        Object.values(HOTELS).forEach(h => {
+          gHotelOverlays.push(new GHotelOverlayClass(gmap, h));
+        });
+      }
+      // 2) Leaflet (lm)
+      if (typeof lm !== "undefined" && lm && window.L) {
+        lHotelMarkers.forEach(m => { try { lm.removeLayer(m); } catch (_) {} });
+        lHotelMarkers = [];
+        Object.values(HOTELS).forEach(h => {
+          const m = L.marker([h.lat, h.lng], {
+            icon: L.divIcon({ className: "", html: hotelPinHtml(h), iconSize: [0, 0], iconAnchor: [0, 0] }),
+            zIndexOffset: 2000
+          });
+          m.bindPopup(hotelPopupHtml(h), { offset: [0, -36] });
+          m.addTo(lm);
+          h._lMarker = m;
+          lHotelMarkers.push(m);
+        });
+      }
+    } catch (_) {}
+  }
+
+  window.focusHotelV32 = function(key) {
+    const h = HOTELS[key];
+    if (!h) return;
+    _skipFitUntil = Date.now() + 1600;
+    if (innerWidth <= 820) tab("map");
+    const apply = () => {
+      renderHotelPinsAll();
+      if (typeof gmap !== "undefined" && gmap && window.google?.maps) {
+        google.maps.event.trigger(gmap, "resize");
+        gmap.panTo({ lat: h.lat, lng: h.lng });
+        gmap.setZoom(17);
+      } else if (typeof lm !== "undefined" && lm) {
+        lm.invalidateSize();
+        lm.setView([h.lat, h.lng], 17);
+      }
+      openHotelPopupOnMap(h);
+    };
+    setTimeout(apply, 60);
+    setTimeout(apply, 280);
+    toast(`${h.emoji} ${h.title} 위치 핀을 표시했습니다`);
+  };
+
+  /* =========================================================================
+   * 5. 최근접 역·출구 매칭 & 현실적인 총 이동거리(TSP) 계산 & 스마트 일차 배정
+   * ========================================================================= */
   const STATIONS_DB = [
     { name: "난바역", exit: "14번 출구", lat: 34.6685, lng: 135.5013 },
     { name: "닛폰바시역", exit: "2번 출구", lat: 34.6675, lng: 135.5062 },
@@ -12546,97 +12972,88 @@ ${caption || rawText}
     return null;
   }
 
-  const HOTELS = {
-    kyoto: { key: "kyoto", title: "교토 숙소", sub: "도후쿠지역 도보 4분", address: "〒605-0981 京都府京都市東山区本町15丁目", lat: 34.97859, lng: 135.76631, emoji: "🏨" },
-    ine: { key: "ine", title: "이네후나야 숙소", sub: "아마노하시다테 인근", address: "京都府宮津市中野", lat: 35.53836, lng: 135.19021, emoji: "🌊" },
-    osaka: { key: "osaka", title: "오사카 숙소", sub: "닛폰바시역 도보 6분", address: "〒542-0073 大阪府大阪市中央区日本橋2丁目", lat: 34.661784, lng: 135.508406, emoji: "🏢" }
-  };
-
-  let lHotelMarkers = [];
-  function renderHotelPins() {
-    try {
-      if (typeof lm !== "undefined" && lm && window.L) {
-        lHotelMarkers.forEach(m => { try { lm.removeLayer(m); } catch (_) {} });
-        lHotelMarkers = [];
-        Object.values(HOTELS).forEach(h => {
-          const m = L.marker([h.lat, h.lng], {
-            icon: L.divIcon({ className: "", html: `<div class="v31-hotel-pill">${h.emoji} ${esc(h.title)}</div>`, iconSize: [100, 30], iconAnchor: [50, 30] }),
-            zIndexOffset: 2000
-          });
-          m.bindPopup(`<b>${h.emoji} ${esc(h.title)}</b><br>${esc(h.sub)}<br><small>${esc(h.address)}</small>`);
-          m.addTo(lm);
-          h._lMarker = m;
-          lHotelMarkers.push(m);
-        });
+  function orderByShortestPath(group, anchorLat, anchorLng) {
+    if (!Array.isArray(group) || group.length <= 1) return group || [];
+    const withCoord = group.filter(x => Number(x.lat) && Number(x.lng));
+    const noCoord = group.filter(x => !Number(x.lat) || !Number(x.lng));
+    const pool = [...withCoord];
+    const ordered = [];
+    let curLat = anchorLat, curLng = anchorLng;
+    while (pool.length) {
+      let bestIdx = 0, bestDist = Infinity;
+      for (let i = 0; i < pool.length; i++) {
+        const d = distKm(curLat, curLng, Number(pool[i].lat), Number(pool[i].lng));
+        if (d < bestDist) { bestDist = d; bestIdx = i; }
       }
-    } catch (_) {}
+      const picked = pool.splice(bestIdx, 1)[0];
+      ordered.push(picked);
+      curLat = Number(picked.lat);
+      curLng = Number(picked.lng);
+    }
+    return [...ordered, ...noCoord];
   }
 
-  window.focusHotelV31 = function(key) {
-    const h = HOTELS[key];
-    if (!h) return;
-    if (innerWidth <= 820) tab("map");
-    setTimeout(() => {
-      renderHotelPins();
-      if (typeof gmap !== "undefined" && gmap && window.google?.maps) {
-        gmap.panTo({ lat: h.lat, lng: h.lng });
-        gmap.setZoom(17);
-        if (!mapInfoWindow) mapInfoWindow = new google.maps.InfoWindow();
-        mapInfoWindow.setContent(`<div style="color:#0f172a;padding:4px"><b>${h.emoji} ${esc(h.title)}</b><br>${esc(h.sub)}<br><small>${esc(h.address)}</small></div>`);
-        mapInfoWindow.setPosition({ lat: h.lat, lng: h.lng });
-        mapInfoWindow.open({ map: gmap });
-      } else if (typeof lm !== "undefined" && lm) {
-        lm.invalidateSize();
-        lm.setView([h.lat, h.lng], 17);
-        if (h._lMarker) h._lMarker.openPopup();
-      }
-      toast(`${h.emoji} ${h.title} 위치를 지도에 표시했습니다`);
-    }, 150);
-  };
+  function calcRealisticTotalKm(list) {
+    const valid = (list || []).filter(i => Number(i.lat) && Number(i.lng));
+    if (valid.length < 2) return 0;
+    const sorted = orderByShortestPath(valid, 34.6685, 135.5013);
+    let sum = 0;
+    for (let i = 1; i < sorted.length; i++) {
+      const d = distKm(Number(sorted[i - 1].lat), Number(sorted[i - 1].lng), Number(sorted[i].lat), Number(sorted[i].lng));
+      if (d < 60) sum += d;
+    }
+    return sum;
+  }
 
-  // 일차 균등 자동 배정 및 전체 초기화
-  window.autoAssignDaysV31 = function() {
+  window.autoAssignDaysV32 = function() {
     if (!Array.isArray(items) || !items.length) return toast("저장된 장소가 없습니다");
     const slots = ["09:30", "11:00", "12:30", "14:30", "16:30", "18:30", "20:00"];
-    const perDay = Math.max(1, Math.ceil(items.length / 7));
-    items.forEach((it, idx) => {
+    const sorted = orderByShortestPath(items, 34.9858, 135.7588);
+    const perDay = Math.max(1, Math.ceil(sorted.length / 7));
+    sorted.forEach((it, idx) => {
       it.day = Math.min(7, Math.floor(idx / perDay) + 1);
       it.visitTime = slots[idx % slots.length];
       it.updatedAt = Date.now();
     });
+    items = sorted;
     save();
     draw(true);
-    window.renderV31Dashboard?.();
-    toast("🗓️ Day 1~7 일정 및 방문시간을 균등 배정했습니다!");
+    window.renderV32Dashboard?.();
+    toast("🗓️ 최단 동선 기준으로 Day 1~7 코스를 자동 배정했습니다!");
   };
 
-  window.resetDaysV31 = function() {
+  window.resetDaysV32 = function() {
     if (!Array.isArray(items)) return;
     items.forEach(it => { it.day = 0; it.visitTime = ""; it.updatedAt = Date.now(); });
     if (typeof mapDay !== "undefined") mapDay = 0;
     save();
     draw(true);
-    window.renderV31Dashboard?.();
+    window.renderV32Dashboard?.();
     toast("↩️ 모든 장소를 '일차 미정'으로 초기화했습니다");
   };
 
-  // 목록 1/N 정산 바
+  /* =========================================================================
+   * 6. 목록 1/N 정산 바 & 홈 대시보드 렌더링
+   * ========================================================================= */
   let jpyRate = 8.48, splitCnt = 3, calcAmt = 0, calcCur = "JPY";
   function renderSplitBar() {
     const searchRow = document.querySelector("#tab-list .search-row");
     const topCard = searchRow?.closest(".card");
     if (!searchRow || !topCard) return;
 
-    let bar = document.getElementById("v31ListBudgetBar");
+    document.getElementById("v31ListBudgetBar")?.remove();
+    document.getElementById("v31ListBudgetDrawer")?.remove();
+
+    let bar = document.getElementById("v32ListBudgetBar");
     if (!bar) {
       bar = document.createElement("div");
-      bar.id = "v31ListBudgetBar";
+      bar.id = "v32ListBudgetBar";
       searchRow.insertBefore(bar, searchRow.firstChild);
     }
-    let drawer = document.getElementById("v31ListBudgetDrawer");
+    let drawer = document.getElementById("v32ListBudgetDrawer");
     if (!drawer) {
       drawer = document.createElement("div");
-      drawer.id = "v31ListBudgetDrawer";
+      drawer.id = "v32ListBudgetDrawer";
       topCard.appendChild(drawer);
     }
 
@@ -12650,30 +13067,31 @@ ${caption || rawText}
       drawer.dataset.bound = "1";
       drawer.innerHTML = `
         <div style="display:flex;gap:6px;align-items:center">
-          <input type="text" id="v31Amt" placeholder="금액 입력" inputmode="numeric" style="flex:1;margin:0;min-height:38px;padding:6px 10px;font-size:13.5px" />
-          <select id="v31Cur" class="btn g" style="width:72px;margin:0;min-height:38px;padding:4px 6px;font-size:12.5px"><option value="JPY">¥ 엔</option><option value="KRW">₩ 원</option></select>
-          <button type="button" class="mb" id="v31Minus" style="min-height:38px;padding:0 10px">-</button>
-          <b id="v31Cnt" style="font-size:13px;min-width:30px;text-align:center">${splitCnt}명</b>
-          <button type="button" class="mb" id="v31Plus" style="min-height:38px;padding:0 10px">+</button>
+          <input type="text" id="v32Amt" placeholder="금액 입력" inputmode="numeric" style="flex:1;margin:0;min-height:38px;padding:6px 10px;font-size:13.5px" />
+          <select id="v32Cur" class="btn g" style="width:72px;margin:0;min-height:38px;padding:4px 6px;font-size:12.5px"><option value="JPY">¥ 엔</option><option value="KRW">₩ 원</option></select>
+          <button type="button" class="mb" id="v32Minus" style="min-height:38px;padding:0 10px">-</button>
+          <b id="v32Cnt" style="font-size:13px;min-width:30px;text-align:center">${splitCnt}명</b>
+          <button type="button" class="mb" id="v32Plus" style="min-height:38px;padding:0 10px">+</button>
+          <button type="button" class="mb dg" id="v32Reset" style="min-height:38px;padding:0 9px;font-size:11.5px">초기화</button>
         </div>
       `;
       const update = () => {
-        calcAmt = Number(String(document.getElementById("v31Amt").value || "").replace(/[^0-9.]/g, "")) || 0;
-        calcCur = document.getElementById("v31Cur").value;
-        document.getElementById("v31Cnt").textContent = `${splitCnt}명`;
+        calcAmt = Number(String(document.getElementById("v32Amt").value || "").replace(/[^0-9.]/g, "")) || 0;
+        calcCur = document.getElementById("v32Cur").value;
+        document.getElementById("v32Cnt").textContent = `${splitCnt}명`;
         renderSplitBar();
       };
-      document.getElementById("v31Amt").oninput = update;
-      document.getElementById("v31Cur").onchange = update;
-      document.getElementById("v31Minus").onclick = () => { splitCnt = Math.max(1, splitCnt - 1); update(); };
-      document.getElementById("v31Plus").onclick = () => { splitCnt = Math.min(20, splitCnt + 1); update(); };
+      document.getElementById("v32Amt").oninput = update;
+      document.getElementById("v32Cur").onchange = update;
+      document.getElementById("v32Minus").onclick = () => { splitCnt = Math.max(1, splitCnt - 1); update(); };
+      document.getElementById("v32Plus").onclick = () => { splitCnt = Math.min(20, splitCnt + 1); update(); };
+      document.getElementById("v32Reset").onclick = () => { document.getElementById("v32Amt").value = ""; update(); };
     }
   }
 
-  // 홈 대시보드 & 우측 하단 [+] 시트 설치
   function setupHomeAndFab() {
     const homeTab = document.getElementById("tab-add");
-    if (!homeTab || document.getElementById("v31Dashboard")) return;
+    if (!homeTab || document.getElementById("v32Dashboard")) return;
 
     const origCard = homeTab.querySelector(".card");
     const rsEl = document.getElementById("rs");
@@ -12686,64 +13104,59 @@ ${caption || rawText}
     if (origCard) origCard.style.display = "none";
 
     const dash = document.createElement("div");
-    dash.id = "v31Dashboard";
+    dash.id = "v32Dashboard";
     homeTab.insertBefore(dash, homeTab.firstChild);
 
     const fab = document.createElement("button");
     fab.type = "button";
-    fab.id = "v31FabBtn";
+    fab.id = "v32FabBtn";
     fab.className = "show";
     fab.innerHTML = '<span class="ms" style="font-size:28px">add</span>';
     document.body.appendChild(fab);
 
     const wrap = document.createElement("div");
-    wrap.id = "v31ImportSheetWrap";
+    wrap.id = "v32ImportSheetWrap";
     wrap.innerHTML = `
-      <div id="v31ImportSheet">
+      <div id="v32ImportSheet">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
           <b style="font-size:17px">장소 가져오기 / 등록</b>
-          <button type="button" class="mb" id="v31CloseSheet">닫기</button>
+          <button type="button" class="mb" id="v32CloseSheet">닫기</button>
         </div>
-        <div id="v31SegSlot"></div>
-        <div id="v31TextSlot"></div>
+        <div id="v32SegSlot"></div>
+        <div id="v32TextSlot"></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
-          <button type="button" class="btn g" id="v31OcrBtn" style="margin:0"><span class="ms">imagesmode</span>스샷 분석</button>
-          <button type="button" class="btn g" id="v31ManBtn" style="margin:0"><span class="ms">edit_location_alt</span>직접 1건 등록</button>
+          <button type="button" class="btn g" id="v32OcrBtn" style="margin:0"><span class="ms">imagesmode</span>스샷 분석</button>
+          <button type="button" class="btn g" id="v32ManBtn" style="margin:0"><span class="ms">edit_location_alt</span>직접 1건 등록</button>
         </div>
-        <div id="v31ManSlot" style="margin-top:10px"></div>
-        <div id="v31RsSlot" style="margin-top:10px"></div>
+        <div id="v32ManSlot" style="margin-top:10px"></div>
+        <div id="v32RsSlot" style="margin-top:10px"></div>
       </div>
     `;
     document.body.appendChild(wrap);
 
-    if (segEl) document.getElementById("v31SegSlot").appendChild(segEl);
+    if (segEl) document.getElementById("v32SegSlot").appendChild(segEl);
     if (shareBox && analyzeBtn) {
-      document.getElementById("v31TextSlot").appendChild(shareBox);
-      document.getElementById("v31TextSlot").appendChild(analyzeBtn);
+      document.getElementById("v32TextSlot").appendChild(shareBox);
+      document.getElementById("v32TextSlot").appendChild(analyzeBtn);
     }
-    if (manualBox) document.getElementById("v31ManSlot").appendChild(manualBox);
-    if (rsEl) document.getElementById("v31RsSlot").appendChild(rsEl);
+    if (manualBox) document.getElementById("v32ManSlot").appendChild(manualBox);
+    if (rsEl) document.getElementById("v32RsSlot").appendChild(rsEl);
 
     fab.onclick = () => wrap.classList.toggle("on");
-    document.getElementById("v31CloseSheet").onclick = () => wrap.classList.remove("on");
+    document.getElementById("v32CloseSheet").onclick = () => wrap.classList.remove("on");
     wrap.onclick = (e) => { if (e.target === wrap) wrap.classList.remove("on"); };
-    document.getElementById("v31OcrBtn").onclick = () => shareFile?.click();
-    document.getElementById("v31ManBtn").onclick = () => manualBox?.classList.toggle("on");
+    document.getElementById("v32OcrBtn").onclick = () => shareFile?.click();
+    document.getElementById("v32ManBtn").onclick = () => manualBox?.classList.toggle("on");
   }
 
-  window.renderV31Dashboard = function() {
-    const dash = document.getElementById("v31Dashboard");
+  window.renderV32Dashboard = function() {
+    const dash = document.getElementById("v32Dashboard");
     if (!dash) return;
     const list = Array.isArray(items) ? items : [];
     const total = list.length;
     const coords = list.filter(i => Number(i.lat) && Number(i.lng)).length;
     const scheduled = list.filter(i => Number(i.day) > 0).length;
-    let routeKm = 0;
-    const pts = list.filter(i => Number(i.lat) && Number(i.lng));
-    for (let i = 1; i < pts.length; i++) {
-      const d = distKm(Number(pts[i - 1].lat), Number(pts[i - 1].lng), Number(pts[i].lat), Number(pts[i].lng));
-      if (d < 200) routeKm += d;
-    }
+    const routeKm = calcRealisticTotalKm(list);
 
     const activeDays = [...new Set(list.filter(x => Number(x.day) > 0).map(x => Number(x.day)))].sort((a, b) => a - b);
     const dayRows = activeDays.length
@@ -12754,8 +13167,8 @@ ${caption || rawText}
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
               <b style="color:var(--pr)">Day ${d} 코스 (${dList.length}곳)</b>
               <div style="display:flex;gap:6px">
-                <button type="button" class="mb pr" data-v31-dmap="${d}" style="min-height:28px;padding:3px 9px;font-size:11.5px">지도 동선</button>
-                <button type="button" class="mb" data-v31-dlist="${d}" style="min-height:28px;padding:3px 9px;font-size:11.5px">목록 편집</button>
+                <button type="button" class="mb pr" data-v32-dmap="${d}" style="min-height:28px;padding:3px 9px;font-size:11.5px">지도 동선</button>
+                <button type="button" class="mb" data-v32-dlist="${d}" style="min-height:28px;padding:3px 9px;font-size:11.5px">목록 편집</button>
               </div>
             </div>
             <div style="font-size:12px;color:var(--sub)">${esc(names)}</div>
@@ -12764,9 +13177,9 @@ ${caption || rawText}
       : `<div class="ds">우측 상단 [자동 배정]을 누르면 Day 1~7 코스가 생성됩니다.</div>`;
 
     dash.innerHTML = `
-      <div class="v31-hero">
-        <img class="v31-hero-bg" src="https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=1000&q=80" alt="" onerror="this.style.display='none'" />
-        <div class="v31-hero-grad"></div>
+      <div class="v32-hero">
+        <img class="v32-hero-bg" src="https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=1000&q=80" alt="" onerror="this.style.display='none'" />
+        <div class="v32-hero-grad"></div>
         <div style="position:relative;z-index:2;display:flex;justify-content:space-between;align-items:center">
           <span class="ux7-badge places" style="background:#2563eb;color:#fff;padding:4px 10px">🗓️ 2026-11-24 출발</span>
           <span class="ux7-badge">🌤️ 오사카·교토</span>
@@ -12774,143 +13187,150 @@ ${caption || rawText}
         <div style="position:relative;z-index:2;margin-top:28px">
           <div style="font-size:23px;font-weight:900;margin-bottom:10px">오사카·교토 여행 플랜</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <button type="button" class="btn" id="v31HeroAdd" style="min-height:40px;font-size:13px"><span class="ms">add_circle</span>장소 가져오기</button>
-            <button type="button" class="btn g" id="v31HeroList" style="margin:0;min-height:40px;font-size:13px;background:rgba(15,23,42,0.75);color:#fff"><span class="ms">format_list_bulleted</span>전체 목록 보기</button>
+            <button type="button" class="btn" id="v32HeroAdd" style="min-height:40px;font-size:13px"><span class="ms">add_circle</span>장소 가져오기</button>
+            <button type="button" class="btn g" id="v32HeroList" style="margin:0;min-height:40px;font-size:13px;background:rgba(15,23,42,0.75);color:#fff"><span class="ms">format_list_bulleted</span>전체 목록 보기</button>
           </div>
         </div>
       </div>
 
-      <div class="v31-bento-grid">
-        <div class="v31-bento-card b-blue" data-v31-go="ALL"><span>저장한 장소</span><b>${total}곳</b></div>
-        <div class="v31-bento-card b-green" data-v31-go="ALL"><span>좌표 설정 완료</span><b>${coords}곳</b></div>
-        <div class="v31-bento-card b-purple" data-v31-go="ALL"><span>일차 배정 완료</span><b>${scheduled}곳</b></div>
-        <div class="v31-bento-card b-amber" id="v31GoRoute"><span>총 예상 이동거리</span><b>${routeKm.toFixed(1)}km</b></div>
+      <div class="v32-bento-grid">
+        <div class="v32-bento-card b-blue" data-v32-go="ALL"><span>저장한 장소</span><b>${total}곳</b></div>
+        <div class="v32-bento-card b-green" data-v32-go="ALL"><span>좌표 설정 완료</span><b>${coords}곳</b></div>
+        <div class="v32-bento-card b-purple" data-v32-go="ALL"><span>일차 배정 완료</span><b>${scheduled}곳</b></div>
+        <div class="v32-bento-card b-amber" id="v32GoRoute"><span>최단 동선 총거리</span><b>${routeKm.toFixed(1)}km</b></div>
       </div>
 
-      <div class="v31-sec-card">
+      <div class="v32-sec-card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
           <b style="font-size:15px">일차별 코스 & 동선 지도</b>
           <div style="display:flex;gap:6px">
-            <button type="button" class="mb pr" id="v31AutoDay" style="min-height:30px;padding:4px 10px;font-size:11.5px">자동 배정</button>
-            <button type="button" class="mb dg" id="v31ResetDay" style="min-height:30px;padding:4px 10px;font-size:11.5px">초기화</button>
+            <button type="button" class="mb pr" id="v32AutoDay" style="min-height:30px;padding:4px 10px;font-size:11.5px">자동 배정</button>
+            <button type="button" class="mb dg" id="v32ResetDay" style="min-height:30px;padding:4px 10px;font-size:11.5px">초기화</button>
           </div>
         </div>
         ${dayRows}
       </div>
 
-      <div class="v31-sec-card">
+      <div class="v32-sec-card">
         <b style="display:block;font-size:15px;margin-bottom:10px">주요 거점 숙소 위치보기</b>
-        <div class="v31-base-grid">
-          <button type="button" class="v31-base-btn" data-v31-hotel="kyoto"><span class="ms" style="color:#3b82f6">temple_buddhist</span><span>교토 숙소</span></button>
-          <button type="button" class="v31-base-btn" data-v31-hotel="ine"><span class="ms" style="color:#10b981">waves</span><span>이네후나야 숙소</span></button>
-          <button type="button" class="v31-base-btn" data-v31-hotel="osaka"><span class="ms" style="color:#f59e0b">apartment</span><span>오사카 숙소</span></button>
+        <div class="v32-base-grid">
+          <button type="button" class="v32-base-btn" data-v32-hotel="kyoto"><span class="ms" style="color:#3b82f6">temple_buddhist</span><span>교토 숙소</span></button>
+          <button type="button" class="v32-base-btn" data-v32-hotel="ine"><span class="ms" style="color:#10b981">waves</span><span>이네후나야 숙소</span></button>
+          <button type="button" class="v32-base-btn" data-v32-hotel="osaka"><span class="ms" style="color:#f59e0b">apartment</span><span>오사카 숙소</span></button>
         </div>
       </div>
     `;
 
-    document.getElementById("v31HeroAdd").onclick = () => document.getElementById("v31ImportSheetWrap")?.classList.add("on");
-    document.getElementById("v31HeroList").onclick = () => tab("list");
-    document.getElementById("v31AutoDay").onclick = () => window.autoAssignDaysV31();
-    document.getElementById("v31ResetDay").onclick = () => window.resetDaysV31();
-    document.getElementById("v31GoRoute").onclick = () => { mapRouteOn = true; draw(true); if (innerWidth <= 820) tab("map"); fit(); };
+    document.getElementById("v32HeroAdd").onclick = () => document.getElementById("v32ImportSheetWrap")?.classList.add("on");
+    document.getElementById("v32HeroList").onclick = () => tab("list");
+    document.getElementById("v32AutoDay").onclick = () => window.autoAssignDaysV32();
+    document.getElementById("v32ResetDay").onclick = () => window.resetDaysV32();
+    document.getElementById("v32GoRoute").onclick = () => { mapRouteOn = true; draw(true); if (innerWidth <= 820) tab("map"); fit(); };
 
-    dash.querySelectorAll("[data-v31-go]").forEach(el => { el.onclick = () => tab("list"); });
-    dash.querySelectorAll("[data-v31-hotel]").forEach(el => { el.onclick = () => window.focusHotelV31(el.dataset.v31Hotel); });
-    dash.querySelectorAll("[data-v31-dmap]").forEach(el => {
+    dash.querySelectorAll("[data-v32-go]").forEach(el => { el.onclick = () => tab("list"); });
+    dash.querySelectorAll("[data-v32-hotel]").forEach(el => { el.onclick = () => window.focusHotelV32(el.dataset.v32Hotel); });
+    dash.querySelectorAll("[data-v32-dmap]").forEach(el => {
       el.onclick = () => {
-        mapDay = Number(el.dataset.v31Dmap) || 0;
+        mapDay = Number(el.dataset.v32Dmap) || 0;
         mapRouteOn = true;
         draw(true);
         if (innerWidth <= 820) tab("map");
         setTimeout(fit, 100);
       };
     });
-    dash.querySelectorAll("[data-v31-dlist]").forEach(el => {
+    dash.querySelectorAll("[data-v32-dlist]").forEach(el => {
       el.onclick = () => {
         listCat = "ALL";
-        listFilter.ALL = "DAY:" + el.dataset.v31Dlist;
+        listFilter.ALL = "DAY:" + el.dataset.v32Dlist;
         tab("list");
       };
     });
   };
 
-  // MutationObserver 없이 renderListTab 시에만 1회 실행되는 안전한 카드 데코레이터
+  /* =========================================================================
+   * 7. 목록 카드 데코레이터 (중복 체크 아이콘 제거 & 구간 경로 배지 제거)
+   * ========================================================================= */
   const TIMES = ["", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00"];
-  function decorateCardsOnce() {
+  function decorateCardsV32() {
     const listEl = document.getElementById("list-LIST");
     if (!listEl || !Array.isArray(items)) return;
 
-    listEl.querySelectorAll(".v31-route-connector").forEach(el => el.remove());
-    const itemMap = new Map(items.map(it => [String(it.id), it]));
-    const cards = Array.from(listEl.querySelectorAll(".item[data-id]"));
+    // 기존 구간 경로보기 배지 완전 삭제
+    listEl.querySelectorAll(".v27-route-connector, .v28-route-connector, .v31-route-connector").forEach(el => el.remove());
 
-    cards.forEach(cardEl => {
+    const itemMap = new Map(items.map(it => [String(it.id), it]));
+    listEl.querySelectorAll(".item[data-id]").forEach(cardEl => {
       cardEl.style.display = "";
       const it = itemMap.get(String(cardEl.dataset.id));
       if (!it) return;
 
       const nmRow = cardEl.querySelector(".mid .nm");
-      if (nmRow && !nmRow.querySelector(".v31-coord-check") && Number(it.lat) && Number(it.lng)) {
-        const chk = document.createElement("span");
-        chk.className = "v31-coord-check";
-        chk.innerHTML = '<span class="ms fill" style="font-size:19px">check_circle</span>';
-        nmRow.appendChild(chk);
-      }
+      if (nmRow) {
+        // 중복 생성되던 모든 이전 체크 아이콘 제거 후 단 1개만 부착
+        nmRow.querySelectorAll(".star-btn, .v27-coord-check, .v28-coord-check, .v31-coord-check, .v32-coord-check").forEach(el => el.remove());
+        if (Number(it.lat) && Number(it.lng)) {
+          const chk = document.createElement("span");
+          chk.className = "v32-coord-check";
+          chk.innerHTML = '<span class="ms fill" style="font-size:19px">check_circle</span>';
+          const daySel = nmRow.querySelector(".ux7-day-select");
+          if (daySel) nmRow.insertBefore(chk, daySel);
+          else nmRow.appendChild(chk);
+        }
 
-      if (nmRow && !nmRow.querySelector(".v31-time-select")) {
-        const ts = document.createElement("select");
-        ts.className = "v31-time-select";
-        ts.innerHTML = TIMES.map(t => `<option value="${t}" ${(it.visitTime || "") === t ? "selected" : ""}>${t || "시간"}</option>`).join("");
-        ts.onclick = e => e.stopPropagation();
-        ts.onchange = e => {
-          e.stopPropagation();
-          it.visitTime = ts.value;
-          persistNow();
-          window.renderV31Dashboard?.();
-        };
-        nmRow.appendChild(ts);
+        nmRow.querySelectorAll(".v27-time-select, .v28-time-select, .v31-time-select").forEach(el => el.remove());
+        let ts = nmRow.querySelector(".v32-time-select");
+        if (!ts) {
+          ts = document.createElement("select");
+          ts.className = "v32-time-select";
+          ts.innerHTML = TIMES.map(t => `<option value="${t}" ${(it.visitTime || "") === t ? "selected" : ""}>${t || "시간"}</option>`).join("");
+          ts.onclick = e => e.stopPropagation();
+          ts.onchange = e => {
+            e.stopPropagation();
+            it.visitTime = ts.value;
+            persistNow();
+            window.renderV32Dashboard?.();
+          };
+          nmRow.appendChild(ts);
+        } else {
+          ts.value = it.visitTime || "";
+        }
       }
 
       const metaRow = cardEl.querySelector(".ux7-meta-row");
-      if (metaRow && !metaRow.querySelector(".v31-station-badge")) {
-        const txtSpan = metaRow.querySelector("span:last-child");
-        if (txtSpan) txtSpan.textContent = cleanText(txtSpan.textContent) || "상세 보기";
+      if (metaRow) {
+        metaRow.querySelectorAll(".v27-station-badge, .v28-station-badge, .v31-station-badge, .v32-station-badge").forEach(el => el.remove());
         const st = getNearestStation(it);
         if (st) {
           const b = document.createElement("span");
-          b.className = "v31-station-badge";
+          b.className = "v32-station-badge";
           b.textContent = st;
           metaRow.prepend(b);
         }
       }
     });
+  }
 
-    // 연속 카드 간 구간 거리 표시
-    for (let i = 0; i < cards.length - 1; i++) {
-      const a = itemMap.get(String(cards[i].dataset.id));
-      const b = itemMap.get(String(cards[i + 1].dataset.id));
-      if (!a || !b || !Number(a.lat) || !Number(a.lng) || !Number(b.lat) || !Number(b.lng)) continue;
-      const dKm = distKm(Number(a.lat), Number(a.lng), Number(b.lat), Number(b.lng));
-      if (dKm > 150) continue;
-      const distStr = dKm < 1 ? `${Math.round(dKm * 1000)}m` : `${dKm.toFixed(1)}km`;
-      const conn = document.createElement("div");
-      conn.className = "v31-route-connector";
-      conn.innerHTML = `<div class="v31-rc-line"></div><button type="button" class="v31-rc-pill">↕ 다음 장소까지 ${distStr} · 경로보기 ↗</button>`;
-      conn.querySelector("button").onclick = (e) => {
-        e.stopPropagation();
-        openExtClean(`https://www.google.com/maps/dir/?api=1&origin=${a.lat},${a.lng}&destination=${b.lat},${b.lng}`);
-      };
-      cards[i].insertAdjacentElement("afterend", conn);
-    }
+  if (typeof draw === "function") {
+    const _origDraw = draw;
+    draw = function(...args) {
+      const r = _origDraw.apply(this, args);
+      renderHotelPinsAll();
+      return r;
+    };
   }
 
   if (typeof renderListTab === "function") {
     const _origRenderList = renderListTab;
     renderListTab = function(...args) {
+      const lTab = document.getElementById("tab-list");
+      const keepPos = lTab && lTab.classList.contains("active") ? lTab.scrollTop : savedListScrollTop;
       const r = _origRenderList.apply(this, args);
-      decorateCardsOnce();
+      decorateCardsV32();
       renderSplitBar();
-      window.renderV31Dashboard?.();
+      window.renderV32Dashboard?.();
+      if (lTab && keepPos > 0) {
+        lTab.scrollTop = keepPos;
+      }
       return r;
     };
   }
@@ -12918,33 +13338,50 @@ ${caption || rawText}
   if (typeof tab === "function") {
     const _origTab = tab;
     tab = function(k, ...rest) {
+      const targetKey = CATS[k] ? "list" : k;
+      const wasAlreadyActive = (typeof activeTab !== "undefined" && activeTab === targetKey);
+
       const r = _origTab.apply(this, [k, ...rest]);
-      const fab = document.getElementById("v31FabBtn");
-      if (fab) fab.classList.toggle("show", k === "add" || k === "list");
-      window.renderV31Dashboard?.();
+      const fab = document.getElementById("v32FabBtn");
+      if (fab) fab.classList.toggle("show", targetKey === "add" || targetKey === "list");
+
+      window.renderV32Dashboard?.();
       renderSplitBar();
-      renderHotelPins();
-      scrollTopNow(k);
+      renderHotelPinsAll();
+      syncOnlineBadge();
+
+      if (wasAlreadyActive) {
+        // 같은 탭 버튼을 한 번 더 눌렀을 때만 관성을 즉시 끊고 최상단으로 이동
+        killMomentumAndScrollToTop(targetKey);
+      } else if (targetKey === "list") {
+        // 다른 탭에 갔다가 목록 탭으로 돌아왔을 때는 기존 스크롤 위치 복원
+        const lTab = document.getElementById("tab-list");
+        if (lTab && savedListScrollTop > 0) {
+          lTab.scrollTop = savedListScrollTop;
+          requestAnimationFrame(() => { lTab.scrollTop = savedListScrollTop; });
+        }
+      }
       return r;
     };
   }
 
-  function bootV31() {
+  function bootV32() {
     setupHomeAndFab();
+    syncOnlineBadge();
     renderSplitBar();
-    renderHotelPins();
-    window.renderV31Dashboard?.();
-    decorateCardsOnce();
+    renderHotelPinsAll();
+    window.renderV32Dashboard?.();
+    decorateCardsV32();
     tab("add");
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", bootV31);
+    document.addEventListener("DOMContentLoaded", bootV32);
   } else {
-    bootV31();
+    bootV32();
   }
 })();
 </script>
-<!-- === V31_CLEAN_PATCH_END === -->
+<!-- === V32_FINAL_UX_PATCH_END === -->
 </body>
 </html>
