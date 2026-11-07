@@ -1,6 +1,6 @@
-// V23_OFFLINE_FIRST_SW_1794041291
-const CACHE_STATIC = "trip-static-v23";
-const CACHE_RUNTIME = "trip-runtime-v23";
+// V24_OFFLINE_FIRST_SW_1794041954
+const CACHE_STATIC = "trip-static-v24";
+const CACHE_RUNTIME = "trip-runtime-v24";
 
 const PRECACHE_URLS = [
   "/",
@@ -31,22 +31,31 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+self.addEventListener("sync", (event) => {
+  if (event.tag === "trip-offline-sync") {
+    event.waitUntil(
+      self.clients.matchAll().then((clients) => {
+        clients.forEach((client) => client.postMessage({ type: "FLUSH_OFFLINE_QUEUE" }));
+      })
+    );
+  }
+});
+
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
   const url = new URL(req.url);
 
-  // Firebase 실시간 통신 및 API 호출은 네트워크 직접 처리
   if (
     url.hostname.includes("firestore.googleapis.com") ||
     url.hostname.includes("googleapis.com/v1beta") ||
     url.hostname.includes("rapidapi.com") ||
+    url.hostname.includes("overpass-api.de") ||
     url.pathname.startsWith("/api/")
   ) {
     return;
   }
 
-  // 1) 페이지 네비게이션(index.html): 네트워크 우선 시도 후 오프라인이면 캐시 즉시 반환
   if (req.mode === "navigate" || url.pathname === "/" || url.pathname.endsWith("/index.html")) {
     event.respondWith(
       fetch(req)
@@ -60,8 +69,6 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 2) 지도 타일(OpenStreetMap / Carto), 폰트, 아이콘, 외부 라이브러리(CDN), 명소 배너 사진:
-  //    캐시에 있으면 즉시 반환하면서 백그라운드 갱신(Stale-While-Revalidate) -> 와이파이 없어도 작동
   if (
     url.hostname.includes("tile.openstreetmap.org") ||
     url.hostname.includes("basemaps.cartocdn.com") ||
