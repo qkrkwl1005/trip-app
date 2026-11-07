@@ -1,12 +1,11 @@
 <!doctype html>
 <html lang="ko" data-theme="dark">
   <head>
-<!-- === V21_HEAD_CACHE_START === -->
-<script src="https://cdn.jsdelivr.net/npm/exifreader@4.23.5/dist/exif-reader.min.js" defer></script>
+<!-- === V22_HEAD_CACHE_START === -->
 <script>
 window.Sortable = null;
-(function registerOfflineSwV21() {
-  const VER = "TRIP_V21_BUST_1793999523";
+(function registerOfflineSwV22() {
+  const VER = "TRIP_V22_BUST_1794024081";
   if (localStorage.getItem("TRIP_LAST_CACHE_BUST") !== VER) {
     localStorage.setItem("TRIP_LAST_CACHE_BUST", VER);
     if ("caches" in window) {
@@ -15,14 +14,15 @@ window.Sortable = null;
   }
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
-      navigator.serviceWorker.register("/sw.js?v=21").then(reg => {
+      navigator.serviceWorker.register("/sw.js?v=22").then(reg => {
         reg.update().catch(() => {});
       }).catch(() => {});
     });
   }
 })();
 </script>
-<!-- === V21_HEAD_CACHE_END === -->
+<!-- === V22_HEAD_CACHE_END === -->
+
 
 
 
@@ -12380,11 +12380,14 @@ ${caption || rawText}
 
 
 
-<!-- === V21_STREAMLINED_PATCH_START === -->
+
+<!-- === V22_SMART_ROUTE_AND_NO_BLANK_PATCH_START === -->
 <style>
-  /* 1. 별표 버튼, 불필요 필터 바, 기존 검색창 숨김 */
+  /* 1. 별표 버튼, 불필요 필터 칩, 기존 검색창 숨김 */
   .item .star-btn,
   #lchips-LIST .lchip[data-f="STAR"],
+  #mapChips [data-act="mapStarToggle"],
+  #mapChips [data-act="mapDayCycle"],
   #smartFilterBar,
   #v8QuickDayBar,
   #uxGuideSteps {
@@ -12405,7 +12408,7 @@ ${caption || rawText}
   }
 
   /* 2. 좌표 완료 초록색 체크, 역·출구 배지, 휴무일 경고 배지 */
-  .v21-coord-check {
+  .v22-coord-check {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -12415,11 +12418,11 @@ ${caption || rawText}
     flex: none;
     pointer-events: none;
   }
-  .v21-coord-check .ms {
+  .v22-coord-check .ms {
     font-size: 20px;
     color: #10b981;
   }
-  .v21-station-badge {
+  .v22-station-badge {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -12432,12 +12435,12 @@ ${caption || rawText}
     border: 1px solid rgba(59, 130, 246, 0.32);
     flex: none;
   }
-  [data-theme="light"] .v21-station-badge {
+  [data-theme="light"] .v22-station-badge {
     background: rgba(37, 99, 235, 0.1);
     color: #1d4ed8;
     border-color: rgba(37, 99, 235, 0.25);
   }
-  .v21-holiday-warn {
+  .v22-holiday-warn {
     display: inline-flex;
     align-items: center;
     gap: 3px;
@@ -12451,8 +12454,24 @@ ${caption || rawText}
     flex: none;
   }
 
-  /* 3. 목록 상단: 심플 1/N 정산 바 (불필요한 글·내역칸 제거, 금액·인원만 표시) */
-  #v21ListBudgetBar {
+  /* 3. 지도 위 숙소 전용 고정 마커 스타일 */
+  .v22-hotel-pin {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 11px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: #fff;
+    font: 800 12px/1.2 "Pretendard Variable", system-ui, sans-serif;
+    border: 2px solid #fff;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55);
+    white-space: nowrap;
+    transform: translate(-50%, -100%);
+  }
+
+  /* 4. 목록 상단: 초간편 1/N 정산 바 */
+  #v22ListBudgetBar {
     flex: 1;
     min-width: 0;
     min-height: 40px;
@@ -12467,7 +12486,7 @@ ${caption || rawText}
     cursor: pointer;
     user-select: none;
   }
-  .v21-lb-text {
+  .v22-lb-text {
     font-size: 13px;
     font-weight: 900;
     color: var(--tx);
@@ -12475,7 +12494,7 @@ ${caption || rawText}
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .v21-lb-pill {
+  .v22-lb-pill {
     padding: 4px 9px;
     border-radius: 999px;
     background: var(--pr-soft);
@@ -12485,7 +12504,7 @@ ${caption || rawText}
     white-space: nowrap;
     flex: none;
   }
-  #v21ListBudgetDrawer {
+  #v22ListBudgetDrawer {
     display: none;
     margin-top: 10px;
     padding: 12px;
@@ -12493,9 +12512,9 @@ ${caption || rawText}
     background: var(--s2);
     border: 1px solid var(--bd2);
   }
-  #v21ListBudgetDrawer.on { display: block; }
+  #v22ListBudgetDrawer.on { display: block; }
 
-  /* 4. 드래그 손잡이(⋮⋮) 및 플로팅 카드 */
+  /* 5. 드래그 손잡이(⋮⋮) 및 플로팅 카드 */
   .v8-drag-handle {
     cursor: grab;
     color: var(--sub);
@@ -12516,14 +12535,14 @@ ${caption || rawText}
     font-size: 23px;
     pointer-events: none;
   }
-  .item.v21-drag-placeholder {
+  .item.v22-drag-placeholder {
     opacity: 0.16 !important;
     background: var(--pr-soft) !important;
     border: 2px dashed var(--pr) !important;
     box-shadow: none !important;
     transform: scale(0.98) !important;
   }
-  .v21-floating-card {
+  .v22-floating-card {
     position: fixed !important;
     z-index: 2147483647 !important;
     pointer-events: none !important;
@@ -12536,8 +12555,8 @@ ${caption || rawText}
     will-change: transform;
   }
 
-  /* 5. 우측 하단 고정 [+] 플로팅 버튼 & 바텀 시트 */
-  #v21FabBtn {
+  /* 6. 우측 하단 고정 [+] 플로팅 버튼 & 바텀 시트 */
+  #v22FabBtn {
     position: fixed;
     right: 20px;
     bottom: calc(86px + env(safe-area-inset-bottom));
@@ -12556,14 +12575,14 @@ ${caption || rawText}
     transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
   }
   @media (min-width: 821px) {
-    #v21FabBtn { left: 362px; right: auto; bottom: 24px; }
+    #v22FabBtn { left: 362px; right: auto; bottom: 24px; }
   }
-  #v21FabBtn.show { display: flex; }
-  #v21FabBtn:active { transform: scale(0.92); }
-  #v21FabBtn .ms { font-size: 30px; transition: transform 0.25s ease; }
-  #v21FabBtn.open .ms { transform: rotate(45deg); }
+  #v22FabBtn.show { display: flex; }
+  #v22FabBtn:active { transform: scale(0.92); }
+  #v22FabBtn .ms { font-size: 30px; transition: transform 0.25s ease; }
+  #v22FabBtn.open .ms { transform: rotate(45deg); }
 
-  #v21ImportSheetWrap {
+  #v22ImportSheetWrap {
     position: fixed;
     inset: 0;
     z-index: 230;
@@ -12574,8 +12593,8 @@ ${caption || rawText}
     align-items: flex-end;
     justify-content: center;
   }
-  #v21ImportSheetWrap.on { display: flex; }
-  #v21ImportSheet {
+  #v22ImportSheetWrap.on { display: flex; }
+  #v22ImportSheet {
     width: 100%;
     max-width: 520px;
     max-height: 90dvh;
@@ -12588,14 +12607,14 @@ ${caption || rawText}
     box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.55);
     animation: shUp 0.26s cubic-bezier(0.22, 1, 0.36, 1);
   }
-  .v21-sheet-handle {
+  .v22-sheet-handle {
     width: 44px;
     height: 5px;
     border-radius: 999px;
     background: var(--bd2);
     margin: 2px auto 14px;
   }
-  .v21-url-bar {
+  .v22-url-bar {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -12605,7 +12624,7 @@ ${caption || rawText}
     border: 1px solid var(--bd2);
     margin-bottom: 10px;
   }
-  .v21-url-bar input {
+  .v22-url-bar input {
     flex: 1;
     border: 0 !important;
     background: transparent !important;
@@ -12615,7 +12634,7 @@ ${caption || rawText}
     font-size: 14px !important;
     box-shadow: none !important;
   }
-  .v21-url-bar .v21-paste-pill {
+  .v22-url-bar .v22-paste-pill {
     flex: none;
     min-height: 36px;
     padding: 0 14px;
@@ -12628,14 +12647,14 @@ ${caption || rawText}
     font-weight: 800;
     cursor: pointer;
   }
-  .v21-platforms {
+  .v22-platforms {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 8px;
     margin: 14px 0;
     text-align: center;
   }
-  .v21-plat-item {
+  .v22-plat-item {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -12645,7 +12664,7 @@ ${caption || rawText}
     color: var(--sub);
     cursor: pointer;
   }
-  .v21-plat-ico {
+  .v22-plat-ico {
     width: 46px;
     height: 46px;
     border-radius: 50%;
@@ -12654,13 +12673,13 @@ ${caption || rawText}
     display: grid;
     place-items: center;
   }
-  .v21-import-list {
+  .v22-import-list {
     display: flex;
     flex-direction: column;
     gap: 10px;
     margin-top: 6px;
   }
-  .v21-import-card {
+  .v22-import-card {
     display: flex;
     align-items: center;
     gap: 14px;
@@ -12674,7 +12693,7 @@ ${caption || rawText}
     text-align: left;
     cursor: pointer;
   }
-  .v21-import-card .v21-ic-box {
+  .v22-import-card .v22-ic-box {
     width: 42px;
     height: 42px;
     border-radius: 12px;
@@ -12682,10 +12701,10 @@ ${caption || rawText}
     place-items: center;
     flex: none;
   }
-  .v21-import-card .v21-ic-txt { flex: 1; min-width: 0; }
-  .v21-import-card .v21-ic-txt b { display: block; font-size: 14px; font-weight: 800; margin-bottom: 2px; }
-  .v21-import-card .v21-ic-txt small { display: block; font-size: 12px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .v21-collapse-pane {
+  .v22-import-card .v22-ic-txt { flex: 1; min-width: 0; }
+  .v22-import-card .v22-ic-txt b { display: block; font-size: 14px; font-weight: 800; margin-bottom: 2px; }
+  .v22-import-card .v22-ic-txt small { display: block; font-size: 12px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .v22-collapse-pane {
     display: none;
     padding: 14px;
     border-radius: 16px;
@@ -12693,15 +12712,15 @@ ${caption || rawText}
     border: 1px solid var(--bd2);
     margin-top: 6px;
   }
-  .v21-collapse-pane.on { display: block; }
+  .v22-collapse-pane.on { display: block; }
 
-  /* 6. 홈 대시보드 스타일 (스탬프 제거 -> 3열 요약 지표) */
-  #v21Dashboard {
+  /* 7. 홈 대시보드 스타일 */
+  #v22Dashboard {
     display: flex;
     flex-direction: column;
     gap: 14px;
   }
-  .v21-hero {
+  .v22-hero {
     position: relative;
     border-radius: 26px;
     min-height: 205px;
@@ -12715,7 +12734,7 @@ ${caption || rawText}
     box-shadow: 0 14px 34px rgba(0, 0, 0, 0.42);
     border: 1px solid rgba(255, 255, 255, 0.14);
   }
-  .v21-hero-bg {
+  .v22-hero-bg {
     position: absolute;
     inset: 0;
     width: 100%;
@@ -12725,17 +12744,17 @@ ${caption || rawText}
     filter: contrast(1.04) saturate(1.12);
     pointer-events: none;
   }
-  .v21-hero-grad {
+  .v22-hero-grad {
     position: absolute;
     inset: 0;
     background: linear-gradient(180deg, rgba(8,10,15,0.18) 0%, rgba(8,10,15,0.52) 48%, rgba(8,10,15,0.92) 100%);
     pointer-events: none;
   }
-  .v21-hero-top, .v21-hero-btm {
+  .v22-hero-top, .v22-hero-btm {
     position: relative;
     z-index: 2;
   }
-  .v21-dday-pill {
+  .v22-dday-pill {
     display: inline-flex;
     align-items: center;
     gap: 5px;
@@ -12748,7 +12767,7 @@ ${caption || rawText}
     cursor: pointer;
     box-shadow: 0 4px 12px rgba(0,0,0,0.35);
   }
-  .v21-hero-spot-tag {
+  .v22-hero-spot-tag {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -12763,7 +12782,7 @@ ${caption || rawText}
     border: 1px solid rgba(255,255,255,0.18);
     cursor: pointer;
   }
-  .v21-hero-title {
+  .v22-hero-title {
     font-size: 24px;
     font-weight: 900;
     letter-spacing: -0.02em;
@@ -12772,12 +12791,12 @@ ${caption || rawText}
     text-shadow: 0 2px 10px rgba(0,0,0,0.6);
     cursor: pointer;
   }
-  .v21-stats-grid {
+  .v22-stats-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 10px;
   }
-  .v21-stat-card {
+  .v22-stat-card {
     background: var(--s);
     border: 1px solid var(--bd);
     border-radius: 18px;
@@ -12786,52 +12805,52 @@ ${caption || rawText}
     box-shadow: var(--sh-card);
     cursor: pointer;
   }
-  .v21-stat-card b {
+  .v22-stat-card b {
     display: block;
     font-size: 20px;
     font-weight: 900;
     color: var(--tx);
   }
-  .v21-stat-card span {
+  .v22-stat-card span {
     font-size: 11.5px;
     font-weight: 700;
     color: var(--sub);
   }
-  .v21-sec-card {
+  .v22-sec-card {
     background: var(--s);
     border: 1px solid var(--bd);
     border-radius: 22px;
     padding: 16px;
     box-shadow: var(--sh-card);
   }
-  .v21-day-scroll {
+  .v22-day-list {
     display: flex;
-    gap: 8px;
-    overflow-x: auto;
-    padding-bottom: 4px;
-    scrollbar-width: none;
+    flex-direction: column;
+    gap: 10px;
   }
-  .v21-day-scroll::-webkit-scrollbar { display: none; }
-  .v21-day-card {
-    flex: none;
-    min-width: 126px;
-    padding: 12px;
+  .v22-day-row {
+    padding: 13px 14px;
     border-radius: 16px;
     background: var(--s2);
     border: 1px solid var(--bd2);
-    cursor: pointer;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
   }
-  .v21-day-card:active { transform: scale(0.97); }
-  .v21-base-grid {
+  .v22-day-route-preview {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--sub);
+    line-height: 1.45;
+    word-break: keep-all;
+  }
+  .v22-base-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 8px;
   }
-  .v21-base-btn {
-    padding: 10px 8px;
+  .v22-base-btn {
+    padding: 11px 8px;
     border-radius: 14px;
     background: var(--s2);
     border: 1px solid var(--bd);
@@ -12845,17 +12864,22 @@ ${caption || rawText}
     gap: 4px;
     cursor: pointer;
   }
-  .v21-base-btn:active { transform: scale(0.96); border-color: var(--pr); }
+  .v22-base-btn small {
+    font-size: 10.5px;
+    color: var(--sub);
+    font-weight: 600;
+  }
+  .v22-base-btn:active { transform: scale(0.96); border-color: var(--pr); }
 </style>
 
 <script>
-(function initV21StreamlinedApp() {
+(function initV22SmartRouteAndNoBlank() {
   /* =========================================================================
-   * 1. 스플래시 화면 빠른 페이드아웃 & Firestore 오프라인 지속성
+   * 1. 스플래시 빠른 페이드아웃 & iOS PWA 하얀 빈 창(about:blank) 원천 차단
    * ========================================================================= */
   const spEl = document.getElementById("v8Splash");
   if (spEl) {
-    setTimeout(() => spEl.classList.add("hide"), 400);
+    setTimeout(() => spEl.classList.add("hide"), 380);
   }
 
   setTimeout(() => {
@@ -12866,8 +12890,405 @@ ${caption || rawText}
     } catch (_) {}
   }, 300);
 
+  // [핵심 해결] 외부 앱(구글맵/인스타/유튜브) 이동 후 복귀 시 하얀 화면(X 닫기 창)이 남지 않도록 처리
+  function openExternalCleanNoBlank(url) {
+    const u = String(url || "").trim();
+    if (!u) return;
+    // 모바일/iOS PWA 환경에서는 _blank 새 창을 띄우지 않고 직접 유니버설 링크를 호출해야 빈 창이 남지 않음
+    const a = document.createElement("a");
+    a.href = u;
+    a.rel = "noopener noreferrer";
+    // 데스크톱 브라우저에서만 새 탭, 모바일에서는 현재 컨텍스트에서 바로 앱 핸드오프
+    if (!/iPhone|iPad|iPod|Android/i.test(navigator.userAgent || "")) {
+      a.target = "_blank";
+    }
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+  window.openExternalCleanNoBlank = openExternalCleanNoBlank;
+
+  // 기존 openExternalVideo 함수도 하얀 창이 남지 않게 오버라이드
+  if (typeof openExternalVideo === "function") {
+    openExternalVideo = function(url) {
+      const u = (typeof normalizeVidUrl === "function" ? normalizeVidUrl(url) : "") || String(url || "").trim();
+      if (!u) return toast("연결된 영상 링크가 없어요");
+      openExternalCleanNoBlank(u);
+    };
+  }
+
+  // 모바일에서 구글맵 등 <a target="_blank"> 클릭 시 하얀 창 생성 방지
+  document.addEventListener("click", (e) => {
+    const link = e.target.closest("a[target='_blank']");
+    if (!link) return;
+    const href = link.getAttribute("href") || "";
+    if (/google\.com\/maps|maps\.app\.goo\.gl|instagram\.com|youtu\.be|youtube\.com|tiktok\.com/i.test(href)) {
+      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent || "")) {
+        e.preventDefault();
+        e.stopPropagation();
+        openExternalCleanNoBlank(href);
+      }
+    }
+  }, true);
+
   /* =========================================================================
-   * 2. 최근접 역(Station) 및 출구 번호(Exit) 정밀 매칭 엔진
+   * 2. 주요 거점 숙소 3곳 정의 & 앱 내 지도 마커 + 상세 위치 보기 연동
+   *    (단순 숫자 좌표 대신 실제 숙소명·지역명·근접역 표시)
+   * ========================================================================= */
+  const ACCOMMODATIONS = {
+    kyoto: {
+      id: "hotel_kyoto",
+      title: "교토 숙소",
+      sub: "히가시야마구 혼마치 · 도후쿠지역 도보 4분",
+      address: "〒605-0981 京都府京都市東山区本町15丁目 (교토 히가시야마구 혼마치)",
+      gmapQuery: "34.97859,135.76631",
+      lat: 34.97859,
+      lng: 135.76631,
+      emoji: "🏨"
+    },
+    ine: {
+      id: "hotel_ine",
+      title: "이네후나야·미야즈 숙소",
+      sub: "교토부 미야즈시 · 아마노하시다테 인근",
+      address: "京都府宮津市中野 (교토부 미야즈시 아마노하시다테 북측)",
+      gmapQuery: "35.53836,135.19021",
+      lat: 35.53836,
+      lng: 135.19021,
+      emoji: "🌊"
+    },
+    osaka: {
+      id: "hotel_osaka",
+      title: "오사카 숙소",
+      sub: "주오구 닛폰바시 2초메 · 난바/닛폰바시역 도보 6분",
+      address: "〒542-0073 大阪府大阪市中央区日本橋2丁目 (오사카 주오구 닛폰바시 2초메)",
+      gmapQuery: "34.661784,135.508406",
+      lat: 34.661784,
+      lng: 135.508406,
+      emoji: "🏢"
+    }
+  };
+
+  let hotelMapMarkers = [];
+  function renderHotelMarkersOnMap() {
+    if (typeof lm === "undefined" || !lm || !window.L) return;
+    hotelMapMarkers.forEach(m => { try { lm.removeLayer(m); } catch (_) {} });
+    hotelMapMarkers = [];
+
+    Object.values(ACCOMMODATIONS).forEach(h => {
+      const m = L.marker([h.lat, h.lng], {
+        icon: L.divIcon({
+          className: "",
+          html: `<div class="v22-hotel-pin">${h.emoji} ${esc(h.title)}</div>`,
+          iconSize: [110, 32],
+          iconAnchor: [55, 32]
+        }),
+        zIndexOffset: 900
+      });
+      const popupHtml = `
+        <div class="mapPinPopup">
+          <strong>${h.emoji} ${esc(h.title)}</strong>
+          <div style="font-size:12px;font-weight:700;color:#2563eb;margin-bottom:4px">${esc(h.sub)}</div>
+          <div class="mapPinAddress">${esc(h.address)}</div>
+          <div class="mapPinActions">
+            <button type="button" class="mb pr" onclick="window.openHotelTaxiV22('${h.id}')"><span class="ms">local_taxi</span>택시화면</button>
+            <button type="button" class="mb" onclick="navigator.clipboard?.writeText('${esc(h.address)}');toast('숙소 주소를 복사했어요')"><span class="ms">content_copy</span>주소복사</button>
+            <button type="button" class="mb" onclick="window.openExternalCleanNoBlank('https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(h.address)}')"><span class="ms">map</span>구글맵</button>
+          </div>
+        </div>
+      `;
+      m.bindPopup(popupHtml);
+      m.addTo(lm);
+      h._marker = m;
+      hotelMapMarkers.push(m);
+    });
+  }
+
+  window.openHotelTaxiV22 = function(key) {
+    const h = Object.values(ACCOMMODATIONS).find(x => x.id === key);
+    if (h && typeof openTaxiModal === "function") {
+      openTaxiModal({ name: h.title, localName: h.sub, address: h.address, lat: h.lat, lng: h.lng });
+    }
+  };
+
+  window.focusHotelOnAppMapV22 = function(key) {
+    const h = ACCOMMODATIONS[key];
+    if (!h) return;
+    if (innerWidth <= 820) tab("map");
+    setTimeout(() => {
+      renderHotelMarkersOnMap();
+      if (typeof lm !== "undefined" && lm) {
+        lm.invalidateSize();
+        lm.setView([h.lat, h.lng], 16, { animate: true });
+        if (h._marker) h._marker.openPopup();
+      } else if (typeof focusMapOnItem === "function") {
+        focusMapOnItem(h);
+      }
+      toast(`${h.emoji} ${h.title} (${h.sub})`);
+    }, 120);
+  };
+
+  /* =========================================================================
+   * 3. 다중 장소 릴스(`외 N곳`) 자동 개별 분리 + 진짜 권역 클러스터링 & 최단 동선(TSP) 일차 배정
+   * ========================================================================= */
+  // 한 릴스에 여러 곳(예: 금각사+우지+기온 9곳)이 묶여 동선을 망치는 항목을 개별 장소 카드로 자동 분리
+  function unbundleScatteredMultiPlaces() {
+    if (!Array.isArray(items)) return 0;
+    let splitCount = 0;
+    const nextItems = [];
+
+    for (const it of items) {
+      if (Array.isArray(it.places) && it.places.length > 1) {
+        const validSub = it.places.filter(p => p && (p.name || p.address));
+        if (validSub.length > 1) {
+          validSub.forEach((p, idx) => {
+            const cleanName = String(p.name || it.name || "장소").replace(/\s*외\s*\d+곳$/, "").trim();
+            nextItems.push({
+              ...it,
+              id: idx === 0 ? it.id : `${it.id}_sub_${idx}_${Date.now().toString(36)}`,
+              name: cleanName,
+              localName: p.localName || "",
+              address: p.address || it.address || "",
+              price: p.price || it.price || "",
+              info: p.info || it.info || "",
+              lat: Number(p.lat) || (idx === 0 ? Number(it.lat) : null) || null,
+              lng: Number(p.lng) || (idx === 0 ? Number(it.lng) : null) || null,
+              places: [{
+                name: cleanName,
+                localName: p.localName || "",
+                address: p.address || it.address || "",
+                price: p.price || it.price || "",
+                info: p.info || it.info || "",
+                lat: Number(p.lat) || null,
+                lng: Number(p.lng) || null
+              }],
+              updatedAt: Date.now()
+            });
+          });
+          splitCount += validSub.length - 1;
+          continue;
+        }
+      }
+      nextItems.push(it);
+    }
+
+    if (splitCount > 0) {
+      items = nextItems;
+    }
+    return splitCount;
+  }
+
+  // 출발 기점(숙소/거점역)에서 가장 가까운 순서대로 한붓그리기(Nearest-Neighbor TSP) 정렬
+  function orderByShortestPath(group, anchorLat, anchorLng) {
+    if (!Array.isArray(group) || group.length <= 1) return group || [];
+    const withCoord = group.filter(x => Number(x.lat) && Number(x.lng));
+    const noCoord = group.filter(x => !Number(x.lat) || !Number(x.lng));
+    const pool = [...withCoord];
+    const ordered = [];
+    let curLat = anchorLat;
+    let curLng = anchorLng;
+
+    while (pool.length) {
+      let bestIdx = 0;
+      let bestDist = Infinity;
+      for (let i = 0; i < pool.length; i++) {
+        const d = distKm(curLat, curLng, Number(pool[i].lat), Number(pool[i].lng));
+        if (d < bestDist) {
+          bestDist = d;
+          bestIdx = i;
+        }
+      }
+      const picked = pool.splice(bestIdx, 1)[0];
+      ordered.push(picked);
+      curLat = Number(picked.lat);
+      curLng = Number(picked.lng);
+    }
+    return [...ordered, ...noCoord];
+  }
+
+  window.smartBalancedAssignDaysV22 = function() {
+    if (!Array.isArray(items) || !items.length) return toast("저장된 장소가 없습니다");
+    if (typeof pushLocalHistory === "function") pushLocalHistory();
+
+    // 1단계: 릴스 1개에 9곳씩 묶여 우지~금각사로 동선이 튀던 묶음 카드를 개별 장소로 자동 분리
+    const unbundled = unbundleScatteredMultiPlaces();
+
+    // 2단계: 세밀한 지리적 권역(Micro-Zone) 분류
+    const zones = {
+      kyoto_east: [],   // 기온·가와라마치·기요미즈데라·산조·은각사 (교토 동부/중부)
+      kyoto_west_south: [], // 아라시야마·금각사(서부/북서) + 후시미이나리·우지(남부) + 비와코
+      ine_tango: [],    // 이네후나야·아마노하시다테·미야즈
+      kurashiki: [],    // 구라시키·오카야마
+      osaka_north: [],  // 우메다·나카자키초·미노오·오사카성
+      osaka_south: []   // 난바·도톤보리·신사이바시·닛폰바시·텐노지
+    };
+
+    items.forEach(it => {
+      const txt = `${it.name || ""} ${it.address || ""} ${it.note || ""}`.toLowerCase();
+      const lat = Number(it.lat) || 0;
+      const lng = Number(it.lng) || 0;
+
+      if (/이네|후나야|아마노하시다테|미야즈|ine|funaya|伊根|天橋立|宮津/.test(txt) || lat >= 35.40) {
+        zones.ine_tango.push(it);
+      } else if (/구라시키|오카야마|kurashiki|okayama|倉敷|岡山/.test(txt) || (lng > 0 && lng < 134.3)) {
+        zones.kurashiki.push(it);
+      } else if (
+        /아라시야마|치쿠린|도게츠|금각사|킨카쿠지|우지|모리한|후시미|이나리|비와코|오쓰|arashiyama|kinkaku|uji|inari|biwako|嵐山|金閣寺|宇治|伏見|琵琶湖/.test(txt) ||
+        (lat >= 34.86 && lat < 35.30 && (lng < 135.748 || lat < 34.975 || lng >= 135.82))
+      ) {
+        zones.kyoto_west_south.push(it);
+      } else if (
+        /교토|기온|가와라마치|기요미즈|청수사|산조|시조|가라스마|히가시야마|은각사|철학의길|kyoto|gion|kawaramachi|kiyomizu|京都|祇園|河原町|清水|三条|四条|烏丸/.test(txt) ||
+        (lat >= 34.975 && lat < 35.30 && lng >= 135.748 && lng < 135.82)
+      ) {
+        zones.kyoto_east.push(it);
+      } else if (
+        /우메다|우메키타|나카자키|텐마|오기마치|미노오|사츠키야마|이케다|오사카성|신오사카|umeda|nakazaki|minoh|satsukiyama|梅田|中崎町|天満|箕面|五月山|大阪城/.test(txt) ||
+        (lat >= 34.685 && lat < 34.86)
+      ) {
+        zones.osaka_north.push(it);
+      } else {
+        zones.osaka_south.push(it);
+      }
+    });
+
+    // 3단계: 각 권역 내부를 숙소 기점 최단 동선(Nearest-Neighbor TSP)으로 정렬 후 Day 1~7 배정
+    const dayBuckets = { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [], 7: [] };
+
+    // 교토 동부/중부 -> Day 1 (너무 많으면 Day 1, 2 분배)
+    const kyotoEastSorted = orderByShortestPath(zones.kyoto_east, ACCOMMODATIONS.kyoto.lat, ACCOMMODATIONS.kyoto.lng);
+    const kyotoWestSorted = orderByShortestPath(zones.kyoto_west_south, ACCOMMODATIONS.kyoto.lat, ACCOMMODATIONS.kyoto.lng);
+
+    if (kyotoWestSorted.length > 0) {
+      dayBuckets[1].push(...kyotoEastSorted);
+      dayBuckets[2].push(...kyotoWestSorted);
+    } else {
+      const half = Math.ceil(kyotoEastSorted.length / 2);
+      dayBuckets[1].push(...kyotoEastSorted.slice(0, half));
+      dayBuckets[2].push(...kyotoEastSorted.slice(half));
+    }
+
+    // 이네후나야·아마노하시다테 -> Day 3
+    dayBuckets[3].push(...orderByShortestPath(zones.ine_tango, ACCOMMODATIONS.ine.lat, ACCOMMODATIONS.ine.lng));
+
+    // 우메다·미노오·오사카 북부 -> Day 5
+    dayBuckets[5].push(...orderByShortestPath(zones.osaka_north, 34.7025, 135.4980));
+
+    // 구라시키·오카야마 -> 있으면 Day 6
+    const kurashikiSorted = orderByShortestPath(zones.kurashiki, 34.6019, 133.7658);
+    if (kurashikiSorted.length > 0) {
+      dayBuckets[6].push(...kurashikiSorted);
+    }
+
+    // 오사카 남부(난바·도톤보리·신사이바시 등)를 오사카 숙소 기점 최단 동선으로 정렬한 뒤,
+    // 남는 일차(Day 4, Day 6(구라시키 없을 때), Day 7 등)에 동선 순서대로 균등 분할!
+    const osakaSouthSorted = orderByShortestPath(zones.osaka_south, ACCOMMODATIONS.osaka.lat, ACCOMMODATIONS.osaka.lng);
+    const osakaTargetDays = [4];
+    if (!dayBuckets[3].length) osakaTargetDays.unshift(3);
+    if (!dayBuckets[6].length) osakaTargetDays.push(6);
+    osakaTargetDays.push(7);
+
+    const chunkSize = Math.max(1, Math.ceil(osakaSouthSorted.length / osakaTargetDays.length));
+    osakaSouthSorted.forEach((it, idx) => {
+      const d = osakaTargetDays[Math.min(osakaTargetDays.length - 1, Math.floor(idx / chunkSize))];
+      dayBuckets[d].push(it);
+    });
+
+    // 4단계: 각 일차별로 다시 한 번 최단 동선 순서로 정렬하여 items 전체 배열 순서를 확정
+    const finalItems = [];
+    for (let d = 1; d <= 7; d++) {
+      const anchor = d <= 2 ? ACCOMMODATIONS.kyoto : d === 3 ? ACCOMMODATIONS.ine : ACCOMMODATIONS.osaka;
+      const sortedDay = orderByShortestPath(dayBuckets[d], anchor.lat, anchor.lng);
+      sortedDay.forEach(it => {
+        it.day = d;
+        it.updatedAt = Date.now();
+        finalItems.push(it);
+      });
+    }
+
+    items = finalItems;
+    if (typeof save === "function") save();
+    if (typeof draw === "function") draw(true);
+    if (window.renderV22Dashboard) window.renderV22Dashboard();
+    toast(`🗓️ ${unbundled ? `묶음 장소 ${unbundled}곳을 분리하고 ` : ""}권역·최단 동선 순으로 Day 1~7 코스를 완성했습니다!`);
+  };
+
+  window.resetAllDaysToUnassignedV22 = function() {
+    const list = typeof items !== "undefined" && Array.isArray(items) ? items : [];
+    const assigned = list.filter(x => Number(x.day) > 0);
+    if (!assigned.length) return toast("이미 모든 장소가 일차 미정 상태입니다");
+    if (typeof pushLocalHistory === "function") pushLocalHistory();
+
+    list.forEach(it => {
+      it.day = 0;
+      it.updatedAt = Date.now();
+    });
+    if (typeof mapDay !== "undefined") mapDay = 0;
+    if (typeof listFilter !== "undefined") {
+      Object.keys(listFilter).forEach(k => { listFilter[k] = "ALL"; });
+    }
+    if (typeof save === "function") save();
+    if (typeof draw === "function") draw(true);
+    if (window.renderV22Dashboard) window.renderV22Dashboard();
+    toast("↩️ 모든 장소를 '일차 미정'으로 초기화했습니다");
+  };
+
+  /* =========================================================================
+   * 4. 지도 핀 번호(1, 2, 3...) 및 팝업 번호 일치 & 동선(Polyline) 순서 동기화
+   * ========================================================================= */
+  if (typeof expandMapPins === "function") {
+    const _origExpandMapPins = expandMapPins;
+    expandMapPins = function(validItems) {
+      const rawPins = _origExpandMapPins(validItems);
+      // 현재 배열 순서대로 모든 핀에 1, 2, 3, 4... 방문 순서 번호 부여
+      rawPins.forEach((p, idx) => {
+        p._pinNumber = idx + 1;
+        p._routeOrder = idx + 1;
+      });
+      return rawPins;
+    };
+  }
+
+  if (typeof mapPinPlaceHtml === "function") {
+    mapPinPlaceHtml = function(item, place, index) {
+      const num = item._routeOrder || (index + 1);
+      return `<div class="mapPinPlace"><strong>${num}. ${esc(place.name || "장소")}</strong><div class="mapPinAddress">${esc(place.address || "주소 미입력")}</div><div class="mapPinActions"><a class="mb pr" href="${esc(getGMapLink(place))}" target="_blank" rel="noopener"><span class="ms">map</span>구글지도</a><button type="button" class="mb" data-act="jumpToList" data-id="${esc(item.id)}"><span class="ms">format_list_bulleted</span>목록</button><a class="mb" href="${esc(getGMapDirLink(place))}" target="_blank" rel="noopener"><span class="ms">directions</span>길찾기</a><button type="button" class="mb" data-act="openGroupedItem" data-id="${esc(item.id)}" data-place-idx="${index}"><span class="ms">movie</span>릴스에서 보기</button></div></div>`;
+    };
+  }
+
+  if (typeof buildOrderedRoutePoints === "function") {
+    buildOrderedRoutePoints = function(valid) {
+      if (!Array.isArray(valid) || valid.length < 2) return { pts: [], totalKm: 0 };
+      const orderMap = new Map();
+      (items || []).forEach((it, idx) => orderMap.set(String(it.id), idx));
+
+      const ordered = [...valid].sort((a, b) => {
+        const da = Number(a.day) || 99;
+        const db = Number(b.day) || 99;
+        if (da !== db) return da - db;
+        const ia = orderMap.has(String(a.id)) ? orderMap.get(String(a.id)) : 9999;
+        const ib = orderMap.has(String(b.id)) ? orderMap.get(String(b.id)) : 9999;
+        if (ia !== ib) return ia - ib;
+        return (Number(a._placeIndex) || 0) - (Number(b._placeIndex) || 0);
+      });
+
+      let totalKm = 0;
+      for (let k = 1; k < ordered.length; k++) {
+        totalKm += distKm(
+          Number(ordered[k - 1].lat),
+          Number(ordered[k - 1].lng),
+          Number(ordered[k].lat),
+          Number(ordered[k].lng)
+        );
+      }
+      return {
+        pts: ordered.map(x => [Number(x.lat), Number(x.lng)]),
+        totalKm
+      };
+    };
+  }
+
+  /* =========================================================================
+   * 5. 최근접 역·출구 번호 매칭 엔진 & 방문요일 휴무 검증
    * ========================================================================= */
   let stationExitCache = {};
   try {
@@ -12875,70 +13296,6 @@ ${caption || rawText}
   } catch (_) {
     stationExitCache = {};
   }
-  function saveStationExitCache() {
-    try {
-      localStorage.setItem("TRIP_V20_STATION_CACHE", JSON.stringify(stationExitCache));
-    } catch (_) {}
-  }
-
-  const STATION_KO_DICT = [
-    [/難波|なんば|namba/i, "난바역"],
-    [/日本橋|nipponbashi|nippombashi/i, "닛폰바시역"],
-    [/心斎橋|shinsaibashi/i, "신사이바시역"],
-    [/長堀橋|nagahoribashi/i, "나가호리바시역"],
-    [/四ツ橋|yotsubashi/i, "요쓰바시역"],
-    [/梅田|umeda/i, "우메다역"],
-    [/大阪|osaka(?!\s*port|\s*castle)/i, "오사카역"],
-    [/新大阪|shin-osaka/i, "신오사카역"],
-    [/中崎町|nakazakicho/i, "나카자키초역"],
-    [/扇町|ogimachi/i, "오기마치역"],
-    [/天神橋筋六丁目|tenjinbashisuji/i, "텐진바시스지6초메역"],
-    [/天満|temma|tenma/i, "텐마역"],
-    [/淀屋橋|yodoyabashi/i, "요도야바시역"],
-    [/本町|hommachi|honmachi/i, "혼마치역"],
-    [/北浜|kitahama/i, "기타하마역"],
-    [/天満橋|temmabashi/i, "텐마바시역"],
-    [/谷町四丁目|tanimachi\s*4/i, "다니마치4초메역"],
-    [/森ノ宮|morinomiya/i, "모리노미야역"],
-    [/大阪城公園|osakajokoen/i, "오사카조코엔역"],
-    [/天王寺|tennoji/i, "텐노지역"],
-    [/阿倍野|abeno/i, "아베노역"],
-    [/動物園前|dobutsuen-mae/i, "도부쓰엔마에역"],
-    [/新今宮|shin-imamiya/i, "신이마미야역"],
-    [/恵美須町|ebisucho/i, "에비스초역"],
-    [/大国町|daikokucho/i, "다이코쿠초역"],
-    [/大阪港|osakako/i, "오사카코역"],
-    [/ユニバーサルシティ|universal\s*city/i, "유니버설시티역"],
-    [/京都河原町|河原町|kawaramachi/i, "가와라마치역"],
-    [/祇園四条|gion-shijo/i, "기온시조역"],
-    [/三条|sanjo/i, "산조역"],
-    [/烏丸御池|karasuma\s*oike/i, "가라스마오이케역"],
-    [/烏丸|karasuma/i, "가라스마역"],
-    [/四条|shijo/i, "시조역"],
-    [/清水五条|kiyomizu-gojo/i, "기요미즈고조역"],
-    [/東山|higashiyama/i, "히가시야마역"],
-    [/蹴上|keage/i, "게아게역"],
-    [/伏見稲荷|fushimi-inari/i, "후시미이나리역"],
-    [/稲荷|inari/i, "이나리역"],
-    [/東福寺|tofukuji/i, "도후쿠지역"],
-    [/京都|kyoto/i, "교토역"],
-    [/嵐山|arashiyama/i, "아라시야마역"],
-    [/北野白梅町|kitano-hakubaicho/i, "기타노하쿠바이초역"],
-    [/北大路|kitaoji/i, "기타오지역"],
-    [/出町柳|demachiyanagi/i, "데마치야나기역"],
-    [/八瀬比叡山口|yase-hieizanguchi/i, "야세히에이잔구치역"],
-    [/貴船口|kibuneguchi/i, "기부네구치역"],
-    [/鞍馬|kurama/i, "구라마역"],
-    [/宇治|uji/i, "우지역"],
-    [/箕面|minoo|minoh/i, "미노오역"],
-    [/池田|ikeda/i, "이케다역"],
-    [/天橋立|amanohashidate/i, "아마노하시다테역"],
-    [/宮津|miyazu/i, "미야즈역"],
-    [/倉敷|kurashiki/i, "구라시키역"],
-    [/岡山|okayama/i, "오카야마역"],
-    [/大津|otsu/i, "오쓰역"],
-    [/近江今津|omi-imazu/i, "오미이마즈역"]
-  ];
 
   const VERIFIED_STATIONS_DB = [
     { name: "난바역", exit: "14번 출구", lat: 34.6685, lng: 135.5013 },
@@ -13015,24 +13372,6 @@ ${caption || rawText}
     { name: "간사이공항역", exit: "제2터미널", lat: 34.4351, lng: 135.2442 }
   ];
 
-  function translateStationName(rawName) {
-    const s = String(rawName || "").trim();
-    if (!s) return "";
-    for (const [re, ko] of STATION_KO_DICT) {
-      if (re.test(s)) return ko;
-    }
-    if (/[가-힣]/.test(s)) return s.endsWith("역") || s.endsWith("정류장") ? s : s + "역";
-    return s.replace(/\s*Station$/i, "").replace(/駅$/, "") + "역";
-  }
-
-  function formatExitRef(rawRef) {
-    const r = String(rawRef || "").trim();
-    if (!r) return "";
-    if (/출구|구$/.test(r)) return r;
-    if (/^[0-9A-Za-z\-]+$/.test(r)) return `${r}번 출구`;
-    return r;
-  }
-
   function calcWalkMinutes(dKm) {
     return Math.max(1, Math.round((dKm * 1000 * 1.3) / 80));
   }
@@ -13074,80 +13413,6 @@ ${caption || rawText}
     return null;
   }
 
-  let _overpassRunning = false;
-  async function enrichStationsViaOverpass() {
-    if (_overpassRunning || navigator.onLine === false) return;
-    const list = typeof items !== "undefined" && Array.isArray(items) ? items : [];
-    const targets = list.filter(it => {
-      const la = Number(it.lat), lo = Number(it.lng);
-      if (!la || !lo) return false;
-      return !stationExitCache[`${la.toFixed(4)},${lo.toFixed(4)}`];
-    }).slice(0, 10);
-
-    if (!targets.length) return;
-    _overpassRunning = true;
-
-    try {
-      for (const it of targets) {
-        const la = Number(it.lat), lo = Number(it.lng);
-        const k = `${la.toFixed(4)},${lo.toFixed(4)}`;
-        const query = `[out:json][timeout:6];(node(around:900,${la},${lo})["railway"~"station|halt"];node(around:550,${la},${lo})["railway"~"subway_entrance|train_station_entrance"];);out body;`;
-        try {
-          const r = await fetch("https://overpass-api.de/api/interpreter", {
-            method: "POST",
-            body: "data=" + encodeURIComponent(query)
-          });
-          if (!r.ok) continue;
-          const d = await r.json();
-          const els = d?.elements || [];
-          const stations = els.filter(e => /station|halt/.test(e.tags?.railway || ""));
-          const entrances = els.filter(e => /entrance/.test(e.tags?.railway || "") && (e.tags?.ref || e.tags?.name));
-
-          if (stations.length) {
-            stations.sort((a, b) => distKm(la, lo, a.lat, a.lon) - distKm(la, lo, b.lat, b.lon));
-            const nearSt = stations[0];
-            const stKo = nearSt.tags?.["name:ko"]
-              ? (nearSt.tags["name:ko"].endsWith("역") ? nearSt.tags["name:ko"] : nearSt.tags["name:ko"] + "역")
-              : translateStationName(nearSt.tags?.name || nearSt.tags?.["name:ja"] || "");
-
-            let exitStr = "";
-            let distToTarget = distKm(la, lo, nearSt.lat, nearSt.lon);
-
-            if (entrances.length) {
-              entrances.sort((a, b) => distKm(la, lo, a.lat, a.lon) - distKm(la, lo, b.lat, b.lon));
-              const nearEx = entrances[0];
-              const exRef = nearEx.tags?.ref || nearEx.tags?.name || "";
-              exitStr = formatExitRef(exRef);
-              distToTarget = distKm(la, lo, nearEx.lat, nearEx.lon);
-            } else {
-              const dbMatches = VERIFIED_STATIONS_DB.filter(x => x.name === stKo);
-              if (dbMatches.length) {
-                dbMatches.sort((a, b) => distKm(la, lo, a.lat, a.lng) - distKm(la, lo, b.lat, b.lng));
-                if (distKm(la, lo, dbMatches[0].lat, dbMatches[0].lng) <= 0.8) {
-                  exitStr = dbMatches[0].exit;
-                  distToTarget = distKm(la, lo, dbMatches[0].lat, dbMatches[0].lng);
-                }
-              }
-            }
-
-            if (stKo) {
-              const wMin = calcWalkMinutes(distToTarget);
-              const tLbl = wMin <= 25 ? `도보 ${wMin}분` : `약 ${distToTarget.toFixed(1)}km`;
-              stationExitCache[k] = `🚇 ${stKo}${exitStr ? " " + exitStr : ""} (${tLbl})`;
-              saveStationExitCache();
-            }
-          }
-        } catch (_) {}
-      }
-      decorateV21Cards();
-    } finally {
-      _overpassRunning = false;
-    }
-  }
-
-  /* =========================================================================
-   * 3. 출발일(TRIP_V17_DATE) + 일차(Day N) 기준 방문 예정 요일 휴무 검증기
-   * ========================================================================= */
   const KOR_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
   function checkScheduledDayHoliday(it) {
     const d = Number(it?.day) || 0;
@@ -13167,140 +13432,7 @@ ${caption || rawText}
   }
 
   /* =========================================================================
-   * 4. 피로도·시간·권역을 고려한 스마트 일차 균등 배정 & 전체 일차 초기화(미정)
-   * ========================================================================= */
-  const LANDMARK_COVERS = [
-    {
-      label: "교토 기요미즈데라 & 야사카의 탑",
-      url: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=1200&q=80"
-    },
-    {
-      label: "교토 후시미이나리 신사 센본토리이",
-      url: "https://images.unsplash.com/photo-1478436127897-769e1b3f0f36?auto=format&fit=crop&w=1200&q=80"
-    },
-    {
-      label: "오사카 도톤보리 & 네온 야경",
-      url: "https://images.unsplash.com/photo-1590559899731-a382839e5549?auto=format&fit=crop&w=1200&q=80"
-    },
-    {
-      label: "교토 아라시야마 & 도게츠교",
-      url: "https://images.unsplash.com/photo-1545569341-9eb8b30979d9?auto=format&fit=crop&w=1200&q=80"
-    },
-    {
-      label: "오사카성 천수각 파노라마",
-      url: "https://images.unsplash.com/photo-1589452271712-64b8a66c7b71?auto=format&fit=crop&w=1200&q=80"
-    }
-  ];
-  let coverIdx = Number(localStorage.getItem("TRIP_V19_COVER_IDX")) || 0;
-
-  // 피로도·시간·지역 클러스터링 기반 7일 균등 배정 (하루에 다 쏠리는 현상 방지)
-  window.smartBalancedAssignDaysV21 = function() {
-    const list = typeof items !== "undefined" && Array.isArray(items) ? items : [];
-    if (!list.length) return toast("저장된 장소가 없습니다");
-    if (typeof pushLocalHistory === "function") pushLocalHistory();
-
-    // 권역별 분류
-    const buckets = {
-      kyoto: [],
-      biwako: [],
-      ine: [],
-      kurashiki: [],
-      minoh_umeda: [],
-      osaka_south: []
-    };
-
-    list.forEach(it => {
-      const txt = `${it.name || ""} ${it.address || ""} ${it.note || ""}`.toLowerCase();
-      const lat = Number(it.lat) || 0;
-      const lng = Number(it.lng) || 0;
-
-      if (/이네|후나야|아마노하시다테|미야즈|ine|funaya|伊根|天橋立/.test(txt) || lat >= 35.45) {
-        buckets.ine.push(it);
-      } else if (/구라시키|오카야마|kurashiki|okayama|倉敷|岡山/.test(txt) || (lng > 0 && lng < 134.3)) {
-        buckets.kurashiki.push(it);
-      } else if (/비와코|시가|오쓰|biwako|otsu|琵琶湖|大津/.test(txt) || lng >= 135.84) {
-        buckets.biwako.push(it);
-      } else if (/교토|아라시야마|기온|기요미즈|청수사|후시미|금각사|가와라마치|kyoto|京都|嵐山|祇園|清水/.test(txt) || (lat >= 34.89 && lat < 35.25)) {
-        buckets.kyoto.push(it);
-      } else if (/미노오|사츠키야마|이케다|우메다|우메키타|나카자키초|텐마|minoh|satsukiyama|umeda|箕面|五月山|梅田|中崎町/.test(txt) || (lat >= 34.695 && lat < 34.89)) {
-        buckets.minoh_umeda.push(it);
-      } else {
-        buckets.osaka_south.push(it);
-      }
-    });
-
-    // 같은 권역 안에서는 위도·경도 순으로 정렬하여 동선 꼬임 최소화 + 카테고리(장소/식당/카페/쇼핑) 교차 배치
-    const sortAndInterleave = (arr) => {
-      arr.sort((a, b) => (Number(b.lat) || 0) - (Number(a.lat) || 0));
-      const byCat = { PLACE: [], FOOD: [], CAFE: [], SHOP: [] };
-      arr.forEach(x => (byCat[x.category] || byCat.PLACE).push(x));
-      const mixed = [];
-      let maxLen = Math.max(byCat.PLACE.length, byCat.FOOD.length, byCat.CAFE.length, byCat.SHOP.length);
-      for (let i = 0; i < maxLen; i++) {
-        if (byCat.PLACE[i]) mixed.push(byCat.PLACE[i]);
-        if (byCat.FOOD[i]) mixed.push(byCat.FOOD[i]);
-        if (byCat.CAFE[i]) mixed.push(byCat.CAFE[i]);
-        if (byCat.SHOP[i]) mixed.push(byCat.SHOP[i]);
-      }
-      return mixed;
-    };
-
-    const assignAcrossDays = (arr, targetDays) => {
-      const ordered = sortAndInterleave(arr);
-      if (!ordered.length) return;
-      // 하루 피로도를 고려해 targetDays에 균등 분할 (라운드로빈/청크 분배)
-      const perDay = Math.max(1, Math.ceil(ordered.length / targetDays.length));
-      ordered.forEach((it, idx) => {
-        const dIdx = Math.min(targetDays.length - 1, Math.floor(idx / perDay));
-        it.day = targetDays[dIdx];
-        it.updatedAt = Date.now();
-      });
-    };
-
-    // 교토권 -> Day 1, Day 2로 분산
-    assignAcrossDays([...buckets.kyoto, ...buckets.biwako], [1, 2]);
-    // 이네후나야권 -> Day 3
-    assignAcrossDays(buckets.ine, [3]);
-    // 구라시키권 -> Day 6
-    assignAcrossDays(buckets.kurashiki, [6]);
-    // 우메다·미노오권 -> Day 5 (많으면 Day 5, Day 6에 분산)
-    assignAcrossDays(buckets.minoh_umeda, buckets.kurashiki.length ? [5] : [5, 6]);
-    // 오사카 난바·도톤보리·기타(가장 많은 비중) -> 하루에 몰리지 않도록 Day 4, Day 5, Day 7(및 비어있는 날)로 균등 분산
-    const osakaDays = [4, 7];
-    if (buckets.minoh_umeda.length < 5) osakaDays.splice(1, 0, 5);
-    if (buckets.kurashiki.length === 0) osakaDays.splice(osakaDays.length - 1, 0, 6);
-    if (buckets.ine.length === 0) osakaDays.unshift(3);
-    assignAcrossDays(buckets.osaka_south, osakaDays);
-
-    if (typeof save === "function") save();
-    if (typeof draw === "function") draw(true);
-    if (window.renderV21Dashboard) window.renderV21Dashboard();
-    toast("🗓️ 하루 피로도와 동선을 고려해 Day 1~7로 균등 배정했습니다!");
-  };
-
-  // 실수로 눌렀을 때 한 번에 모두 '일차 미정(0)'으로 초기화하는 함수
-  window.resetAllDaysToUnassignedV21 = function() {
-    const list = typeof items !== "undefined" && Array.isArray(items) ? items : [];
-    const assigned = list.filter(x => Number(x.day) > 0);
-    if (!assigned.length) return toast("이미 모든 장소가 일차 미정 상태입니다");
-    if (typeof pushLocalHistory === "function") pushLocalHistory();
-
-    list.forEach(it => {
-      it.day = 0;
-      it.updatedAt = Date.now();
-    });
-    if (typeof mapDay !== "undefined") mapDay = 0;
-    if (typeof listFilter !== "undefined") {
-      Object.keys(listFilter).forEach(k => { listFilter[k] = "ALL"; });
-    }
-    if (typeof save === "function") save();
-    if (typeof draw === "function") draw(true);
-    if (window.renderV21Dashboard) window.renderV21Dashboard();
-    toast("↩️ 모든 장소를 '일차 미정'으로 초기화했습니다");
-  };
-
-  /* =========================================================================
-   * 5. 하단 탭(홈·목록·설정) 클릭 시 스크롤 맨 위로 이동 & 목록 필터 꼬임 방지
+   * 6. 하단 탭(홈·목록·설정) 터치 시 스크롤 맨 위로 이동
    * ========================================================================= */
   function scrollTabToTop(tabKey) {
     requestAnimationFrame(() => {
@@ -13317,7 +13449,6 @@ ${caption || rawText}
     if (tb && tb.dataset.tab) {
       const k = tb.dataset.tab;
       if (k === "list" && typeof listFilter !== "undefined") {
-        // 잘못된 필터 값으로 인해 목록이 빈 화면으로 나오는 현상 자동 복구
         const curF = listFilter[listCat] || "ALL";
         if (!["ALL", "TODO", "DONE", "VID"].includes(curF) && !curF.startsWith("DAY:") && !curF.startsWith("REG:")) {
           listFilter[listCat] = "ALL";
@@ -13328,7 +13459,7 @@ ${caption || rawText}
   }, true);
 
   /* =========================================================================
-   * 6. 목록 상단: 심플 1/N 정산기 (내역칸·불필요 설명 제거, 금액과 인원만)
+   * 7. 목록 상단: 초간편 1/N 정산기 (내역칸·설명 제거, 금액과 인원만)
    * ========================================================================= */
   let jpyRate = Number(localStorage.getItem("TRIP_V17_JPY_RATE")) || 8.48;
   let splitCount = Number(localStorage.getItem("TRIP_V17_SPLIT_CNT")) || 3;
@@ -13355,23 +13486,21 @@ ${caption || rawText}
     const topCard = searchRow?.closest(".card");
     if (!searchRow || !topCard) return;
 
-    // 이전 버전 위젯 정리
-    document.getElementById("v19ListBudgetBar")?.remove();
-    document.getElementById("v19ListBudgetDrawer")?.remove();
-    document.getElementById("v20ListBudgetBar")?.remove();
-    document.getElementById("v20ListBudgetDrawer")?.remove();
+    ["v19ListBudgetBar", "v19ListBudgetDrawer", "v20ListBudgetBar", "v20ListBudgetDrawer", "v21ListBudgetBar", "v21ListBudgetDrawer"].forEach(id => {
+      document.getElementById(id)?.remove();
+    });
 
-    let bar = document.getElementById("v21ListBudgetBar");
+    let bar = document.getElementById("v22ListBudgetBar");
     if (!bar) {
       bar = document.createElement("div");
-      bar.id = "v21ListBudgetBar";
+      bar.id = "v22ListBudgetBar";
       searchRow.insertBefore(bar, searchRow.firstChild);
     }
 
-    let drawer = document.getElementById("v21ListBudgetDrawer");
+    let drawer = document.getElementById("v22ListBudgetDrawer");
     if (!drawer) {
       drawer = document.createElement("div");
-      drawer.id = "v21ListBudgetDrawer";
+      drawer.id = "v22ListBudgetDrawer";
       topCard.appendChild(drawer);
     }
 
@@ -13380,8 +13509,8 @@ ${caption || rawText}
     const perPersonJpy = Math.round(perPersonKrw / Math.max(0.1, jpyRate));
 
     bar.innerHTML = `
-      <span class="v21-lb-text">1인 ₩${perPersonKrw.toLocaleString()} (${splitCount}명)</span>
-      <span class="v21-lb-pill">1/N 정산 ▾</span>
+      <span class="v22-lb-text">1인 ₩${perPersonKrw.toLocaleString()} (${splitCount}명)</span>
+      <span class="v22-lb-pill">1/N 정산 ▾</span>
     `;
 
     bar.onclick = () => {
@@ -13390,24 +13519,24 @@ ${caption || rawText}
 
     drawer.innerHTML = `
       <div style="display:flex;gap:6px;align-items:center">
-        <input type="text" id="v21AmtInput" value="${calcAmount ? calcAmount : ""}" placeholder="금액 입력" inputmode="numeric" style="flex:1;min-width:0;margin:0;min-height:40px;padding:6px 12px;font-size:14px;font-weight:800" />
-        <select id="v21CurSelect" class="btn g" style="width:74px;margin:0;min-height:40px;padding:4px 8px;font-size:13px;flex:none">
+        <input type="text" id="v22AmtInput" value="${calcAmount ? calcAmount : ""}" placeholder="금액 입력" inputmode="numeric" style="flex:1;min-width:0;margin:0;min-height:40px;padding:6px 12px;font-size:14px;font-weight:800" />
+        <select id="v22CurSelect" class="btn g" style="width:74px;margin:0;min-height:40px;padding:4px 8px;font-size:13px;flex:none">
           <option value="JPY" ${calcCur === "JPY" ? "selected" : ""}>¥ 엔</option>
           <option value="KRW" ${calcCur === "KRW" ? "selected" : ""}>₩ 원</option>
         </select>
-        <button type="button" class="mb" id="v21SplitMinus" style="min-height:40px;padding:0 11px;font-size:15px;flex:none">-</button>
-        <b id="v21SplitCountLbl" style="font-size:13.5px;min-width:34px;text-align:center;flex:none">${splitCount}명</b>
-        <button type="button" class="mb" id="v21SplitPlus" style="min-height:40px;padding:0 11px;font-size:15px;flex:none">+</button>
-        <button type="button" class="mb dg" id="v21SplitReset" style="min-height:40px;padding:0 10px;font-size:12px;flex:none">초기화</button>
+        <button type="button" class="mb" id="v22SplitMinus" style="min-height:40px;padding:0 11px;font-size:15px;flex:none">-</button>
+        <b id="v22SplitCountLbl" style="font-size:13.5px;min-width:34px;text-align:center;flex:none">${splitCount}명</b>
+        <button type="button" class="mb" id="v22SplitPlus" style="min-height:40px;padding:0 11px;font-size:15px;flex:none">+</button>
+        <button type="button" class="mb dg" id="v22SplitReset" style="min-height:40px;padding:0 10px;font-size:12px;flex:none">초기화</button>
       </div>
-      <div id="v21ResultLine" style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:12px;background:var(--s);border:1px solid var(--bd)">
+      <div id="v22ResultLine" style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:12px;background:var(--s);border:1px solid var(--bd)">
         <span style="font-size:13px;font-weight:800;color:var(--sub)">1인당 (${splitCount}명)</span>
         <b style="font-size:16px;font-weight:900;color:var(--pr)">₩${perPersonKrw.toLocaleString()} <span style="font-size:12.5px;color:var(--sub);font-weight:700">(¥${perPersonJpy.toLocaleString()})</span></b>
       </div>
     `;
 
-    const amtInp = document.getElementById("v21AmtInput");
-    const curSel = document.getElementById("v21CurSelect");
+    const amtInp = document.getElementById("v22AmtInput");
+    const curSel = document.getElementById("v22CurSelect");
 
     const updateCalcLive = () => {
       calcAmount = Number(String(amtInp.value || "").replace(/[^0-9.]/g, "")) || 0;
@@ -13419,11 +13548,11 @@ ${caption || rawText}
       const pKrw = Math.round(tKrw / Math.max(1, splitCount));
       const pJpy = Math.round(pKrw / Math.max(0.1, jpyRate));
 
-      const barTxt = bar.querySelector(".v21-lb-text");
+      const barTxt = bar.querySelector(".v22-lb-text");
       if (barTxt) barTxt.textContent = `1인 ₩${pKrw.toLocaleString()} (${splitCount}명)`;
-      const cntLbl = document.getElementById("v21SplitCountLbl");
+      const cntLbl = document.getElementById("v22SplitCountLbl");
       if (cntLbl) cntLbl.textContent = `${splitCount}명`;
-      const resLine = document.getElementById("v21ResultLine");
+      const resLine = document.getElementById("v22ResultLine");
       if (resLine) {
         resLine.innerHTML = `
           <span style="font-size:13px;font-weight:800;color:var(--sub)">1인당 (${splitCount}명)</span>
@@ -13435,19 +13564,19 @@ ${caption || rawText}
     amtInp.oninput = updateCalcLive;
     curSel.onchange = updateCalcLive;
 
-    document.getElementById("v21SplitMinus").onclick = (e) => {
+    document.getElementById("v22SplitMinus").onclick = (e) => {
       e.stopPropagation();
       splitCount = Math.max(1, splitCount - 1);
       localStorage.setItem("TRIP_V17_SPLIT_CNT", String(splitCount));
       updateCalcLive();
     };
-    document.getElementById("v21SplitPlus").onclick = (e) => {
+    document.getElementById("v22SplitPlus").onclick = (e) => {
       e.stopPropagation();
       splitCount = Math.min(20, splitCount + 1);
       localStorage.setItem("TRIP_V17_SPLIT_CNT", String(splitCount));
       updateCalcLive();
     };
-    document.getElementById("v21SplitReset").onclick = (e) => {
+    document.getElementById("v22SplitReset").onclick = (e) => {
       e.stopPropagation();
       amtInp.value = "";
       updateCalcLive();
@@ -13455,11 +13584,35 @@ ${caption || rawText}
   }
 
   /* =========================================================================
-   * 7. 우측 하단 [+] 버튼 & 가져오기 바텀 시트 구성
+   * 8. 우측 하단 [+] 버튼 & 가져오기 바텀 시트 구성
    * ========================================================================= */
+  const LANDMARK_COVERS = [
+    {
+      label: "교토 기요미즈데라 & 야사카의 탑",
+      url: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=1200&q=80"
+    },
+    {
+      label: "교토 후시미이나리 신사 센본토리이",
+      url: "https://images.unsplash.com/photo-1478436127897-769e1b3f0f36?auto=format&fit=crop&w=1200&q=80"
+    },
+    {
+      label: "오사카 도톤보리 & 네온 야경",
+      url: "https://images.unsplash.com/photo-1590559899731-a382839e5549?auto=format&fit=crop&w=1200&q=80"
+    },
+    {
+      label: "교토 아라시야마 & 도게츠교",
+      url: "https://images.unsplash.com/photo-1545569341-9eb8b30979d9?auto=format&fit=crop&w=1200&q=80"
+    },
+    {
+      label: "오사카성 천수각 파노라마",
+      url: "https://images.unsplash.com/photo-1589452271712-64b8a66c7b71?auto=format&fit=crop&w=1200&q=80"
+    }
+  ];
+  let coverIdx = Number(localStorage.getItem("TRIP_V19_COVER_IDX")) || 0;
+
   function setupImportBottomSheetAndDashboard() {
     const homeTab = document.getElementById("tab-add");
-    if (!homeTab || document.getElementById("v21ImportSheetWrap")) return;
+    if (!homeTab || document.getElementById("v22ImportSheetWrap")) return;
 
     const origCard = homeTab.querySelector(".card");
     const rsEl = document.getElementById("rs");
@@ -13474,94 +13627,94 @@ ${caption || rawText}
     if (origCard) origCard.style.display = "none";
 
     const dashEl = document.createElement("div");
-    dashEl.id = "v21Dashboard";
+    dashEl.id = "v22Dashboard";
     homeTab.insertBefore(dashEl, homeTab.firstChild);
 
     const fab = document.createElement("button");
     fab.type = "button";
-    fab.id = "v21FabBtn";
+    fab.id = "v22FabBtn";
     fab.title = "장소 가져오기 / 추가";
     fab.innerHTML = '<span class="ms">add</span>';
     document.body.appendChild(fab);
 
     const sheetWrap = document.createElement("div");
-    sheetWrap.id = "v21ImportSheetWrap";
+    sheetWrap.id = "v22ImportSheetWrap";
     sheetWrap.innerHTML = `
-      <div id="v21ImportSheet">
-        <div class="v21-sheet-handle"></div>
+      <div id="v22ImportSheet">
+        <div class="v22-sheet-handle"></div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
           <div style="font-size:18px;font-weight:900;color:var(--tx);display:flex;align-items:center;gap:6px">
             <span class="ms fill" style="color:var(--pr)">download</span>장소 가져오기
           </div>
-          <button type="button" class="mb" id="v21CloseImportBtn" style="min-height:32px;padding:4px 12px;font-size:12px">닫기</button>
+          <button type="button" class="mb" id="v22CloseImportBtn" style="min-height:32px;padding:4px 12px;font-size:12px">닫기</button>
         </div>
 
-        <div id="v21SegMount"></div>
-        <div id="v21StepperMount"></div>
+        <div id="v22SegMount"></div>
+        <div id="v22StepperMount"></div>
 
-        <div class="v21-url-bar">
-          <input type="text" id="v21UnifiedUrlInput" placeholder="소셜 미디어, 릴스·쇼츠 등의 URL" autocomplete="off" />
-          <button type="button" class="v21-paste-pill" id="v21QuickPasteBtn">붙여넣기</button>
+        <div class="v22-url-bar">
+          <input type="text" id="v22UnifiedUrlInput" placeholder="소셜 미디어, 릴스·쇼츠 등의 URL" autocomplete="off" />
+          <button type="button" class="v22-paste-pill" id="v22QuickPasteBtn">붙여넣기</button>
         </div>
-        <button type="button" class="btn" id="v21PrimaryFetchBtn" style="border-radius:999px;min-height:46px">
+        <button type="button" class="btn" id="v22PrimaryFetchBtn" style="border-radius:999px;min-height:46px">
           <span class="ms fill">bolt</span>링크에서 가져오기
         </button>
 
-        <div class="v21-platforms">
-          <div class="v21-plat-item" data-plat="yt">
-            <div class="v21-plat-ico"><span class="ms fill" style="color:#ef4444;font-size:22px">smart_display</span></div>
+        <div class="v22-platforms">
+          <div class="v22-plat-item" data-plat="yt">
+            <div class="v22-plat-ico"><span class="ms fill" style="color:#ef4444;font-size:22px">smart_display</span></div>
             <span>유튜브</span>
           </div>
-          <div class="v21-plat-item" data-plat="ig">
-            <div class="v21-plat-ico"><span class="ms fill" style="color:#ec4899;font-size:22px">photo_camera</span></div>
+          <div class="v22-plat-item" data-plat="ig">
+            <div class="v22-plat-ico"><span class="ms fill" style="color:#ec4899;font-size:22px">photo_camera</span></div>
             <span>인스타그램</span>
           </div>
-          <div class="v21-plat-item" data-plat="tt">
-            <div class="v21-plat-ico"><span class="ms fill" style="color:#38bdf8;font-size:22px">music_note</span></div>
+          <div class="v22-plat-item" data-plat="tt">
+            <div class="v22-plat-ico"><span class="ms fill" style="color:#38bdf8;font-size:22px">music_note</span></div>
             <span>틱톡</span>
           </div>
-          <div class="v21-plat-item" data-plat="etc">
-            <div class="v21-plat-ico"><span class="ms" style="color:var(--sub);font-size:22px">language</span></div>
+          <div class="v22-plat-item" data-plat="etc">
+            <div class="v22-plat-ico"><span class="ms" style="color:var(--sub);font-size:22px">language</span></div>
             <span>기타</span>
           </div>
         </div>
 
-        <div class="v21-import-list">
-          <button type="button" class="v21-import-card" id="v21CardImage">
-            <div class="v21-ic-box" style="background:rgba(16,185,129,0.14);color:#10b981"><span class="ms fill" style="font-size:22px">imagesmode</span></div>
-            <div class="v21-ic-txt"><b>이미지에서 가져오기 (OCR)</b><small>소셜 게시물의 스크린샷 또는 장소 목록</small></div>
+        <div class="v22-import-list">
+          <button type="button" class="v22-import-card" id="v22CardImage">
+            <div class="v22-ic-box" style="background:rgba(16,185,129,0.14);color:#10b981"><span class="ms fill" style="font-size:22px">imagesmode</span></div>
+            <div class="v22-ic-txt"><b>이미지에서 가져오기 (OCR)</b><small>소셜 게시물의 스크린샷 또는 장소 목록</small></div>
             <span class="ms" style="color:var(--sub)">chevron_right</span>
           </button>
 
-          <button type="button" class="v21-import-card" id="v21CardText">
-            <div class="v21-ic-box" style="background:rgba(245,158,11,0.14);color:#f59e0b"><span class="ms fill" style="font-size:22px">description</span></div>
-            <div class="v21-ic-txt"><b>텍스트에서 가져오기</b><small>장소가 포함된 메모, 고정댓글 또는 복사된 텍스트</small></div>
+          <button type="button" class="v22-import-card" id="v22CardText">
+            <div class="v22-ic-box" style="background:rgba(245,158,11,0.14);color:#f59e0b"><span class="ms fill" style="font-size:22px">description</span></div>
+            <div class="v22-ic-txt"><b>텍스트에서 가져오기</b><small>장소가 포함된 메모, 고정댓글 또는 복사된 텍스트</small></div>
             <span class="ms" style="color:var(--sub)">expand_more</span>
           </button>
-          <div class="v21-collapse-pane" id="v21TextPane"></div>
+          <div class="v22-collapse-pane" id="v22TextPane"></div>
 
-          <button type="button" class="v21-import-card" id="v21CardManual">
-            <div class="v21-ic-box" style="background:rgba(59,130,246,0.14);color:#3b82f6"><span class="ms fill" style="font-size:22px">edit_location_alt</span></div>
-            <div class="v21-ic-txt"><b>직접 장소 등록하기</b><small>링크 없이 장소명·주소로 빠르게 1건 등록</small></div>
+          <button type="button" class="v22-import-card" id="v22CardManual">
+            <div class="v22-ic-box" style="background:rgba(59,130,246,0.14);color:#3b82f6"><span class="ms fill" style="font-size:22px">edit_location_alt</span></div>
+            <div class="v22-ic-txt"><b>직접 장소 등록하기</b><small>링크 없이 장소명·주소로 빠르게 1건 등록</small></div>
             <span class="ms" style="color:var(--sub)">expand_more</span>
           </button>
-          <div class="v21-collapse-pane" id="v21ManualPane"></div>
+          <div class="v22-collapse-pane" id="v22ManualPane"></div>
         </div>
 
-        <div id="v21RsMount" style="margin-top:12px"></div>
+        <div id="v22RsMount" style="margin-top:12px"></div>
       </div>
     `;
     document.body.appendChild(sheetWrap);
 
     if (segEl) {
       segEl.style.marginBottom = "12px";
-      document.getElementById("v21SegMount").appendChild(segEl);
+      document.getElementById("v22SegMount").appendChild(segEl);
     }
-    if (stepperEl) document.getElementById("v21StepperMount").appendChild(stepperEl);
-    if (rsEl) document.getElementById("v21RsMount").appendChild(rsEl);
+    if (stepperEl) document.getElementById("v22StepperMount").appendChild(stepperEl);
+    if (rsEl) document.getElementById("v22RsMount").appendChild(rsEl);
 
     if (shareBox) {
-      const textPane = document.getElementById("v21TextPane");
+      const textPane = document.getElementById("v22TextPane");
       shareBox.style.display = "block";
       shareBox.style.marginBottom = "8px";
       shareBox.placeholder = "복사한 릴스·쇼츠 캡션이나 고정댓글 맛집 리스트를 붙여넣으세요 (최대 10곳)";
@@ -13576,7 +13729,7 @@ ${caption || rawText}
     }
 
     if (manualBox) {
-      const manualPane = document.getElementById("v21ManualPane");
+      const manualPane = document.getElementById("v22ManualPane");
       manualBox.style.display = "flex";
       manualBox.style.marginTop = "0";
       manualBox.style.padding = "0";
@@ -13584,12 +13737,12 @@ ${caption || rawText}
       manualPane.appendChild(manualBox);
     }
 
-    window.openV21ImportSheet = function(mode) {
+    window.openV22ImportSheet = function(mode) {
       if (typeof window.v8Haptic === "function") window.v8Haptic(12);
       sheetWrap.classList.add("on");
       fab.classList.add("open");
-      const textPane = document.getElementById("v21TextPane");
-      const manualPane = document.getElementById("v21ManualPane");
+      const textPane = document.getElementById("v22TextPane");
+      const manualPane = document.getElementById("v22ManualPane");
       if (mode === "text") {
         textPane.classList.add("on");
         manualPane.classList.remove("on");
@@ -13601,21 +13754,21 @@ ${caption || rawText}
       }
     };
 
-    window.closeV21ImportSheet = function() {
+    window.closeV22ImportSheet = function() {
       sheetWrap.classList.remove("on");
       fab.classList.remove("open");
     };
 
     fab.onclick = () => {
-      if (sheetWrap.classList.contains("on")) window.closeV21ImportSheet();
-      else window.openV21ImportSheet();
+      if (sheetWrap.classList.contains("on")) window.closeV22ImportSheet();
+      else window.openV22ImportSheet();
     };
-    document.getElementById("v21CloseImportBtn").onclick = window.closeV21ImportSheet;
+    document.getElementById("v22CloseImportBtn").onclick = window.closeV22ImportSheet;
     sheetWrap.addEventListener("click", (e) => {
-      if (e.target === sheetWrap) window.closeV21ImportSheet();
+      if (e.target === sheetWrap) window.closeV22ImportSheet();
     });
 
-    const urlInp = document.getElementById("v21UnifiedUrlInput");
+    const urlInp = document.getElementById("v22UnifiedUrlInput");
     const syncUrl = (val) => {
       const v = String(val || "").trim();
       urlInp.value = v;
@@ -13631,7 +13784,7 @@ ${caption || rawText}
 
     urlInp.addEventListener("input", () => syncUrl(urlInp.value));
 
-    document.getElementById("v21QuickPasteBtn").onclick = async () => {
+    document.getElementById("v22QuickPasteBtn").onclick = async () => {
       try {
         const clip = await navigator.clipboard.readText();
         if (clip && clip.trim()) {
@@ -13646,27 +13799,27 @@ ${caption || rawText}
       toast("입력창을 길게 눌러 붙여넣어 주세요");
     };
 
-    document.getElementById("v21PrimaryFetchBtn").onclick = () => {
+    document.getElementById("v22PrimaryFetchBtn").onclick = () => {
       if (urlInp.value.trim()) syncUrl(urlInp.value);
       analyzeBtn?.click();
       setTimeout(() => { urlInp.value = ""; }, 700);
     };
 
-    sheetWrap.querySelectorAll(".v21-plat-item").forEach(el => {
-      el.onclick = () => document.getElementById("v21QuickPasteBtn").click();
+    sheetWrap.querySelectorAll(".v22-plat-item").forEach(el => {
+      el.onclick = () => document.getElementById("v22QuickPasteBtn").click();
     });
 
-    document.getElementById("v21CardImage").onclick = () => shareFile?.click();
-    document.getElementById("v21CardText").onclick = () => {
-      const textPane = document.getElementById("v21TextPane");
-      const manualPane = document.getElementById("v21ManualPane");
+    document.getElementById("v22CardImage").onclick = () => shareFile?.click();
+    document.getElementById("v22CardText").onclick = () => {
+      const textPane = document.getElementById("v22TextPane");
+      const manualPane = document.getElementById("v22ManualPane");
       const on = textPane.classList.toggle("on");
       manualPane.classList.remove("on");
       if (on) setTimeout(() => shareBox?.focus(), 80);
     };
-    document.getElementById("v21CardManual").onclick = () => {
-      const textPane = document.getElementById("v21TextPane");
-      const manualPane = document.getElementById("v21ManualPane");
+    document.getElementById("v22CardManual").onclick = () => {
+      const textPane = document.getElementById("v22TextPane");
+      const manualPane = document.getElementById("v22ManualPane");
       const on = manualPane.classList.toggle("on");
       textPane.classList.remove("on");
       if (on) setTimeout(() => document.getElementById("ux7ManName")?.focus(), 80);
@@ -13674,7 +13827,7 @@ ${caption || rawText}
   }
 
   function updateFabVisibility() {
-    const fab = document.getElementById("v21FabBtn");
+    const fab = document.getElementById("v22FabBtn");
     if (!fab) return;
     const isMap = document.body.classList.contains("show-map");
     const curTab = typeof activeTab !== "undefined" ? activeTab : "add";
@@ -13682,13 +13835,22 @@ ${caption || rawText}
   }
 
   /* =========================================================================
-   * 8. 홈 탭 렌더링
-   *    - 방문 스탬프 제거 (전체 장소 / 좌표 완료 / 일차 배정 3열 구성)
-   *    - 일차별 코스: [자동 배정] + [초기화(일차미정)] 버튼 상시 노출
-   *    - 주요 거점 숙소: 길찾기 대신 구글맵 '위치보기'로 연결
+   * 9. 홈 탭 대시보드 렌더링
+   *    - 일차별 코스: 각 일차의 실제 방문 순서 요약 표시 + [목록 편집] / [동선 지도] 버튼 제공
+   *    - 숙소 위치보기: 앱 내 지도 마커로 즉시 확대 + 구글맵(하얀 창 없음) 버튼 제공
    * ========================================================================= */
-  window.renderV21Dashboard = function() {
-    const dashEl = document.getElementById("v21Dashboard");
+  const DAY_ZONE_LABELS = {
+    1: "교토 동부·중부 (기온·가와라마치·청수사)",
+    2: "교토 서부·남부 (아라시야마·금각사·우지)",
+    3: "교토 북부 해안 (이네후나야·아마노하시다테)",
+    4: "오사카 남부 A (도톤보리·신사이바시)",
+    5: "오사카 북부·근교 (우메다·나카자키초·미노오)",
+    6: "오카야마·구라시키 / 오사카 남부 B",
+    7: "오사카 명소·쇼핑 & 마무리"
+  };
+
+  window.renderV22Dashboard = function() {
+    const dashEl = document.getElementById("v22Dashboard");
     if (!dashEl) return;
 
     const list = typeof items !== "undefined" && Array.isArray(items) ? items : [];
@@ -13698,7 +13860,7 @@ ${caption || rawText}
 
     const curCover = LANDMARK_COVERS[coverIdx % LANDMARK_COVERS.length];
 
-    let savedTitle = localStorage.getItem("TRIP_V17_TITLE") || "오사카·교토 7일 여행";
+    let savedTitle = localStorage.getItem("TRIP_V17_TITLE") || "오사카·교토 여행";
     let savedDate = localStorage.getItem("TRIP_V17_DATE") || "2026-11-24";
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -13708,75 +13870,83 @@ ${caption || rawText}
 
     const activeDays = [...new Set(list.filter(x => Number(x.day) > 0).map(x => Number(x.day)))].sort((a, b) => a - b);
     const dayCardsHtml = activeDays.length
-      ? `<div class="v21-day-scroll">
+      ? `<div class="v22-day-list">
           ${activeDays.map(d => {
             const dItems = list.filter(x => Number(x.day) === d);
-            const firstNm = dItems[0]?.name || "장소";
+            const routePreview = dItems.slice(0, 5).map((x, idx) => `${idx + 1}. ${x.name}`).join(" → ") + (dItems.length > 5 ? ` 외 ${dItems.length - 5}곳` : "");
             return `
-              <div class="v21-day-card" data-v21-daymap="${d}">
-                <div style="display:flex;align-items:center;justify-content:space-between">
-                  <b style="font-size:14px;color:var(--pr)">Day ${d}</b>
+              <div class="v22-day-row">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+                  <div>
+                    <b style="font-size:14.5px;color:var(--pr)">Day ${d}</b>
+                    <span style="font-size:11.5px;font-weight:700;color:var(--tx);margin-left:6px">${esc(DAY_ZONE_LABELS[d] || `Day ${d} 코스`)}</span>
+                  </div>
                   <span class="ux7-badge">${dItems.length}곳</span>
                 </div>
-                <div style="font-size:12px;font-weight:700;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(firstNm)}</div>
-                <div style="font-size:11px;color:var(--sub);display:flex;align-items:center;gap:3px;margin-top:2px">
-                  <span class="ms" style="font-size:14px;color:var(--pr)">route</span>동선 지도 보기
+                <div class="v22-day-route-preview">${esc(routePreview)}</div>
+                <div style="display:flex;gap:6px;margin-top:2px">
+                  <button type="button" class="mb pr" data-v22-daymap="${d}" style="flex:1;min-height:34px;padding:5px 10px;font-size:12px">
+                    <span class="ms" style="font-size:15px">route</span>동선 지도 보기
+                  </button>
+                  <button type="button" class="mb" data-v22-daylist="${d}" style="flex:1;min-height:34px;padding:5px 10px;font-size:12px">
+                    <span class="ms" style="font-size:15px">format_list_bulleted</span>목록 순서 편집
+                  </button>
                 </div>
               </div>
             `;
           }).join("")}
         </div>`
-      : `<div class="ds" style="padding:6px 0">아직 일차가 배정된 장소가 없습니다. 우측 상단 [자동 배정]을 눌러보세요.</div>`;
+      : `<div class="ds" style="padding:6px 0">아직 일차가 배정된 장소가 없습니다. 우측 상단 [자동 배정]을 누르면 권역과 최단 동선에 맞춰 자동으로 코스가 짜여집니다.</div>`;
 
     dashEl.innerHTML = `
       <!-- 1. 오사카·교토 명소 커버 히어로 카드 -->
-      <div class="v21-hero">
-        <img class="v21-hero-bg" src="${esc(curCover.url)}" referrerpolicy="no-referrer" onerror="this.style.display='none'" alt="" />
-        <div class="v21-hero-grad"></div>
-        <div class="v21-hero-top" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-          <span class="v21-dday-pill" id="v21EditDdayBtn"><span class="ms" style="font-size:15px">event</span>${esc(ddayText)} · ${esc(savedDate)}</span>
-          <button type="button" class="v21-hero-spot-tag" id="v21NextCoverBtn" title="클릭하여 명소 배경 변경">
+      <div class="v22-hero">
+        <img class="v22-hero-bg" src="${esc(curCover.url)}" referrerpolicy="no-referrer" onerror="this.style.display='none'" alt="" />
+        <div class="v22-hero-grad"></div>
+        <div class="v22-hero-top" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <span class="v22-dday-pill" id="v22EditDdayBtn"><span class="ms" style="font-size:15px">event</span>${esc(ddayText)} · ${esc(savedDate)}</span>
+          <button type="button" class="v22-hero-spot-tag" id="v22NextCoverBtn" title="클릭하여 명소 배경 변경">
             <span class="ms" style="font-size:14px">photo_camera</span>${esc(curCover.label)} ↻
           </button>
         </div>
-        <div class="v21-hero-btm" style="margin-top:38px">
-          <div class="v21-hero-title" id="v21EditTitleBtn">${esc(savedTitle)} <span class="ms" style="font-size:16px;opacity:0.75">edit</span></div>
+        <div class="v22-hero-btm" style="margin-top:38px">
+          <div class="v22-hero-title" id="v22EditTitleBtn">${esc(savedTitle)} <span class="ms" style="font-size:16px;opacity:0.75">edit</span></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
-            <button type="button" class="btn" id="v21QuickAddBtn" style="min-height:42px;padding:8px 12px;font-size:13px">
+            <button type="button" class="btn" id="v22QuickAddBtn" style="min-height:42px;padding:8px 12px;font-size:13px">
               <span class="ms">add_circle</span>장소 가져오기
             </button>
-            <button type="button" class="btn g" id="v21QuickListBtn" style="margin:0;min-height:42px;padding:8px 12px;font-size:13px;background:rgba(15,23,42,0.72);color:#fff;border-color:rgba(255,255,255,0.28)">
+            <button type="button" class="btn g" id="v22QuickListBtn" style="margin:0;min-height:42px;padding:8px 12px;font-size:13px;background:rgba(15,23,42,0.72);color:#fff;border-color:rgba(255,255,255,0.28)">
               <span class="ms">format_list_bulleted</span>전체 목록 보기
             </button>
           </div>
         </div>
       </div>
 
-      <!-- 2. 핵심 3대 지표 (방문 스탬프 제거) -->
-      <div class="v21-stats-grid">
-        <div class="v21-stat-card" data-v21-goto="ALL">
+      <!-- 2. 핵심 3대 지표 -->
+      <div class="v22-stats-grid">
+        <div class="v22-stat-card" data-v22-goto="ALL">
           <b>${total}</b>
           <span>전체 장소</span>
         </div>
-        <div class="v21-stat-card" data-v21-goto="COORD">
+        <div class="v22-stat-card" data-v22-goto="COORD">
           <b style="color:#10b981">${coords}</b>
           <span>좌표 완료</span>
         </div>
-        <div class="v21-stat-card" data-v21-goto="DAY">
+        <div class="v22-stat-card" data-v22-goto="DAY">
           <b style="color:#3b82f6">${scheduled}</b>
           <span>일차 배정</span>
         </div>
       </div>
 
-      <!-- 3. 일차별 코스 & 동선 지도 (균등 자동배정 + 일차 전체 초기화 버튼 제공) -->
-      <div class="v21-sec-card">
+      <!-- 3. 일차별 코스 & 동선 지도 -->
+      <div class="v22-sec-card">
         <div class="sec-title" style="margin-bottom:10px;font-size:15px">
           <span><span class="ms" style="color:var(--pr)">route</span>일차별 코스 & 동선 지도</span>
           <div style="display:flex;gap:6px">
-            <button type="button" class="mb pr" id="v21AutoAssignDaysBtn" style="min-height:30px;padding:4px 10px;font-size:11.5px">
+            <button type="button" class="mb pr" id="v22AutoAssignDaysBtn" style="min-height:30px;padding:4px 10px;font-size:11.5px">
               <span class="ms" style="font-size:15px">auto_awesome</span>자동 배정
             </button>
-            <button type="button" class="mb dg" id="v21ResetDaysBtn" style="min-height:30px;padding:4px 10px;font-size:11.5px">
+            <button type="button" class="mb dg" id="v22ResetDaysBtn" style="min-height:30px;padding:4px 10px;font-size:11.5px">
               <span class="ms" style="font-size:15px">restart_alt</span>초기화
             </button>
           </div>
@@ -13784,61 +13954,64 @@ ${caption || rawText}
         ${dayCardsHtml}
       </div>
 
-      <!-- 4. 주요 거점 숙소 위치보기 (구글맵 위치 핀만 표시) -->
-      <div class="v21-sec-card">
+      <!-- 4. 주요 거점 숙소 위치보기 (앱 내 지도에서 숙소 마커+주소 즉시 표시) -->
+      <div class="v22-sec-card">
         <div class="sec-title" style="margin-bottom:10px;font-size:15px">
           <span><span class="ms" style="color:#10b981">hotel</span>주요 거점 숙소 위치보기</span>
-          <small style="font-size:11px;color:var(--sub);font-weight:700">구글맵 위치 표시</small>
+          <small style="font-size:11px;color:var(--sub);font-weight:700">터치 시 지도에서 숙소 핀 확인</small>
         </div>
-        <div class="v21-base-grid">
-          <button type="button" class="v21-base-btn" data-v21-loc="34.97859,135.76631">
+        <div class="v22-base-grid">
+          <button type="button" class="v22-base-btn" data-v22-hotel="kyoto">
             <span class="ms" style="color:#3b82f6">temple_buddhist</span>
             <span>교토 숙소</span>
+            <small>도후쿠지역 인근</small>
           </button>
-          <button type="button" class="v21-base-btn" data-v21-loc="35.53836,135.19021">
+          <button type="button" class="v22-base-btn" data-v22-hotel="ine">
             <span class="ms" style="color:#10b981">waves</span>
             <span>이네후나야 숙소</span>
+            <small>아마노하시다테</small>
           </button>
-          <button type="button" class="v21-base-btn" data-v21-loc="34.661784,135.508406">
+          <button type="button" class="v22-base-btn" data-v22-hotel="osaka">
             <span class="ms" style="color:#f59e0b">apartment</span>
             <span>오사카 숙소</span>
+            <small>닛폰바시·난바</small>
           </button>
         </div>
       </div>
     `;
 
-    document.getElementById("v21NextCoverBtn").onclick = (e) => {
+    document.getElementById("v22NextCoverBtn").onclick = (e) => {
       e.stopPropagation();
       coverIdx = (coverIdx + 1) % LANDMARK_COVERS.length;
       localStorage.setItem("TRIP_V19_COVER_IDX", String(coverIdx));
-      window.renderV21Dashboard();
+      window.renderV22Dashboard();
     };
-    document.getElementById("v21EditTitleBtn").onclick = () => {
+    document.getElementById("v22EditTitleBtn").onclick = () => {
       const next = prompt("여행 제목을 입력하세요:", savedTitle);
       if (next && next.trim()) {
         localStorage.setItem("TRIP_V17_TITLE", next.trim());
-        window.renderV21Dashboard();
+        window.renderV22Dashboard();
       }
     };
-    document.getElementById("v21EditDdayBtn").onclick = () => {
+    document.getElementById("v22EditDdayBtn").onclick = () => {
       const next = prompt("여행 출발일(YYYY-MM-DD)을 입력하세요:", savedDate);
       if (next && /^\d{4}-\d{2}-\d{2}$/.test(next.trim())) {
         localStorage.setItem("TRIP_V17_DATE", next.trim());
-        window.renderV21Dashboard();
+        window.renderV22Dashboard();
       }
     };
-    document.getElementById("v21QuickAddBtn").onclick = () => window.openV21ImportSheet();
-    document.getElementById("v21QuickListBtn").onclick = () => {
+    document.getElementById("v22QuickAddBtn").onclick = () => window.openV22ImportSheet();
+    document.getElementById("v22QuickListBtn").onclick = () => {
       listCat = "ALL";
       listFilter.ALL = "ALL";
       tab("list");
       scrollTabToTop("list");
     };
 
-    document.getElementById("v21AutoAssignDaysBtn").onclick = () => window.smartBalancedAssignDaysV21();
-    document.getElementById("v21ResetDaysBtn").onclick = () => window.resetAllDaysToUnassignedV21();
+    document.getElementById("v22AutoAssignDaysBtn").onclick = () => window.smartBalancedAssignDaysV22();
+    document.getElementById("v22ResetDaysBtn").onclick = () => window.resetAllDaysToUnassignedV22();
 
-    dashEl.querySelectorAll("[data-v21-goto]").forEach(card => {
+    dashEl.querySelectorAll("[data-v22-goto]").forEach(card => {
       card.onclick = () => {
         listCat = "ALL";
         listFilter.ALL = "ALL";
@@ -13847,70 +14020,46 @@ ${caption || rawText}
       };
     });
 
-    dashEl.querySelectorAll("[data-v21-daymap]").forEach(card => {
-      card.onclick = () => {
-        const d = Number(card.dataset.v21Daymap) || 0;
+    dashEl.querySelectorAll("[data-v22-daymap]").forEach(btn => {
+      btn.onclick = () => {
+        const d = Number(btn.dataset.v22Daymap) || 0;
         if (typeof mapDay !== "undefined") mapDay = d;
         if (typeof mapRouteOn !== "undefined") mapRouteOn = true;
         if (typeof draw === "function") draw(true);
         if (innerWidth <= 820) tab("map");
         if (typeof fit === "function") setTimeout(fit, 120);
-        if (typeof toast === "function") toast(`🗓️ Day ${d} 이동 동선을 지도에 표시합니다`);
+        if (typeof toast === "function") toast(`🗓️ Day ${d} 최단 동선을 지도에 표시합니다`);
       };
     });
 
-    // 길찾기(dir)가 아닌 구글맵 해당 위치 핀 보기(search/?api=1&query=)로 연결
-    dashEl.querySelectorAll("[data-v21-loc]").forEach(btn => {
+    dashEl.querySelectorAll("[data-v22-daylist]").forEach(btn => {
       btn.onclick = () => {
-        const coord = btn.dataset.v21Loc;
-        window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(coord)}`, "_blank", "noopener");
+        const d = Number(btn.dataset.v22Daylist) || 0;
+        listCat = "ALL";
+        listFilter.ALL = "DAY:" + d;
+        tab("list");
+        scrollTabToTop("list");
+        if (typeof toast === "function") toast(`📋 Day ${d} 코스 목록입니다 (드래그하여 순서 변경 가능)`);
+      };
+    });
+
+    dashEl.querySelectorAll("[data-v22-hotel]").forEach(btn => {
+      btn.onclick = () => {
+        window.focusHotelOnAppMapV22(btn.dataset.v22Hotel);
       };
     });
   };
 
   /* =========================================================================
-   * 9. 목록 카드(초록 체크 + **역 **번 출구 배지 + 스탬프 제거) & FLIP 스무스 드래그
+   * 10. 목록 카드(초록 체크 + **역 **번 출구 배지) & FLIP 스무스 드래그
    * ========================================================================= */
-  if (typeof buildOrderedRoutePoints === "function") {
-    buildOrderedRoutePoints = function(valid) {
-      if (!Array.isArray(valid) || valid.length < 2) return { pts: [], totalKm: 0 };
-      const orderMap = new Map();
-      (items || []).forEach((it, idx) => orderMap.set(String(it.id), idx));
-
-      const ordered = [...valid].sort((a, b) => {
-        const da = Number(a.day) || 99;
-        const db = Number(b.day) || 99;
-        if (da !== db) return da - db;
-        const ia = orderMap.has(String(a.id)) ? orderMap.get(String(a.id)) : 9999;
-        const ib = orderMap.has(String(b.id)) ? orderMap.get(String(b.id)) : 9999;
-        if (ia !== ib) return ia - ib;
-        return (Number(a._placeIndex) || 0) - (Number(b._placeIndex) || 0);
-      });
-
-      let totalKm = 0;
-      for (let k = 1; k < ordered.length; k++) {
-        totalKm += distKm(
-          Number(ordered[k - 1].lat),
-          Number(ordered[k - 1].lng),
-          Number(ordered[k].lat),
-          Number(ordered[k].lng)
-        );
-      }
-      return {
-        pts: ordered.map(x => [Number(x.lat), Number(x.lng)]),
-        totalKm
-      };
-    };
-  }
-
-  function decorateV21Cards() {
+  function decorateV22Cards() {
     const listEl = document.getElementById("list-LIST");
     if (!listEl || !Array.isArray(items)) return;
 
     const itemMap = new Map(items.map(it => [String(it.id), it]));
 
     listEl.querySelectorAll(".item[data-id]").forEach(cardEl => {
-      // 이전 스마트 필터에 의해 display:none 처리되었던 카드 강제 표시 복구
       cardEl.style.display = "";
 
       const id = String(cardEl.dataset.id);
@@ -13932,18 +14081,17 @@ ${caption || rawText}
       const nmRow = cardEl.querySelector(".mid .nm");
       if (!nmRow) return;
 
-      // 별표, 이전 체크, 스탬프 배지 모두 제거
-      nmRow.querySelectorAll(".star-btn, .v11-coord-check, .v12-coord-check, .v13-coord-check, .v14-coord-check, .v16-coord-check, .v17-coord-check, .v18-coord-check, .v19-coord-check, .v20-coord-check, .v17-stamp-badge, .v18-stamp-badge, .v19-stamp-badge, .v20-stamp-badge").forEach(el => el.remove());
+      nmRow.querySelectorAll(".star-btn, .v11-coord-check, .v12-coord-check, .v13-coord-check, .v14-coord-check, .v16-coord-check, .v17-coord-check, .v18-coord-check, .v19-coord-check, .v20-coord-check, .v21-coord-check, .v17-stamp-badge, .v18-stamp-badge, .v19-stamp-badge, .v20-stamp-badge").forEach(el => el.remove());
 
       const hasCoord = typeof hasMapCoordinates === "function"
         ? hasMapCoordinates(it)
         : Boolean(Number(it.lat) && Number(it.lng));
 
-      let checkEl = nmRow.querySelector(".v21-coord-check");
+      let checkEl = nmRow.querySelector(".v22-coord-check");
       if (hasCoord) {
         if (!checkEl) {
           checkEl = document.createElement("span");
-          checkEl.className = "v21-coord-check";
+          checkEl.className = "v22-coord-check";
           checkEl.title = "좌표 설정 완료";
           checkEl.innerHTML = '<span class="ms fill">check_circle</span>';
           const daySel = nmRow.querySelector(".ux7-day-select");
@@ -13956,14 +14104,14 @@ ${caption || rawText}
 
       const metaRow = cardEl.querySelector(".ux7-meta-row");
       if (metaRow) {
-        metaRow.querySelectorAll(".v18-pass-badge, .v19-pass-badge, .v20-station-badge, .v20-holiday-warn").forEach(el => el.remove());
+        metaRow.querySelectorAll(".v18-pass-badge, .v19-pass-badge, .v20-station-badge, .v20-holiday-warn, .v21-station-badge, .v21-holiday-warn").forEach(el => el.remove());
 
         const stInfo = getNearestStationAndExit(it);
-        let stBadge = metaRow.querySelector(".v21-station-badge");
+        let stBadge = metaRow.querySelector(".v22-station-badge");
         if (stInfo) {
           if (!stBadge) {
             stBadge = document.createElement("span");
-            stBadge.className = "v21-station-badge";
+            stBadge.className = "v22-station-badge";
             metaRow.prepend(stBadge);
           }
           stBadge.textContent = stInfo;
@@ -13972,11 +14120,11 @@ ${caption || rawText}
         }
 
         const holidayWarn = checkScheduledDayHoliday(it);
-        let holBadge = metaRow.querySelector(".v21-holiday-warn");
+        let holBadge = metaRow.querySelector(".v22-holiday-warn");
         if (holidayWarn) {
           if (!holBadge) {
             holBadge = document.createElement("span");
-            holBadge.className = "v21-holiday-warn";
+            holBadge.className = "v22-holiday-warn";
             metaRow.prepend(holBadge);
           }
           holBadge.textContent = holidayWarn;
@@ -14013,8 +14161,8 @@ ${caption || rawText}
         void el.offsetHeight;
         el.style.transition = "transform 250ms cubic-bezier(0.22, 1, 0.36, 1)";
         el.style.transform = "translate3d(0, 0, 0)";
-        clearTimeout(el._v21FlipTimer);
-        el._v21FlipTimer = setTimeout(() => {
+        clearTimeout(el._v22FlipTimer);
+        el._v22FlipTimer = setTimeout(() => {
           el.style.transition = "";
           el.style.transform = "";
         }, 260);
@@ -14079,7 +14227,7 @@ ${caption || rawText}
     const scrollEl = document.getElementById("tab-list") || listEl.parentElement;
 
     const cloneEl = card.cloneNode(true);
-    cloneEl.className = card.className + " v21-floating-card";
+    cloneEl.className = card.className + " v22-floating-card";
     cloneEl.style.width = rect.width + "px";
     cloneEl.style.height = rect.height + "px";
     cloneEl.style.left = rect.left + "px";
@@ -14094,7 +14242,7 @@ ${caption || rawText}
       }
     }, 125);
 
-    card.classList.add("v21-drag-placeholder");
+    card.classList.add("v22-drag-placeholder");
     card.classList.remove("selected");
     if (typeof selected !== "undefined" && selected.clear) selected.clear();
     if (typeof window.v8Haptic === "function") window.v8Haptic(18);
@@ -14142,7 +14290,7 @@ ${caption || rawText}
     state.cloneEl.style.boxShadow = "0 4px 16px rgba(0, 0, 0, 0.2)";
 
     setTimeout(() => {
-      state.card.classList.remove("v21-drag-placeholder");
+      state.card.classList.remove("v22-drag-placeholder");
       state.cloneEl.remove();
       dragState = null;
 
@@ -14169,7 +14317,7 @@ ${caption || rawText}
       if (typeof pushLocalHistory === "function") pushLocalHistory();
       if (typeof persistNow === "function") persistNow();
       if (typeof draw === "function") draw(true);
-      if (window.renderV21Dashboard) window.renderV21Dashboard();
+      if (window.renderV22Dashboard) window.renderV22Dashboard();
       if (typeof toast === "function") toast("순서 및 지도 동선이 갱신되었습니다");
     }, 195);
   }
@@ -14237,15 +14385,24 @@ ${caption || rawText}
     }
   }, { capture: true });
 
+  if (typeof draw === "function") {
+    const _origDrawV22 = draw;
+    draw = function(...args) {
+      const r = _origDrawV22.apply(this, args);
+      renderHotelMarkersOnMap();
+      return r;
+    };
+  }
+
   if (typeof tab === "function") {
     const _origTab = tab;
     tab = function(k, ...rest) {
       const r = _origTab.apply(this, [k, ...rest]);
       updateFabVisibility();
-      if (window.renderV21Dashboard) window.renderV21Dashboard();
+      if (window.renderV22Dashboard) window.renderV22Dashboard();
       renderSimpleSplitWidget();
+      renderHotelMarkersOnMap();
       scrollTabToTop(k);
-      setTimeout(enrichStationsViaOverpass, 500);
       return r;
     };
   }
@@ -14260,45 +14417,44 @@ ${caption || rawText}
         }
       }
       const r = _origRenderList.apply(this, args);
-      decorateV21Cards();
+      decorateV22Cards();
       renderSimpleSplitWidget();
-      if (window.renderV21Dashboard) window.renderV21Dashboard();
-      setTimeout(enrichStationsViaOverpass, 500);
+      if (window.renderV22Dashboard) window.renderV22Dashboard();
       return r;
     };
   }
 
   const listObserver = new MutationObserver(() => {
-    decorateV21Cards();
+    decorateV22Cards();
   });
 
-  function bootV21() {
+  function bootV22() {
     if (typeof listFilter !== "undefined") {
       Object.keys(listFilter).forEach(k => { listFilter[k] = "ALL"; });
     }
     setupImportBottomSheetAndDashboard();
     updateFabVisibility();
     renderSimpleSplitWidget();
-    if (window.renderV21Dashboard) window.renderV21Dashboard();
+    renderHotelMarkersOnMap();
+    if (window.renderV22Dashboard) window.renderV22Dashboard();
     const listEl = document.getElementById("list-LIST");
-    if (listEl && !listEl._v21Observed) {
-      listEl._v21Observed = true;
+    if (listEl && !listEl._v22Observed) {
+      listEl._v22Observed = true;
       listObserver.observe(listEl, { childList: true });
     }
     if (typeof renderListTab === "function") renderListTab();
-    decorateV21Cards();
-    setTimeout(enrichStationsViaOverpass, 900);
+    decorateV22Cards();
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", bootV21);
+    document.addEventListener("DOMContentLoaded", bootV22);
   } else {
-    bootV21();
+    bootV22();
   }
-  setTimeout(bootV21, 250);
-  setTimeout(bootV21, 700);
+  setTimeout(bootV22, 250);
+  setTimeout(bootV22, 700);
 })();
 </script>
-<!-- === V21_STREAMLINED_PATCH_END === -->
+<!-- === V22_SMART_ROUTE_AND_NO_BLANK_PATCH_END === -->
 </body>
 </html>
