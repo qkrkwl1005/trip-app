@@ -5,9 +5,9 @@
   "start_url": "./index.html",
   "display": "standalone",
   "share_target": {
-    "action": "./index.html?share",
-    "method": "POST",
-    "enctype": "multipart/form-data",
+    "action": "./index.html",
+    "method": "GET",
+    "enctype": "application/x-www-form-urlencoded",
     "params": {
       "title": "title",
       "text": "text",

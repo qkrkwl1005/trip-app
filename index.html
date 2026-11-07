@@ -13835,5 +13835,332 @@ ${caption || rawText}
 })();
 </script>
 <!-- === V33_UI_AND_DRAG_FIX_END === -->
+<!-- === V34_UX_MOTION_SHARE_PATCH_START === -->
+<style>
+  /* 1. 무의미하게 전 카드에 도배되던 '방금 수정됨' 배지 숨김 */
+  .v8-live-pill {
+    display: none !important;
+  }
+
+  /* 2. 카드 하단 컨트롤 줄(릴스·길찾기·일차·시간) 1줄 고정 및 컴팩트 정렬 */
+  #list-LIST .item .v33-card-ctrl-row {
+    display: flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    flex-wrap: nowrap !important;
+    margin-top: 9px !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+  }
+  #list-LIST .item .v33-card-ctrl-row::-webkit-scrollbar {
+    display: none !important;
+  }
+  #list-LIST .item .v33-card-ctrl-row .mb {
+    min-height: 31px !important;
+    padding: 4px 10px !important;
+    font-size: 11.5px !important;
+    border-radius: 10px !important;
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+  }
+  #list-LIST .item .v33-card-ctrl-row .ux7-day-select,
+  #list-LIST .item .v33-card-ctrl-row .v32-time-select {
+    min-height: 31px !important;
+    padding: 3px 7px !important;
+    font-size: 11px !important;
+    border-radius: 10px !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* 3. 선택 모드(editMode) 시 우측 방문완료 체크박스 숨김 (체크박스 2개 중복 혼란 방지) */
+  #list-LIST.v34-select-mode .item input[data-act="done"] {
+    display: none !important;
+  }
+
+  /* 4. 지도 드래그 시 상단 칩/버튼 깜빡임 현상 제거 */
+  #map-wrap.ux-map-interacting #mapChips,
+  #map-wrap.ux-map-interacting #mapStrip,
+  #map-wrap.ux-map-interacting #locBtn,
+  #map-wrap.ux-map-interacting #myMapsBtn {
+    opacity: 1 !important;
+    transform: none !important;
+    pointer-events: auto !important;
+  }
+
+  /* 5. 지도 컴팩트 핀 모드 (밀집 지역 겹침 해소용) */
+  #map-wrap.v34-compact-pins .pinCard {
+    width: 34px !important;
+    height: 34px !important;
+    border-radius: 50% !important;
+  }
+  #map-wrap.v34-compact-pins .pinCard img,
+  #map-wrap.v34-compact-pins .pinCard b {
+    display: none !important;
+  }
+  #map-wrap.v34-compact-pins .pinCard .pinNum {
+    position: static !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    font-size: 13px !important;
+  }
+
+  /* 6. 가져오기 바텀 시트 부드러운 열기/닫기 모션 적용 */
+  #v32ImportSheetWrap {
+    display: flex !important;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.24s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.24s;
+  }
+  #v32ImportSheetWrap.on {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+  #v32ImportSheet {
+    transform: translateY(36px);
+    transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  #v32ImportSheetWrap.on #v32ImportSheet {
+    transform: translateY(0);
+  }
+
+  /* 7. 지도 화면에서 토스트 메시지가 하단 버튼을 가리지 않도록 위치 상향 */
+  body.show-map #toast {
+    bottom: calc(142px + env(safe-area-inset-bottom)) !important;
+  }
+
+  /* 8. 인스타 복사 링크 자동 감지 원터치 분석 배너 */
+  #v34ClipBanner {
+    position: fixed;
+    left: 14px;
+    right: 14px;
+    bottom: calc(84px + env(safe-area-inset-bottom));
+    z-index: 1900;
+    background: linear-gradient(135deg, #1e293b, #0f172a);
+    border: 1.5px solid #3b82f6;
+    border-radius: 18px;
+    padding: 11px 14px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(16px);
+    pointer-events: none;
+    transition: opacity 0.22s ease, transform 0.22s ease, visibility 0.22s;
+  }
+  #v34ClipBanner.on {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+</style>
+
+<div id="v34ClipBanner">
+  <div style="min-width:0;flex:1">
+    <div style="font-size:12.5px;font-weight:900;color:#93c5fd">📋 복사한 릴스·쇼츠 링크 감지됨</div>
+    <div id="v34ClipUrlTxt" style="font-size:11px;color:#cbd5e1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px"></div>
+  </div>
+  <div style="display:flex;gap:6px;flex:none">
+    <button type="button" class="mb pr" id="v34ClipAnalyzeBtn" style="min-height:34px;padding:5px 12px;font-size:12px">바로 분석</button>
+    <button type="button" class="mb" id="v34ClipCloseBtn" style="min-height:34px;padding:5px 9px;font-size:12px">✕</button>
+  </div>
+</div>
+
+<script>
+(function initV34UxMotionSharePatch() {
+  /* =========================================================================
+   * 1. 선택 모드(editMode.LIST) 상태 동기화 및 탭 전환 시 자동 해제
+   * ========================================================================= */
+  function syncSelectModeClass() {
+    const listEl = document.getElementById("list-LIST");
+    if (listEl && typeof editMode !== "undefined") {
+      listEl.classList.toggle("v34-select-mode", Boolean(editMode.LIST));
+    }
+  }
+
+  if (typeof renderListTab === "function") {
+    const _origRenderListV34 = renderListTab;
+    renderListTab = function(...args) {
+      const r = _origRenderListV34.apply(this, args);
+      syncSelectModeClass();
+      return r;
+    };
+  }
+
+  if (typeof tab === "function") {
+    const _origTabV34 = tab;
+    tab = function(k, ...rest) {
+      const targetKey = (typeof CATS !== "undefined" && CATS[k]) ? "list" : k;
+      if (targetKey !== "list" && typeof editMode !== "undefined" && editMode.LIST) {
+        editMode.LIST = false;
+        if (typeof selected !== "undefined") selected.clear();
+        syncSelectModeClass();
+      }
+      return _origTabV34.apply(this, [k, ...rest]);
+    };
+  }
+
+  /* =========================================================================
+   * 2. 권역 분리형(교토 북부/오사카 남부) 스마트 자동 일차 배정
+   * ========================================================================= */
+  window.autoAssignDaysV32 = function() {
+    if (!Array.isArray(items) || !items.length) return toast("저장된 장소가 없습니다");
+    const slots = ["09:30", "11:00", "12:30", "14:30", "16:30", "18:30", "20:00"];
+
+    const withCoord = items.filter(x => Number(x.lat) && Number(x.lng));
+    const noCoord = items.filter(x => !Number(x.lat) || !Number(x.lng));
+
+    // 위도 34.82 기준으로 북부(교토·이네·아라시야마)와 남부(오사카·구라시키) 분리 후 각각 최단 동선 정렬
+    const northGroup = withCoord.filter(x => Number(x.lat) >= 34.82);
+    const southGroup = withCoord.filter(x => Number(x.lat) < 34.82);
+
+    const sortCluster = (arr, startLat, startLng) => {
+      const pool = [...arr];
+      const out = [];
+      let cLat = startLat, cLng = startLng;
+      while (pool.length) {
+        let bIdx = 0, bDist = Infinity;
+        for (let i = 0; i < pool.length; i++) {
+          const d = distKm(cLat, cLng, Number(pool[i].lat), Number(pool[i].lng));
+          if (d < bDist) { bDist = d; bIdx = i; }
+        }
+        const p = pool.splice(bIdx, 1)[0];
+        out.push(p);
+        cLat = Number(p.lat);
+        cLng = Number(p.lng);
+      }
+      return out;
+    };
+
+    const orderedNorth = sortCluster(northGroup, 34.9858, 135.7588); // 교토역 기점
+    const orderedSouth = sortCluster(southGroup, 34.6685, 135.5013); // 난바역 기점
+    const combined = [...orderedNorth, ...orderedSouth, ...noCoord];
+
+    const total = combined.length;
+    const northDays = Math.max(1, Math.min(5, Math.round((orderedNorth.length / Math.max(1, total)) * 7)));
+    const southDays = Math.max(1, 7 - northDays);
+
+    combined.forEach((it, idx) => {
+      if (idx < orderedNorth.length) {
+        const perNorth = Math.max(1, Math.ceil(orderedNorth.length / northDays));
+        it.day = Math.min(northDays, Math.floor(idx / perNorth) + 1);
+      } else {
+        const sIdx = idx - orderedNorth.length;
+        const perSouth = Math.max(1, Math.ceil(Math.max(1, total - orderedNorth.length) / southDays));
+        it.day = Math.min(7, northDays + Math.floor(sIdx / perSouth) + 1);
+      }
+      it.visitTime = slots[idx % slots.length];
+    });
+
+    items = combined;
+    persistNow();
+    render(true);
+    draw(true);
+    window.renderV32Dashboard?.();
+    toast(`🗓️ 교토권(Day 1~${northDays}) · 오사카권(Day ${northDays + 1}~7) 권역별로 동선을 배정했습니다!`);
+  };
+
+  /* =========================================================================
+   * 3. 지도 상단 칩에 [핀 작게/크게] 토글 버튼 추가 (밀집 구역 겹침 해소)
+   * ========================================================================= */
+  if (typeof renderMapChips === "function") {
+    const _origRenderMapChips = renderMapChips;
+    renderMapChips = function(...args) {
+      const r = _origRenderMapChips.apply(this, args);
+      const rows = document.querySelectorAll("#mapChips .chip-row");
+      const subRow = rows[1];
+      const mapWrap = document.getElementById("map-wrap");
+      if (subRow && mapWrap && !subRow.querySelector('[data-act="v34CompactPin"]')) {
+        const isCompact = mapWrap.classList.contains("v34-compact-pins");
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "chip sub";
+        btn.dataset.act = "v34CompactPin";
+        if (isCompact) btn.style.cssText = "background:var(--pr);color:#fff;border-color:transparent";
+        btn.innerHTML = `<span class="ms">pin_drop</span>${isCompact ? "사진핀 보기" : "작은핀 보기"}`;
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          const on = mapWrap.classList.toggle("v34-compact-pins");
+          renderMapChips();
+          toast(on ? "📍 겹침 방지를 위해 작은 번호 핀으로 전환했습니다" : "🖼️ 사진 카드 핀으로 전환했습니다");
+        };
+        subRow.appendChild(btn);
+      }
+      return r;
+    };
+  }
+
+  /* =========================================================================
+   * 4. 클립보드 인스타/유튜브 링크 자동 감지 배너 (복사 후 앱 진입 시 원터치 분석)
+   * ========================================================================= */
+  let lastDismissedClipUrl = sessionStorage.getItem("V34_LAST_CLIP_URL") || "";
+  const banner = document.getElementById("v34ClipBanner");
+  const urlTxt = document.getElementById("v34ClipUrlTxt");
+  let detectedUrl = "";
+
+  async function checkClipboardForReel() {
+    if (!navigator.clipboard || !navigator.clipboard.readText) return;
+    if (document.visibilityState !== "visible") return;
+    try {
+      const txt = (await navigator.clipboard.readText() || "").trim();
+      if (!txt) return;
+      const meta = typeof parseVideoMeta === "function" ? parseVideoMeta(txt) : null;
+      if (!meta || !meta.url) return;
+      if (meta.url === lastDismissedClipUrl) return;
+      const alreadySaved = Array.isArray(items) && items.some(
+        x => (typeof normalizeVidUrl === "function" ? normalizeVidUrl(getVidUrlStr(x.vid)) : x.vid) === meta.url
+      );
+      if (alreadySaved) return;
+
+      detectedUrl = txt;
+      if (urlTxt) urlTxt.textContent = meta.url;
+      banner?.classList.add("on");
+    } catch (_) {}
+  }
+
+  document.getElementById("v34ClipCloseBtn").onclick = () => {
+    const meta = typeof parseVideoMeta === "function" ? parseVideoMeta(detectedUrl) : null;
+    if (meta?.url) {
+      lastDismissedClipUrl = meta.url;
+      sessionStorage.setItem("V34_LAST_CLIP_URL", meta.url);
+    }
+    banner?.classList.remove("on");
+  };
+
+  document.getElementById("v34ClipAnalyzeBtn").onclick = () => {
+    const meta = typeof parseVideoMeta === "function" ? parseVideoMeta(detectedUrl) : null;
+    if (meta?.url) {
+      lastDismissedClipUrl = meta.url;
+      sessionStorage.setItem("V34_LAST_CLIP_URL", meta.url);
+    }
+    banner?.classList.remove("on");
+    const shareBox = document.getElementById("shareBox");
+    const reelBox = document.getElementById("reelLinkBox");
+    if (shareBox) shareBox.value = detectedUrl;
+    if (reelBox && meta?.url) reelBox.value = meta.url;
+    document.getElementById("v32ImportSheetWrap")?.classList.add("on");
+    if (typeof runAnalyzeShare === "function") runAnalyzeShare();
+  };
+
+  window.addEventListener("focus", () => setTimeout(checkClipboardForReel, 350));
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") setTimeout(checkClipboardForReel, 350);
+  });
+
+  // + 버튼을 눌렀을 때도 입력칸이 비어있다면 클립보드 확인 유도
+  const fab = document.getElementById("v32FabBtn");
+  if (fab) {
+    fab.addEventListener("click", () => {
+      setTimeout(checkClipboardForReel, 150);
+    });
+  }
+})();
+</script>
+<!-- === V34_UX_MOTION_SHARE_PATCH_END === -->
 </body>
 </html>
