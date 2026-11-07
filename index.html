@@ -1,11 +1,11 @@
 <!doctype html>
 <html lang="ko" data-theme="dark">
   <head>
-<!-- === V22_HEAD_CACHE_START === -->
+<!-- === V23_HEAD_CACHE_START === -->
 <script>
 window.Sortable = null;
-(function registerOfflineSwV22() {
-  const VER = "TRIP_V22_BUST_1794024081";
+(function registerOfflineSwV23() {
+  const VER = "TRIP_V23_BUST_1794041291";
   if (localStorage.getItem("TRIP_LAST_CACHE_BUST") !== VER) {
     localStorage.setItem("TRIP_LAST_CACHE_BUST", VER);
     if ("caches" in window) {
@@ -14,14 +14,15 @@ window.Sortable = null;
   }
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
-      navigator.serviceWorker.register("/sw.js?v=22").then(reg => {
+      navigator.serviceWorker.register("/sw.js?v=23").then(reg => {
         reg.update().catch(() => {});
       }).catch(() => {});
     });
   }
 })();
 </script>
-<!-- === V22_HEAD_CACHE_END === -->
+<!-- === V23_HEAD_CACHE_END === -->
+
 
 
 
@@ -12381,7 +12382,8 @@ ${caption || rawText}
 
 
 
-<!-- === V22_SMART_ROUTE_AND_NO_BLANK_PATCH_START === -->
+
+<!-- === V23_HOTEL_PIN_AND_GMAP_PATCH_START === -->
 <style>
   /* 1. 별표 버튼, 불필요 필터 칩, 기존 검색창 숨김 */
   .item .star-btn,
@@ -12408,7 +12410,7 @@ ${caption || rawText}
   }
 
   /* 2. 좌표 완료 초록색 체크, 역·출구 배지, 휴무일 경고 배지 */
-  .v22-coord-check {
+  .v23-coord-check {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -12418,11 +12420,11 @@ ${caption || rawText}
     flex: none;
     pointer-events: none;
   }
-  .v22-coord-check .ms {
+  .v23-coord-check .ms {
     font-size: 20px;
     color: #10b981;
   }
-  .v22-station-badge {
+  .v23-station-badge {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -12435,12 +12437,12 @@ ${caption || rawText}
     border: 1px solid rgba(59, 130, 246, 0.32);
     flex: none;
   }
-  [data-theme="light"] .v22-station-badge {
+  [data-theme="light"] .v23-station-badge {
     background: rgba(37, 99, 235, 0.1);
     color: #1d4ed8;
     border-color: rgba(37, 99, 235, 0.25);
   }
-  .v22-holiday-warn {
+  .v23-holiday-warn {
     display: inline-flex;
     align-items: center;
     gap: 3px;
@@ -12454,24 +12456,85 @@ ${caption || rawText}
     flex: none;
   }
 
-  /* 3. 지도 위 숙소 전용 고정 마커 스타일 */
-  .v22-hotel-pin {
+  /* 3. 지도 위 숙소 전용 고정 마커 (구글맵·Leaflet·네이버맵 공통) */
+  .v23-hotel-anchor {
+    position: absolute;
+    width: 0;
+    height: 0;
+    cursor: pointer;
+    pointer-events: auto;
+    z-index: 9999;
+  }
+  .v23-hotel-pulse {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 56px;
+    height: 56px;
+    margin-left: -28px;
+    margin-top: -28px;
+    border-radius: 50%;
+    background: rgba(16, 185, 129, 0.38);
+    border: 2px solid #10b981;
+    animation: v23Radar 1.6s ease-out infinite;
+    pointer-events: none;
+  }
+  @keyframes v23Radar {
+    0% { transform: scale(0.45); opacity: 1; }
+    100% { transform: scale(1.75); opacity: 0; }
+  }
+  .v23-hotel-dot {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 14px;
+    height: 14px;
+    margin-left: -7px;
+    margin-top: -7px;
+    border-radius: 50%;
+    background: #10b981;
+    border: 2.5px solid #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.65);
+    pointer-events: none;
+  }
+  .v23-hotel-pill {
+    position: absolute;
+    left: 0;
+    bottom: 12px;
+    transform: translateX(-50%);
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    padding: 6px 11px;
+    padding: 7px 13px;
     border-radius: 999px;
-    background: linear-gradient(135deg, #10b981, #059669);
-    color: #fff;
-    font: 800 12px/1.2 "Pretendard Variable", system-ui, sans-serif;
-    border: 2px solid #fff;
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55);
+    background: linear-gradient(135deg, #059669, #10b981);
+    color: #ffffff;
+    font: 900 13px/1.2 "Pretendard Variable", system-ui, sans-serif;
+    border: 2.5px solid #ffffff;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.6);
     white-space: nowrap;
-    transform: translate(-50%, -100%);
+  }
+  .v23-hotel-pill::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: -8px;
+    transform: translateX(-50%);
+    border-width: 8px 7px 0;
+    border-style: solid;
+    border-color: #ffffff transparent transparent;
+  }
+  .v23-hotel-anchor.active .v23-hotel-pill {
+    background: linear-gradient(135deg, #d97706, #f59e0b);
+    transform: translateX(-50%) scale(1.08);
+  }
+  .v23-hotel-anchor.active .v23-hotel-pulse {
+    background: rgba(245, 158, 11, 0.45);
+    border-color: #f59e0b;
   }
 
   /* 4. 목록 상단: 초간편 1/N 정산 바 */
-  #v22ListBudgetBar {
+  #v23ListBudgetBar {
     flex: 1;
     min-width: 0;
     min-height: 40px;
@@ -12486,7 +12549,7 @@ ${caption || rawText}
     cursor: pointer;
     user-select: none;
   }
-  .v22-lb-text {
+  .v23-lb-text {
     font-size: 13px;
     font-weight: 900;
     color: var(--tx);
@@ -12494,7 +12557,7 @@ ${caption || rawText}
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .v22-lb-pill {
+  .v23-lb-pill {
     padding: 4px 9px;
     border-radius: 999px;
     background: var(--pr-soft);
@@ -12504,7 +12567,7 @@ ${caption || rawText}
     white-space: nowrap;
     flex: none;
   }
-  #v22ListBudgetDrawer {
+  #v23ListBudgetDrawer {
     display: none;
     margin-top: 10px;
     padding: 12px;
@@ -12512,7 +12575,7 @@ ${caption || rawText}
     background: var(--s2);
     border: 1px solid var(--bd2);
   }
-  #v22ListBudgetDrawer.on { display: block; }
+  #v23ListBudgetDrawer.on { display: block; }
 
   /* 5. 드래그 손잡이(⋮⋮) 및 플로팅 카드 */
   .v8-drag-handle {
@@ -12535,14 +12598,14 @@ ${caption || rawText}
     font-size: 23px;
     pointer-events: none;
   }
-  .item.v22-drag-placeholder {
+  .item.v23-drag-placeholder {
     opacity: 0.16 !important;
     background: var(--pr-soft) !important;
     border: 2px dashed var(--pr) !important;
     box-shadow: none !important;
     transform: scale(0.98) !important;
   }
-  .v22-floating-card {
+  .v23-floating-card {
     position: fixed !important;
     z-index: 2147483647 !important;
     pointer-events: none !important;
@@ -12556,7 +12619,7 @@ ${caption || rawText}
   }
 
   /* 6. 우측 하단 고정 [+] 플로팅 버튼 & 바텀 시트 */
-  #v22FabBtn {
+  #v23FabBtn {
     position: fixed;
     right: 20px;
     bottom: calc(86px + env(safe-area-inset-bottom));
@@ -12575,14 +12638,14 @@ ${caption || rawText}
     transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
   }
   @media (min-width: 821px) {
-    #v22FabBtn { left: 362px; right: auto; bottom: 24px; }
+    #v23FabBtn { left: 362px; right: auto; bottom: 24px; }
   }
-  #v22FabBtn.show { display: flex; }
-  #v22FabBtn:active { transform: scale(0.92); }
-  #v22FabBtn .ms { font-size: 30px; transition: transform 0.25s ease; }
-  #v22FabBtn.open .ms { transform: rotate(45deg); }
+  #v23FabBtn.show { display: flex; }
+  #v23FabBtn:active { transform: scale(0.92); }
+  #v23FabBtn .ms { font-size: 30px; transition: transform 0.25s ease; }
+  #v23FabBtn.open .ms { transform: rotate(45deg); }
 
-  #v22ImportSheetWrap {
+  #v23ImportSheetWrap {
     position: fixed;
     inset: 0;
     z-index: 230;
@@ -12593,8 +12656,8 @@ ${caption || rawText}
     align-items: flex-end;
     justify-content: center;
   }
-  #v22ImportSheetWrap.on { display: flex; }
-  #v22ImportSheet {
+  #v23ImportSheetWrap.on { display: flex; }
+  #v23ImportSheet {
     width: 100%;
     max-width: 520px;
     max-height: 90dvh;
@@ -12607,14 +12670,14 @@ ${caption || rawText}
     box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.55);
     animation: shUp 0.26s cubic-bezier(0.22, 1, 0.36, 1);
   }
-  .v22-sheet-handle {
+  .v23-sheet-handle {
     width: 44px;
     height: 5px;
     border-radius: 999px;
     background: var(--bd2);
     margin: 2px auto 14px;
   }
-  .v22-url-bar {
+  .v23-url-bar {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -12624,7 +12687,7 @@ ${caption || rawText}
     border: 1px solid var(--bd2);
     margin-bottom: 10px;
   }
-  .v22-url-bar input {
+  .v23-url-bar input {
     flex: 1;
     border: 0 !important;
     background: transparent !important;
@@ -12634,7 +12697,7 @@ ${caption || rawText}
     font-size: 14px !important;
     box-shadow: none !important;
   }
-  .v22-url-bar .v22-paste-pill {
+  .v23-url-bar .v23-paste-pill {
     flex: none;
     min-height: 36px;
     padding: 0 14px;
@@ -12647,14 +12710,14 @@ ${caption || rawText}
     font-weight: 800;
     cursor: pointer;
   }
-  .v22-platforms {
+  .v23-platforms {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 8px;
     margin: 14px 0;
     text-align: center;
   }
-  .v22-plat-item {
+  .v23-plat-item {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -12664,7 +12727,7 @@ ${caption || rawText}
     color: var(--sub);
     cursor: pointer;
   }
-  .v22-plat-ico {
+  .v23-plat-ico {
     width: 46px;
     height: 46px;
     border-radius: 50%;
@@ -12673,13 +12736,13 @@ ${caption || rawText}
     display: grid;
     place-items: center;
   }
-  .v22-import-list {
+  .v23-import-list {
     display: flex;
     flex-direction: column;
     gap: 10px;
     margin-top: 6px;
   }
-  .v22-import-card {
+  .v23-import-card {
     display: flex;
     align-items: center;
     gap: 14px;
@@ -12693,7 +12756,7 @@ ${caption || rawText}
     text-align: left;
     cursor: pointer;
   }
-  .v22-import-card .v22-ic-box {
+  .v23-import-card .v23-ic-box {
     width: 42px;
     height: 42px;
     border-radius: 12px;
@@ -12701,10 +12764,10 @@ ${caption || rawText}
     place-items: center;
     flex: none;
   }
-  .v22-import-card .v22-ic-txt { flex: 1; min-width: 0; }
-  .v22-import-card .v22-ic-txt b { display: block; font-size: 14px; font-weight: 800; margin-bottom: 2px; }
-  .v22-import-card .v22-ic-txt small { display: block; font-size: 12px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .v22-collapse-pane {
+  .v23-import-card .v23-ic-txt { flex: 1; min-width: 0; }
+  .v23-import-card .v23-ic-txt b { display: block; font-size: 14px; font-weight: 800; margin-bottom: 2px; }
+  .v23-import-card .v23-ic-txt small { display: block; font-size: 12px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .v23-collapse-pane {
     display: none;
     padding: 14px;
     border-radius: 16px;
@@ -12712,15 +12775,15 @@ ${caption || rawText}
     border: 1px solid var(--bd2);
     margin-top: 6px;
   }
-  .v22-collapse-pane.on { display: block; }
+  .v23-collapse-pane.on { display: block; }
 
   /* 7. 홈 대시보드 스타일 */
-  #v22Dashboard {
+  #v23Dashboard {
     display: flex;
     flex-direction: column;
     gap: 14px;
   }
-  .v22-hero {
+  .v23-hero {
     position: relative;
     border-radius: 26px;
     min-height: 205px;
@@ -12734,7 +12797,7 @@ ${caption || rawText}
     box-shadow: 0 14px 34px rgba(0, 0, 0, 0.42);
     border: 1px solid rgba(255, 255, 255, 0.14);
   }
-  .v22-hero-bg {
+  .v23-hero-bg {
     position: absolute;
     inset: 0;
     width: 100%;
@@ -12744,17 +12807,17 @@ ${caption || rawText}
     filter: contrast(1.04) saturate(1.12);
     pointer-events: none;
   }
-  .v22-hero-grad {
+  .v23-hero-grad {
     position: absolute;
     inset: 0;
     background: linear-gradient(180deg, rgba(8,10,15,0.18) 0%, rgba(8,10,15,0.52) 48%, rgba(8,10,15,0.92) 100%);
     pointer-events: none;
   }
-  .v22-hero-top, .v22-hero-btm {
+  .v23-hero-top, .v23-hero-btm {
     position: relative;
     z-index: 2;
   }
-  .v22-dday-pill {
+  .v23-dday-pill {
     display: inline-flex;
     align-items: center;
     gap: 5px;
@@ -12767,7 +12830,7 @@ ${caption || rawText}
     cursor: pointer;
     box-shadow: 0 4px 12px rgba(0,0,0,0.35);
   }
-  .v22-hero-spot-tag {
+  .v23-hero-spot-tag {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -12782,7 +12845,7 @@ ${caption || rawText}
     border: 1px solid rgba(255,255,255,0.18);
     cursor: pointer;
   }
-  .v22-hero-title {
+  .v23-hero-title {
     font-size: 24px;
     font-weight: 900;
     letter-spacing: -0.02em;
@@ -12791,12 +12854,12 @@ ${caption || rawText}
     text-shadow: 0 2px 10px rgba(0,0,0,0.6);
     cursor: pointer;
   }
-  .v22-stats-grid {
+  .v23-stats-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 10px;
   }
-  .v22-stat-card {
+  .v23-stat-card {
     background: var(--s);
     border: 1px solid var(--bd);
     border-radius: 18px;
@@ -12805,30 +12868,30 @@ ${caption || rawText}
     box-shadow: var(--sh-card);
     cursor: pointer;
   }
-  .v22-stat-card b {
+  .v23-stat-card b {
     display: block;
     font-size: 20px;
     font-weight: 900;
     color: var(--tx);
   }
-  .v22-stat-card span {
+  .v23-stat-card span {
     font-size: 11.5px;
     font-weight: 700;
     color: var(--sub);
   }
-  .v22-sec-card {
+  .v23-sec-card {
     background: var(--s);
     border: 1px solid var(--bd);
     border-radius: 22px;
     padding: 16px;
     box-shadow: var(--sh-card);
   }
-  .v22-day-list {
+  .v23-day-list {
     display: flex;
     flex-direction: column;
     gap: 10px;
   }
-  .v22-day-row {
+  .v23-day-row {
     padding: 13px 14px;
     border-radius: 16px;
     background: var(--s2);
@@ -12837,19 +12900,19 @@ ${caption || rawText}
     flex-direction: column;
     gap: 6px;
   }
-  .v22-day-route-preview {
+  .v23-day-route-preview {
     font-size: 12px;
     font-weight: 600;
     color: var(--sub);
     line-height: 1.45;
     word-break: keep-all;
   }
-  .v22-base-grid {
+  .v23-base-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 8px;
   }
-  .v22-base-btn {
+  .v23-base-btn {
     padding: 11px 8px;
     border-radius: 14px;
     background: var(--s2);
@@ -12864,18 +12927,18 @@ ${caption || rawText}
     gap: 4px;
     cursor: pointer;
   }
-  .v22-base-btn small {
+  .v23-base-btn small {
     font-size: 10.5px;
     color: var(--sub);
     font-weight: 600;
   }
-  .v22-base-btn:active { transform: scale(0.96); border-color: var(--pr); }
+  .v23-base-btn:active { transform: scale(0.96); border-color: var(--pr); }
 </style>
 
 <script>
-(function initV22SmartRouteAndNoBlank() {
+(function initV23HotelPinAndGmap() {
   /* =========================================================================
-   * 1. 스플래시 빠른 페이드아웃 & iOS PWA 하얀 빈 창(about:blank) 원천 차단
+   * 1. 스플래시 페이드아웃 & 외부 앱(구글맵 등) 복귀 시 하얀 빈 창(about:blank) 차단
    * ========================================================================= */
   const spEl = document.getElementById("v8Splash");
   if (spEl) {
@@ -12890,15 +12953,12 @@ ${caption || rawText}
     } catch (_) {}
   }, 300);
 
-  // [핵심 해결] 외부 앱(구글맵/인스타/유튜브) 이동 후 복귀 시 하얀 화면(X 닫기 창)이 남지 않도록 처리
   function openExternalCleanNoBlank(url) {
     const u = String(url || "").trim();
     if (!u) return;
-    // 모바일/iOS PWA 환경에서는 _blank 새 창을 띄우지 않고 직접 유니버설 링크를 호출해야 빈 창이 남지 않음
     const a = document.createElement("a");
     a.href = u;
     a.rel = "noopener noreferrer";
-    // 데스크톱 브라우저에서만 새 탭, 모바일에서는 현재 컨텍스트에서 바로 앱 핸드오프
     if (!/iPhone|iPad|iPod|Android/i.test(navigator.userAgent || "")) {
       a.target = "_blank";
     }
@@ -12908,7 +12968,6 @@ ${caption || rawText}
   }
   window.openExternalCleanNoBlank = openExternalCleanNoBlank;
 
-  // 기존 openExternalVideo 함수도 하얀 창이 남지 않게 오버라이드
   if (typeof openExternalVideo === "function") {
     openExternalVideo = function(url) {
       const u = (typeof normalizeVidUrl === "function" ? normalizeVidUrl(url) : "") || String(url || "").trim();
@@ -12917,7 +12976,6 @@ ${caption || rawText}
     };
   }
 
-  // 모바일에서 구글맵 등 <a target="_blank"> 클릭 시 하얀 창 생성 방지
   document.addEventListener("click", (e) => {
     const link = e.target.closest("a[target='_blank']");
     if (!link) return;
@@ -12932,105 +12990,259 @@ ${caption || rawText}
   }, true);
 
   /* =========================================================================
-   * 2. 주요 거점 숙소 3곳 정의 & 앱 내 지도 마커 + 상세 위치 보기 연동
-   *    (단순 숫자 좌표 대신 실제 숙소명·지역명·근접역 표시)
+   * 2. 주요 거점 숙소 3곳 (구글맵 gmap / Leaflet lm / 네이버맵 nmap 100% 마커 지원!)
    * ========================================================================= */
   const ACCOMMODATIONS = {
     kyoto: {
+      key: "kyoto",
       id: "hotel_kyoto",
       title: "교토 숙소",
       sub: "히가시야마구 혼마치 · 도후쿠지역 도보 4분",
       address: "〒605-0981 京都府京都市東山区本町15丁目 (교토 히가시야마구 혼마치)",
-      gmapQuery: "34.97859,135.76631",
       lat: 34.97859,
       lng: 135.76631,
       emoji: "🏨"
     },
     ine: {
+      key: "ine",
       id: "hotel_ine",
-      title: "이네후나야·미야즈 숙소",
+      title: "이네후나야 숙소",
       sub: "교토부 미야즈시 · 아마노하시다테 인근",
       address: "京都府宮津市中野 (교토부 미야즈시 아마노하시다테 북측)",
-      gmapQuery: "35.53836,135.19021",
       lat: 35.53836,
       lng: 135.19021,
       emoji: "🌊"
     },
     osaka: {
+      key: "osaka",
       id: "hotel_osaka",
       title: "오사카 숙소",
       sub: "주오구 닛폰바시 2초메 · 난바/닛폰바시역 도보 6분",
       address: "〒542-0073 大阪府大阪市中央区日本橋2丁目 (오사카 주오구 닛폰바시 2초메)",
-      gmapQuery: "34.661784,135.508406",
       lat: 34.661784,
       lng: 135.508406,
       emoji: "🏢"
     }
   };
 
-  let hotelMapMarkers = [];
-  function renderHotelMarkersOnMap() {
-    if (typeof lm === "undefined" || !lm || !window.L) return;
-    hotelMapMarkers.forEach(m => { try { lm.removeLayer(m); } catch (_) {} });
-    hotelMapMarkers = [];
+  let activeHotelKey = "";
+  let gHotelOverlays = [];
+  let lHotelMarkers = [];
+  let nHotelMarkers = [];
+  let GHotelOverlayClass = null;
 
-    Object.values(ACCOMMODATIONS).forEach(h => {
-      const m = L.marker([h.lat, h.lng], {
-        icon: L.divIcon({
-          className: "",
-          html: `<div class="v22-hotel-pin">${h.emoji} ${esc(h.title)}</div>`,
-          iconSize: [110, 32],
-          iconAnchor: [55, 32]
-        }),
-        zIndexOffset: 900
-      });
-      const popupHtml = `
-        <div class="mapPinPopup">
-          <strong>${h.emoji} ${esc(h.title)}</strong>
-          <div style="font-size:12px;font-weight:700;color:#2563eb;margin-bottom:4px">${esc(h.sub)}</div>
-          <div class="mapPinAddress">${esc(h.address)}</div>
-          <div class="mapPinActions">
-            <button type="button" class="mb pr" onclick="window.openHotelTaxiV22('${h.id}')"><span class="ms">local_taxi</span>택시화면</button>
-            <button type="button" class="mb" onclick="navigator.clipboard?.writeText('${esc(h.address)}');toast('숙소 주소를 복사했어요')"><span class="ms">content_copy</span>주소복사</button>
-            <button type="button" class="mb" onclick="window.openExternalCleanNoBlank('https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(h.address)}')"><span class="ms">map</span>구글맵</button>
-          </div>
-        </div>
-      `;
-      m.bindPopup(popupHtml);
-      m.addTo(lm);
-      h._marker = m;
-      hotelMapMarkers.push(m);
-    });
+  function hotelPinInnerHtml(h) {
+    const isAct = activeHotelKey === h.key;
+    return `
+      <div class="v23-hotel-anchor${isAct ? " active" : ""}">
+        <div class="v23-hotel-pulse"></div>
+        <div class="v23-hotel-dot"></div>
+        <div class="v23-hotel-pill">${h.emoji} ${esc(h.title)}</div>
+      </div>
+    `;
   }
 
-  window.openHotelTaxiV22 = function(key) {
-    const h = Object.values(ACCOMMODATIONS).find(x => x.id === key);
+  function hotelPopupContentHtml(h) {
+    return `
+      <div class="mapPinPopup" style="min-width:220px">
+        <strong style="font-size:15.5px;color:#059669">${h.emoji} ${esc(h.title)} (여기예요!)</strong>
+        <div style="font-size:12.5px;font-weight:800;color:#2563eb;margin:4px 0">${esc(h.sub)}</div>
+        <div class="mapPinAddress" style="font-size:12.5px;margin-bottom:10px">${esc(h.address)}</div>
+        <div class="mapPinActions">
+          <button type="button" class="mb pr" onclick="window.openHotelTaxiV23('${h.key}')"><span class="ms">local_taxi</span>택시화면</button>
+          <button type="button" class="mb" onclick="navigator.clipboard?.writeText('${esc(h.address)}');toast('📋 숙소 주소를 복사했어요')"><span class="ms">content_copy</span>주소복사</button>
+          <button type="button" class="mb" onclick="window.openExternalCleanNoBlank('https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(h.address)}')"><span class="ms">map</span>구글맵</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function openHotelInfoWindowOnMap(h) {
+    if (!h) return;
+    if (typeof gmap !== "undefined" && gmap && window.google?.maps) {
+      if (!mapInfoWindow) mapInfoWindow = new google.maps.InfoWindow();
+      mapInfoWindow.setOptions({
+        pixelOffset: new google.maps.Size(0, -44)
+      });
+      mapInfoWindow.setContent(hotelPopupContentHtml(h));
+      mapInfoWindow.setPosition({ lat: h.lat, lng: h.lng });
+      mapInfoWindow.open({ map: gmap });
+      return;
+    }
+    if (typeof nmap !== "undefined" && nmap && window.naver?.maps) {
+      if (!nMapInfoWindow) {
+        nMapInfoWindow = new naver.maps.InfoWindow({
+          maxWidth: 280,
+          backgroundColor: "#fff",
+          borderColor: "#d1d5db",
+          anchorSize: new naver.maps.Size(10, 10)
+        });
+      }
+      nMapInfoWindow.setContent(hotelPopupContentHtml(h));
+      nMapInfoWindow.open(nmap, new naver.maps.LatLng(h.lat, h.lng));
+      return;
+    }
+    if (typeof lm !== "undefined" && lm && h._lMarker) {
+      h._lMarker.setPopupContent(hotelPopupContentHtml(h));
+      try { h._lMarker.openPopup(); } catch (_) {}
+    }
+  }
+
+  function ensureGHotelClass() {
+    if (GHotelOverlayClass) return GHotelOverlayClass;
+    if (!window.google || !google.maps || !google.maps.OverlayView) return null;
+    class GHotelOverlay extends google.maps.OverlayView {
+      constructor(map, hotel) {
+        super();
+        this.hotel = hotel;
+        this.div = null;
+        this.setMap(map);
+      }
+      onAdd() {
+        this.div = document.createElement("div");
+        this.div.style.cssText = "position:absolute;width:0;height:0;cursor:pointer;pointer-events:auto;z-index:9999";
+        this.div.innerHTML = hotelPinInnerHtml(this.hotel);
+        const onTap = (e) => {
+          e.stopPropagation();
+          activeHotelKey = this.hotel.key;
+          openHotelInfoWindowOnMap(this.hotel);
+        };
+        this.div.addEventListener("click", onTap);
+        this.div.addEventListener("touchend", onTap);
+        this.getPanes().overlayMouseTarget.appendChild(this.div);
+      }
+      draw() {
+        if (!this.div) return;
+        const proj = this.getProjection();
+        if (!proj) return;
+        const p = proj.fromLatLngToDivPixel(new google.maps.LatLng(this.hotel.lat, this.hotel.lng));
+        if (!p) return;
+        this.div.style.left = p.x + "px";
+        this.div.style.top = p.y + "px";
+        const anchor = this.div.querySelector(".v23-hotel-anchor");
+        if (anchor) anchor.classList.toggle("active", activeHotelKey === this.hotel.key);
+      }
+      onRemove() {
+        if (this.div) {
+          this.div.remove();
+          this.div = null;
+        }
+      }
+    }
+    GHotelOverlayClass = GHotelOverlay;
+    return GHotelOverlayClass;
+  }
+
+  function renderHotelMarkersAllEngines() {
+    // 1) Google Maps (gmap)
+    if (typeof gmap !== "undefined" && gmap && window.google?.maps) {
+      gHotelOverlays.forEach(o => { try { o.setMap(null); } catch (_) {} });
+      gHotelOverlays = [];
+      const Cls = ensureGHotelClass();
+      if (Cls) {
+        Object.values(ACCOMMODATIONS).forEach(h => {
+          const ov = new Cls(gmap, h);
+          h._gOverlay = ov;
+          gHotelOverlays.push(ov);
+        });
+      }
+    }
+
+    // 2) Leaflet OpenStreetMap (lm)
+    if (typeof lm !== "undefined" && lm && window.L) {
+      lHotelMarkers.forEach(m => { try { lm.removeLayer(m); } catch (_) {} });
+      lHotelMarkers = [];
+      Object.values(ACCOMMODATIONS).forEach(h => {
+        const m = L.marker([h.lat, h.lng], {
+          icon: L.divIcon({
+            className: "",
+            html: hotelPinInnerHtml(h),
+            iconSize: [0, 0],
+            iconAnchor: [0, 0]
+          }),
+          zIndexOffset: 2000
+        });
+        m.bindPopup(hotelPopupContentHtml(h), { offset: [0, -38] });
+        m.addTo(lm);
+        h._lMarker = m;
+        lHotelMarkers.push(m);
+      });
+    }
+
+    // 3) Naver Maps (nmap)
+    if (typeof nmap !== "undefined" && nmap && window.naver?.maps) {
+      nHotelMarkers.forEach(m => { try { m.setMap(null); } catch (_) {} });
+      nHotelMarkers = [];
+      Object.values(ACCOMMODATIONS).forEach(h => {
+        const m = new naver.maps.Marker({
+          position: new naver.maps.LatLng(h.lat, h.lng),
+          map: nmap,
+          icon: {
+            content: hotelPinInnerHtml(h),
+            anchor: new naver.maps.Point(0, 0)
+          },
+          zIndex: 2000
+        });
+        naver.maps.Event.addListener(m, "click", () => {
+          activeHotelKey = h.key;
+          openHotelInfoWindowOnMap(h);
+        });
+        h._nMarker = m;
+        nHotelMarkers.push(m);
+      });
+    }
+  }
+
+  window.openHotelTaxiV23 = function(key) {
+    const h = ACCOMMODATIONS[key];
     if (h && typeof openTaxiModal === "function") {
       openTaxiModal({ name: h.title, localName: h.sub, address: h.address, lat: h.lat, lng: h.lng });
     }
   };
 
-  window.focusHotelOnAppMapV22 = function(key) {
+  // 숙소 위치보기 버튼 클릭 시 fit()이 줌아웃시키는 것을 차단하고 정확히 숙소 핀과 말풍선을 띄움
+  let _skipFitUntil = 0;
+  if (typeof fit === "function") {
+    const _origFitV23 = fit;
+    fit = function(...args) {
+      if (Date.now() < _skipFitUntil) return;
+      return _origFitV23.apply(this, args);
+    };
+  }
+
+  window.focusHotelOnAppMapV23 = function(key) {
     const h = ACCOMMODATIONS[key];
     if (!h) return;
+    activeHotelKey = key;
+    _skipFitUntil = Date.now() + 1400;
+
     if (innerWidth <= 820) tab("map");
-    setTimeout(() => {
-      renderHotelMarkersOnMap();
-      if (typeof lm !== "undefined" && lm) {
+
+    const applyFocus = () => {
+      renderHotelMarkersAllEngines();
+      if (typeof gmap !== "undefined" && gmap && window.google?.maps) {
+        google.maps.event.trigger(gmap, "resize");
+        gmap.panTo({ lat: h.lat, lng: h.lng });
+        gmap.setZoom(17);
+      } else if (typeof nmap !== "undefined" && nmap && window.naver?.maps) {
+        naver.maps.Event.trigger(nmap, "resize");
+        nmap.setCenter(new naver.maps.LatLng(h.lat, h.lng));
+        nmap.setZoom(17);
+      } else if (typeof lm !== "undefined" && lm) {
         lm.invalidateSize();
-        lm.setView([h.lat, h.lng], 16, { animate: true });
-        if (h._marker) h._marker.openPopup();
-      } else if (typeof focusMapOnItem === "function") {
-        focusMapOnItem(h);
+        lm.setView([h.lat, h.lng], 17, { animate: true });
       }
-      toast(`${h.emoji} ${h.title} (${h.sub})`);
-    }, 120);
+      openHotelInfoWindowOnMap(h);
+    };
+
+    setTimeout(applyFocus, 60);
+    setTimeout(applyFocus, 260);
+    toast(`${h.emoji} ${h.title} 위치 핀을 표시했습니다`);
   };
 
   /* =========================================================================
-   * 3. 다중 장소 릴스(`외 N곳`) 자동 개별 분리 + 진짜 권역 클러스터링 & 최단 동선(TSP) 일차 배정
+   * 3. 다중 장소 릴스 자동 분리 + 권역 클러스터링 & 최단 동선(TSP) 일차 배정
    * ========================================================================= */
-  // 한 릴스에 여러 곳(예: 금각사+우지+기온 9곳)이 묶여 동선을 망치는 항목을 개별 장소 카드로 자동 분리
   function unbundleScatteredMultiPlaces() {
     if (!Array.isArray(items)) return 0;
     let splitCount = 0;
@@ -13071,13 +13283,10 @@ ${caption || rawText}
       nextItems.push(it);
     }
 
-    if (splitCount > 0) {
-      items = nextItems;
-    }
+    if (splitCount > 0) items = nextItems;
     return splitCount;
   }
 
-  // 출발 기점(숙소/거점역)에서 가장 가까운 순서대로 한붓그리기(Nearest-Neighbor TSP) 정렬
   function orderByShortestPath(group, anchorLat, anchorLng) {
     if (!Array.isArray(group) || group.length <= 1) return group || [];
     const withCoord = group.filter(x => Number(x.lat) && Number(x.lng));
@@ -13105,21 +13314,19 @@ ${caption || rawText}
     return [...ordered, ...noCoord];
   }
 
-  window.smartBalancedAssignDaysV22 = function() {
+  window.smartBalancedAssignDaysV23 = function() {
     if (!Array.isArray(items) || !items.length) return toast("저장된 장소가 없습니다");
     if (typeof pushLocalHistory === "function") pushLocalHistory();
 
-    // 1단계: 릴스 1개에 9곳씩 묶여 우지~금각사로 동선이 튀던 묶음 카드를 개별 장소로 자동 분리
     const unbundled = unbundleScatteredMultiPlaces();
 
-    // 2단계: 세밀한 지리적 권역(Micro-Zone) 분류
     const zones = {
-      kyoto_east: [],   // 기온·가와라마치·기요미즈데라·산조·은각사 (교토 동부/중부)
-      kyoto_west_south: [], // 아라시야마·금각사(서부/북서) + 후시미이나리·우지(남부) + 비와코
-      ine_tango: [],    // 이네후나야·아마노하시다테·미야즈
-      kurashiki: [],    // 구라시키·오카야마
-      osaka_north: [],  // 우메다·나카자키초·미노오·오사카성
-      osaka_south: []   // 난바·도톤보리·신사이바시·닛폰바시·텐노지
+      kyoto_east: [],
+      kyoto_west_south: [],
+      ine_tango: [],
+      kurashiki: [],
+      osaka_north: [],
+      osaka_south: []
     };
 
     items.forEach(it => {
@@ -13151,10 +13358,7 @@ ${caption || rawText}
       }
     });
 
-    // 3단계: 각 권역 내부를 숙소 기점 최단 동선(Nearest-Neighbor TSP)으로 정렬 후 Day 1~7 배정
     const dayBuckets = { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [], 7: [] };
-
-    // 교토 동부/중부 -> Day 1 (너무 많으면 Day 1, 2 분배)
     const kyotoEastSorted = orderByShortestPath(zones.kyoto_east, ACCOMMODATIONS.kyoto.lat, ACCOMMODATIONS.kyoto.lng);
     const kyotoWestSorted = orderByShortestPath(zones.kyoto_west_south, ACCOMMODATIONS.kyoto.lat, ACCOMMODATIONS.kyoto.lng);
 
@@ -13167,20 +13371,12 @@ ${caption || rawText}
       dayBuckets[2].push(...kyotoEastSorted.slice(half));
     }
 
-    // 이네후나야·아마노하시다테 -> Day 3
     dayBuckets[3].push(...orderByShortestPath(zones.ine_tango, ACCOMMODATIONS.ine.lat, ACCOMMODATIONS.ine.lng));
-
-    // 우메다·미노오·오사카 북부 -> Day 5
     dayBuckets[5].push(...orderByShortestPath(zones.osaka_north, 34.7025, 135.4980));
 
-    // 구라시키·오카야마 -> 있으면 Day 6
     const kurashikiSorted = orderByShortestPath(zones.kurashiki, 34.6019, 133.7658);
-    if (kurashikiSorted.length > 0) {
-      dayBuckets[6].push(...kurashikiSorted);
-    }
+    if (kurashikiSorted.length > 0) dayBuckets[6].push(...kurashikiSorted);
 
-    // 오사카 남부(난바·도톤보리·신사이바시 등)를 오사카 숙소 기점 최단 동선으로 정렬한 뒤,
-    // 남는 일차(Day 4, Day 6(구라시키 없을 때), Day 7 등)에 동선 순서대로 균등 분할!
     const osakaSouthSorted = orderByShortestPath(zones.osaka_south, ACCOMMODATIONS.osaka.lat, ACCOMMODATIONS.osaka.lng);
     const osakaTargetDays = [4];
     if (!dayBuckets[3].length) osakaTargetDays.unshift(3);
@@ -13193,7 +13389,6 @@ ${caption || rawText}
       dayBuckets[d].push(it);
     });
 
-    // 4단계: 각 일차별로 다시 한 번 최단 동선 순서로 정렬하여 items 전체 배열 순서를 확정
     const finalItems = [];
     for (let d = 1; d <= 7; d++) {
       const anchor = d <= 2 ? ACCOMMODATIONS.kyoto : d === 3 ? ACCOMMODATIONS.ine : ACCOMMODATIONS.osaka;
@@ -13208,11 +13403,11 @@ ${caption || rawText}
     items = finalItems;
     if (typeof save === "function") save();
     if (typeof draw === "function") draw(true);
-    if (window.renderV22Dashboard) window.renderV22Dashboard();
-    toast(`🗓️ ${unbundled ? `묶음 장소 ${unbundled}곳을 분리하고 ` : ""}권역·최단 동선 순으로 Day 1~7 코스를 완성했습니다!`);
+    if (window.renderV23Dashboard) window.renderV23Dashboard();
+    toast(`🗓️ 권역과 최단 동선 순으로 Day 1~7 코스를 자동 배정했습니다!`);
   };
 
-  window.resetAllDaysToUnassignedV22 = function() {
+  window.resetAllDaysToUnassignedV23 = function() {
     const list = typeof items !== "undefined" && Array.isArray(items) ? items : [];
     const assigned = list.filter(x => Number(x.day) > 0);
     if (!assigned.length) return toast("이미 모든 장소가 일차 미정 상태입니다");
@@ -13228,18 +13423,17 @@ ${caption || rawText}
     }
     if (typeof save === "function") save();
     if (typeof draw === "function") draw(true);
-    if (window.renderV22Dashboard) window.renderV22Dashboard();
+    if (window.renderV23Dashboard) window.renderV23Dashboard();
     toast("↩️ 모든 장소를 '일차 미정'으로 초기화했습니다");
   };
 
   /* =========================================================================
-   * 4. 지도 핀 번호(1, 2, 3...) 및 팝업 번호 일치 & 동선(Polyline) 순서 동기화
+   * 4. 지도 핀 순서 번호(1, 2, 3...) & 동선(Polyline) 연동
    * ========================================================================= */
   if (typeof expandMapPins === "function") {
     const _origExpandMapPins = expandMapPins;
     expandMapPins = function(validItems) {
       const rawPins = _origExpandMapPins(validItems);
-      // 현재 배열 순서대로 모든 핀에 1, 2, 3, 4... 방문 순서 번호 부여
       rawPins.forEach((p, idx) => {
         p._pinNumber = idx + 1;
         p._routeOrder = idx + 1;
@@ -13486,21 +13680,21 @@ ${caption || rawText}
     const topCard = searchRow?.closest(".card");
     if (!searchRow || !topCard) return;
 
-    ["v19ListBudgetBar", "v19ListBudgetDrawer", "v20ListBudgetBar", "v20ListBudgetDrawer", "v21ListBudgetBar", "v21ListBudgetDrawer"].forEach(id => {
+    ["v19ListBudgetBar", "v19ListBudgetDrawer", "v20ListBudgetBar", "v20ListBudgetDrawer", "v21ListBudgetBar", "v21ListBudgetDrawer", "v22ListBudgetBar", "v22ListBudgetDrawer"].forEach(id => {
       document.getElementById(id)?.remove();
     });
 
-    let bar = document.getElementById("v22ListBudgetBar");
+    let bar = document.getElementById("v23ListBudgetBar");
     if (!bar) {
       bar = document.createElement("div");
-      bar.id = "v22ListBudgetBar";
+      bar.id = "v23ListBudgetBar";
       searchRow.insertBefore(bar, searchRow.firstChild);
     }
 
-    let drawer = document.getElementById("v22ListBudgetDrawer");
+    let drawer = document.getElementById("v23ListBudgetDrawer");
     if (!drawer) {
       drawer = document.createElement("div");
-      drawer.id = "v22ListBudgetDrawer";
+      drawer.id = "v23ListBudgetDrawer";
       topCard.appendChild(drawer);
     }
 
@@ -13509,8 +13703,8 @@ ${caption || rawText}
     const perPersonJpy = Math.round(perPersonKrw / Math.max(0.1, jpyRate));
 
     bar.innerHTML = `
-      <span class="v22-lb-text">1인 ₩${perPersonKrw.toLocaleString()} (${splitCount}명)</span>
-      <span class="v22-lb-pill">1/N 정산 ▾</span>
+      <span class="v23-lb-text">1인 ₩${perPersonKrw.toLocaleString()} (${splitCount}명)</span>
+      <span class="v23-lb-pill">1/N 정산 ▾</span>
     `;
 
     bar.onclick = () => {
@@ -13519,24 +13713,24 @@ ${caption || rawText}
 
     drawer.innerHTML = `
       <div style="display:flex;gap:6px;align-items:center">
-        <input type="text" id="v22AmtInput" value="${calcAmount ? calcAmount : ""}" placeholder="금액 입력" inputmode="numeric" style="flex:1;min-width:0;margin:0;min-height:40px;padding:6px 12px;font-size:14px;font-weight:800" />
-        <select id="v22CurSelect" class="btn g" style="width:74px;margin:0;min-height:40px;padding:4px 8px;font-size:13px;flex:none">
+        <input type="text" id="v23AmtInput" value="${calcAmount ? calcAmount : ""}" placeholder="금액 입력" inputmode="numeric" style="flex:1;min-width:0;margin:0;min-height:40px;padding:6px 12px;font-size:14px;font-weight:800" />
+        <select id="v23CurSelect" class="btn g" style="width:74px;margin:0;min-height:40px;padding:4px 8px;font-size:13px;flex:none">
           <option value="JPY" ${calcCur === "JPY" ? "selected" : ""}>¥ 엔</option>
           <option value="KRW" ${calcCur === "KRW" ? "selected" : ""}>₩ 원</option>
         </select>
-        <button type="button" class="mb" id="v22SplitMinus" style="min-height:40px;padding:0 11px;font-size:15px;flex:none">-</button>
-        <b id="v22SplitCountLbl" style="font-size:13.5px;min-width:34px;text-align:center;flex:none">${splitCount}명</b>
-        <button type="button" class="mb" id="v22SplitPlus" style="min-height:40px;padding:0 11px;font-size:15px;flex:none">+</button>
-        <button type="button" class="mb dg" id="v22SplitReset" style="min-height:40px;padding:0 10px;font-size:12px;flex:none">초기화</button>
+        <button type="button" class="mb" id="v23SplitMinus" style="min-height:40px;padding:0 11px;font-size:15px;flex:none">-</button>
+        <b id="v23SplitCountLbl" style="font-size:13.5px;min-width:34px;text-align:center;flex:none">${splitCount}명</b>
+        <button type="button" class="mb" id="v23SplitPlus" style="min-height:40px;padding:0 11px;font-size:15px;flex:none">+</button>
+        <button type="button" class="mb dg" id="v23SplitReset" style="min-height:40px;padding:0 10px;font-size:12px;flex:none">초기화</button>
       </div>
-      <div id="v22ResultLine" style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:12px;background:var(--s);border:1px solid var(--bd)">
+      <div id="v23ResultLine" style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:12px;background:var(--s);border:1px solid var(--bd)">
         <span style="font-size:13px;font-weight:800;color:var(--sub)">1인당 (${splitCount}명)</span>
         <b style="font-size:16px;font-weight:900;color:var(--pr)">₩${perPersonKrw.toLocaleString()} <span style="font-size:12.5px;color:var(--sub);font-weight:700">(¥${perPersonJpy.toLocaleString()})</span></b>
       </div>
     `;
 
-    const amtInp = document.getElementById("v22AmtInput");
-    const curSel = document.getElementById("v22CurSelect");
+    const amtInp = document.getElementById("v23AmtInput");
+    const curSel = document.getElementById("v23CurSelect");
 
     const updateCalcLive = () => {
       calcAmount = Number(String(amtInp.value || "").replace(/[^0-9.]/g, "")) || 0;
@@ -13548,11 +13742,11 @@ ${caption || rawText}
       const pKrw = Math.round(tKrw / Math.max(1, splitCount));
       const pJpy = Math.round(pKrw / Math.max(0.1, jpyRate));
 
-      const barTxt = bar.querySelector(".v22-lb-text");
+      const barTxt = bar.querySelector(".v23-lb-text");
       if (barTxt) barTxt.textContent = `1인 ₩${pKrw.toLocaleString()} (${splitCount}명)`;
-      const cntLbl = document.getElementById("v22SplitCountLbl");
+      const cntLbl = document.getElementById("v23SplitCountLbl");
       if (cntLbl) cntLbl.textContent = `${splitCount}명`;
-      const resLine = document.getElementById("v22ResultLine");
+      const resLine = document.getElementById("v23ResultLine");
       if (resLine) {
         resLine.innerHTML = `
           <span style="font-size:13px;font-weight:800;color:var(--sub)">1인당 (${splitCount}명)</span>
@@ -13564,19 +13758,19 @@ ${caption || rawText}
     amtInp.oninput = updateCalcLive;
     curSel.onchange = updateCalcLive;
 
-    document.getElementById("v22SplitMinus").onclick = (e) => {
+    document.getElementById("v23SplitMinus").onclick = (e) => {
       e.stopPropagation();
       splitCount = Math.max(1, splitCount - 1);
       localStorage.setItem("TRIP_V17_SPLIT_CNT", String(splitCount));
       updateCalcLive();
     };
-    document.getElementById("v22SplitPlus").onclick = (e) => {
+    document.getElementById("v23SplitPlus").onclick = (e) => {
       e.stopPropagation();
       splitCount = Math.min(20, splitCount + 1);
       localStorage.setItem("TRIP_V17_SPLIT_CNT", String(splitCount));
       updateCalcLive();
     };
-    document.getElementById("v22SplitReset").onclick = (e) => {
+    document.getElementById("v23SplitReset").onclick = (e) => {
       e.stopPropagation();
       amtInp.value = "";
       updateCalcLive();
@@ -13612,7 +13806,7 @@ ${caption || rawText}
 
   function setupImportBottomSheetAndDashboard() {
     const homeTab = document.getElementById("tab-add");
-    if (!homeTab || document.getElementById("v22ImportSheetWrap")) return;
+    if (!homeTab || document.getElementById("v23ImportSheetWrap")) return;
 
     const origCard = homeTab.querySelector(".card");
     const rsEl = document.getElementById("rs");
@@ -13627,94 +13821,94 @@ ${caption || rawText}
     if (origCard) origCard.style.display = "none";
 
     const dashEl = document.createElement("div");
-    dashEl.id = "v22Dashboard";
+    dashEl.id = "v23Dashboard";
     homeTab.insertBefore(dashEl, homeTab.firstChild);
 
     const fab = document.createElement("button");
     fab.type = "button";
-    fab.id = "v22FabBtn";
+    fab.id = "v23FabBtn";
     fab.title = "장소 가져오기 / 추가";
     fab.innerHTML = '<span class="ms">add</span>';
     document.body.appendChild(fab);
 
     const sheetWrap = document.createElement("div");
-    sheetWrap.id = "v22ImportSheetWrap";
+    sheetWrap.id = "v23ImportSheetWrap";
     sheetWrap.innerHTML = `
-      <div id="v22ImportSheet">
-        <div class="v22-sheet-handle"></div>
+      <div id="v23ImportSheet">
+        <div class="v23-sheet-handle"></div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
           <div style="font-size:18px;font-weight:900;color:var(--tx);display:flex;align-items:center;gap:6px">
             <span class="ms fill" style="color:var(--pr)">download</span>장소 가져오기
           </div>
-          <button type="button" class="mb" id="v22CloseImportBtn" style="min-height:32px;padding:4px 12px;font-size:12px">닫기</button>
+          <button type="button" class="mb" id="v23CloseImportBtn" style="min-height:32px;padding:4px 12px;font-size:12px">닫기</button>
         </div>
 
-        <div id="v22SegMount"></div>
-        <div id="v22StepperMount"></div>
+        <div id="v23SegMount"></div>
+        <div id="v23StepperMount"></div>
 
-        <div class="v22-url-bar">
-          <input type="text" id="v22UnifiedUrlInput" placeholder="소셜 미디어, 릴스·쇼츠 등의 URL" autocomplete="off" />
-          <button type="button" class="v22-paste-pill" id="v22QuickPasteBtn">붙여넣기</button>
+        <div class="v23-url-bar">
+          <input type="text" id="v23UnifiedUrlInput" placeholder="소셜 미디어, 릴스·쇼츠 등의 URL" autocomplete="off" />
+          <button type="button" class="v23-paste-pill" id="v23QuickPasteBtn">붙여넣기</button>
         </div>
-        <button type="button" class="btn" id="v22PrimaryFetchBtn" style="border-radius:999px;min-height:46px">
+        <button type="button" class="btn" id="v23PrimaryFetchBtn" style="border-radius:999px;min-height:46px">
           <span class="ms fill">bolt</span>링크에서 가져오기
         </button>
 
-        <div class="v22-platforms">
-          <div class="v22-plat-item" data-plat="yt">
-            <div class="v22-plat-ico"><span class="ms fill" style="color:#ef4444;font-size:22px">smart_display</span></div>
+        <div class="v23-platforms">
+          <div class="v23-plat-item" data-plat="yt">
+            <div class="v23-plat-ico"><span class="ms fill" style="color:#ef4444;font-size:22px">smart_display</span></div>
             <span>유튜브</span>
           </div>
-          <div class="v22-plat-item" data-plat="ig">
-            <div class="v22-plat-ico"><span class="ms fill" style="color:#ec4899;font-size:22px">photo_camera</span></div>
+          <div class="v23-plat-item" data-plat="ig">
+            <div class="v23-plat-ico"><span class="ms fill" style="color:#ec4899;font-size:22px">photo_camera</span></div>
             <span>인스타그램</span>
           </div>
-          <div class="v22-plat-item" data-plat="tt">
-            <div class="v22-plat-ico"><span class="ms fill" style="color:#38bdf8;font-size:22px">music_note</span></div>
+          <div class="v23-plat-item" data-plat="tt">
+            <div class="v23-plat-ico"><span class="ms fill" style="color:#38bdf8;font-size:22px">music_note</span></div>
             <span>틱톡</span>
           </div>
-          <div class="v22-plat-item" data-plat="etc">
-            <div class="v22-plat-ico"><span class="ms" style="color:var(--sub);font-size:22px">language</span></div>
+          <div class="v23-plat-item" data-plat="etc">
+            <div class="v23-plat-ico"><span class="ms" style="color:var(--sub);font-size:22px">language</span></div>
             <span>기타</span>
           </div>
         </div>
 
-        <div class="v22-import-list">
-          <button type="button" class="v22-import-card" id="v22CardImage">
-            <div class="v22-ic-box" style="background:rgba(16,185,129,0.14);color:#10b981"><span class="ms fill" style="font-size:22px">imagesmode</span></div>
-            <div class="v22-ic-txt"><b>이미지에서 가져오기 (OCR)</b><small>소셜 게시물의 스크린샷 또는 장소 목록</small></div>
+        <div class="v23-import-list">
+          <button type="button" class="v23-import-card" id="v23CardImage">
+            <div class="v23-ic-box" style="background:rgba(16,185,129,0.14);color:#10b981"><span class="ms fill" style="font-size:22px">imagesmode</span></div>
+            <div class="v23-ic-txt"><b>이미지에서 가져오기 (OCR)</b><small>소셜 게시물의 스크린샷 또는 장소 목록</small></div>
             <span class="ms" style="color:var(--sub)">chevron_right</span>
           </button>
 
-          <button type="button" class="v22-import-card" id="v22CardText">
-            <div class="v22-ic-box" style="background:rgba(245,158,11,0.14);color:#f59e0b"><span class="ms fill" style="font-size:22px">description</span></div>
-            <div class="v22-ic-txt"><b>텍스트에서 가져오기</b><small>장소가 포함된 메모, 고정댓글 또는 복사된 텍스트</small></div>
+          <button type="button" class="v23-import-card" id="v23CardText">
+            <div class="v23-ic-box" style="background:rgba(245,158,11,0.14);color:#f59e0b"><span class="ms fill" style="font-size:22px">description</span></div>
+            <div class="v23-ic-txt"><b>텍스트에서 가져오기</b><small>장소가 포함된 메모, 고정댓글 또는 복사된 텍스트</small></div>
             <span class="ms" style="color:var(--sub)">expand_more</span>
           </button>
-          <div class="v22-collapse-pane" id="v22TextPane"></div>
+          <div class="v23-collapse-pane" id="v23TextPane"></div>
 
-          <button type="button" class="v22-import-card" id="v22CardManual">
-            <div class="v22-ic-box" style="background:rgba(59,130,246,0.14);color:#3b82f6"><span class="ms fill" style="font-size:22px">edit_location_alt</span></div>
-            <div class="v22-ic-txt"><b>직접 장소 등록하기</b><small>링크 없이 장소명·주소로 빠르게 1건 등록</small></div>
+          <button type="button" class="v23-import-card" id="v23CardManual">
+            <div class="v23-ic-box" style="background:rgba(59,130,246,0.14);color:#3b82f6"><span class="ms fill" style="font-size:22px">edit_location_alt</span></div>
+            <div class="v23-ic-txt"><b>직접 장소 등록하기</b><small>링크 없이 장소명·주소로 빠르게 1건 등록</small></div>
             <span class="ms" style="color:var(--sub)">expand_more</span>
           </button>
-          <div class="v22-collapse-pane" id="v22ManualPane"></div>
+          <div class="v23-collapse-pane" id="v23ManualPane"></div>
         </div>
 
-        <div id="v22RsMount" style="margin-top:12px"></div>
+        <div id="v23RsMount" style="margin-top:12px"></div>
       </div>
     `;
     document.body.appendChild(sheetWrap);
 
     if (segEl) {
       segEl.style.marginBottom = "12px";
-      document.getElementById("v22SegMount").appendChild(segEl);
+      document.getElementById("v23SegMount").appendChild(segEl);
     }
-    if (stepperEl) document.getElementById("v22StepperMount").appendChild(stepperEl);
-    if (rsEl) document.getElementById("v22RsMount").appendChild(rsEl);
+    if (stepperEl) document.getElementById("v23StepperMount").appendChild(stepperEl);
+    if (rsEl) document.getElementById("v23RsMount").appendChild(rsEl);
 
     if (shareBox) {
-      const textPane = document.getElementById("v22TextPane");
+      const textPane = document.getElementById("v23TextPane");
       shareBox.style.display = "block";
       shareBox.style.marginBottom = "8px";
       shareBox.placeholder = "복사한 릴스·쇼츠 캡션이나 고정댓글 맛집 리스트를 붙여넣으세요 (최대 10곳)";
@@ -13729,7 +13923,7 @@ ${caption || rawText}
     }
 
     if (manualBox) {
-      const manualPane = document.getElementById("v22ManualPane");
+      const manualPane = document.getElementById("v23ManualPane");
       manualBox.style.display = "flex";
       manualBox.style.marginTop = "0";
       manualBox.style.padding = "0";
@@ -13737,12 +13931,12 @@ ${caption || rawText}
       manualPane.appendChild(manualBox);
     }
 
-    window.openV22ImportSheet = function(mode) {
+    window.openV23ImportSheet = function(mode) {
       if (typeof window.v8Haptic === "function") window.v8Haptic(12);
       sheetWrap.classList.add("on");
       fab.classList.add("open");
-      const textPane = document.getElementById("v22TextPane");
-      const manualPane = document.getElementById("v22ManualPane");
+      const textPane = document.getElementById("v23TextPane");
+      const manualPane = document.getElementById("v23ManualPane");
       if (mode === "text") {
         textPane.classList.add("on");
         manualPane.classList.remove("on");
@@ -13754,21 +13948,21 @@ ${caption || rawText}
       }
     };
 
-    window.closeV22ImportSheet = function() {
+    window.closeV23ImportSheet = function() {
       sheetWrap.classList.remove("on");
       fab.classList.remove("open");
     };
 
     fab.onclick = () => {
-      if (sheetWrap.classList.contains("on")) window.closeV22ImportSheet();
-      else window.openV22ImportSheet();
+      if (sheetWrap.classList.contains("on")) window.closeV23ImportSheet();
+      else window.openV23ImportSheet();
     };
-    document.getElementById("v22CloseImportBtn").onclick = window.closeV22ImportSheet;
+    document.getElementById("v23CloseImportBtn").onclick = window.closeV23ImportSheet;
     sheetWrap.addEventListener("click", (e) => {
-      if (e.target === sheetWrap) window.closeV22ImportSheet();
+      if (e.target === sheetWrap) window.closeV23ImportSheet();
     });
 
-    const urlInp = document.getElementById("v22UnifiedUrlInput");
+    const urlInp = document.getElementById("v23UnifiedUrlInput");
     const syncUrl = (val) => {
       const v = String(val || "").trim();
       urlInp.value = v;
@@ -13784,7 +13978,7 @@ ${caption || rawText}
 
     urlInp.addEventListener("input", () => syncUrl(urlInp.value));
 
-    document.getElementById("v22QuickPasteBtn").onclick = async () => {
+    document.getElementById("v23QuickPasteBtn").onclick = async () => {
       try {
         const clip = await navigator.clipboard.readText();
         if (clip && clip.trim()) {
@@ -13799,27 +13993,27 @@ ${caption || rawText}
       toast("입력창을 길게 눌러 붙여넣어 주세요");
     };
 
-    document.getElementById("v22PrimaryFetchBtn").onclick = () => {
+    document.getElementById("v23PrimaryFetchBtn").onclick = () => {
       if (urlInp.value.trim()) syncUrl(urlInp.value);
       analyzeBtn?.click();
       setTimeout(() => { urlInp.value = ""; }, 700);
     };
 
-    sheetWrap.querySelectorAll(".v22-plat-item").forEach(el => {
-      el.onclick = () => document.getElementById("v22QuickPasteBtn").click();
+    sheetWrap.querySelectorAll(".v23-plat-item").forEach(el => {
+      el.onclick = () => document.getElementById("v23QuickPasteBtn").click();
     });
 
-    document.getElementById("v22CardImage").onclick = () => shareFile?.click();
-    document.getElementById("v22CardText").onclick = () => {
-      const textPane = document.getElementById("v22TextPane");
-      const manualPane = document.getElementById("v22ManualPane");
+    document.getElementById("v23CardImage").onclick = () => shareFile?.click();
+    document.getElementById("v23CardText").onclick = () => {
+      const textPane = document.getElementById("v23TextPane");
+      const manualPane = document.getElementById("v23ManualPane");
       const on = textPane.classList.toggle("on");
       manualPane.classList.remove("on");
       if (on) setTimeout(() => shareBox?.focus(), 80);
     };
-    document.getElementById("v22CardManual").onclick = () => {
-      const textPane = document.getElementById("v22TextPane");
-      const manualPane = document.getElementById("v22ManualPane");
+    document.getElementById("v23CardManual").onclick = () => {
+      const textPane = document.getElementById("v23TextPane");
+      const manualPane = document.getElementById("v23ManualPane");
       const on = manualPane.classList.toggle("on");
       textPane.classList.remove("on");
       if (on) setTimeout(() => document.getElementById("ux7ManName")?.focus(), 80);
@@ -13827,7 +14021,7 @@ ${caption || rawText}
   }
 
   function updateFabVisibility() {
-    const fab = document.getElementById("v22FabBtn");
+    const fab = document.getElementById("v23FabBtn");
     if (!fab) return;
     const isMap = document.body.classList.contains("show-map");
     const curTab = typeof activeTab !== "undefined" ? activeTab : "add";
@@ -13836,8 +14030,6 @@ ${caption || rawText}
 
   /* =========================================================================
    * 9. 홈 탭 대시보드 렌더링
-   *    - 일차별 코스: 각 일차의 실제 방문 순서 요약 표시 + [목록 편집] / [동선 지도] 버튼 제공
-   *    - 숙소 위치보기: 앱 내 지도 마커로 즉시 확대 + 구글맵(하얀 창 없음) 버튼 제공
    * ========================================================================= */
   const DAY_ZONE_LABELS = {
     1: "교토 동부·중부 (기온·가와라마치·청수사)",
@@ -13849,8 +14041,8 @@ ${caption || rawText}
     7: "오사카 명소·쇼핑 & 마무리"
   };
 
-  window.renderV22Dashboard = function() {
-    const dashEl = document.getElementById("v22Dashboard");
+  window.renderV23Dashboard = function() {
+    const dashEl = document.getElementById("v23Dashboard");
     if (!dashEl) return;
 
     const list = typeof items !== "undefined" && Array.isArray(items) ? items : [];
@@ -13870,12 +14062,12 @@ ${caption || rawText}
 
     const activeDays = [...new Set(list.filter(x => Number(x.day) > 0).map(x => Number(x.day)))].sort((a, b) => a - b);
     const dayCardsHtml = activeDays.length
-      ? `<div class="v22-day-list">
+      ? `<div class="v23-day-list">
           ${activeDays.map(d => {
             const dItems = list.filter(x => Number(x.day) === d);
             const routePreview = dItems.slice(0, 5).map((x, idx) => `${idx + 1}. ${x.name}`).join(" → ") + (dItems.length > 5 ? ` 외 ${dItems.length - 5}곳` : "");
             return `
-              <div class="v22-day-row">
+              <div class="v23-day-row">
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
                   <div>
                     <b style="font-size:14.5px;color:var(--pr)">Day ${d}</b>
@@ -13883,12 +14075,12 @@ ${caption || rawText}
                   </div>
                   <span class="ux7-badge">${dItems.length}곳</span>
                 </div>
-                <div class="v22-day-route-preview">${esc(routePreview)}</div>
+                <div class="v23-day-route-preview">${esc(routePreview)}</div>
                 <div style="display:flex;gap:6px;margin-top:2px">
-                  <button type="button" class="mb pr" data-v22-daymap="${d}" style="flex:1;min-height:34px;padding:5px 10px;font-size:12px">
+                  <button type="button" class="mb pr" data-v23-daymap="${d}" style="flex:1;min-height:34px;padding:5px 10px;font-size:12px">
                     <span class="ms" style="font-size:15px">route</span>동선 지도 보기
                   </button>
-                  <button type="button" class="mb" data-v22-daylist="${d}" style="flex:1;min-height:34px;padding:5px 10px;font-size:12px">
+                  <button type="button" class="mb" data-v23-daylist="${d}" style="flex:1;min-height:34px;padding:5px 10px;font-size:12px">
                     <span class="ms" style="font-size:15px">format_list_bulleted</span>목록 순서 편집
                   </button>
                 </div>
@@ -13900,22 +14092,22 @@ ${caption || rawText}
 
     dashEl.innerHTML = `
       <!-- 1. 오사카·교토 명소 커버 히어로 카드 -->
-      <div class="v22-hero">
-        <img class="v22-hero-bg" src="${esc(curCover.url)}" referrerpolicy="no-referrer" onerror="this.style.display='none'" alt="" />
-        <div class="v22-hero-grad"></div>
-        <div class="v22-hero-top" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-          <span class="v22-dday-pill" id="v22EditDdayBtn"><span class="ms" style="font-size:15px">event</span>${esc(ddayText)} · ${esc(savedDate)}</span>
-          <button type="button" class="v22-hero-spot-tag" id="v22NextCoverBtn" title="클릭하여 명소 배경 변경">
+      <div class="v23-hero">
+        <img class="v23-hero-bg" src="${esc(curCover.url)}" referrerpolicy="no-referrer" onerror="this.style.display='none'" alt="" />
+        <div class="v23-hero-grad"></div>
+        <div class="v23-hero-top" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <span class="v23-dday-pill" id="v23EditDdayBtn"><span class="ms" style="font-size:15px">event</span>${esc(ddayText)} · ${esc(savedDate)}</span>
+          <button type="button" class="v23-hero-spot-tag" id="v23NextCoverBtn" title="클릭하여 명소 배경 변경">
             <span class="ms" style="font-size:14px">photo_camera</span>${esc(curCover.label)} ↻
           </button>
         </div>
-        <div class="v22-hero-btm" style="margin-top:38px">
-          <div class="v22-hero-title" id="v22EditTitleBtn">${esc(savedTitle)} <span class="ms" style="font-size:16px;opacity:0.75">edit</span></div>
+        <div class="v23-hero-btm" style="margin-top:38px">
+          <div class="v23-hero-title" id="v23EditTitleBtn">${esc(savedTitle)} <span class="ms" style="font-size:16px;opacity:0.75">edit</span></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
-            <button type="button" class="btn" id="v22QuickAddBtn" style="min-height:42px;padding:8px 12px;font-size:13px">
+            <button type="button" class="btn" id="v23QuickAddBtn" style="min-height:42px;padding:8px 12px;font-size:13px">
               <span class="ms">add_circle</span>장소 가져오기
             </button>
-            <button type="button" class="btn g" id="v22QuickListBtn" style="margin:0;min-height:42px;padding:8px 12px;font-size:13px;background:rgba(15,23,42,0.72);color:#fff;border-color:rgba(255,255,255,0.28)">
+            <button type="button" class="btn g" id="v23QuickListBtn" style="margin:0;min-height:42px;padding:8px 12px;font-size:13px;background:rgba(15,23,42,0.72);color:#fff;border-color:rgba(255,255,255,0.28)">
               <span class="ms">format_list_bulleted</span>전체 목록 보기
             </button>
           </div>
@@ -13923,30 +14115,30 @@ ${caption || rawText}
       </div>
 
       <!-- 2. 핵심 3대 지표 -->
-      <div class="v22-stats-grid">
-        <div class="v22-stat-card" data-v22-goto="ALL">
+      <div class="v23-stats-grid">
+        <div class="v23-stat-card" data-v23-goto="ALL">
           <b>${total}</b>
           <span>전체 장소</span>
         </div>
-        <div class="v22-stat-card" data-v22-goto="COORD">
+        <div class="v23-stat-card" data-v23-goto="COORD">
           <b style="color:#10b981">${coords}</b>
           <span>좌표 완료</span>
         </div>
-        <div class="v22-stat-card" data-v22-goto="DAY">
+        <div class="v23-stat-card" data-v23-goto="DAY">
           <b style="color:#3b82f6">${scheduled}</b>
           <span>일차 배정</span>
         </div>
       </div>
 
       <!-- 3. 일차별 코스 & 동선 지도 -->
-      <div class="v22-sec-card">
+      <div class="v23-sec-card">
         <div class="sec-title" style="margin-bottom:10px;font-size:15px">
           <span><span class="ms" style="color:var(--pr)">route</span>일차별 코스 & 동선 지도</span>
           <div style="display:flex;gap:6px">
-            <button type="button" class="mb pr" id="v22AutoAssignDaysBtn" style="min-height:30px;padding:4px 10px;font-size:11.5px">
+            <button type="button" class="mb pr" id="v23AutoAssignDaysBtn" style="min-height:30px;padding:4px 10px;font-size:11.5px">
               <span class="ms" style="font-size:15px">auto_awesome</span>자동 배정
             </button>
-            <button type="button" class="mb dg" id="v22ResetDaysBtn" style="min-height:30px;padding:4px 10px;font-size:11.5px">
+            <button type="button" class="mb dg" id="v23ResetDaysBtn" style="min-height:30px;padding:4px 10px;font-size:11.5px">
               <span class="ms" style="font-size:15px">restart_alt</span>초기화
             </button>
           </div>
@@ -13954,24 +14146,24 @@ ${caption || rawText}
         ${dayCardsHtml}
       </div>
 
-      <!-- 4. 주요 거점 숙소 위치보기 (앱 내 지도에서 숙소 마커+주소 즉시 표시) -->
-      <div class="v22-sec-card">
+      <!-- 4. 주요 거점 숙소 위치보기 (구글맵/앱 지도 위 숙소 핀+말풍선 즉시 표시) -->
+      <div class="v23-sec-card">
         <div class="sec-title" style="margin-bottom:10px;font-size:15px">
           <span><span class="ms" style="color:#10b981">hotel</span>주요 거점 숙소 위치보기</span>
           <small style="font-size:11px;color:var(--sub);font-weight:700">터치 시 지도에서 숙소 핀 확인</small>
         </div>
-        <div class="v22-base-grid">
-          <button type="button" class="v22-base-btn" data-v22-hotel="kyoto">
+        <div class="v23-base-grid">
+          <button type="button" class="v23-base-btn" data-v23-hotel="kyoto">
             <span class="ms" style="color:#3b82f6">temple_buddhist</span>
             <span>교토 숙소</span>
             <small>도후쿠지역 인근</small>
           </button>
-          <button type="button" class="v22-base-btn" data-v22-hotel="ine">
+          <button type="button" class="v23-base-btn" data-v23-hotel="ine">
             <span class="ms" style="color:#10b981">waves</span>
             <span>이네후나야 숙소</span>
             <small>아마노하시다테</small>
           </button>
-          <button type="button" class="v22-base-btn" data-v22-hotel="osaka">
+          <button type="button" class="v23-base-btn" data-v23-hotel="osaka">
             <span class="ms" style="color:#f59e0b">apartment</span>
             <span>오사카 숙소</span>
             <small>닛폰바시·난바</small>
@@ -13980,38 +14172,38 @@ ${caption || rawText}
       </div>
     `;
 
-    document.getElementById("v22NextCoverBtn").onclick = (e) => {
+    document.getElementById("v23NextCoverBtn").onclick = (e) => {
       e.stopPropagation();
       coverIdx = (coverIdx + 1) % LANDMARK_COVERS.length;
       localStorage.setItem("TRIP_V19_COVER_IDX", String(coverIdx));
-      window.renderV22Dashboard();
+      window.renderV23Dashboard();
     };
-    document.getElementById("v22EditTitleBtn").onclick = () => {
+    document.getElementById("v23EditTitleBtn").onclick = () => {
       const next = prompt("여행 제목을 입력하세요:", savedTitle);
       if (next && next.trim()) {
         localStorage.setItem("TRIP_V17_TITLE", next.trim());
-        window.renderV22Dashboard();
+        window.renderV23Dashboard();
       }
     };
-    document.getElementById("v22EditDdayBtn").onclick = () => {
+    document.getElementById("v23EditDdayBtn").onclick = () => {
       const next = prompt("여행 출발일(YYYY-MM-DD)을 입력하세요:", savedDate);
       if (next && /^\d{4}-\d{2}-\d{2}$/.test(next.trim())) {
         localStorage.setItem("TRIP_V17_DATE", next.trim());
-        window.renderV22Dashboard();
+        window.renderV23Dashboard();
       }
     };
-    document.getElementById("v22QuickAddBtn").onclick = () => window.openV22ImportSheet();
-    document.getElementById("v22QuickListBtn").onclick = () => {
+    document.getElementById("v23QuickAddBtn").onclick = () => window.openV23ImportSheet();
+    document.getElementById("v23QuickListBtn").onclick = () => {
       listCat = "ALL";
       listFilter.ALL = "ALL";
       tab("list");
       scrollTabToTop("list");
     };
 
-    document.getElementById("v22AutoAssignDaysBtn").onclick = () => window.smartBalancedAssignDaysV22();
-    document.getElementById("v22ResetDaysBtn").onclick = () => window.resetAllDaysToUnassignedV22();
+    document.getElementById("v23AutoAssignDaysBtn").onclick = () => window.smartBalancedAssignDaysV23();
+    document.getElementById("v23ResetDaysBtn").onclick = () => window.resetAllDaysToUnassignedV23();
 
-    dashEl.querySelectorAll("[data-v22-goto]").forEach(card => {
+    dashEl.querySelectorAll("[data-v23-goto]").forEach(card => {
       card.onclick = () => {
         listCat = "ALL";
         listFilter.ALL = "ALL";
@@ -14020,9 +14212,9 @@ ${caption || rawText}
       };
     });
 
-    dashEl.querySelectorAll("[data-v22-daymap]").forEach(btn => {
+    dashEl.querySelectorAll("[data-v23-daymap]").forEach(btn => {
       btn.onclick = () => {
-        const d = Number(btn.dataset.v22Daymap) || 0;
+        const d = Number(btn.dataset.v23Daymap) || 0;
         if (typeof mapDay !== "undefined") mapDay = d;
         if (typeof mapRouteOn !== "undefined") mapRouteOn = true;
         if (typeof draw === "function") draw(true);
@@ -14032,9 +14224,9 @@ ${caption || rawText}
       };
     });
 
-    dashEl.querySelectorAll("[data-v22-daylist]").forEach(btn => {
+    dashEl.querySelectorAll("[data-v23-daylist]").forEach(btn => {
       btn.onclick = () => {
-        const d = Number(btn.dataset.v22Daylist) || 0;
+        const d = Number(btn.dataset.v23Daylist) || 0;
         listCat = "ALL";
         listFilter.ALL = "DAY:" + d;
         tab("list");
@@ -14043,9 +14235,9 @@ ${caption || rawText}
       };
     });
 
-    dashEl.querySelectorAll("[data-v22-hotel]").forEach(btn => {
+    dashEl.querySelectorAll("[data-v23-hotel]").forEach(btn => {
       btn.onclick = () => {
-        window.focusHotelOnAppMapV22(btn.dataset.v22Hotel);
+        window.focusHotelOnAppMapV23(btn.dataset.v23Hotel);
       };
     });
   };
@@ -14053,7 +14245,7 @@ ${caption || rawText}
   /* =========================================================================
    * 10. 목록 카드(초록 체크 + **역 **번 출구 배지) & FLIP 스무스 드래그
    * ========================================================================= */
-  function decorateV22Cards() {
+  function decorateV23Cards() {
     const listEl = document.getElementById("list-LIST");
     if (!listEl || !Array.isArray(items)) return;
 
@@ -14081,17 +14273,17 @@ ${caption || rawText}
       const nmRow = cardEl.querySelector(".mid .nm");
       if (!nmRow) return;
 
-      nmRow.querySelectorAll(".star-btn, .v11-coord-check, .v12-coord-check, .v13-coord-check, .v14-coord-check, .v16-coord-check, .v17-coord-check, .v18-coord-check, .v19-coord-check, .v20-coord-check, .v21-coord-check, .v17-stamp-badge, .v18-stamp-badge, .v19-stamp-badge, .v20-stamp-badge").forEach(el => el.remove());
+      nmRow.querySelectorAll(".star-btn, .v11-coord-check, .v12-coord-check, .v13-coord-check, .v14-coord-check, .v16-coord-check, .v17-coord-check, .v18-coord-check, .v19-coord-check, .v20-coord-check, .v21-coord-check, .v22-coord-check, .v17-stamp-badge, .v18-stamp-badge, .v19-stamp-badge, .v20-stamp-badge").forEach(el => el.remove());
 
       const hasCoord = typeof hasMapCoordinates === "function"
         ? hasMapCoordinates(it)
         : Boolean(Number(it.lat) && Number(it.lng));
 
-      let checkEl = nmRow.querySelector(".v22-coord-check");
+      let checkEl = nmRow.querySelector(".v23-coord-check");
       if (hasCoord) {
         if (!checkEl) {
           checkEl = document.createElement("span");
-          checkEl.className = "v22-coord-check";
+          checkEl.className = "v23-coord-check";
           checkEl.title = "좌표 설정 완료";
           checkEl.innerHTML = '<span class="ms fill">check_circle</span>';
           const daySel = nmRow.querySelector(".ux7-day-select");
@@ -14104,14 +14296,14 @@ ${caption || rawText}
 
       const metaRow = cardEl.querySelector(".ux7-meta-row");
       if (metaRow) {
-        metaRow.querySelectorAll(".v18-pass-badge, .v19-pass-badge, .v20-station-badge, .v20-holiday-warn, .v21-station-badge, .v21-holiday-warn").forEach(el => el.remove());
+        metaRow.querySelectorAll(".v18-pass-badge, .v19-pass-badge, .v20-station-badge, .v20-holiday-warn, .v21-station-badge, .v21-holiday-warn, .v22-station-badge, .v22-holiday-warn").forEach(el => el.remove());
 
         const stInfo = getNearestStationAndExit(it);
-        let stBadge = metaRow.querySelector(".v22-station-badge");
+        let stBadge = metaRow.querySelector(".v23-station-badge");
         if (stInfo) {
           if (!stBadge) {
             stBadge = document.createElement("span");
-            stBadge.className = "v22-station-badge";
+            stBadge.className = "v23-station-badge";
             metaRow.prepend(stBadge);
           }
           stBadge.textContent = stInfo;
@@ -14120,11 +14312,11 @@ ${caption || rawText}
         }
 
         const holidayWarn = checkScheduledDayHoliday(it);
-        let holBadge = metaRow.querySelector(".v22-holiday-warn");
+        let holBadge = metaRow.querySelector(".v23-holiday-warn");
         if (holidayWarn) {
           if (!holBadge) {
             holBadge = document.createElement("span");
-            holBadge.className = "v22-holiday-warn";
+            holBadge.className = "v23-holiday-warn";
             metaRow.prepend(holBadge);
           }
           holBadge.textContent = holidayWarn;
@@ -14161,8 +14353,8 @@ ${caption || rawText}
         void el.offsetHeight;
         el.style.transition = "transform 250ms cubic-bezier(0.22, 1, 0.36, 1)";
         el.style.transform = "translate3d(0, 0, 0)";
-        clearTimeout(el._v22FlipTimer);
-        el._v22FlipTimer = setTimeout(() => {
+        clearTimeout(el._v23FlipTimer);
+        el._v23FlipTimer = setTimeout(() => {
           el.style.transition = "";
           el.style.transform = "";
         }, 260);
@@ -14227,7 +14419,7 @@ ${caption || rawText}
     const scrollEl = document.getElementById("tab-list") || listEl.parentElement;
 
     const cloneEl = card.cloneNode(true);
-    cloneEl.className = card.className + " v22-floating-card";
+    cloneEl.className = card.className + " v23-floating-card";
     cloneEl.style.width = rect.width + "px";
     cloneEl.style.height = rect.height + "px";
     cloneEl.style.left = rect.left + "px";
@@ -14242,7 +14434,7 @@ ${caption || rawText}
       }
     }, 125);
 
-    card.classList.add("v22-drag-placeholder");
+    card.classList.add("v23-drag-placeholder");
     card.classList.remove("selected");
     if (typeof selected !== "undefined" && selected.clear) selected.clear();
     if (typeof window.v8Haptic === "function") window.v8Haptic(18);
@@ -14290,7 +14482,7 @@ ${caption || rawText}
     state.cloneEl.style.boxShadow = "0 4px 16px rgba(0, 0, 0, 0.2)";
 
     setTimeout(() => {
-      state.card.classList.remove("v22-drag-placeholder");
+      state.card.classList.remove("v23-drag-placeholder");
       state.cloneEl.remove();
       dragState = null;
 
@@ -14317,7 +14509,7 @@ ${caption || rawText}
       if (typeof pushLocalHistory === "function") pushLocalHistory();
       if (typeof persistNow === "function") persistNow();
       if (typeof draw === "function") draw(true);
-      if (window.renderV22Dashboard) window.renderV22Dashboard();
+      if (window.renderV23Dashboard) window.renderV23Dashboard();
       if (typeof toast === "function") toast("순서 및 지도 동선이 갱신되었습니다");
     }, 195);
   }
@@ -14386,10 +14578,10 @@ ${caption || rawText}
   }, { capture: true });
 
   if (typeof draw === "function") {
-    const _origDrawV22 = draw;
+    const _origDrawV23 = draw;
     draw = function(...args) {
-      const r = _origDrawV22.apply(this, args);
-      renderHotelMarkersOnMap();
+      const r = _origDrawV23.apply(this, args);
+      renderHotelMarkersAllEngines();
       return r;
     };
   }
@@ -14399,9 +14591,9 @@ ${caption || rawText}
     tab = function(k, ...rest) {
       const r = _origTab.apply(this, [k, ...rest]);
       updateFabVisibility();
-      if (window.renderV22Dashboard) window.renderV22Dashboard();
+      if (window.renderV23Dashboard) window.renderV23Dashboard();
       renderSimpleSplitWidget();
-      renderHotelMarkersOnMap();
+      renderHotelMarkersAllEngines();
       scrollTabToTop(k);
       return r;
     };
@@ -14417,44 +14609,44 @@ ${caption || rawText}
         }
       }
       const r = _origRenderList.apply(this, args);
-      decorateV22Cards();
+      decorateV23Cards();
       renderSimpleSplitWidget();
-      if (window.renderV22Dashboard) window.renderV22Dashboard();
+      if (window.renderV23Dashboard) window.renderV23Dashboard();
       return r;
     };
   }
 
   const listObserver = new MutationObserver(() => {
-    decorateV22Cards();
+    decorateV23Cards();
   });
 
-  function bootV22() {
+  function bootV23() {
     if (typeof listFilter !== "undefined") {
       Object.keys(listFilter).forEach(k => { listFilter[k] = "ALL"; });
     }
     setupImportBottomSheetAndDashboard();
     updateFabVisibility();
     renderSimpleSplitWidget();
-    renderHotelMarkersOnMap();
-    if (window.renderV22Dashboard) window.renderV22Dashboard();
+    renderHotelMarkersAllEngines();
+    if (window.renderV23Dashboard) window.renderV23Dashboard();
     const listEl = document.getElementById("list-LIST");
-    if (listEl && !listEl._v22Observed) {
-      listEl._v22Observed = true;
+    if (listEl && !listEl._v23Observed) {
+      listEl._v23Observed = true;
       listObserver.observe(listEl, { childList: true });
     }
     if (typeof renderListTab === "function") renderListTab();
-    decorateV22Cards();
+    decorateV23Cards();
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", bootV22);
+    document.addEventListener("DOMContentLoaded", bootV23);
   } else {
-    bootV22();
+    bootV23();
   }
-  setTimeout(bootV22, 250);
-  setTimeout(bootV22, 700);
+  setTimeout(bootV23, 250);
+  setTimeout(bootV23, 800);
 })();
 </script>
-<!-- === V22_SMART_ROUTE_AND_NO_BLANK_PATCH_END === -->
+<!-- === V23_HOTEL_PIN_AND_GMAP_PATCH_END === -->
 </body>
 </html>

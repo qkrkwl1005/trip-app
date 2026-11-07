@@ -1,6 +1,6 @@
-// V22_OFFLINE_FIRST_SW_1794024081
-const CACHE_STATIC = "trip-static-v22";
-const CACHE_RUNTIME = "trip-runtime-v22";
+// V23_OFFLINE_FIRST_SW_1794041291
+const CACHE_STATIC = "trip-static-v23";
+const CACHE_RUNTIME = "trip-runtime-v23";
 
 const PRECACHE_URLS = [
   "/",
