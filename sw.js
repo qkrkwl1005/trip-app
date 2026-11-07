@@ -1,22 +1,9 @@
-// V27_OFFLINE_FIRST_SW_1794045169
-const CACHE_STATIC = "trip-static-v27";
-const CACHE_RUNTIME = "trip-runtime-v27";
-
-const PRECACHE_URLS = [
-  "/",
-  "/index.html",
-  "/manifest.json",
-  "/icon-192.png?v=8",
-  "/icon-512.png?v=8",
-  "/apple-touch-icon.png?v=8",
-  "/favicon.png?v=8"
-];
+// V28_NETWORK_FIRST_SW_1794046932
+const CACHE_STATIC = "trip-static-v28";
+const CACHE_RUNTIME = "trip-runtime-v28";
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_STATIC).then((cache) => cache.addAll(PRECACHE_URLS).catch(() => {}))
-  );
 });
 
 self.addEventListener("activate", (event) => {
@@ -29,16 +16,6 @@ self.addEventListener("activate", (event) => {
       )
     ).then(() => self.clients.claim())
   );
-});
-
-self.addEventListener("sync", (event) => {
-  if (event.tag === "trip-offline-sync") {
-    event.waitUntil(
-      self.clients.matchAll().then((clients) => {
-        clients.forEach((client) => client.postMessage({ type: "FLUSH_OFFLINE_QUEUE" }));
-      })
-    );
-  }
 });
 
 self.addEventListener("fetch", (event) => {
@@ -56,9 +33,10 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // HTML 문서는 항상 최신 서버 버전을 먼저 가져오고 오프라인일 때만 캐시 반환
   if (req.mode === "navigate" || url.pathname === "/" || url.pathname.endsWith("/index.html")) {
     event.respondWith(
-      fetch(req)
+      fetch(req, { cache: "no-store" })
         .then((res) => {
           const copy = res.clone();
           caches.open(CACHE_STATIC).then((c) => c.put(req, copy));
@@ -69,6 +47,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // 지도 타일 및 정적 리소스 캐싱
   if (
     url.hostname.includes("tile.openstreetmap.org") ||
     url.hostname.includes("basemaps.cartocdn.com") ||
