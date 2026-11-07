@@ -13383,5 +13383,457 @@ ${caption || rawText}
 })();
 </script>
 <!-- === V32_FINAL_UX_PATCH_END === -->
+<!-- === V33_UI_AND_DRAG_FIX_START === -->
+<style>
+  /* 1. 상단 유틸리티 바 줄바꿈 깨짐 완벽 교정 */
+  #ux7TopUtilBar {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 6px !important;
+    padding: calc(10px + env(safe-area-inset-top)) 12px 10px !important;
+    flex-wrap: nowrap !important;
+  }
+  #ux7TopUtilBar .ux7-title {
+    display: flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    font-size: 14.5px !important;
+    font-weight: 900 !important;
+  }
+  #ux7TopUtilBar .ux7-title > span {
+    white-space: nowrap !important;
+  }
+  #v32TopOnlineBadge {
+    padding: 3px 7px !important;
+    font-size: 10.5px !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+  }
+  #ux7TopUtilBar .ux7-actions {
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+  }
+  #ux7TopUtilBar .ux7-actions::-webkit-scrollbar {
+    display: none !important;
+  }
+  #ux7TopUtilBar .ux7-actions .mb {
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    min-height: 30px !important;
+    padding: 4px 8px !important;
+    font-size: 11px !important;
+    gap: 3px !important;
+    border-radius: 999px !important;
+  }
+  #ux7TopUtilBar .ux7-actions .mb .ms {
+    font-size: 15px !important;
+  }
+
+  /* 2. 목록 카드 제목 줄(.nm) 및 좌측 체크 아이콘 정렬 */
+  #list-LIST .item .mid .nm {
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: 6px !important;
+    font-size: 16px !important;
+    line-height: 1.35 !important;
+    word-break: keep-all !important;
+    overflow-wrap: anywhere !important;
+  }
+  .v32-coord-check {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: #34d399 !important;
+    flex: none !important;
+    margin-top: 2px !important;
+    margin-right: 1px !important;
+  }
+  .v33-card-ctrl-row {
+    margin-top: 10px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    flex-wrap: wrap !important;
+  }
+  .ux7-day-select, .v32-time-select {
+    min-height: 32px !important;
+    padding: 4px 8px !important;
+    font-size: 11.5px !important;
+    border-radius: 10px !important;
+  }
+
+  /* 3. 네이티브 드래그 앤 드롭 시각 피드백 */
+  .v8-drag-handle {
+    cursor: grab !important;
+    padding: 10px 4px !important;
+    margin-left: -6px !important;
+    color: var(--sub) !important;
+    touch-action: none !important;
+    user-select: none !important;
+    -webkit-user-select: none !important;
+  }
+  .item.v33-dragging {
+    opacity: 0.92 !important;
+    transform: scale(1.02) !important;
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.55) !important;
+    border-color: var(--pr) !important;
+    background: var(--s2) !important;
+    z-index: 50 !important;
+  }
+
+  /* 4. 상세창 통합 도구 메뉴 버튼 & 팝오버 그리드 */
+  #v33ToolWrap {
+    margin-top: 12px;
+  }
+  #v33ToolToggleBtn {
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 14px;
+    border-radius: 14px;
+    background: var(--s2);
+    border: 1px solid var(--bd2);
+    color: var(--tx);
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+  }
+  #v33ToolToggleBtn.on {
+    border-color: var(--pr);
+    background: var(--pr-soft);
+    color: var(--pr);
+  }
+  #v33ToolMenuBox {
+    display: none;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-top: 8px;
+    padding: 12px;
+    border-radius: 16px;
+    background: var(--s2);
+    border: 1px solid var(--bd2);
+  }
+  #v33ToolMenuBox.on {
+    display: grid;
+  }
+  #v33ToolMenuBox .mb {
+    width: 100% !important;
+    justify-content: flex-start !important;
+    padding: 9px 12px !important;
+    border-radius: 12px !important;
+    font-size: 12.5px !important;
+    min-height: 38px !important;
+  }
+
+  /* 5. 상세창 타이틀 로컬 상호명 줄바꿈 정돈 */
+  #sbody .v33-sheet-title {
+    display: block !important;
+    font-weight: 800 !important;
+    font-size: 19px !important;
+    line-height: 1.35 !important;
+    flex: 1 !important;
+  }
+  #sbody .v33-sheet-sub {
+    display: block !important;
+    margin-top: 4px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: var(--sub) !important;
+    word-break: break-all !important;
+  }
+</style>
+
+<script>
+(function initV33UiAndDragFix() {
+  /* =========================================================================
+   * 1. 공유 방 병합 시 로컬 드래그 순서 보호 (원격 스냅샷이 순서를 되돌리는 현상 차단)
+   * ========================================================================= */
+  window.__lastManualReorderAt = 0;
+  if (typeof mergeSharedItems === "function") {
+    const _origMerge = mergeSharedItems;
+    mergeSharedItems = function(localList, remoteList) {
+      const merged = _origMerge(localList, remoteList);
+      if (Array.isArray(localList) && localList.length && (sharedLocalDirty || Date.now() - window.__lastManualReorderAt < 30000)) {
+        const byId = new Map(merged.map(it => [String(it.id), it]));
+        const ordered = [];
+        localList.forEach(loc => {
+          const id = String(loc?.id || "");
+          if (byId.has(id)) {
+            ordered.push(byId.get(id));
+            byId.delete(id);
+          }
+        });
+        byId.forEach(rem => ordered.push(rem));
+        return ordered;
+      }
+      return merged;
+    };
+  }
+
+  /* =========================================================================
+   * 2. 목록 카드 레이아웃 정돈: 체크 표시를 이름 좌측으로, 일차/시간은 하단 버튼 줄로 이동
+   * ========================================================================= */
+  function fixCardLayoutV33() {
+    const listEl = document.getElementById("list-LIST");
+    if (!listEl || !Array.isArray(items)) return;
+
+    listEl.querySelectorAll(".item[data-id]").forEach(cardEl => {
+      const mid = cardEl.querySelector(".mid");
+      const nmRow = mid?.querySelector(".nm");
+      if (!mid || !nmRow) return;
+
+      // 체크 표시를 이름 좌측 맨 앞으로 이동
+      const chk = nmRow.querySelector(".v32-coord-check");
+      if (chk && nmRow.firstChild !== chk) {
+        nmRow.insertBefore(chk, nmRow.firstChild);
+      }
+
+      // 하단 버튼 컨테이너 찾기 ([릴스] [길찾기] 줄)
+      const btnRow = Array.from(mid.querySelectorAll(":scope > div")).find(
+        d => d !== nmRow && !d.classList.contains("ux7-meta-row") && !d.classList.contains("sfb-badge")
+      );
+      if (btnRow) {
+        btnRow.classList.add("v33-card-ctrl-row");
+        const daySel = nmRow.querySelector(".ux7-day-select") || mid.querySelector(".ux7-day-select");
+        const timeSel = nmRow.querySelector(".v32-time-select") || mid.querySelector(".v32-time-select");
+        if (daySel && daySel.parentElement !== btnRow) btnRow.appendChild(daySel);
+        if (timeSel && timeSel.parentElement !== btnRow) btnRow.appendChild(timeSel);
+      }
+    });
+  }
+
+  /* =========================================================================
+   * 3. 네이티브 터치 & 마우스 드래그 앤 드롭 정렬 엔진 (.v8-drag-handle)
+   * ========================================================================= */
+  function initNativeDragSortV33() {
+    const listEl = document.getElementById("list-LIST");
+    if (!listEl || listEl._v33DragBound) return;
+    listEl._v33DragBound = true;
+
+    let dragCard = null;
+    let pointerId = null;
+    let autoScrollRaf = null;
+    let lastClientY = 0;
+
+    const scrollContainer = () => document.getElementById("tab-list") || listEl.parentElement;
+
+    const runAutoScroll = () => {
+      if (!dragCard) return;
+      const sc = scrollContainer();
+      if (sc) {
+        const rect = sc.getBoundingClientRect();
+        const topZone = rect.top + 65;
+        const botZone = rect.bottom - 90;
+        if (lastClientY < topZone) sc.scrollTop -= 8;
+        else if (lastClientY > botZone) sc.scrollTop += 8;
+      }
+      autoScrollRaf = requestAnimationFrame(runAutoScroll);
+    };
+
+    const onMove = (clientY) => {
+      if (!dragCard) return;
+      lastClientY = clientY;
+      const siblings = Array.from(listEl.querySelectorAll(".item[data-id]")).filter(
+        el => el !== dragCard && el.style.display !== "none"
+      );
+      for (const sib of siblings) {
+        const r = sib.getBoundingClientRect();
+        const midY = r.top + r.height / 2;
+        if (clientY < midY) {
+          if (sib.previousElementSibling !== dragCard) {
+            listEl.insertBefore(dragCard, sib);
+            if (window.v8Haptic) window.v8Haptic(8);
+          }
+          return;
+        }
+      }
+      const last = siblings[siblings.length - 1];
+      if (last && last.nextElementSibling !== dragCard) {
+        listEl.appendChild(dragCard);
+        if (window.v8Haptic) window.v8Haptic(8);
+      }
+    };
+
+    const finishDrag = () => {
+      if (!dragCard) return;
+      cancelAnimationFrame(autoScrollRaf);
+      dragCard.classList.remove("v33-dragging");
+      dragCard = null;
+      pointerId = null;
+
+      // DOM 순서를 items 배열에 정확히 반영 (필터링 상태에서도 안전하게 슬롯 교체)
+      const domIds = Array.from(listEl.querySelectorAll(".item[data-id]"))
+        .filter(el => el.style.display !== "none")
+        .map(el => String(el.dataset.id));
+
+      if (domIds.length > 1 && Array.isArray(items)) {
+        const visibleSet = new Set(domIds);
+        const itemMap = new Map(items.map(it => [String(it.id), it]));
+        const reorderedVisible = domIds.map(id => itemMap.get(id)).filter(Boolean);
+
+        let vIdx = 0;
+        const now = Date.now();
+        items = items.map(it => {
+          if (visibleSet.has(String(it.id)) && vIdx < reorderedVisible.length) {
+            const picked = reorderedVisible[vIdx++];
+            picked.updatedAt = now;
+            picked._localTouch = now;
+            return picked;
+          }
+          return it;
+        });
+
+        window.__lastManualReorderAt = now;
+        if (window.v8Haptic) window.v8Haptic(18);
+        if (typeof persistNow === "function") persistNow();
+        if (typeof save === "function") save();
+        if (typeof draw === "function") draw(true);
+        if (typeof toast === "function") toast("↕️ 목록 순서가 변경되었습니다");
+      }
+    };
+
+    // 모바일 Touch 이벤트 바인딩
+    listEl.addEventListener("touchstart", (e) => {
+      const handle = e.target.closest(".v8-drag-handle");
+      if (!handle || e.touches.length !== 1) return;
+      const card = handle.closest(".item[data-id]");
+      if (!card) return;
+      e.stopPropagation();
+      dragCard = card;
+      lastClientY = e.touches[0].clientY;
+      dragCard.classList.add("v33-dragging");
+      if (window.v8Haptic) window.v8Haptic(16);
+      cancelAnimationFrame(autoScrollRaf);
+      autoScrollRaf = requestAnimationFrame(runAutoScroll);
+    }, { passive: true });
+
+    listEl.addEventListener("touchmove", (e) => {
+      if (!dragCard || !e.touches[0]) return;
+      e.preventDefault();
+      e.stopPropagation();
+      onMove(e.touches[0].clientY);
+    }, { passive: false });
+
+    window.addEventListener("touchend", () => { if (dragCard) finishDrag(); }, { passive: true });
+    window.addEventListener("touchcancel", () => { if (dragCard) finishDrag(); }, { passive: true });
+
+    // 데스크톱 Mouse 이벤트 바인딩
+    listEl.addEventListener("mousedown", (e) => {
+      const handle = e.target.closest(".v8-drag-handle");
+      if (!handle || e.button !== 0) return;
+      const card = handle.closest(".item[data-id]");
+      if (!card) return;
+      e.preventDefault();
+      e.stopPropagation();
+      dragCard = card;
+      lastClientY = e.clientY;
+      dragCard.classList.add("v33-dragging");
+      cancelAnimationFrame(autoScrollRaf);
+      autoScrollRaf = requestAnimationFrame(runAutoScroll);
+    });
+
+    window.addEventListener("mousemove", (e) => {
+      if (!dragCard) return;
+      e.preventDefault();
+      onMove(e.clientY);
+    });
+
+    window.addEventListener("mouseup", () => { if (dragCard) finishDrag(); });
+  }
+
+  /* =========================================================================
+   * 4. 상세창(#sbody) 10개 도구 버튼을 단일 메뉴 버튼으로 통합 + 제목 괄호 줄바꿈 교정
+   * ========================================================================= */
+  function upgradeSheetToolsV33() {
+    const sbody = document.getElementById("sbody");
+    if (!sbody) return;
+
+    // 4-1. 제목 줄 로컬 상호명 괄호 줄바꿈 깨짐 교정
+    const curItem = (typeof items !== "undefined" && Array.isArray(items)) ? items.find(x => x.id === cur) : null;
+    const titleEl = sbody.querySelector(".nm");
+    if (titleEl && curItem && !titleEl.classList.contains("v33-sheet-title")) {
+      titleEl.classList.add("v33-sheet-title");
+      const subHtml = (curItem.localName && curItem.localName !== curItem.name)
+        ? `<span class="v33-sheet-sub">${esc(curItem.localName)}</span>`
+        : "";
+      titleEl.innerHTML = `${esc(curItem.name)}${subHtml}`;
+    }
+
+    // 4-2. 상세 도구 버튼들을 단일 토글 메뉴 안에 통합
+    const infoPane = sbody.querySelector('.ux-stab-pane[data-pane="info"]') || sbody;
+    const viewerDetails = infoPane.querySelector("details.acc");
+    if (!viewerDetails || document.getElementById("v33ToolWrap")) return;
+
+    const btns = Array.from(viewerDetails.querySelectorAll("button.mb"));
+    if (!btns.length) return;
+
+    const wrap = document.createElement("div");
+    wrap.id = "v33ToolWrap";
+    wrap.innerHTML = `
+      <button type="button" id="v33ToolToggleBtn">
+        <span style="display:flex;align-items:center;gap:6px">
+          <span class="ms">tune</span>도구 및 화면 전환 (${btns.length}개 기능)
+        </span>
+        <span class="ms" id="v33ToolArrow">expand_more</span>
+      </button>
+      <div id="v33ToolMenuBox"></div>
+    `;
+
+    const menuBox = wrap.querySelector("#v33ToolMenuBox");
+    btns.forEach(btn => {
+      menuBox.appendChild(btn);
+      btn.addEventListener("click", () => {
+        menuBox.classList.remove("on");
+        wrap.querySelector("#v33ToolToggleBtn")?.classList.remove("on");
+      });
+    });
+
+    viewerDetails.replaceWith(wrap);
+
+    const toggleBtn = wrap.querySelector("#v33ToolToggleBtn");
+    toggleBtn.onclick = (e) => {
+      e.stopPropagation();
+      const open = menuBox.classList.toggle("on");
+      toggleBtn.classList.toggle("on", open);
+      wrap.querySelector("#v33ToolArrow").textContent = open ? "expand_less" : "expand_more";
+    };
+  }
+
+  if (typeof renderListTab === "function") {
+    const _origRenderListV33 = renderListTab;
+    renderListTab = function(...args) {
+      const r = _origRenderListV33.apply(this, args);
+      fixCardLayoutV33();
+      initNativeDragSortV33();
+      return r;
+    };
+  }
+
+  if (typeof showSheet === "function") {
+    const _origShowSheetV33 = showSheet;
+    showSheet = function(...args) {
+      const r = _origShowSheetV33.apply(this, args);
+      upgradeSheetToolsV33();
+      return r;
+    };
+  }
+
+  setTimeout(() => {
+    fixCardLayoutV33();
+    initNativeDragSortV33();
+  }, 200);
+})();
+</script>
+<!-- === V33_UI_AND_DRAG_FIX_END === -->
 </body>
 </html>
