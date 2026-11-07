@@ -5,7 +5,7 @@
 <script>
 window.Sortable = null;
 (function forceUpdateV28() {
-  const VER = "TRIP_V27_BUST_1794048768";
+  const VER = "TRIP_V29_BUST_1794053667";
   const prev = localStorage.getItem("TRIP_LAST_CACHE_BUST");
   if (prev !== VER) {
     localStorage.setItem("TRIP_LAST_CACHE_BUST", VER);
@@ -26,7 +26,7 @@ window.Sortable = null;
   }
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
-      navigator.serviceWorker.register("/sw.js?v=28_1794046932").then(reg => {
+      navigator.serviceWorker.register("./sw.js?v=28_1794046932").then(reg => {
         reg.update().catch(() => {});
       }).catch(() => {});
     });
@@ -1448,11 +1448,20 @@ window.Sortable = null;
 
 
 <!-- === V8_APP_ICON_LINKS_START === -->
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=8">
-    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png?v=8">
-    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png?v=8">
-    <link rel="shortcut icon" type="image/png" href="/favicon.png?v=8">
+    <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png?v=8">
+    <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png?v=8">
+    <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png?v=8">
+    <link rel="shortcut icon" type="image/png" href="./favicon.png?v=8">
     <!-- === V8_APP_ICON_LINKS_END === -->
+<style>
+  @keyframes v8SplashForceHide {
+    0%, 70% { opacity: 1; visibility: visible; }
+    100% { opacity: 0; visibility: hidden; pointer-events: none; display: none; }
+  }
+  #v8Splash {
+    animation: v8SplashForceHide 0.9s ease forwards !important;
+  }
+</style>
 </head>
   <body>
 <!-- === V8_SPLASH_START === -->
@@ -1499,7 +1508,7 @@ window.Sortable = null;
 </style>
 <div id="v8Splash" role="status" aria-live="polite">
   <div class="v8-sp-logo">
-    <img src="/icon-192.png?v=8" onerror="this.onerror=null;this.src='/apple-touch-icon.png?v=8';" alt="앱 로고" />
+    <img src="./icon-192.png?v=8" onerror="this.onerror=null;this.src='./apple-touch-icon.png?v=8';" alt="앱 로고" />
   </div>
 </div>
 <!-- === V8_SPLASH_END === -->
@@ -11277,7 +11286,7 @@ ${caption || rawText}
     bar.id = "ux7TopUtilBar";
     bar.innerHTML = `
       <div class="ux7-title">
-        <img src="/icon-192.png?v=8" alt="" style="width:22px;height:22px;border-radius:6px;object-fit:cover;display:block">
+        <img src="./icon-192.png?v=8" alt="" style="width:22px;height:22px;border-radius:6px;object-fit:cover;display:block">
         <span>여행플래너</span>
       </div>
       <div class="ux7-actions">
