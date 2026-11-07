@@ -5,7 +5,7 @@
 <script>
 window.Sortable = null;
 (function forceUpdateV28() {
-  const VER = "TRIP_V29_BUST_1794053667";
+  const VER = "TRIP_V30_BUST_1794054780";
   const prev = localStorage.getItem("TRIP_LAST_CACHE_BUST");
   if (prev !== VER) {
     localStorage.setItem("TRIP_LAST_CACHE_BUST", VER);
@@ -1506,7 +1506,7 @@ window.Sortable = null;
     50% { transform: scale(1.05); }
   }
 </style>
-<div id="v8Splash" role="status" aria-live="polite">
+<div id="v8Splash" style="display:none!important" role="status" aria-live="polite">
   <div class="v8-sp-logo">
     <img src="./icon-192.png?v=8" onerror="this.onerror=null;this.src='./apple-touch-icon.png?v=8';" alt="앱 로고" />
   </div>
@@ -13690,7 +13690,7 @@ ${caption || rawText}
     const tileUrls = new Set([
       "/",
       "/index.html",
-      "/icon-192.png?v=8",
+      "./icon-192.png?v=8",
       "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css",
       "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"
     ]);
