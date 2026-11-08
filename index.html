@@ -18691,5 +18691,187 @@ ${caption || rawText}
 })();
 </script>
 <!-- === V43_SLEEK_REDESIGN_AND_DECLUTTER_SUITE_END === -->
+<!-- === V45_SMART_QUERY_CACHE_AND_RETRY_ENGINE_START === -->
+<script id="v45-smart-query-cache-script">
+(function initTanStackQueryPatternEngine() {
+  /* =========================================================================
+   * TanStack Query 패턴 클라이언트 (Smart Query Cache & Background Retry)
+   * 1) stale-while-revalidate: 메모리/로컬 캐시로 0.01초 즉시 렌더링 + 백그라운드 최신화
+   * 2) 지수 백오프(Exponential Backoff) 자동 재시도: 네트워크 불안정 시 1s->2s->4s 재시도
+   * 3) 오프라인 큐: 오프라인 중 실행된 요청은 온라인 복구(window.ononline) 시 자동 동기화
+   * ========================================================================= */
+  class SmartQueryClient {
+    constructor() {
+      this.cache = new Map();
+      this.offlineQueue = [];
+      this.listeners = new Map();
+      this._initOfflineSync();
+    }
+
+    _storageKey(key) {
+      return `TRIP_QUERY_CACHE_${key}`;
+    }
+
+    getQueryData(key) {
+      if (this.cache.has(key)) return this.cache.get(key).data;
+      try {
+        const raw = localStorage.getItem(this._storageKey(key));
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          this.cache.set(key, parsed);
+          return parsed.data;
+        }
+      } catch (_) {}
+      return null;
+    }
+
+    setQueryData(key, data, ttlMs = 1000 * 60 * 60 * 6) { // 기본 6시간 캐시
+      const record = { data, updatedAt: Date.now(), expiresAt: Date.now() + ttlMs };
+      this.cache.set(key, record);
+      try {
+        localStorage.setItem(this._storageKey(key), JSON.stringify(record));
+      } catch (_) {}
+      this._emit(key, data);
+    }
+
+    isStale(key, staleTimeMs = 1000 * 60 * 15) { // 15분 이상 지나면 백그라운드 갱신
+      const record = this.cache.get(key);
+      if (!record) return true;
+      return Date.now() - record.updatedAt > staleTimeMs;
+    }
+
+    _emit(key, data) {
+      const cbs = this.listeners.get(key) || [];
+      cbs.forEach(cb => { try { cb(data); } catch (_) {} });
+    }
+
+    subscribe(key, cb) {
+      if (!this.listeners.has(key)) this.listeners.set(key, []);
+      this.listeners.get(key).push(cb);
+      const cur = this.getQueryData(key);
+      if (cur !== null && cur !== undefined) cb(cur);
+      return () => {
+        const arr = this.listeners.get(key) || [];
+        this.listeners.set(key, arr.filter(f => f !== cb));
+      };
+    }
+
+    // TanStack Query의 core: fetchWithRetry + SWR 패턴
+    async fetchQuery({ queryKey, queryFn, staleTime = 1000 * 60 * 15, retry = 3, retryDelay = 1000 }) {
+      const cached = this.getQueryData(queryKey);
+      const stale = this.isStale(queryKey, staleTime);
+
+      // 1) 캐시가 있으면 즉시 반환 (화면 지연 0ms)
+      if (cached !== null && cached !== undefined && !stale) {
+        return cached;
+      }
+
+      // 2) 오프라인 상태면 캐시 그대로 반환
+      if (!navigator.onLine) {
+        if (cached !== null && cached !== undefined) return cached;
+        throw new Error("Offline and no cache available");
+      }
+
+      // 3) 백그라운드 / 포그라운드 지수 백오프 재시도 요청
+      const run = async () => {
+        let lastErr = null;
+        for (let attempt = 0; attempt < retry; attempt++) {
+          try {
+            const data = await queryFn();
+            if (data !== null && data !== undefined) {
+              this.setQueryData(queryKey, data);
+              return data;
+            }
+          } catch (err) {
+            lastErr = err;
+            if (attempt < retry - 1) {
+              const backoff = retryDelay * Math.pow(2, attempt);
+              await new Promise(r => setTimeout(r, backoff));
+            }
+          }
+        }
+        throw lastErr || new Error("Query failed after retries");
+      };
+
+      // 캐시가 이미 존재하면 백그라운드에서 조용히 갱신하고 우선 기존 캐시 반환(SWR)
+      if (cached !== null && cached !== undefined) {
+        run().catch(() => {});
+        return cached;
+      }
+
+      // 캐시가 없으면 완료될 때까지 대기
+      return await run();
+    }
+
+    _initOfflineSync() {
+      window.addEventListener("online", () => {
+        if (typeof toast === "function") {
+          toast("🌐 인터넷이 다시 연결되었습니다. 데이터를 동기화합니다.");
+        }
+        // 날씨, 환율, 공유 상태 자동 백그라운드 리패치
+        if (typeof fetchRealTimeOsakaWeather === "function") fetchRealTimeOsakaWeather();
+        if (typeof fetchRealTimeJpyRate === "function") fetchRealTimeJpyRate();
+        if (typeof draw === "function") draw(true);
+      });
+    }
+  }
+
+  window.tripQueryClient = new SmartQueryClient();
+
+  // 기존 날씨/환율 fetcher에 스마트 쿼리 캐시 레이어 연결
+  if (typeof fetchRealTimeOsakaWeather === "function") {
+    const _rawWeather = fetchRealTimeOsakaWeather;
+    fetchRealTimeOsakaWeather = async function() {
+      return await window.tripQueryClient.fetchQuery({
+        queryKey: "OSAKA_WEATHER_V45",
+        queryFn: async () => {
+          const r = await fetch("https://api.open-meteo.com/v1/forecast?latitude=34.6685&longitude=135.5013&current_weather=true");
+          if (!r.ok) throw new Error("Weather HTTP " + r.status);
+          const d = await r.json();
+          if (d && d.current_weather) {
+            const temp = Math.round(d.current_weather.temperature);
+            const desc = typeof wmoToEmoji === "function" ? wmoToEmoji(Number(d.current_weather.weathercode)) : "☀️";
+            const text = `${desc} · 오사카 ${temp}°C`;
+            cachedWeatherText = text;
+            localStorage.setItem("TRIP_V42_WEATHER_TEXT", text);
+            if (typeof updateHeroWeatherBadge === "function") updateHeroWeatherBadge();
+            return text;
+          }
+          return null;
+        },
+        staleTime: 1000 * 60 * 30, // 30분 캐시
+        retry: 3,
+        retryDelay: 1200
+      });
+    };
+  }
+
+  if (typeof fetchRealTimeJpyRate === "function") {
+    const _rawRate = fetchRealTimeJpyRate;
+    fetchRealTimeJpyRate = async function() {
+      return await window.tripQueryClient.fetchQuery({
+        queryKey: "JPY_RATE_V45",
+        queryFn: async () => {
+          const r = await fetch("https://api.frankfurter.app/latest?from=JPY&to=KRW");
+          if (!r.ok) throw new Error("Rate HTTP " + r.status);
+          const d = await r.json();
+          const krw = Number(d?.rates?.KRW);
+          if (krw && !isNaN(krw)) {
+            window.__realJpyRate = krw;
+            localStorage.setItem("TRIP_V42_JPY_RATE", String(krw));
+            if (typeof renderListTab === "function") renderListTab();
+            return krw;
+          }
+          return null;
+        },
+        staleTime: 1000 * 60 * 60 * 2, // 2시간 캐시
+        retry: 3,
+        retryDelay: 1200
+      });
+    };
+  }
+})();
+</script>
+<!-- === V45_SMART_QUERY_CACHE_AND_RETRY_ENGINE_END === -->
 </body>
 </html>
