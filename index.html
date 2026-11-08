@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="ko" data-theme="dark">
   <head>
+  <script src="https://unpkg.com/lucide@latest"></script>
 
 
 
@@ -16161,5 +16162,95 @@ ${caption || rawText}
 })();
 </script>
 <!-- === V38_EMPTY_STATES_9_AND_PROGRESS_BAR_CIRCULAR_END === -->
+
+<!-- 하단 탭바 Lucide 아이콘 & 인터랙션 모션 패치 -->
+<style id="tab-icon-motion-style">
+  @keyframes tabBounce {
+    0% { transform: scale(1) translateY(0); }
+    28% { transform: scale(1.25) translateY(-5px); }
+    50% { transform: scale(0.92) translateY(1px); }
+    75% { transform: scale(1.08) translateY(-1px); }
+    100% { transform: scale(1) translateY(0); }
+  }
+  @keyframes mapPinDrop {
+    0% { transform: translateY(-14px) scale(0.7); opacity: 0.2; }
+    55% { transform: translateY(3px) scale(1.12); opacity: 1; }
+    75% { transform: translateY(-2px) scale(0.96); }
+    100% { transform: translateY(0) scale(1); opacity: 1; }
+  }
+  .tab-bounce-anim {
+    animation: tabBounce 0.42s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+  }
+  .map-drop-anim {
+    animation: mapPinDrop 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.3) !important;
+  }
+  .tab-icon-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 3px;
+    pointer-events: none;
+  }
+</style>
+<script id="tab-icon-injector">
+(function() {
+  const TABS = [
+    { text: '목록', icon: 'list', anim: 'tab-bounce-anim' },
+    { text: '지도', icon: 'map-pin', anim: 'map-drop-anim' },
+    { text: '일정', icon: 'calendar', anim: 'tab-bounce-anim' },
+    { text: '설정', icon: 'settings', anim: 'tab-bounce-anim' }
+  ];
+
+  function applyIcons() {
+    TABS.forEach(item => {
+      const candidates = Array.from(document.querySelectorAll('button, a, div, span')).filter(el => {
+        const directText = Array.from(el.childNodes)
+          .filter(n => n.nodeType === Node.TEXT_NODE)
+          .map(n => n.textContent.trim())
+          .join('');
+        return (directText === item.text || el.textContent.trim() === item.text) &&
+               (el.closest('nav, footer, [class*="nav"], [class*="tab"], [class*="bar"]') || el.className.includes('tab') || el.className.includes('nav'));
+      });
+
+      candidates.forEach(el => {
+        const btn = el.closest('button, [role="tab"], .tab-item, .nav-item') || el;
+        if (btn.dataset.iconInjected) return;
+        btn.dataset.iconInjected = "true";
+
+        // 기존 텍스트 아이콘 또는 Material Symbols 숨김 처리
+        const oldIcon = btn.querySelector('.material-symbols-outlined, svg, i');
+        if (oldIcon) oldIcon.style.display = 'none';
+
+        const wrapper = document.createElement('span');
+        wrapper.className = 'tab-icon-wrapper';
+        wrapper.innerHTML = `<i data-lucide="${item.icon}"></i>`;
+        btn.insertBefore(wrapper, btn.firstChild);
+
+        btn.addEventListener('click', () => {
+          wrapper.classList.remove(item.anim);
+          void wrapper.offsetWidth;
+          wrapper.classList.add(item.anim);
+        });
+        wrapper.addEventListener('animationend', () => {
+          wrapper.classList.remove(item.anim);
+        });
+      });
+    });
+
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons();
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', applyIcons);
+  } else {
+    applyIcons();
+  }
+  setTimeout(applyIcons, 300);
+  setTimeout(applyIcons, 800);
+})();
+</script>
+
 </body>
 </html>
