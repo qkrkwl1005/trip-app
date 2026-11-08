@@ -1,3 +1,4 @@
+// cache-bust: v35-1794123087
 // SW_CLEAN_V29_1794053667
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => {
