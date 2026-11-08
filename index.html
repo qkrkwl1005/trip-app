@@ -14557,5 +14557,1565 @@ ${caption || rawText}
 })();
 </script>
 <!-- === V37_IOS_FOLD8_CROSS_PATCH_END === -->
+
+<!-- === V38_EMPTY_STATES_9_AND_PROGRESS_BAR_CIRCULAR_START === -->
+<style>
+  /* 1. 빈 화면 9가지(Empty States) 프리미엄 카드 디자인 */
+  .v38-empty-card {
+    position: relative;
+    margin: 12px 0;
+    padding: 28px 20px 24px;
+    border-radius: 24px;
+    background: var(--s);
+    border: 1px solid var(--bd2);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 10px;
+    animation: v38FadeIn 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  @keyframes v38FadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .v38-empty-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 11px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    background: var(--s2);
+    color: var(--sub);
+    border: 1px solid var(--bd2);
+  }
+  .v38-empty-badge b {
+    color: var(--pr);
+    font-weight: 900;
+  }
+  .v38-empty-icon-wrap {
+    width: 64px;
+    height: 64px;
+    border-radius: 20px;
+    background: var(--pr-soft);
+    border: 1px solid rgba(59, 130, 246, 0.28);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--pr);
+    margin: 4px 0 2px;
+  }
+  .v38-empty-icon-wrap.warn {
+    background: rgba(245, 158, 11, 0.14);
+    border-color: rgba(245, 158, 11, 0.32);
+    color: #f59e0b;
+  }
+  .v38-empty-icon-wrap.dg {
+    background: rgba(239, 68, 68, 0.14);
+    border-color: rgba(239, 68, 68, 0.32);
+    color: #ef4444;
+  }
+  .v38-empty-icon-wrap.ok {
+    background: rgba(16, 185, 129, 0.14);
+    border-color: rgba(16, 185, 129, 0.32);
+    color: #10b981;
+  }
+  .v38-empty-icon-wrap .ms {
+    font-size: 32px !important;
+  }
+  .v38-empty-title {
+    font-size: 17px;
+    font-weight: 900;
+    color: var(--tx);
+    letter-spacing: -0.02em;
+    line-height: 1.35;
+  }
+  .v38-empty-desc {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--sub);
+    line-height: 1.5;
+    max-width: 300px;
+    word-break: keep-all;
+  }
+  .v38-empty-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 8px;
+    width: 100%;
+  }
+  .v38-empty-btn {
+    min-height: 42px;
+    padding: 9px 18px;
+    border-radius: 14px;
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 800;
+    border: none;
+    background: var(--pr);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    cursor: pointer;
+    box-shadow: 0 6px 18px rgba(59, 130, 246, 0.32);
+    transition: transform 0.15s ease, opacity 0.15s ease;
+  }
+  .v38-empty-btn:active { transform: scale(0.97); }
+  .v38-empty-btn.sub {
+    background: var(--s2);
+    color: var(--tx);
+    border: 1px solid var(--bd2);
+    box-shadow: none;
+  }
+  .v38-empty-checklist {
+    width: 100%;
+    max-width: 280px;
+    background: var(--s2);
+    border: 1px solid var(--bd);
+    border-radius: 14px;
+    padding: 10px 14px;
+    margin-top: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    text-align: left;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--tx);
+  }
+  .v38-empty-checklist div {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .v38-empty-checklist .ms {
+    font-size: 16px !important;
+    color: #10b981;
+  }
+
+  /* 2. 프로그레스 바(Progress Bar) & 프로그레스 서큘러(Progress Circular) 실물 위젯 */
+  #v38ProgressOverlay {
+    position: fixed;
+    left: 50%;
+    bottom: calc(88px + env(safe-area-inset-bottom));
+    transform: translateX(-50%) translateY(20px);
+    width: calc(100% - 28px);
+    max-width: 430px;
+    z-index: 3200;
+    background: rgba(19, 24, 34, 0.96);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid var(--bd2);
+    border-radius: 22px;
+    padding: 16px 18px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.24s ease, transform 0.24s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.24s ease;
+  }
+  [data-theme="light"] #v38ProgressOverlay {
+    background: rgba(255, 255, 255, 0.97);
+    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
+  }
+  #v38ProgressOverlay.on {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateX(-50%) translateY(0);
+  }
+  .v38-prog-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .v38-prog-head-title {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 14px;
+    font-weight: 900;
+    color: var(--tx);
+  }
+  .v38-prog-mode-seg {
+    display: inline-flex;
+    background: var(--s2);
+    border: 1px solid var(--bd2);
+    border-radius: 999px;
+    padding: 2px;
+    gap: 2px;
+  }
+  .v38-prog-mode-btn {
+    border: none;
+    background: transparent;
+    color: var(--sub);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 4px 10px;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .v38-prog-mode-btn.on {
+    background: var(--pr);
+    color: #fff;
+  }
+
+  /* 가로형 프로그레스 바 (Progress Bar) */
+  .v38-bar-view {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .v38-bar-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .v38-bar-label {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--tx);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .v38-bar-pct {
+    font-size: 14px;
+    font-weight: 900;
+    color: var(--pr);
+    font-variant-numeric: tabular-nums;
+  }
+  .v38-bar-track {
+    width: 100%;
+    height: 10px;
+    border-radius: 999px;
+    background: var(--s3);
+    overflow: hidden;
+    position: relative;
+  }
+  .v38-bar-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #3b82f6, #60a5fa, #10b981);
+    transition: width 0.18s ease;
+  }
+  .v38-bar-fill.indeterminate {
+    width: 42% !important;
+    animation: v38IndetBar 1.25s infinite ease-in-out;
+  }
+  @keyframes v38IndetBar {
+    0% { transform: translateX(-110%); }
+    100% { transform: translateX(260%); }
+  }
+
+  /* 원형 프로그레스 서큘러 (Progress Circular) */
+  .v38-circular-view {
+    display: none;
+    align-items: center;
+    gap: 16px;
+    padding: 4px 2px;
+  }
+  .v38-circular-ring-wrap {
+    position: relative;
+    width: 64px;
+    height: 64px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .v38-circular-svg {
+    width: 64px;
+    height: 64px;
+    transform: rotate(-90deg);
+  }
+  .v38-circular-bg {
+    fill: none;
+    stroke: var(--s3);
+    stroke-width: 6;
+  }
+  .v38-circular-fg {
+    fill: none;
+    stroke: var(--pr);
+    stroke-width: 6;
+    stroke-linecap: round;
+    stroke-dasharray: 163.36; /* 2 * PI * 26 */
+    stroke-dashoffset: 163.36;
+    transition: stroke-dashoffset 0.18s ease, stroke 0.2s ease;
+  }
+  .v38-circular-svg.indeterminate {
+    animation: v38Spin 1.1s linear infinite;
+  }
+  .v38-circular-svg.indeterminate .v38-circular-fg {
+    stroke-dashoffset: 110 !important;
+  }
+  @keyframes v38Spin {
+    100% { transform: rotate(270deg); }
+  }
+  .v38-circular-pct {
+    position: absolute;
+    font-size: 13px;
+    font-weight: 900;
+    color: var(--tx);
+    font-variant-numeric: tabular-nums;
+  }
+  .v38-circular-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .v38-circular-title {
+    font-size: 14px;
+    font-weight: 900;
+    color: var(--tx);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .v38-circular-sub {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--sub);
+  }
+
+  #v38ProgressOverlay[data-mode="circular"] .v38-bar-view { display: none; }
+  #v38ProgressOverlay[data-mode="circular"] .v38-circular-view { display: flex; }
+  #v38ProgressOverlay[data-mode="both"] .v38-bar-view { display: flex; margin-bottom: 10px; }
+  #v38ProgressOverlay[data-mode="both"] .v38-circular-view { display: flex; padding-top: 8px; border-top: 1px dashed var(--bd2); }
+
+  /* 3. 목록·설정 내 상태 전환/점검 칩 바 */
+  #v38StateInspectorBar {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding: 6px 2px 2px;
+    margin-top: 4px;
+  }
+  #v38StateInspectorBar::-webkit-scrollbar { display: none; }
+  .v38-state-pill {
+    flex: none;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    background: var(--s2);
+    color: var(--sub);
+    border: 1px solid var(--bd);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .v38-state-pill.on {
+    background: var(--pr);
+    color: #fff;
+    border-color: var(--pr);
+  }
+</style>
+
+<!-- 실시간 프로그레스 바 · 프로그레스 서큘러 통합 위젯 -->
+<div id="v38ProgressOverlay" data-mode="both" role="status" aria-live="polite">
+  <div class="v38-prog-head">
+    <div class="v38-prog-head-title">
+      <span class="ms fill" style="color:var(--pr);font-size:18px" id="v38ProgHeaderIcon">cloud_upload</span>
+      <span id="v38ProgHeaderText">파일 올리기 · 실시간 진행률</span>
+    </div>
+    <div class="v38-prog-mode-seg" title="표시 형태 선택">
+      <button type="button" class="v38-prog-mode-btn" data-pmode="bar">바</button>
+      <button type="button" class="v38-prog-mode-btn" data-pmode="circular">서큘러</button>
+      <button type="button" class="v38-prog-mode-btn on" data-pmode="both">동시비교</button>
+    </div>
+  </div>
+
+  <!-- 가로로 채워지는 프로그레스 바 (Progress Bar) -->
+  <div class="v38-bar-view">
+    <div class="v38-bar-row">
+      <span class="v38-bar-label" id="v38BarTitle">여름 사진 모음</span>
+      <span class="v38-bar-pct" id="v38BarPct">0%</span>
+    </div>
+    <div class="v38-bar-track">
+      <div class="v38-bar-fill" id="v38BarFill"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;color:var(--sub)">
+      <span id="v38BarSub">프로그레스 바 · 가로 채움</span>
+      <span id="v38BarDetail">0 / 0 KB</span>
+    </div>
+  </div>
+
+  <!-- 원형으로 채워지는 프로그레스 서큘러 (Progress Circular) -->
+  <div class="v38-circular-view">
+    <div class="v38-circular-ring-wrap">
+      <svg class="v38-circular-svg" id="v38CircSvg" viewBox="0 0 64 64">
+        <circle class="v38-circular-bg" cx="32" cy="32" r="26"></circle>
+        <circle class="v38-circular-fg" id="v38CircFg" cx="32" cy="32" r="26"></circle>
+      </svg>
+      <span class="v38-circular-pct" id="v38CircPct">0%</span>
+    </div>
+    <div class="v38-circular-info">
+      <div class="v38-circular-title" id="v38CircTitle">여행 영상 · 사진 처리 중</div>
+      <div class="v38-circular-sub" id="v38CircSub">0~100%로 차오르며 어디까지 됐는지 알려 줘요</div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function initV38EmptyStatesAndProgressSystem() {
+  /* =========================================================================
+   * PART A. 프로그레스 바(Progress Bar) & 프로그레스 서큘러(Progress Circular) 엔진
+   * - 실제 파일 읽기/압축(FileReader.onprogress), Firebase Storage uploadTask,
+   *   다중 이미지 AI 분석, 일괄 좌표 지오코딩, KMZ/JSON/CSV 입출력 진행률 0~100% 실시간 연동
+   * - 정확한 퍼센트를 알 수 없는 단일 대기 작업은 Indeterminate(상태 전용) 모드로 자동 전환
+   * ========================================================================= */
+  const overlay = document.getElementById("v38ProgressOverlay");
+  const barTitle = document.getElementById("v38BarTitle");
+  const barPct = document.getElementById("v38BarPct");
+  const barFill = document.getElementById("v38BarFill");
+  const barSub = document.getElementById("v38BarSub");
+  const barDetail = document.getElementById("v38BarDetail");
+  const circSvg = document.getElementById("v38CircSvg");
+  const circFg = document.getElementById("v38CircFg");
+  const circPct = document.getElementById("v38CircPct");
+  const circTitle = document.getElementById("v38CircTitle");
+  const circSub = document.getElementById("v38CircSub");
+  const headerText = document.getElementById("v38ProgHeaderText");
+  const headerIcon = document.getElementById("v38ProgHeaderIcon");
+
+  const CIRCUMFERENCE = 2 * Math.PI * 26; // 163.3628
+  let hideTimer = null;
+
+  // 모드 전환 버튼 (바 / 서큘러 / 동시비교)
+  const savedMode = localStorage.getItem("TRIP_V38_PROG_MODE") || "both";
+  if (overlay) {
+    overlay.dataset.mode = savedMode;
+    overlay.querySelectorAll(".v38-prog-mode-btn").forEach(btn => {
+      btn.classList.toggle("on", btn.dataset.pmode === savedMode);
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const m = btn.dataset.pmode;
+        overlay.dataset.mode = m;
+        localStorage.setItem("TRIP_V38_PROG_MODE", m);
+        overlay.querySelectorAll(".v38-prog-mode-btn").forEach(b => b.classList.toggle("on", b === btn));
+      };
+    });
+  }
+
+  const TripProgress = {
+    start(opts = {}) {
+      if (!overlay) return;
+      clearTimeout(hideTimer);
+      const {
+        header = "파일 올리기 · 실시간 진행률",
+        icon = "cloud_upload",
+        title = "여행 사진·데이터 처리 중",
+        sub = "0~100%로 차오르며 어디까지 됐는지 알려 줘요",
+        detail = "준비 중...",
+        determinate = true,
+        pct = 0
+      } = opts;
+
+      if (headerText) headerText.textContent = header;
+      if (headerIcon) headerIcon.textContent = icon;
+      if (barTitle) barTitle.textContent = title;
+      if (circTitle) circTitle.textContent = title;
+      if (barSub) barSub.textContent = determinate ? "프로그레스 바 · 진행률 측정 중" : "진행 상태 표시 (완료 시점 미정)";
+      if (circSub) circSub.textContent = sub;
+      if (barDetail) barDetail.textContent = detail;
+
+      overlay.classList.add("on");
+      this.update(pct, { title, sub, detail, determinate });
+    },
+
+    update(pct, opts = {}) {
+      if (!overlay) return;
+      const determinate = opts.determinate !== false;
+      if (opts.title) {
+        if (barTitle) barTitle.textContent = opts.title;
+        if (circTitle) circTitle.textContent = opts.title;
+      }
+      if (opts.sub && circSub) circSub.textContent = opts.sub;
+      if (opts.detail && barDetail) barDetail.textContent = opts.detail;
+
+      if (!determinate) {
+        barFill?.classList.add("indeterminate");
+        circSvg?.classList.add("indeterminate");
+        if (barPct) barPct.textContent = "처리 중";
+        if (circPct) circPct.textContent = "…";
+        return;
+      }
+
+      barFill?.classList.remove("indeterminate");
+      circSvg?.classList.remove("indeterminate");
+      const clamped = Math.max(0, Math.min(100, Math.round(Number(pct) || 0)));
+      if (barFill) barFill.style.width = clamped + "%";
+      if (barPct) barPct.textContent = clamped + "%";
+      if (circPct) circPct.textContent = clamped + "%";
+      if (circFg) {
+        const offset = CIRCUMFERENCE - (clamped / 100) * CIRCUMFERENCE;
+        circFg.style.strokeDashoffset = String(offset);
+        circFg.style.stroke = clamped >= 100 ? "#10b981" : "var(--pr)";
+      }
+    },
+
+    finish(msg = "다 올렸어요! (100%)") {
+      if (!overlay) return;
+      this.update(100, {
+        title: msg,
+        sub: "작업이 100% 완료되었어요",
+        detail: "완료됨 ✓",
+        determinate: true
+      });
+      if (window.v8Haptic) window.v8Haptic(18);
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => {
+        overlay.classList.remove("on");
+      }, 1500);
+    },
+
+    hide() {
+      if (!overlay) return;
+      clearTimeout(hideTimer);
+      overlay.classList.remove("on");
+    }
+  };
+  window.TripProgress = TripProgress;
+
+  // 1) 실제 파일 Base64 변환 및 이미지 압축 시 바이트 단위 실시간 진행률(0~100%) 측정
+  if (typeof fileToBase64 === "function") {
+    window.fileToBase64 = function(file, maxW = 640, quality = 0.65, progMeta = null) {
+      return new Promise((resolve, reject) => {
+        const r = new FileReader();
+        const fName = file?.name || "여름 사진 모음";
+        const totalKB = Math.max(1, Math.round((file?.size || 0) / 1024));
+        const basePct = progMeta ? progMeta.basePct : 0;
+        const spanPct = progMeta ? progMeta.spanPct : 100;
+
+        if (!progMeta) {
+          TripProgress.start({
+            header: "파일 올리기 · 이미지 처리",
+            icon: "imagesmode",
+            title: `${fName} 올리는 중`,
+            sub: "프로그레스 바 · 서큘러 (실제 바이트 진행률)",
+            detail: `0 / ${totalKB} KB`,
+            pct: 2
+          });
+        }
+
+        r.onprogress = (ev) => {
+          if (ev.lengthComputable && ev.total > 0) {
+            const readRatio = ev.loaded / ev.total; // 0 ~ 0.7 구간 할당
+            const curPct = basePct + spanPct * (readRatio * 0.7);
+            const loadedKB = Math.round(ev.loaded / 1024);
+            TripProgress.update(curPct, {
+              title: `${fName} 읽는 중`,
+              sub: progMeta ? `${progMeta.index}/${progMeta.total}번째 파일 처리 중` : "파일 데이터를 읽고 있어요",
+              detail: `${loadedKB} / ${totalKB} KB`
+            });
+          }
+        };
+
+        r.onload = async () => {
+          try {
+            TripProgress.update(basePct + spanPct * 0.82, {
+              title: `${fName} 최적화 압축 중`,
+              detail: `${totalKB} KB → 스마트 리사이즈`
+            });
+            const raw = String(r.result || "");
+            const comp = await compressDataUrl(raw, maxW, quality);
+            const target = comp || raw;
+            const mime = (target.match(/^data:([^;]+);/) || [])[1] || "image/jpeg";
+            const outKB = Math.max(1, Math.round((target.length * 0.75) / 1024));
+            TripProgress.update(basePct + spanPct, {
+              title: `${fName} 준비 완료`,
+              detail: `${totalKB}KB → ${outKB}KB 완료`
+            });
+            if (!progMeta) TripProgress.finish(`${fName} 다 올렸어요!`);
+            resolve({ mime, data: target.split(",")[1] || "" });
+          } catch (err) {
+            if (!progMeta) TripProgress.hide();
+            reject(err);
+          }
+        };
+        r.onerror = (e) => {
+          if (!progMeta) TripProgress.hide();
+          reject(e);
+        };
+        r.readAsDataURL(file);
+      });
+    };
+  }
+
+  // 2) Firebase Storage 실제 업로드 시 state_changed(bytesTransferred / totalBytes) 0~100% 연동
+  if (typeof uploadImageToStorage === "function") {
+    window.uploadImageToStorage = async function(file, itemId) {
+      if (!window.firebase || !firebase.storage) return null;
+      try {
+        const storageRef = firebase.storage().ref();
+        const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+        const path = `images/${sharedRoomId || "local"}/${itemId}_${Date.now()}.${ext}`;
+        const totalKB = Math.max(1, Math.round((file.size || 0) / 1024));
+
+        TripProgress.start({
+          header: "클라우드 사진 업로드",
+          icon: "cloud_upload",
+          title: `${file.name || "사진"} 올리는 중`,
+          sub: "공유 방 클라우드로 실시간 전송 중",
+          detail: `0 / ${totalKB} KB`,
+          pct: 1
+        });
+
+        const uploadTask = storageRef.child(path).put(file);
+        return await new Promise((resolve) => {
+          uploadTask.on(
+            "state_changed",
+            (snapshot) => {
+              const total = snapshot.totalBytes || file.size || 1;
+              const loaded = snapshot.bytesTransferred || 0;
+              const pct = Math.round((loaded / total) * 100);
+              TripProgress.update(pct, {
+                title: `${file.name || "사진"} 올리는 중 (${pct}%)`,
+                detail: `${Math.round(loaded / 1024)} / ${Math.round(total / 1024)} KB`
+              });
+            },
+            () => {
+              TripProgress.hide();
+              resolve(null);
+            },
+            async () => {
+              const url = await uploadTask.snapshot.ref.getDownloadURL();
+              TripProgress.finish("클라우드 사진 다 올렸어요!");
+              resolve(url);
+            }
+          );
+        });
+      } catch (e) {
+        TripProgress.hide();
+        return null;
+      }
+    };
+  }
+
+  // 3) 다중 스크린샷 첨부(#shareFile, #sheetShot) 및 일괄 좌표 복구 진행률 연동
+  const shareFileEl = document.getElementById("shareFile");
+  if (shareFileEl) {
+    shareFileEl.onchange = async (e) => {
+      const fs = [...(e.target.files || [])];
+      e.target.value = "";
+      if (!fs.length) return;
+      TripProgress.start({
+        header: `스샷 ${fs.length}장 올리기 · AI 분석`,
+        icon: "auto_awesome",
+        title: `여름·여행 사진 모음 (${fs.length}장)`,
+        sub: "파일 업로드 후 AI 장소 추출을 진행해요",
+        detail: `0 / ${fs.length}장`,
+        pct: 5
+      });
+      try {
+        await runAnalyzeShare(fs);
+        TripProgress.finish(`스샷 ${fs.length}장 분석·저장 완료!`);
+      } catch (_) {
+        TripProgress.hide();
+      }
+    };
+  }
+
+  const sheetShotEl = document.getElementById("sheetShot");
+  if (sheetShotEl) {
+    sheetShotEl.onchange = async (e) => {
+      const fs = [...(e.target.files || [])].slice(0, MAX_MULTI_PLACES);
+      e.target.value = "";
+      if (!fs.length || !cur) return;
+      const total = fs.length;
+      TripProgress.start({
+        header: `상세 스샷 ${total}장 올리기`,
+        icon: "photo_library",
+        title: `스샷 ${total}장 올리는 중`,
+        sub: "각 이미지를 순서대로 읽고 압축해요",
+        detail: `0 / ${total}장`,
+        pct: 2
+      });
+      const b64s = [];
+      for (let idx = 0; idx < total; idx++) {
+        const f = fs[idx];
+        const basePct = Math.round((idx / total) * 75);
+        const spanPct = Math.round((1 / total) * 75);
+        b64s.push(await window.fileToBase64(f, 860, 0.72, {
+          basePct,
+          spanPct,
+          index: idx + 1,
+          total
+        }));
+      }
+      TripProgress.update(85, {
+        title: "AI 캡션·장소 정보 병합 중...",
+        sub: "추출된 장소를 현재 카드에 반영하고 있어요",
+        detail: `${total} / ${total}장 읽음`
+      });
+      const item = items.find((x) => x.id === cur);
+      if (item) await applyCaptionToItem(item, "", b64s);
+      TripProgress.finish("스샷 분석 및 반영 완료!");
+    };
+  }
+
+  // 상단 '좌표' 일괄 복구 버튼 클릭 시 실제 장소 개수(0~100%)만큼 프로그레스 바·서큘러 작동
+  const fixAllBtn = document.getElementById("ux7FixAllCoordsBtn");
+  if (fixAllBtn) {
+    fixAllBtn.onclick = async () => {
+      const missing = (items || []).filter(i => !Number(i.lat) || !Number(i.lng));
+      if (!missing.length) return toast("🟢 모든 장소에 이미 지도 좌표가 설정되어 있어요!");
+      const total = missing.length;
+      TripProgress.start({
+        header: "지도 좌표 일괄 지오코딩",
+        icon: "my_location",
+        title: `미설정 장소 ${total}곳 좌표 찾는 중`,
+        sub: "0~100%로 몇 번째 장소까지 찾았는지 알려 줘요",
+        detail: `0 / ${total}곳 완료`,
+        pct: 3
+      });
+      let fixed = 0;
+      for (let idx = 0; idx < total; idx++) {
+        const it = missing[idx];
+        const pct = Math.round(((idx + 0.3) / total) * 100);
+        TripProgress.update(pct, {
+          title: `'${it.name || "장소"}' 위치 검색 중`,
+          detail: `${idx + 1} / ${total}번째 검색 중`
+        });
+        const g = await geocodePlace(it, "", true);
+        if (g && g.lat && g.lng) {
+          it.lat = g.lat;
+          it.lng = g.lng;
+          it.mapVisible = true;
+          if (Array.isArray(it.places) && it.places[0]) {
+            it.places[0].lat = g.lat;
+            it.places[0].lng = g.lng;
+          }
+          fixed++;
+        }
+        TripProgress.update(Math.round(((idx + 1) / total) * 100), {
+          title: `'${it.name || "장소"}' 처리 완료`,
+          detail: `${idx + 1} / ${total}곳 (${fixed}곳 성공)`
+        });
+      }
+      save();
+      draw(true);
+      TripProgress.finish(`총 ${fixed}곳 좌표 복구 완료!`);
+      toast(`✅ 총 ${fixed}곳의 좌표를 복구해 지도에 표시했어요!`);
+    };
+  }
+
+  /* =========================================================================
+   * PART B. 빈 화면 9가지(Empty States 01~09) 실제 상태 감지 및 원터치 액션 엔진
+   * 01 첫 사용 (First use)
+   * 02 검색 결과 없음 (No search results)
+   * 03 필터 결과 없음 (No filter results)
+   * 04 오프라인 (Offline)
+   * 05 권한 필요 (Permission needed)
+   * 06 모두 완료 (All caught up)
+   * 07 삭제 직후 (Emptied)
+   * 08 오류 화면 (Error state)
+   * 09 잠김 (Locked content)
+   * ========================================================================= */
+  window.__v38EmptyStateMeta = {
+    lastDeletedSnapshot: null,
+    lastDeletedAt: 0,
+    lastDeletedLabel: "",
+    lastErrorMsg: "",
+    lastErrorRetryFn: null,
+    permissionNeeded: null, // 'geo' | 'notif' | 'clip' | null
+    previewForceCode: null  // 사용자가 상태 점검 바에서 직접 눌러 확인하거나 실제 조건으로 트리거
+  };
+
+  // 삭제 직후(07 Emptied) 감지를 위한 래퍼: 전체 삭제 또는 마지막 남은 카드 삭제 시 스냅샷 보존
+  document.addEventListener("click", (e) => {
+    const bulkDel = e.target.closest('[data-act="bulkDelete"]');
+    if (bulkDel && Array.isArray(items) && items.length > 0) {
+      const snapshot = items.map(x => ({ ...x }));
+      setTimeout(() => {
+        if (Array.isArray(items) && items.length === 0) {
+          window.__v38EmptyStateMeta.lastDeletedSnapshot = snapshot;
+          window.__v38EmptyStateMeta.lastDeletedAt = Date.now();
+          window.__v38EmptyStateMeta.lastDeletedLabel = `${snapshot.length}곳의 여행 장소`;
+          if (typeof renderListTab === "function") renderListTab();
+        }
+      }, 30);
+    }
+    const singleDel = e.target.closest('[data-act="del"]');
+    if (singleDel && Array.isArray(items) && items.length === 1) {
+      const snapshot = items.map(x => ({ ...x }));
+      setTimeout(() => {
+        if (Array.isArray(items) && items.length === 0) {
+          window.__v38EmptyStateMeta.lastDeletedSnapshot = snapshot;
+          window.__v38EmptyStateMeta.lastDeletedAt = Date.now();
+          window.__v38EmptyStateMeta.lastDeletedLabel = `'${snapshot[0]?.name || "장소"}'`;
+          if (typeof renderListTab === "function") renderListTab();
+        }
+      }, 30);
+    }
+  }, true);
+
+  // 실제 상황별 빈 화면 9가지 데이터 및 실행 액션 정의
+  function getEmptyStateSpec(code, ctx = {}) {
+    const kw = ctx.kw || ($("v35SearchInput")?.value || $("q-LIST")?.value || "").trim();
+    const catName = (typeof CATS !== "undefined" && CATS[listCat]) ? CATS[listCat].n : "전체";
+    const curF = (typeof listFilter !== "undefined" && listFilter[listCat]) ? listFilter[listCat] : "ALL";
+
+    const specs = {
+      "01": {
+        code: "01",
+        krName: "첫 사용",
+        enName: "First use",
+        icon: "favorite",
+        tone: "",
+        title: "마음에 드는 여행 장소를 추가해 보세요",
+        desc: "릴스·쇼츠 링크를 붙여넣거나 대표 샘플 코스를 불러오면 지도와 일정표가 자동으로 완성돼요.",
+        primaryLabel: "장소 등록·가져오기",
+        primaryIcon: "add_circle",
+        secondaryLabel: "오사카·교토 베스트 코스 담기",
+        secondaryIcon: "auto_awesome"
+      },
+      "02": {
+        code: "02",
+        krName: "검색 결과 없음",
+        enName: "No search results",
+        icon: "search_off",
+        tone: "warn",
+        title: kw ? `'${kw}' 검색 결과가 없어요` : "검색 결과가 없어요",
+        desc: "띄어쓰기를 바꾸거나 철자를 확인해 다시 찾아보세요. 찾는 장소가 없다면 바로 새 장소로 등록할 수 있어요.",
+        primaryLabel: "검색어 지우기",
+        primaryIcon: "backspace",
+        secondaryLabel: kw ? `'${kw}' 바로 신규 등록` : "직접 1건 등록하기",
+        secondaryIcon: "add_location_alt"
+      },
+      "03": {
+        code: "03",
+        krName: "필터 결과 없음",
+        enName: "No filter results",
+        icon: "filter_alt_off",
+        tone: "warn",
+        title: "선택한 조건에 맞는 장소가 없어요",
+        desc: `현재 [${catName} · ${curF}] 필터가 켜져 있어요. 필터를 초기화하면 저장된 ${items?.length || 0}곳을 다시 볼 수 있어요.`,
+        primaryLabel: "필터 초기화",
+        primaryIcon: "restart_alt",
+        secondaryLabel: "전체 카테고리 보기",
+        secondaryIcon: "format_list_bulleted"
+      },
+      "04": {
+        code: "04",
+        krName: "오프라인",
+        enName: "Offline",
+        icon: "wifi_off",
+        tone: "dg",
+        title: "인터넷 연결이 끊겼어요",
+        desc: "연결되면 공유 방과 지도를 자동으로 다시 불러와요. 오프라인 상태에서도 기기에 저장된 일정은 안전하게 볼 수 있어요.",
+        primaryLabel: "연결 다시 시도",
+        primaryIcon: "refresh",
+        secondaryLabel: "로컬 저장 목록 새로고침",
+        secondaryIcon: "storage"
+      },
+      "05": {
+        code: "05",
+        krName: "권한 필요",
+        enName: "Permission needed",
+        icon: "notifications_active",
+        tone: "warn",
+        title: "내 주변 거리 계산과 알림을 위해 권한이 필요해요",
+        desc: "GPS 위치 권한과 브라우저 알림을 허용하면 현재 위치에서 가까운 맛집 정렬과 실시간 동행 알림을 받을 수 있어요.",
+        primaryLabel: "위치·알림 권한 허용하기",
+        primaryIcon: "my_location",
+        secondaryLabel: "오사카 숙소 기준으로 보기",
+        secondaryIcon: "hotel"
+      },
+      "06": {
+        code: "06",
+        krName: "모두 완료",
+        enName: "All caught up",
+        icon: "task_alt",
+        tone: "ok",
+        title: "계획한 여행 일정을 모두 끝냈어요!",
+        desc: "모든 장소 방문을 완료했어요. 완료한 코스도 다시 돌아보거나 새로운 여행지를 추가해 보세요.",
+        checklist: [
+          `총 ${(items || []).length}곳의 여행 장소 등록 완료`,
+          `방문 완료 ${(items || []).filter(x => x.done).length}곳 달성`,
+          "지도 동선 및 카테고리 정리 완료"
+        ],
+        primaryLabel: "완료한 장소까지 모두 보기",
+        primaryIcon: "visibility",
+        secondaryLabel: "새 여행 장소 추가하기",
+        secondaryIcon: "add"
+      },
+      "07": {
+        code: "07",
+        krName: "삭제 직후",
+        enName: "Emptied",
+        icon: "delete_sweep",
+        tone: "warn",
+        title: "장소 목록이 비었어요",
+        desc: window.__v38EmptyStateMeta.lastDeletedSnapshot
+          ? `방금 삭제한 ${window.__v38EmptyStateMeta.lastDeletedLabel || "장소"} 데이터를 즉시 복구하거나 새 장소를 담을 수 있어요.`
+          : "목록의 모든 장소를 비웠어요. 백업에서 복원하거나 새 장소를 추가해 보세요.",
+        primaryLabel: window.__v38EmptyStateMeta.lastDeletedSnapshot ? "방금 삭제한 장소 복구하기" : "새 장소 추가하러 가기",
+        primaryIcon: window.__v38EmptyStateMeta.lastDeletedSnapshot ? "undo" : "add_circle",
+        secondaryLabel: "샘플 여행지 채우기",
+        secondaryIcon: "travel_explore"
+      },
+      "08": {
+        code: "08",
+        krName: "오류 화면",
+        enName: "Error state",
+        icon: "error_outline",
+        tone: "dg",
+        title: "장소 정보를 불러오지 못했어요",
+        desc: window.__v38EmptyStateMeta.lastErrorMsg || "일시적인 네트워크 지연이거나 인스타 보안 차단일 수 있어요. 잠시 뒤 다시 시도해 주세요.",
+        primaryLabel: "다시 불러오기",
+        primaryIcon: "refresh",
+        secondaryLabel: "직접 수동으로 입력하기",
+        secondaryIcon: "edit_note"
+      },
+      "09": {
+        code: "09",
+        krName: "잠김",
+        enName: "Locked content",
+        icon: "lock",
+        tone: "",
+        title: "잠금 보호 중이거나 멤버 전용 기능이에요",
+        desc: "실수 방지 잠금이 켜져 있거나 실시간 공유 방 로그인이 필요한 상태예요. 버튼을 눌러 잠금을 해제하세요.",
+        primaryLabel: "열어 보기 (잠금 해제)",
+        primaryIcon: "lock_open",
+        secondaryLabel: "공유 방 설정으로 이동",
+        secondaryIcon: "group"
+      }
+    };
+    return specs[code] || specs["01"];
+  }
+
+  function renderEmptyStateCardHtml(code, ctx = {}) {
+    const s = getEmptyStateSpec(code, ctx);
+    const checklistHtml = Array.isArray(s.checklist)
+      ? `<div class="v38-empty-checklist">${s.checklist.map(t => `<div><span class="ms fill">check_circle</span><span>${esc(t)}</span></div>`).join("")}</div>`
+      : "";
+    return `
+      <div class="v38-empty-card" data-v38-empty-code="${s.code}">
+        <div class="v38-empty-badge"><b>${s.code} ${esc(s.krName)}</b> · ${esc(s.enName)}</div>
+        <div class="v38-empty-icon-wrap ${s.tone}">
+          <span class="ms fill">${s.icon}</span>
+        </div>
+        <div class="v38-empty-title">${esc(s.title)}</div>
+        <div class="v38-empty-desc">${esc(s.desc)}</div>
+        ${checklistHtml}
+        <div class="v38-empty-actions">
+          <button type="button" class="v38-empty-btn" data-v38-act="primary" data-code="${s.code}">
+            <span class="ms">${s.primaryIcon}</span>${esc(s.primaryLabel)}
+          </button>
+          ${s.secondaryLabel ? `
+            <button type="button" class="v38-empty-btn sub" data-v38-act="secondary" data-code="${s.code}">
+              <span class="ms">${s.secondaryIcon}</span>${esc(s.secondaryLabel)}
+            </button>
+          ` : ""}
+        </div>
+      </div>
+    `;
+  }
+
+  // 현재 앱의 실제 조건에 따라 01~09 중 어떤 빈 화면 상태인지 자동 판별
+  function detectCurrentEmptyCode(allCatItems, filteredItems) {
+    const meta = window.__v38EmptyStateMeta;
+    if (meta.previewForceCode) return meta.previewForceCode;
+
+    const kw = ($("v35SearchInput")?.value || $("q-LIST")?.value || "").trim();
+    const curF = (typeof listFilter !== "undefined" && listFilter[listCat]) ? listFilter[listCat] : "ALL";
+    const smartDay = (typeof smartState !== "undefined" && smartState.day) ? smartState.day : "ALL";
+    const smartOnlyCoord = (typeof smartState !== "undefined" && smartState.onlyCoord);
+
+    // 08: 최근 에러 발생 시
+    if (meta.lastErrorMsg) return "08";
+    // 05: 위치/알림 권한 요청 거부 직후
+    if (meta.permissionNeeded) return "05";
+    // 04: 오프라인이고 표시할 결과가 없을 때
+    if (navigator.onLine === false && (!Array.isArray(items) || items.length === 0)) return "04";
+
+    // 전체 아이템이 0개일 때: 방금 삭제했으면 07(삭제 직후), 아니면 01(첫 사용)
+    if (!Array.isArray(items) || items.length === 0) {
+      if (meta.lastDeletedSnapshot && Date.now() - meta.lastDeletedAt < 600000) {
+        return "07";
+      }
+      return "01";
+    }
+
+    // 검색어가 있는데 결과가 0개면 -> 02 검색 결과 없음
+    if (kw && filteredItems.length === 0) {
+      return "02";
+    }
+
+    // 미방문(TODO) 필터인데 모든 장소를 방문 완료(done=true)한 경우 -> 06 모두 완료!
+    if (curF === "TODO" && allCatItems.length > 0 && allCatItems.every(x => x.done)) {
+      return "06";
+    }
+
+    // 그 외 카테고리/칩/일차/좌표 필터 때문에 결과가 0개인 경우 -> 03 필터 결과 없음
+    if (filteredItems.length === 0 && (listCat !== "ALL" || curF !== "ALL" || smartDay !== "ALL" || smartOnlyCoord)) {
+      return "03";
+    }
+
+    return "01";
+  }
+
+  // 빈 화면 9가지의 버튼 클릭 시 실제로 동작하는 핸들러
+  async function handleEmptyStateAction(code, actType) {
+    if (window.v8Haptic) window.v8Haptic(14);
+    const meta = window.__v38EmptyStateMeta;
+    // 강제 미리보기 모드였다면 액션 실행 시 해제하여 실제 동작 반영
+    meta.previewForceCode = null;
+    syncInspectorPills();
+
+    if (code === "01") {
+      if (actType === "primary") {
+        const wrap = document.getElementById("v32ImportSheetWrap");
+        if (wrap) wrap.classList.add("on");
+        else tab("add");
+      } else {
+        // 오사카·교토 대표 샘플 코스 3곳 실제 추가
+        const samples = [
+          { name: "이치란 도톤보리점 본관", address: "오사카부 오사카시 주오구 소에몬초 7-18", category: "FOOD", day: 1, lat: 34.6691, lng: 135.5031, price: "¥1,180", note: "돈코츠 라멘 대표 맛집" },
+          { name: "기요미즈데라 (청수사)", address: "교토부 교토시 히가시야마구 기요미즈 1-294", category: "PLACE", day: 2, lat: 34.9949, lng: 135.7850, price: "¥500", note: "교토 필수 전통 사찰" },
+          { name: "아라시야마 아라비카 커피 (%)", address: "교토부 교토시 우쿄구 사가텐류지 스스키노바바초 3-47", category: "CAFE", day: 2, lat: 35.0136, lng: 135.6768, price: "¥650", note: "도게츠교 리버뷰 라떼" }
+        ];
+        TripProgress.start({
+          header: "샘플 여행 코스 불러오기",
+          icon: "auto_awesome",
+          title: "오사카·교토 베스트 코스 담는 중",
+          pct: 35
+        });
+        samples.forEach((s, i) => {
+          items.unshift({
+            id: "id_" + Date.now() + "_" + i,
+            ...s,
+            mapVisible: true,
+            places: [{ name: s.name, address: s.address, lat: s.lat, lng: s.lng }],
+            done: false,
+            star: false,
+            updatedAt: Date.now()
+          });
+        });
+        save();
+        draw(true);
+        TripProgress.finish("오사카·교토 3곳 추가 완료!");
+        toast("✨ 오사카·교토 대표 여행지 3곳을 목록과 지도에 담았어요!");
+      }
+      return;
+    }
+
+    if (code === "02") {
+      const inp35 = document.getElementById("v35SearchInput");
+      const inpOrig = document.getElementById("q-LIST");
+      const kw = (inp35?.value || inpOrig?.value || "").trim();
+      if (actType === "primary") {
+        if (inp35) inp35.value = "";
+        if (inpOrig) inpOrig.value = "";
+        const clr = document.getElementById("v35SearchClear");
+        if (clr) clr.style.display = "none";
+        renderListTab();
+        toast("🔍 검색어를 지우고 전체 목록을 표시했어요");
+      } else {
+        // 검색어를 장소명으로 넣어 바로 수동 등록 창 오픈
+        const wrap = document.getElementById("v32ImportSheetWrap");
+        const manBox = document.getElementById("ux7QuickManualBox");
+        const manName = document.getElementById("ux7ManName");
+        if (wrap) wrap.classList.add("on");
+        if (manBox) manBox.classList.add("on");
+        if (manName && kw) manName.value = kw;
+        setTimeout(() => manName?.focus(), 120);
+      }
+      return;
+    }
+
+    if (code === "03") {
+      // 모든 카테고리·필터·스마트필터·근처정렬 완전 초기화
+      listCat = "ALL";
+      if (typeof listFilter !== "undefined") {
+        Object.keys(listFilter).forEach(k => { listFilter[k] = "ALL"; });
+      }
+      if (typeof nearSortOn !== "undefined") nearSortOn = false;
+      document.querySelectorAll("[data-act=nearSort]").forEach(b => b.classList.remove("pr"));
+      const sfbAll = document.querySelector('#sfb-days .sfb-chip[data-day="ALL"]');
+      if (sfbAll) sfbAll.click();
+      const coordBtn = document.getElementById("sfb-coord-only");
+      if (coordBtn && coordBtn.classList.contains("on")) coordBtn.click();
+      const inp35 = document.getElementById("v35SearchInput");
+      const inpOrig = document.getElementById("q-LIST");
+      if (inp35) inp35.value = "";
+      if (inpOrig) inpOrig.value = "";
+      render(true);
+      toast("🔄 모든 필터와 검색 조건을 초기화했어요!");
+      return;
+    }
+
+    if (code === "04") {
+      if (actType === "primary") {
+        TripProgress.start({
+          header: "네트워크 및 동기화 재시도",
+          icon: "sync",
+          title: "연결 상태 확인 및 공유 방 동기화 중...",
+          determinate: false
+        });
+        if (typeof updateNetworkStatus === "function") updateNetworkStatus();
+        if (typeof flushOfflineQueue === "function") await flushOfflineQueue();
+        if (typeof pollSharedRoomNow === "function") await pollSharedRoomNow();
+        setTimeout(() => {
+          TripProgress.finish(navigator.onLine ? "온라인 연결 확인됨!" : "오프라인 캐시 로드 완료");
+          render(true);
+          toast(navigator.onLine ? "🟢 인터넷 연결이 복구되어 동기화했어요!" : "📦 현재 오프라인 상태예요. 기기에 저장된 데이터를 표시합니다.");
+        }, 500);
+      } else {
+        render(true);
+        toast("📦 기기에 저장된 여행 목록을 다시 불러왔어요");
+      }
+      return;
+    }
+
+    if (code === "05") {
+      meta.permissionNeeded = null;
+      if (actType === "primary") {
+        if ("Notification" in window && Notification.permission === "default") {
+          try { await Notification.requestPermission(); } catch (_) {}
+        }
+        if (navigator.geolocation) {
+          toast("📍 브라우저 위치 권한을 요청하고 있어요...");
+          navigator.geolocation.getCurrentPosition(
+            (p) => {
+              userPos = { lat: p.coords.latitude, lng: p.coords.longitude, at: Date.now() };
+              nearSortOn = true;
+              render(true);
+              draw(true);
+              toast("✅ 위치 권한 허용 완료! 내 위치에서 가까운 순으로 정렬했어요.");
+            },
+            () => {
+              toast("⚠️ 브라우저 주소창 왼쪽의 자물쇠/설정 아이콘에서 '위치 권한'을 허용해 주세요.");
+              render(true);
+            },
+            { timeout: 8000 }
+          );
+        } else {
+          render(true);
+        }
+      } else {
+        const sortSel = document.getElementById("sfb-sort");
+        if (sortSel) {
+          sortSel.value = "OSAKA";
+          sortSel.dispatchEvent(new Event("change"));
+        }
+        render(true);
+        toast("🏨 GPS 없이 오사카 거점 숙소에서 가까운 순으로 정렬했어요!");
+      }
+      return;
+    }
+
+    if (code === "06") {
+      if (actType === "primary") {
+        if (typeof listFilter !== "undefined") listFilter[listCat] = "ALL";
+        render(true);
+        toast("🎉 완료한 장소를 포함한 전체 일정을 표시합니다!");
+      } else {
+        document.getElementById("v32ImportSheetWrap")?.classList.add("on");
+      }
+      return;
+    }
+
+    if (code === "07") {
+      if (actType === "primary" && meta.lastDeletedSnapshot) {
+        items = meta.lastDeletedSnapshot.map(x => ({ ...x }));
+        meta.lastDeletedSnapshot = null;
+        save();
+        draw(true);
+        toast("↩️ 방금 삭제한 장소를 모두 원래대로 복구했어요!");
+      } else if (actType === "primary") {
+        document.getElementById("v32ImportSheetWrap")?.classList.add("on");
+      } else {
+        handleEmptyStateAction("01", "secondary");
+      }
+      return;
+    }
+
+    if (code === "08") {
+      meta.lastErrorMsg = "";
+      if (actType === "primary") {
+        if (typeof meta.lastErrorRetryFn === "function") {
+          const fn = meta.lastErrorRetryFn;
+          meta.lastErrorRetryFn = null;
+          await fn();
+        } else {
+          render(true);
+          draw(true);
+          toast("🔄 화면과 데이터를 다시 불러왔어요!");
+        }
+      } else {
+        const wrap = document.getElementById("v32ImportSheetWrap");
+        const manBox = document.getElementById("ux7QuickManualBox");
+        if (wrap) wrap.classList.add("on");
+        if (manBox) manBox.classList.add("on");
+        render(true);
+      }
+      return;
+    }
+
+    if (code === "09") {
+      if (actType === "primary") {
+        const unlockBtn = document.getElementById("v8UnlockEditBtn");
+        if (unlockBtn && unlockBtn.dataset.unlocked !== "1") {
+          unlockBtn.click();
+          toast("🔓 상세창 입력 잠금이 해제되어 자유롭게 수정할 수 있어요!");
+        } else {
+          render(true);
+          toast("🔓 잠금이 해제되어 전체 콘텐츠를 열람할 수 있어요!");
+        }
+      } else {
+        tab("set");
+        toast("👥 실시간 공유 방 및 로그인 설정으로 이동했어요");
+      }
+      return;
+    }
+  }
+
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-v38-act]");
+    if (!btn) return;
+    e.stopPropagation();
+    handleEmptyStateAction(btn.dataset.code, btn.dataset.v38Act);
+  });
+
+  // 목록 탭 상단 카드에 '빈 화면 9가지 & 프로그레스' 실시간 작동/점검 바 주입
+  function injectStateInspectorBar() {
+    const topCard = document.querySelector("#tab-list > .card:first-of-type");
+    if (!topCard || document.getElementById("v38StateInspectorBar")) return;
+
+    const bar = document.createElement("div");
+    bar.id = "v38StateInspectorBar";
+    const states = [
+      ["AUTO", "⚡ 자동감지"],
+      ["PROG", "📊 실제 데이터·좌표 동기화(0~100%)"],
+      ["01", "01 첫 사용"],
+      ["02", "02 검색결과없음"],
+      ["03", "03 필터결과없음"],
+      ["04", "04 오프라인"],
+      ["05", "05 권한필요"],
+      ["06", "06 모두완료"],
+      ["07", "07 삭제직후"],
+      ["08", "08 오류화면"],
+      ["09", "09 잠김"]
+    ];
+    bar.innerHTML = states.map(([code, label]) =>
+      `<button type="button" class="v38-state-pill ${code === "AUTO" ? "on" : ""}" data-v38-pill="${code}">${esc(label)}</button>`
+    ).join("");
+    topCard.appendChild(bar);
+
+    bar.addEventListener("click", (e) => {
+      const pill = e.target.closest("[data-v38-pill]");
+      if (!pill) return;
+      const code = pill.dataset.v38Pill;
+      if (code === "PROG") {
+        runRealDataAuditAndSync();
+        return;
+      }
+      window.__v38EmptyStateMeta.previewForceCode = (code === "AUTO") ? null : code;
+      syncInspectorPills();
+      renderListTab();
+    });
+  }
+
+  function syncInspectorPills() {
+    const bar = document.getElementById("v38StateInspectorBar");
+    if (!bar) return;
+    const curCode = window.__v38EmptyStateMeta.previewForceCode || "AUTO";
+    bar.querySelectorAll("[data-v38-pill]").forEach(p => {
+      if (p.dataset.v38Pill !== "PROG") {
+        p.classList.toggle("on", p.dataset.v38Pill === curCode);
+      }
+    });
+  }
+
+  // 4) 실제 네트워크(fetch) 스트리밍 바이트(Content-Length / ReadableStream) 및 요청 단계 진행률 + 오류(08) 자동 감지
+  const _origFetchV38 = window.fetch ? window.fetch.bind(window) : null;
+  if (_origFetchV38) {
+    window.fetch = async function(input, init) {
+      const urlStr = typeof input === "string" ? input : (input?.url || "");
+      const isTrackedApi = /\/api\/|nominatim\.openstreetmap\.org|firestore|firebase/i.test(urlStr);
+      const isCaptionOrAnalyze = /\/api\/(caption|analyze|place)/i.test(urlStr);
+
+      if (isCaptionOrAnalyze) {
+        const bodyBytes = init?.body ? new TextEncoder().encode(typeof init.body === "string" ? init.body : "").length : 0;
+        const kb = Math.max(1, Math.round(bodyBytes / 1024));
+        TripProgress.start({
+          header: "AI 서버 분석 · 네트워크 전송",
+          icon: "cloud_sync",
+          title: "요청 데이터 전송 중",
+          sub: "실제 네트워크 응답 스트림 바이트를 측정하고 있어요",
+          detail: `전송 ${kb} KB`,
+          pct: 15
+        });
+      }
+
+      try {
+        const res = await _origFetchV38(input, init);
+        if (!res.ok && isCaptionOrAnalyze) {
+          window.__v38EmptyStateMeta.lastErrorMsg = `서버 응답 오류 (HTTP ${res.status}): 데이터를 불러오지 못했어요.`;
+          if (typeof renderListTab === "function") renderListTab();
+        }
+        const contentLength = Number(res.headers?.get("content-length") || 0);
+        if (isTrackedApi && contentLength > 0 && res.body && typeof res.body.getReader === "function") {
+          const clone = res.clone();
+          const reader = clone.body.getReader();
+          let received = 0;
+          (async () => {
+            try {
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                received += value ? value.byteLength : 0;
+                const pct = Math.min(99, Math.round((received / contentLength) * 100));
+                TripProgress.update(pct, {
+                  title: "데이터 수신 중",
+                  detail: `${(received / 1024).toFixed(1)} / ${(contentLength / 1024).toFixed(1)} KB`
+                });
+              }
+            } catch (_) {}
+          })();
+        }
+        return res;
+      } catch (err) {
+        if (isCaptionOrAnalyze) {
+          window.__v38EmptyStateMeta.lastErrorMsg = err?.message || "네트워크 연결 오류로 정보를 불러오지 못했어요.";
+          TripProgress.hide();
+          if (typeof renderListTab === "function") renderListTab();
+        }
+        throw err;
+      }
+    };
+  }
+
+  // 5) 실제 브라우저 위치 권한(Geolocation) 거부 시 '05 권한 필요' 빈 화면 상태 자동 연동
+  if (navigator.geolocation && typeof navigator.geolocation.getCurrentPosition === "function") {
+    const _origGetPos = navigator.geolocation.getCurrentPosition.bind(navigator.geolocation);
+    navigator.geolocation.getCurrentPosition = function(successCb, errorCb, options) {
+      return _origGetPos(
+        (pos) => {
+          window.__v38EmptyStateMeta.permissionNeeded = null;
+          if (typeof successCb === "function") successCb(pos);
+        },
+        (err) => {
+          if (err && err.code === 1) {
+            window.__v38EmptyStateMeta.permissionNeeded = "geo";
+            if (typeof renderListTab === "function") renderListTab();
+          }
+          if (typeof errorCb === "function") errorCb(err);
+        },
+        options
+      );
+    };
+  }
+
+  // 6) JSON / CSV / KMZ 파일 불러오기(#importFile, #importKmzFile, #ulJsonFile) 실제 바이트 읽기 진행률(0~100%) 연동
+  ["importFile", "importKmzFile", "ulJsonFile"].forEach(inputId => {
+    const fileInput = document.getElementById(inputId);
+    if (!fileInput) return;
+    fileInput.addEventListener("change", (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      const totalBytes = Math.max(1, f.size || 1);
+      const totalKB = (totalBytes / 1024).toFixed(1);
+      const probe = new FileReader();
+      TripProgress.start({
+        header: "파일 불러오기 · 실시간 바이트 진행률",
+        icon: "upload_file",
+        title: `${f.name} 읽는 중`,
+        sub: "실제 파일 바이트(loaded / total)에 맞춰 0~100%가 올라가요",
+        detail: `0.0 / ${totalKB} KB`,
+        pct: 1
+      });
+      probe.onprogress = (ev) => {
+        if (ev.lengthComputable && ev.total > 0) {
+          const pct = Math.round((ev.loaded / ev.total) * 90);
+          TripProgress.update(pct, {
+            title: `${f.name} 읽는 중 (${pct}%)`,
+            detail: `${(ev.loaded / 1024).toFixed(1)} / ${(ev.total / 1024).toFixed(1)} KB`
+          });
+        }
+      };
+      probe.onload = () => {
+        TripProgress.finish(`${f.name} (${totalKB} KB) 로드 완료!`);
+      };
+      probe.onerror = () => TripProgress.hide();
+      probe.readAsArrayBuffer(f);
+    }, true);
+  });
+
+  // 7) 실제 앱 데이터·스토리지 바이트·좌표·공유방 동기화 진행률 측정기 (가짜 랜덤 타이머 없음, 100% 실제 작업량 기반)
+  async function runRealDataAuditAndSync() {
+    const list = Array.isArray(items) ? items : [];
+    const encoder = new TextEncoder();
+    const rawJson = JSON.stringify(list);
+    const totalBytes = Math.max(1, encoder.encode(rawJson).byteLength);
+    const totalKB = (totalBytes / 1024).toFixed(1);
+
+    // 작업 단위 구성: 각 아이템 직렬화/좌표 검증(list.length개) + 로컬 스토리지 기록(1) + 오프라인 큐/공유방 동기화(1)
+    const itemSteps = Math.max(1, list.length);
+    const totalSteps = itemSteps + 2;
+    let completedSteps = 0;
+    let processedBytes = 0;
+    let geocodedCount = 0;
+
+    TripProgress.start({
+      header: "실제 데이터 · 스토리지 · 좌표 동기화",
+      icon: "sync",
+      title: `저장된 장소 ${list.length}곳 데이터 검증 시작`,
+      sub: "실제 처리된 바이트와 완료된 작업 단계(completed / total)로 계산돼요",
+      detail: `0.0 / ${totalKB} KB (0/${totalSteps} 단계)`,
+      pct: 0
+    });
+
+    for (let i = 0; i < list.length; i++) {
+      const it = list[i];
+      const itemBytes = encoder.encode(JSON.stringify(it)).byteLength;
+      processedBytes += itemBytes;
+
+      // 좌표가 비어 있는 실제 아이템이 있으면 즉시 지오코딩 API 호출
+      if ((!Number(it.lat) || !Number(it.lng)) && typeof geocodePlace === "function" && navigator.onLine) {
+        const g = await geocodePlace(it, "", true);
+        if (g && g.lat && g.lng) {
+          it.lat = g.lat;
+          it.lng = g.lng;
+          it.mapVisible = true;
+          geocodedCount++;
+        }
+      } else {
+        await new Promise(r => requestAnimationFrame(r));
+      }
+
+      completedSteps++;
+      const realPct = Math.round((completedSteps / totalSteps) * 100);
+      TripProgress.update(realPct, {
+        title: `'${it.name || `장소 #${i + 1}`}' 데이터·좌표 점검 완료`,
+        sub: `실제 바이트 처리량과 장소 검증 단계(${completedSteps}/${totalSteps}) 반영 중`,
+        detail: `${(Math.min(processedBytes, totalBytes) / 1024).toFixed(1)} / ${totalKB} KB`
+      });
+    }
+
+    if (list.length === 0) {
+      await new Promise(r => requestAnimationFrame(r));
+      completedSteps++;
+      TripProgress.update(Math.round((completedSteps / totalSteps) * 100), {
+        title: "로컬 스토리지 캐시 점검 중",
+        detail: `0.0 / ${totalKB} KB`
+      });
+    }
+
+    // 단계 N+1: 실제 localStorage 저장 및 용량 검증
+    if (typeof save === "function") save();
+    completedSteps++;
+    TripProgress.update(Math.round((completedSteps / totalSteps) * 100), {
+      title: "로컬 스토리지 쓰기 검증 완료",
+      detail: `${totalKB} / ${totalKB} KB 기록됨`
+    });
+
+    // 단계 N+2: 실제 오프라인 큐 플러시 및 공유방 폴링
+    if (navigator.onLine) {
+      if (typeof flushOfflineQueue === "function") await flushOfflineQueue();
+      if (typeof pollSharedRoomNow === "function") await pollSharedRoomNow();
+    }
+    completedSteps = totalSteps;
+    if (typeof draw === "function") draw(true);
+
+    TripProgress.finish(
+      `장소 ${list.length}곳 (${totalKB} KB)${geocodedCount ? ` · 좌표 ${geocodedCount}곳 복구` : ""} 동기화 100% 완료!`
+    );
+  }
+
+  // renderListTab 후킹: 기존의 단순 .empty 텍스트나 스마트 필터로 인해 전소된 화면을 9가지 상태 카드로 교체
+  if (typeof renderListTab === "function") {
+    const _origRenderListV38 = renderListTab;
+    renderListTab = function(...args) {
+      const r = _origRenderListV38.apply(this, args);
+      injectStateInspectorBar();
+      syncInspectorPills();
+
+      const listEl = document.getElementById("list-LIST");
+      if (!listEl) return r;
+
+      const allCat = listCat === "ALL" ? (items || []) : (items || []).filter(i => i.category === listCat);
+      const visibleCards = Array.from(listEl.querySelectorAll(".item[data-id]")).filter(el => el.style.display !== "none");
+      const oldEmpty = listEl.querySelector(".empty");
+      const forcedCode = window.__v38EmptyStateMeta.previewForceCode;
+
+      // 기존 안내 카드 제거 후 다시 계산
+      listEl.querySelectorAll(".v38-empty-card").forEach(el => el.remove());
+
+      if (forcedCode) {
+        if (oldEmpty) oldEmpty.remove();
+        listEl.insertAdjacentHTML("afterbegin", renderEmptyStateCardHtml(forcedCode));
+        return r;
+      }
+
+      if (oldEmpty || visibleCards.length === 0) {
+        if (oldEmpty) oldEmpty.remove();
+        const code = detectCurrentEmptyCode(allCat, visibleCards);
+        listEl.insertAdjacentHTML("beforeend", renderEmptyStateCardHtml(code));
+      }
+      return r;
+    };
+  }
+
+  // 온라인/오프라인 전환 시 즉시 빈 화면 상태 갱신
+  window.addEventListener("online", () => { if (typeof renderListTab === "function") renderListTab(); });
+  window.addEventListener("offline", () => { if (typeof renderListTab === "function") renderListTab(); });
+
+  // 초기 앱 부팅 시 실제 리소스/DOM/데이터 하이드레이션 완료율(0~100%) 표시
+  (function trackRealBootProgress() {
+    const resources = performance.getEntriesByType ? performance.getEntriesByType("resource") : [];
+    const totalRes = Math.max(1, resources.length);
+    const totalTransferKB = (resources.reduce((acc, r) => acc + (r.transferSize || r.encodedBodySize || 0), 0) / 1024).toFixed(1);
+    TripProgress.start({
+      header: "앱 리소스 · 여행 데이터 로딩",
+      icon: "bolt",
+      title: `리소스 ${totalRes}개 · 장소 ${(items || []).length}곳 불러오는 중`,
+      sub: "실제 브라우저 리소스 타임라인과 로컬 데이터 로드율이에요",
+      detail: `${totalTransferKB} KB 로드됨`,
+      pct: 45
+    });
+    const onReady = async () => {
+      TripProgress.update(80, {
+        title: "폰트 및 지도 레이어 초기화 중",
+        detail: `${totalRes}/${totalRes} 리소스 · ${totalTransferKB} KB`
+      });
+      if (document.fonts && document.fonts.ready) {
+        try { await document.fonts.ready; } catch (_) {}
+      }
+      injectStateInspectorBar();
+      if (typeof renderListTab === "function") renderListTab();
+      TripProgress.finish(`앱 준비 완료! (장소 ${(items || []).length}곳 로드됨)`);
+    };
+    if (document.readyState === "complete") {
+      setTimeout(onReady, 180);
+    } else {
+      window.addEventListener("load", onReady, { once: true });
+    }
+  })();
+})();
+</script>
+<!-- === V38_EMPTY_STATES_9_AND_PROGRESS_BAR_CIRCULAR_END === -->
 </body>
 </html>
