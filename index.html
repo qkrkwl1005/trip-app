@@ -10035,9 +10035,9 @@ ${caption || rawText}
         }
 
         const BASE_COORDS = {
-          osaka: { label: "오사카 숙소", lat: 34.661784, lng: 135.508406 },
-          kyoto: { label: "교토 숙소", lat: 34.97859, lng: 135.76631 },
-          ine: { label: "이네후나야 숙소", lat: 35.53836, lng: 135.19021 },
+          osaka: { label: "오사카 숙소", lat: 34.661942, lng: 135.508443 },
+          kyoto: { label: "교토 숙소", lat: 34.97858, lng: 135.76654 },
+          ine: { label: "이네후나야 숙소", lat: 35.5381, lng: 135.1908 },
         };
 
         const smartState = {
@@ -12850,29 +12850,35 @@ ${caption || rawText}
     kyoto: {
       key: "kyoto",
       title: "교토 숙소",
-      sub: "도후쿠지역 도보 4분 · 히가시야마구",
-      address: "〒605-0981 京都府京都市東山区本町15丁目",
-      lat: 34.97859,
-      lng: 135.76631,
-      emoji: "🏨"
+      sub: "Randor Residential Hotel Kyoto Suites",
+      hotelName: "Randor Residential Hotel Kyoto Suites",
+      address: "〒601-8022 京都府京都市南区東九条北松ノ木町38-1",
+      lat: 34.97858,
+      lng: 135.76654,
+      emoji: "🏨",
+      gmapQuery: "Randor Residential Hotel Kyoto Suites 〒601-8022 京都府京都市南区東九条北松ノ木町38-1"
     },
     ine: {
       key: "ine",
       title: "이네후나야 숙소",
-      sub: "아마노하시다테 북측 · 미야즈시",
-      address: "京都府宮津市中野",
-      lat: 35.53836,
-      lng: 135.19021,
-      emoji: "🌊"
+      sub: "すぎ by moku (moku杢《すぎ》)",
+      hotelName: "すぎ by moku",
+      address: "〒626-0011 京都府宮津市白柏1257番地",
+      lat: 35.5381,
+      lng: 135.1908,
+      emoji: "🌊",
+      gmapQuery: "すぎ by moku杢 京都府宮津市白柏1257番地"
     },
     osaka: {
       key: "osaka",
       title: "오사카 숙소",
-      sub: "닛폰바시·난바역 도보 6분",
-      address: "〒542-0073 大阪府大阪市中央区日本橋2丁目",
-      lat: 34.661784,
-      lng: 135.508406,
-      emoji: "🏢"
+      sub: "Osaka House 701 (Nipponbashihigashi)",
+      hotelName: "Osaka House 701 (덴노지의 아파트먼트)",
+      address: "〒556-0006 大阪府大阪市浪速区日本橋東1丁目5-14 大阪ハウス 701",
+      lat: 34.661942,
+      lng: 135.508443,
+      emoji: "🏢",
+      gmapQuery: "大阪府大阪市浪速区日本橋東1丁目5-14"
     }
   };
 
@@ -12893,14 +12899,15 @@ ${caption || rawText}
   }
 
   function hotelPopupHtml(h) {
-    const gmapCoordUrl = `https://www.google.com/maps/search/?api=1&query=${h.lat},${h.lng}`;
+    const queryStr = h.gmapQuery || `${h.lat},${h.lng}`;
+    const gmapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(queryStr)}`;
     return `
-      <div class="mapPinPopup" style="min-width:225px;color:#0f172a;padding:2px">
+      <div class="mapPinPopup" style="min-width:235px;color:#0f172a;padding:2px">
         <strong style="font-size:15px;color:#059669">${h.emoji} ${esc(h.title)}</strong>
         <div style="font-size:12px;font-weight:800;color:#2563eb;margin:3px 0">${esc(h.sub)}</div>
-        <div style="font-size:12px;color:#475569;margin-bottom:8px;word-break:break-all">${esc(h.address)}</div>
+        <div style="font-size:11.5px;color:#475569;margin-bottom:8px;word-break:break-all">${esc(h.address)}</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <button type="button" class="mb pr" onclick="window.openExternalCleanNoBlank('${gmapCoordUrl}')" style="min-height:32px;padding:4px 10px;font-size:11.5px"><span class="ms">map</span>구글맵 열기</button>
+          <button type="button" class="mb pr" onclick="window.openExternalCleanNoBlank('${gmapUrl}')" style="min-height:32px;padding:4px 10px;font-size:11.5px"><span class="ms">map</span>구글맵 열기</button>
           <button type="button" class="mb" onclick="navigator.clipboard?.writeText('${esc(h.address)}');toast('📋 숙소 주소를 복사했습니다')" style="min-height:32px;padding:4px 10px;font-size:11.5px"><span class="ms">content_copy</span>주소복사</button>
           <button type="button" class="mb" onclick="window.openHotelTaxiV32('${h.key}')" style="min-height:32px;padding:4px 10px;font-size:11.5px"><span class="ms">local_taxi</span>택시화면</button>
         </div>
@@ -14359,9 +14366,13 @@ ${caption || rawText}
 
   /* 3. 숙소 팝업에서 구글맵 열기 시 좌표 대신 실제 주소+숙소명으로 검색되도록 개선 */
   const HOTEL_QUERIES = {
-    "34.97859,135.76631": "〒605-0981 京都府京都市東山区本町15丁目",
-    "35.53836,135.19021": "京都府宮津市中野 伊根",
-    "34.661784,135.508406": "〒542-0073 大阪府大阪市中央区日本橋2丁目"
+    "34.97858,135.76654": "Randor Residential Hotel Kyoto Suites 〒601-8022 京都府京都市南区東九条北松ノ木町38-1",
+    "35.5381,135.1908": "すぎ by moku杢 京都府宮津市白柏1257番地",
+    "34.661942,135.508443": "大阪府大阪市浪速区日本橋東1丁目5-14",
+    // 구좌표 호환 유지
+    "34.97859,135.76631": "Randor Residential Hotel Kyoto Suites 〒601-8022 京都府京都市南区東九条北松ノ木町38-1",
+    "35.53836,135.19021": "すぎ by moku杢 京都府宮津市白柏1257番地",
+    "34.661784,135.508406": "大阪府大阪市浪速区日本橋東1丁目5-14"
   };
   if (typeof window.openExternalCleanNoBlank === "function") {
     const _origOpenExt = window.openExternalCleanNoBlank;
