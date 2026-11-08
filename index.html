@@ -14077,5 +14077,248 @@ ${caption || rawText}
 })();
 </script>
 <!-- === V35_CLEAN_STRUCTURE_PATCH_END === -->
+<!-- === V36_EYE_COMFORT_PATCH_START === -->
+<style>
+  /* 1. 눈이 편안한 저채도 다크/라이트 컬러 밸런스 */
+  [data-theme="dark"] {
+    --bg: #0b0e14;
+    --s: #131822;
+    --s2: #1a202c;
+    --s3: #242c3d;
+    --bd: rgba(255, 255, 255, 0.07);
+    --bd2: rgba(255, 255, 255, 0.13);
+    --tx: #f1f5f9;
+    --sub: #94a3b8;
+    --pr: #3b82f6;
+    --pr-soft: rgba(59, 130, 246, 0.14);
+  }
+
+  /* 2. 상단 유틸리티 바(#ux7TopUtilBar) 우측 버튼 잘림 완벽 해결 */
+  #ux7TopUtilBar {
+    padding: calc(8px + env(safe-area-inset-top)) 12px 8px !important;
+    gap: 4px !important;
+  }
+  #ux7TopUtilBar .ux7-title {
+    font-size: 14.5px !important;
+    gap: 5px !important;
+  }
+  #v32TopOnlineBadge {
+    font-size: 10px !important;
+    padding: 2px 6px !important;
+  }
+  #ux7TopUtilBar .ux7-actions {
+    gap: 4px !important;
+    overflow: visible !important;
+  }
+  #ux7TopUtilBar .ux7-actions .mb {
+    min-height: 28px !important;
+    padding: 4px 7px !important;
+    font-size: 10.5px !important;
+    border-radius: 10px !important;
+  }
+
+  /* 3. 홈 대시보드 Bento 카드: 산만한 4색 테두리를 차분한 통일 톤으로 개선 */
+  .v32-bento-card.b-blue,
+  .v32-bento-card.b-green,
+  .v32-bento-card.b-purple,
+  .v32-bento-card.b-amber {
+    background: var(--s) !important;
+    border: 1px solid var(--bd2) !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18) !important;
+  }
+  .v32-bento-card b {
+    font-size: 21px !important;
+    letter-spacing: -0.02em;
+  }
+
+  /* 4. 목록 탭 상단 컨트롤 압축 및 1/N 정산 드로어 잘림 해결 */
+  #tab-list > .card:first-of-type {
+    padding: 10px 12px !important;
+    margin-bottom: -4px !important;
+  }
+  #v35SearchRow { margin-bottom: 6px !important; }
+  #v35SearchInput {
+    min-height: 36px !important;
+    font-size: 13px !important;
+  }
+  #v32ListBudgetDrawer {
+    padding: 10px !important;
+    margin-top: 8px !important;
+  }
+  .v36-budget-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .v36-budget-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+  }
+
+  /* 5. 장소 카드(.item) 시각적 피로도 완화 및 정돈 */
+  #list-LIST .item {
+    padding: 13px 14px !important;
+    border-radius: 18px !important;
+    background: var(--s) !important;
+    border: 1px solid var(--bd) !important;
+  }
+  #list-LIST .item .mid .nm {
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    color: var(--tx) !important;
+  }
+  .v32-coord-check .ms {
+    font-size: 16px !important;
+    color: #10b981 !important;
+    opacity: 0.85;
+  }
+  .v32-station-badge {
+    background: rgba(148, 163, 184, 0.12) !important;
+    color: var(--tx) !important;
+    border: 1px solid rgba(148, 163, 184, 0.22) !important;
+    font-weight: 600 !important;
+    font-size: 11px !important;
+    padding: 2px 7px !important;
+  }
+  .ux7-badge.places {
+    background: rgba(59, 130, 246, 0.12) !important;
+    color: #93c5fd !important;
+    border: 1px solid rgba(59, 130, 246, 0.22) !important;
+    font-weight: 700 !important;
+  }
+  /* 원색 핑크 그라데이션 릴스 버튼을 눈이 편한 소프트 로즈 톤으로 변경 */
+  .reel-jump {
+    background: rgba(225, 48, 108, 0.15) !important;
+    color: #fda4af !important;
+    border: 1px solid rgba(225, 48, 108, 0.32) !important;
+    box-shadow: none !important;
+    font-weight: 700 !important;
+  }
+  [data-theme="light"] .reel-jump {
+    background: #fff1f2 !important;
+    color: #be123c !important;
+    border-color: #fecdd3 !important;
+  }
+  .v33-card-ctrl-row .ux7-day-select,
+  .v33-card-ctrl-row .v32-time-select {
+    background: var(--s2) !important;
+    color: var(--sub) !important;
+    border: 1px solid var(--bd2) !important;
+    font-weight: 700 !important;
+  }
+
+  /* 6. 상세 바텀 시트(#sheet) 하단 고정 바 겹침 해결 및 정돈 */
+  .ux-stab-pane {
+    padding-bottom: 32px !important;
+  }
+  .ux-sheet-footer {
+    background: rgba(19, 24, 34, 0.96) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+  }
+  [data-theme="light"] .ux-sheet-footer {
+    background: rgba(255, 255, 255, 0.96) !important;
+  }
+
+  /* 7. 설정 탭 중복 이메일 상태줄 숨김 및 하단 네비게이션 불투명도 개선 */
+  #sharedUserStatus { display: none !important; }
+  @media (max-width: 820px) {
+    #nav {
+      background: rgba(15, 19, 28, 0.96) !important;
+    }
+    [data-theme="light"] #nav {
+      background: rgba(255, 255, 255, 0.96) !important;
+    }
+  }
+</style>
+
+<script>
+(function initV36EyeComfortPatch() {
+  /* 1. 상단 유틸리티 바 버튼을 컴팩트하게 다듬어 우측 잘림 방지 */
+  function compactTopUtilBar() {
+    const fixBtn = document.getElementById("ux7FixAllCoordsBtn");
+    const copyBtn = document.getElementById("ux7QuickCopyPlanBtn");
+    if (fixBtn) fixBtn.innerHTML = `<span class="ms">my_location</span>좌표`;
+    if (copyBtn) copyBtn.innerHTML = `<span class="ms">content_copy</span>복사`;
+  }
+
+  /* 2. 1/N 정산 드로어를 2줄 구조로 재배치하여 좌우 잘림 완벽 해결 */
+  function fixBudgetDrawerLayout() {
+    const drawer = document.getElementById("v32ListBudgetDrawer");
+    if (!drawer || drawer.dataset.v36Fixed === "1") return;
+    const amt = document.getElementById("v32Amt");
+    const cur = document.getElementById("v32Cur");
+    const minus = document.getElementById("v32Minus");
+    const cnt = document.getElementById("v32Cnt");
+    const plus = document.getElementById("v32Plus");
+    const reset = document.getElementById("v32Reset");
+    if (!amt || !cur || !minus || !cnt || !plus || !reset) return;
+
+    drawer.dataset.v36Fixed = "1";
+    const grid = document.createElement("div");
+    grid.className = "v36-budget-grid";
+
+    const row1 = document.createElement("div");
+    row1.className = "v36-budget-row";
+    amt.style.cssText = "flex:1;min-width:0;margin:0;min-height:38px;padding:6px 12px;font-size:14px";
+    cur.style.cssText = "width:84px;flex:none;margin:0;min-height:38px;padding:4px 8px;font-size:13px";
+    row1.append(amt, cur);
+
+    const row2 = document.createElement("div");
+    row2.className = "v36-budget-row";
+    row2.style.justifyContent = "space-between";
+    const stepWrap = document.createElement("div");
+    stepWrap.style.cssText = "display:flex;align-items:center;gap:8px";
+    const lbl = document.createElement("span");
+    lbl.style.cssText = "font-size:12.5px;font-weight:700;color:var(--sub)";
+    lbl.textContent = "정산 인원";
+    stepWrap.append(lbl, minus, cnt, plus);
+    reset.style.cssText = "min-height:34px;padding:0 12px;font-size:12px";
+    row2.append(stepWrap, reset);
+
+    grid.append(row1, row2);
+    drawer.innerHTML = "";
+    drawer.appendChild(grid);
+  }
+
+  /* 3. 숙소 팝업에서 구글맵 열기 시 좌표 대신 실제 주소+숙소명으로 검색되도록 개선 */
+  const HOTEL_QUERIES = {
+    "34.97859,135.76631": "〒605-0981 京都府京都市東山区本町15丁目",
+    "35.53836,135.19021": "京都府宮津市中野 伊根",
+    "34.661784,135.508406": "〒542-0073 大阪府大阪市中央区日本橋2丁目"
+  };
+  if (typeof window.openExternalCleanNoBlank === "function") {
+    const _origOpenExt = window.openExternalCleanNoBlank;
+    window.openExternalCleanNoBlank = function(url) {
+      let targetUrl = String(url || "");
+      for (const [coord, addr] of Object.entries(HOTEL_QUERIES)) {
+        if (targetUrl.includes(coord)) {
+          targetUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`;
+          break;
+        }
+      }
+      return _origOpenExt(targetUrl);
+    };
+  }
+
+  if (typeof renderListTab === "function") {
+    const _origRenderListV36 = renderListTab;
+    renderListTab = function(...args) {
+      const r = _origRenderListV36.apply(this, args);
+      compactTopUtilBar();
+      fixBudgetDrawerLayout();
+      return r;
+    };
+  }
+
+  setTimeout(() => {
+    compactTopUtilBar();
+    fixBudgetDrawerLayout();
+  }, 250);
+})();
+</script>
+<!-- === V36_EYE_COMFORT_PATCH_END === -->
 </body>
 </html>
