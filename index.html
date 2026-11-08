@@ -7927,12 +7927,18 @@
         let capStatus = "";
 
         if (vidUrl && caption.length < 8) {
+          if (typeof window.__v8AiSetStep === "function") {
+            window.__v8AiSetStep("1단계: 영상 메타데이터 및 캡션 추출 중...", 28);
+          }
           toast("릴스/쇼츠 캡션 정보를 불러오는 중...");
           const fetched = await fetchVideoCaption(vidUrl);
           if (fetched) {
             caption = (caption + "\n" + fetched).trim();
             if ($("shareBox") && (!($("shareBox").value || "").replace(/https?:\/\/[^\s]+/g, "").trim())) {
               $("shareBox").value = fetched;
+            }
+            if (typeof window.__v8AiSetStep === "function") {
+              window.__v8AiSetStep("1단계: 캡션 추출 완료, AI 분석 준비 중...", 45);
             }
           } else {
             capStatus =
@@ -7950,6 +7956,9 @@
           if (!hasAi || !(caption.length >= 2 || images.length > 0 || vidUrl))
             return [];
           try {
+            if (typeof window.__v8AiSetStep === "function") {
+              window.__v8AiSetStep("2단계: AI 장소·상호명 추출 중...", 58);
+            }
             const needWebSearch = Boolean(
               images.length > 0 ||
               caption.length < 200 ||
@@ -7981,6 +7990,9 @@ ${caption || rawText}
               images.slice(0, MAX_MULTI_PLACES),
               needWebSearch,
             );
+            if (typeof window.__v8AiSetStep === "function") {
+              window.__v8AiSetStep("2단계: AI 장소 추출 완료! 좌표 매핑 중...", 78);
+            }
             return extractJsonArray(txt).slice(0, MAX_MULTI_PLACES);
           } catch (e) {
             aiErr = e.message;
@@ -8043,6 +8055,12 @@ ${caption || rawText}
           ];
         }
 
+        const totalCands = Math.max(1, cands.length);
+        let geoDoneCount = 0;
+        if (typeof window.__v8AiSetStep === "function") {
+          window.__v8AiSetStep(`3단계: 정밀 위경도 좌표 매핑 중... (0/${totalCands})`, 82);
+        }
+
         await Promise.all(
           cands.map(async (c, idx) => {
             if (
@@ -8064,6 +8082,11 @@ ${caption || rawText}
               }
             }
             if (!c.name && c.address) c.name = c.address.split(",")[0].trim();
+            geoDoneCount++;
+            if (typeof window.__v8AiSetStep === "function") {
+              const geoPct = 82 + Math.round((geoDoneCount / totalCands) * 16); // 82% ~ 98%
+              window.__v8AiSetStep(`3단계: 정밀 위경도 매핑 (${geoDoneCount}/${totalCands}곳)`, geoPct);
+            }
           }),
         );
 
@@ -11609,16 +11632,17 @@ ${caption || rawText}
   #v8AiStepper.on { display: flex; }
   .v8-ai-bar-bg {
     width: 100%;
-    height: 6px;
+    height: 7px;
     border-radius: 999px;
     background: rgba(59, 130, 246, 0.2);
     overflow: hidden;
   }
   .v8-ai-bar-fill {
-    width: 15%;
+    width: 0%;
     height: 100%;
-    background: var(--pr);
-    transition: width 0.3s ease;
+    background: linear-gradient(90deg, #3b82f6, #60a5fa);
+    border-radius: 999px;
+    transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   /* 지도 하프 바텀 시트 (Map-List Drawer) */
@@ -12209,15 +12233,54 @@ ${caption || rawText}
         const barEl = document.getElementById("v8AiStepBar");
         const setStep = (t, p) => {
           if (txtEl) txtEl.textContent = t;
-          if (pctEl) pctEl.textContent = p + "%";
-          if (barEl) barEl.style.width = p + "%";
+          if (pctEl) pctEl.textContent = Math.round(p) + "%";
+          if (barEl) barEl.style.width = Math.min(100, Math.round(p)) + "%";
         };
-        setStep("1단계: 영상 메타데이터 및 캡션 추출 중...", 25);
-        const t1 = setTimeout(() => setStep("2단계: AI 장소·상호명 추출 중...", 60), 1100);
-        const t2 = setTimeout(() => setStep("3단계: 정밀 위경도 좌표 매핑 중...", 88), 2400);
+
+        // 뚝뚝 끊기지 않고 부드럽게 실시간으로 진행률이 오르도록 애니메이션 티커 적용
+        let currentPct = 5;
+        let targetPct = 25;
+        let currentText = "1단계: 영상 메타데이터 및 캡션 추출 중...";
+        setStep(currentText, currentPct);
+
+        const animInterval = setInterval(() => {
+          if (currentPct < targetPct) {
+            currentPct += Math.max(0.5, (targetPct - currentPct) * 0.12);
+            setStep(currentText, currentPct);
+          } else if (currentPct < 96 && targetPct < 97) {
+            // 장시간 네트워크 대기 중에도 완전히 멈추지 않고 0.2~0.4%씩 부드럽게 점진 전진
+            currentPct += 0.25;
+            setStep(currentText, currentPct);
+          }
+        }, 80);
+
+        // 단계 전환을 전역 훅으로 연결하여 실제 비동기 처리가 끝나면 즉시 반영
+        window.__v8AiSetStep = (text, target) => {
+          currentText = text;
+          targetPct = Math.max(targetPct, target);
+        };
+
+        // 1단계(메타데이터 추출: 5~40%) -> 2단계(AI 장소 분석: 40~75%) -> 3단계(정밀 좌표 매핑: 75~96%)
+        targetPct = 38;
+        const tStep2 = setTimeout(() => {
+          if (currentPct < 70) {
+            window.__v8AiSetStep("2단계: AI 장소·상호명 추출 중...", 68);
+          }
+        }, 1200);
+        const tStep3 = setTimeout(() => {
+          if (currentPct < 85) {
+            window.__v8AiSetStep("3단계: 정밀 위경도 좌표 매핑 중...", 86);
+          }
+        }, 2800);
+
         try {
           const out = await _origAnalyze.apply(this, args);
-          setStep("완료!", 100);
+          clearInterval(animInterval);
+          clearTimeout(tStep2);
+          clearTimeout(tStep3);
+          setStep("분석 완료! (100%)", 100);
+          if (window.v8Haptic) window.v8Haptic(18);
+
           // 캡션 자동 인식 실패 시 즉시 수동 입력 박스를 열어 사용자 행동 유도
           if (Array.isArray(res) && res.length === 1 && isGenericSharedName(res[0].name)) {
             const manBox = document.getElementById("ux7QuickManualBox");
@@ -12228,9 +12291,11 @@ ${caption || rawText}
           }
           return out;
         } finally {
-          clearTimeout(t1);
-          clearTimeout(t2);
-          setTimeout(() => stepper.classList.remove("on"), 600);
+          clearInterval(animInterval);
+          clearTimeout(tStep2);
+          clearTimeout(tStep3);
+          window.__v8AiSetStep = null;
+          setTimeout(() => stepper.classList.remove("on"), 650);
         }
       };
     }
@@ -16083,37 +16148,16 @@ ${caption || rawText}
   window.addEventListener("online", () => { if (typeof renderListTab === "function") renderListTab(); });
   window.addEventListener("offline", () => { if (typeof renderListTab === "function") renderListTab(); });
 
-  // 초기 앱 부팅 시 실제 리소스/DOM/데이터 하이드레이션 완료율(0~100%) 표시
-  (function trackRealBootProgress() {
-    const resources = performance.getEntriesByType ? performance.getEntriesByType("resource") : [];
-    const totalRes = Math.max(1, resources.length);
-    const totalTransferKB = (resources.reduce((acc, r) => acc + (r.transferSize || r.encodedBodySize || 0), 0) / 1024).toFixed(1);
-    TripProgress.start({
-      header: "앱 리소스 · 여행 데이터 로딩",
-      icon: "bolt",
-      title: `리소스 ${totalRes}개 · 장소 ${(items || []).length}곳 불러오는 중`,
-      sub: "실제 브라우저 리소스 타임라인과 로컬 데이터 로드율이에요",
-      detail: `${totalTransferKB} KB 로드됨`,
-      pct: 45
-    });
-    const onReady = async () => {
-      TripProgress.update(80, {
-        title: "폰트 및 지도 레이어 초기화 중",
-        detail: `${totalRes}/${totalRes} 리소스 · ${totalTransferKB} KB`
-      });
-      if (document.fonts && document.fonts.ready) {
-        try { await document.fonts.ready; } catch (_) {}
-      }
-      injectStateInspectorBar();
-      if (typeof renderListTab === "function") renderListTab();
-      TripProgress.finish(`앱 준비 완료! (장소 ${(items || []).length}곳 로드됨)`);
-    };
-    if (document.readyState === "complete") {
-      setTimeout(onReady, 180);
-    } else {
-      window.addEventListener("load", onReady, { once: true });
-    }
-  })();
+  // 앱 시작 시 상단 점검 바 초기화 및 빈 화면 렌더링
+  const initV38OnReady = () => {
+    injectStateInspectorBar();
+    if (typeof renderListTab === "function") renderListTab();
+  };
+  if (document.readyState === "complete") {
+    setTimeout(initV38OnReady, 60);
+  } else {
+    window.addEventListener("load", initV38OnReady, { once: true });
+  }
 })();
 </script>
 <!-- === V38_EMPTY_STATES_9_AND_PROGRESS_BAR_CIRCULAR_END === -->
