@@ -16163,94 +16163,650 @@ ${caption || rawText}
 </script>
 <!-- === V38_EMPTY_STATES_9_AND_PROGRESS_BAR_CIRCULAR_END === -->
 
-<!-- 하단 탭바 Lucide 아이콘 & 인터랙션 모션 패치 -->
-<style id="tab-icon-motion-style">
-  @keyframes tabBounce {
-    0% { transform: scale(1) translateY(0); }
-    28% { transform: scale(1.25) translateY(-5px); }
-    50% { transform: scale(0.92) translateY(1px); }
-    75% { transform: scale(1.08) translateY(-1px); }
-    100% { transform: scale(1) translateY(0); }
+<!-- === V39_TWEEN_UI_AND_ANIMATEICONS_SUITE_START === -->
+<style id="v39-tween-animateicons-style">
+  /* =========================================================================
+   * 1. [Tween UI] Navbar Pill Glide (하단 탭 바 & 카테고리 세그먼트 슬라이딩 알약 인디케이터)
+   * ========================================================================= */
+  #nav {
+    position: relative !important;
+    isolation: isolate;
   }
-  @keyframes mapPinDrop {
-    0% { transform: translateY(-14px) scale(0.7); opacity: 0.2; }
-    55% { transform: translateY(3px) scale(1.12); opacity: 1; }
-    75% { transform: translateY(-2px) scale(0.96); }
-    100% { transform: translateY(0) scale(1); opacity: 1; }
+  .v39-nav-glide-pill {
+    position: absolute;
+    z-index: -1;
+    border-radius: 16px;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.22), rgba(96, 165, 250, 0.12));
+    border: 1px solid rgba(96, 165, 250, 0.38);
+    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+    transition: transform 0.42s cubic-bezier(0.22, 1, 0.36, 1), width 0.42s cubic-bezier(0.22, 1, 0.36, 1), height 0.42s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease;
+    pointer-events: none;
+    top: 0;
+    left: 0;
+    opacity: 0;
   }
-  .tab-bounce-anim {
-    animation: tabBounce 0.42s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+  [data-theme="light"] .v39-nav-glide-pill {
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.14), rgba(59, 130, 246, 0.08));
+    border-color: rgba(37, 99, 235, 0.28);
   }
-  .map-drop-anim {
-    animation: mapPinDrop 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.3) !important;
+  #nav.v39-glide-ready .tab-btn.active {
+    background: transparent !important;
   }
-  .tab-icon-wrapper {
+
+  /* =========================================================================
+   * 2. [Tween UI] Dot Bloom Button & Icon Trail Button & Focus Frame Button
+   * ========================================================================= */
+  /* Dot Bloom Button (#v32HeroAdd, #analyzeShare) */
+  #v32HeroAdd,
+  #analyzeShare {
+    position: relative !important;
+    overflow: hidden !important;
+    isolation: isolate;
+    transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease !important;
+  }
+  #v32HeroAdd::before,
+  #analyzeShare::before {
+    content: "";
+    position: absolute;
+    left: 18px;
+    top: 50%;
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.24);
+    transform: translate(-50%, -50%) scale(0);
+    transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.4s ease;
+    pointer-events: none;
+    z-index: -1;
+    opacity: 0;
+  }
+  #v32HeroAdd:hover::before,
+  #v32HeroAdd:active::before,
+  #analyzeShare:hover::before,
+  #analyzeShare:active::before {
+    transform: translate(-50%, -50%) scale(42);
+    opacity: 1;
+  }
+  #v32HeroAdd:active,
+  #analyzeShare:active {
+    transform: scale(0.96) !important;
+  }
+
+  /* Focus Frame Viewfinder (#v32OcrBtn, #v32ManBtn, #v35SearchInput:focus) */
+  #v32OcrBtn,
+  #v32ManBtn {
+    position: relative !important;
+    transition: border-color 0.25s ease, transform 0.22s ease, background 0.25s ease !important;
+  }
+  #v32OcrBtn::after,
+  #v32ManBtn::after {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    border-radius: 11px;
+    border: 1.5px dashed transparent;
+    pointer-events: none;
+    transition: border-color 0.28s ease, inset 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  #v32OcrBtn:hover::after,
+  #v32OcrBtn:active::after,
+  #v32ManBtn:hover::after,
+  #v32ManBtn:active::after {
+    inset: 2px;
+    border-color: rgba(96, 165, 250, 0.65);
+  }
+
+  /* 검색창 Focus Frame & Morphing 효과 */
+  #v35SearchInput {
+    transition: box-shadow 0.3s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.3s ease, transform 0.25s ease !important;
+  }
+  #v35SearchInput:focus {
+    border-color: var(--pr) !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.22), 0 6px 18px rgba(37, 99, 235, 0.15) !important;
+    transform: translateY(-1px);
+  }
+
+  /* Icon Trail Button (길찾기, 릴스, 지도 동선 버튼 호버/터치 시 화살표 슬라이드) */
+  [data-act="route"],
+  [data-act="openVid"],
+  #v32HeroList,
+  [data-v32-dmap] {
+    transition: transform 0.24s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.25s ease !important;
+  }
+  [data-act="route"]:active,
+  [data-act="openVid"]:active,
+  #v32HeroList:active,
+  [data-v32-dmap]:active {
+    transform: translateX(2px) scale(0.96) !important;
+  }
+
+  /* =========================================================================
+   * 3. [Tween UI] Card Hover / Touch Expand (중요★ & 대표 장소 펼쳐지는 쇼케이스)
+   * ========================================================================= */
+  #v39ExpandShowcase {
+    margin: 4px 0 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .v39-sh-head {
     display: flex;
     align-items: center;
-    justify-content: center;
-    margin-bottom: 3px;
-    pointer-events: none;
+    justify-content: space-between;
+    padding: 0 2px;
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--sub);
   }
+  .v39-sh-head b {
+    color: var(--tx);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12.5px;
+  }
+  .v39-expand-deck {
+    display: flex;
+    gap: 7px;
+    width: 100%;
+    height: 118px;
+    user-select: none;
+  }
+  .v39-exp-card {
+    flex: 1;
+    min-width: 54px;
+    position: relative;
+    border-radius: 16px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 1px solid var(--bd2);
+    background: var(--s2);
+    transition: flex 0.48s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.3s ease, box-shadow 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+  }
+  .v39-exp-card.active,
+  .v39-exp-card:hover {
+    flex: 3.1;
+    border-color: rgba(96, 165, 250, 0.65);
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.38);
+  }
+  .v39-exp-bg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1), filter 0.4s ease;
+    filter: brightness(0.72);
+  }
+  .v39-exp-card.active .v39-exp-bg,
+  .v39-exp-card:hover .v39-exp-bg {
+    transform: scale(1.06);
+    filter: brightness(0.88);
+  }
+  .v39-exp-grad {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.1) 10%, rgba(15, 23, 42, 0.88) 100%);
+  }
+  .v39-exp-num {
+    position: absolute;
+    top: 8px;
+    left: 9px;
+    z-index: 2;
+    font-size: 10.5px;
+    font-weight: 900;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.72);
+    color: #93c5fd;
+    backdrop-filter: blur(4px);
+  }
+  .v39-exp-body {
+    position: relative;
+    z-index: 2;
+    padding: 9px 10px;
+    color: #fff;
+    overflow: hidden;
+  }
+  .v39-exp-title {
+    font-size: 12.5px;
+    font-weight: 900;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.25;
+  }
+  .v39-exp-sub {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.78);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+    opacity: 0;
+    max-height: 0;
+    transition: opacity 0.3s ease, max-height 0.35s ease;
+  }
+  .v39-exp-card.active .v39-exp-sub,
+  .v39-exp-card:hover .v39-exp-sub {
+    opacity: 1;
+    max-height: 22px;
+  }
+  .v39-exp-actions {
+    display: none;
+    gap: 5px;
+    margin-top: 6px;
+  }
+  .v39-exp-card.active .v39-exp-actions,
+  .v39-exp-card:hover .v39-exp-actions {
+    display: flex;
+  }
+  .v39-exp-btn {
+    padding: 3px 8px;
+    border-radius: 8px;
+    font-size: 10.5px;
+    font-weight: 800;
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    background: rgba(15, 23, 42, 0.72);
+    color: #fff;
+    cursor: pointer;
+    backdrop-filter: blur(4px);
+  }
+  .v39-exp-btn.pr {
+    background: #2563eb;
+    border-color: #3b82f6;
+  }
+
+  /* =========================================================================
+   * 4. [Tween UI] Smooth Single-Open Accordion (일차별 코스 아코디언)
+   * ========================================================================= */
+  .v39-day-acc-body {
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    transition: max-height 0.38s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.28s ease, margin-top 0.28s ease;
+  }
+  .v39-day-acc-item.open .v39-day-acc-body {
+    max-height: 260px;
+    opacity: 1;
+    margin-top: 8px;
+  }
+  .v39-day-acc-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background: var(--s);
+    border: 1px solid var(--bd2);
+    font-size: 14px;
+    font-weight: 900;
+    color: var(--pr);
+    transition: transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.25s ease;
+  }
+  .v39-day-acc-item.open .v39-day-acc-toggle {
+    transform: rotate(45deg);
+    background: var(--pr-soft);
+  }
+
+  /* =========================================================================
+   * 5. [AnimateIcons] Lucide SVG Path-Level Micro-Animations
+   * ========================================================================= */
+  .v39-lucide-svg {
+    width: 20px;
+    height: 20px;
+    stroke: currentColor;
+    stroke-width: 2.1;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+    overflow: visible;
+    transition: transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .tab-btn.active .v39-lucide-svg {
+    stroke-width: 2.4;
+  }
+  /* 탭 & 액션 아이콘 스프링 키프레임 */
+  @keyframes v39IconPop {
+    0% { transform: scale(1); }
+    35% { transform: scale(1.26) translateY(-3px); }
+    65% { transform: scale(0.92) translateY(1px); }
+    100% { transform: scale(1) translateY(0); }
+  }
+  @keyframes v39PinDrop {
+    0% { transform: translateY(-10px) scale(0.78); }
+    50% { transform: translateY(2px) scale(1.14); }
+    75% { transform: translateY(-1px) scale(0.96); }
+    100% { transform: translateY(0) scale(1); }
+  }
+  @keyframes v39StarSpin {
+    0% { transform: scale(1) rotate(0deg); }
+    45% { transform: scale(1.35) rotate(22deg); }
+    75% { transform: scale(0.92) rotate(-8deg); }
+    100% { transform: scale(1) rotate(0deg); }
+  }
+  @keyframes v39GearTurn {
+    0% { transform: rotate(0deg) scale(1); }
+    50% { transform: rotate(95deg) scale(1.14); }
+    100% { transform: rotate(180deg) scale(1); }
+  }
+  @keyframes v39SparklePulse {
+    0% { transform: scale(1) rotate(0deg); }
+    40% { transform: scale(1.24) rotate(12deg); }
+    80% { transform: scale(0.95) rotate(-6deg); }
+    100% { transform: scale(1) rotate(0deg); }
+  }
+  .v39-anim-pop { animation: v39IconPop 0.44s cubic-bezier(0.22, 1, 0.36, 1) !important; }
+  .v39-anim-pin { animation: v39PinDrop 0.46s cubic-bezier(0.22, 1, 0.36, 1) !important; }
+  .v39-anim-star { animation: v39StarSpin 0.48s cubic-bezier(0.22, 1, 0.36, 1) !important; }
+  .v39-anim-gear { animation: v39GearTurn 0.52s cubic-bezier(0.22, 1, 0.36, 1) !important; }
+  .v39-anim-sparkle { animation: v39SparklePulse 0.48s cubic-bezier(0.22, 1, 0.36, 1) !important; }
 </style>
-<script id="tab-icon-injector">
-(function() {
-  const TABS = [
-    { text: '목록', icon: 'list', anim: 'tab-bounce-anim' },
-    { text: '지도', icon: 'map-pin', anim: 'map-drop-anim' },
-    { text: '일정', icon: 'calendar', anim: 'tab-bounce-anim' },
-    { text: '설정', icon: 'settings', anim: 'tab-bounce-anim' }
-  ];
 
-  function applyIcons() {
-    TABS.forEach(item => {
-      const candidates = Array.from(document.querySelectorAll('button, a, div, span')).filter(el => {
-        const directText = Array.from(el.childNodes)
-          .filter(n => n.nodeType === Node.TEXT_NODE)
-          .map(n => n.textContent.trim())
-          .join('');
-        return (directText === item.text || el.textContent.trim() === item.text) &&
-               (el.closest('nav, footer, [class*="nav"], [class*="tab"], [class*="bar"]') || el.className.includes('tab') || el.className.includes('nav'));
-      });
+<script id="v39-tween-animateicons-engine">
+(function initV39TweenAndAnimateIcons() {
+  /* =========================================================================
+   * A. [AnimateIcons] 순수 인라인 Lucide SVG 아이콘 사전 (외부 CDN 불필요)
+   * ========================================================================= */
+  const LUCIDE_SVGS = {
+    home: '<svg class="v39-lucide-svg" viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
+    list: '<svg class="v39-lucide-svg" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/><path d="M14 4h7"/><path d="M14 9h7"/><path d="M14 15h7"/><path d="M14 20h7"/></svg>',
+    map: '<svg class="v39-lucide-svg" viewBox="0 0 24 24"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg>',
+    set: '<svg class="v39-lucide-svg" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>'
+  };
 
-      candidates.forEach(el => {
-        const btn = el.closest('button, [role="tab"], .tab-item, .nav-item') || el;
-        if (btn.dataset.iconInjected) return;
-        btn.dataset.iconInjected = "true";
+  function upgradeNavIconsAndPillGlide() {
+    const nav = document.getElementById("nav");
+    if (!nav) return;
 
-        // 기존 텍스트 아이콘 또는 Material Symbols 숨김 처리
-        const oldIcon = btn.querySelector('.material-symbols-outlined, svg, i');
-        if (oldIcon) oldIcon.style.display = 'none';
+    // 1) Navbar Pill Glide 엘리먼트 생성
+    let pill = nav.querySelector(".v39-nav-glide-pill");
+    if (!pill) {
+      pill = document.createElement("div");
+      pill.className = "v39-nav-glide-pill";
+      nav.appendChild(pill);
+    }
 
-        const wrapper = document.createElement('span');
-        wrapper.className = 'tab-icon-wrapper';
-        wrapper.innerHTML = `<i data-lucide="${item.icon}"></i>`;
-        btn.insertBefore(wrapper, btn.firstChild);
-
-        btn.addEventListener('click', () => {
-          wrapper.classList.remove(item.anim);
-          void wrapper.offsetWidth;
-          wrapper.classList.add(item.anim);
+    // 2) 각 탭 버튼에 AnimateIcons 스타일 인라인 SVG 장착 및 모션 연결
+    const tabBtns = Array.from(nav.querySelectorAll(".tab-btn"));
+    tabBtns.forEach(btn => {
+      const t = btn.dataset.tab;
+      if (!btn.dataset.v39SvgBound) {
+        btn.dataset.v39SvgBound = "1";
+        const msEl = btn.querySelector(".ms");
+        const svgHtml = t === "add" ? LUCIDE_SVGS.home : t === "list" ? LUCIDE_SVGS.list : t === "map" ? LUCIDE_SVGS.map : LUCIDE_SVGS.set;
+        if (msEl && svgHtml) {
+          msEl.outerHTML = svgHtml;
+        }
+        btn.addEventListener("click", () => {
+          const svg = btn.querySelector(".v39-lucide-svg");
+          if (svg) {
+            const animCls = t === "map" ? "v39-anim-pin" : t === "set" ? "v39-anim-gear" : "v39-anim-pop";
+            svg.classList.remove("v39-anim-pop", "v39-anim-pin", "v39-anim-gear");
+            void svg.offsetWidth;
+            svg.classList.add(animCls);
+          }
+          requestAnimationFrame(syncNavGlidePill);
+          setTimeout(syncNavGlidePill, 80);
         });
-        wrapper.addEventListener('animationend', () => {
-          wrapper.classList.remove(item.anim);
-        });
-      });
+      }
     });
 
-    if (window.lucide && typeof window.lucide.createIcons === 'function') {
-      window.lucide.createIcons();
-    }
+    syncNavGlidePill();
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', applyIcons);
-  } else {
-    applyIcons();
+  function syncNavGlidePill() {
+    const nav = document.getElementById("nav");
+    const pill = nav?.querySelector(".v39-nav-glide-pill");
+    const activeBtn = nav?.querySelector(".tab-btn.active");
+    if (!nav || !pill || !activeBtn) return;
+
+    const navRect = nav.getBoundingClientRect();
+    const btnRect = activeBtn.getBoundingClientRect();
+    if (btnRect.width === 0 || navRect.width === 0) return;
+
+    nav.classList.add("v39-glide-ready");
+    const x = btnRect.left - navRect.left;
+    const y = btnRect.top - navRect.top;
+    pill.style.width = `${btnRect.width}px`;
+    pill.style.height = `${btnRect.height}px`;
+    pill.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+    pill.style.opacity = "1";
   }
-  setTimeout(applyIcons, 300);
-  setTimeout(applyIcons, 800);
+
+  window.addEventListener("resize", syncNavGlidePill);
+
+  /* =========================================================================
+   * B. [AnimateIcons] 카드 및 주요 버튼 클릭 시 즉각적인 아이콘 마이크로 모션
+   * ========================================================================= */
+  document.addEventListener("click", (e) => {
+    const targetBtn = e.target.closest("button, [data-act], .seg > div, .chip");
+    if (!targetBtn) return;
+    const icon = targetBtn.querySelector(".ms, .v39-lucide-svg");
+    if (!icon) return;
+
+    const act = targetBtn.dataset.act || "";
+    let anim = "v39-anim-pop";
+    if (act === "star" || act === "quickStar") anim = "v39-anim-star";
+    else if (act === "focusMap" || act === "route") anim = "v39-anim-pin";
+    else if (targetBtn.id === "analyzeShare" || targetBtn.id === "v32AutoDay") anim = "v39-anim-sparkle";
+
+    icon.classList.remove("v39-anim-pop", "v39-anim-star", "v39-anim-pin", "v39-anim-sparkle");
+    void icon.offsetWidth;
+    icon.classList.add(anim);
+  }, true);
+
+  /* =========================================================================
+   * C. [Tween UI] Card Hover / Touch Expand (중요★ & 베스트 장소 펼쳐지는 쇼케이스)
+   * - 목록 상단에 중요(★) 표시한 장소나 대표 사진이 있는 장소 최대 4곳을
+   *   터치/마우스오버 시 가로로 시원하게 펼쳐지는 카드 덱으로 렌더링
+   * ========================================================================= */
+  let activeShowcaseId = null;
+  let showcaseCollapsed = localStorage.getItem("TRIP_V39_SHOWCASE_HIDE") === "1";
+
+  function renderExpandShowcase() {
+    const topCard = document.querySelector("#tab-list > .card:first-of-type");
+    const listEl = document.getElementById("list-LIST");
+    if (!topCard || !listEl || !Array.isArray(items)) return;
+
+    let wrap = document.getElementById("v39ExpandShowcase");
+    // 검색 중이거나 전체 아이템이 2개 미만이면 쇼케이스 숨김 (화면 깔끔함 유지)
+    const kw = (document.getElementById("v35SearchInput")?.value || document.getElementById("q-LIST")?.value || "").trim();
+    if (kw || items.length < 2) {
+      if (wrap) wrap.style.display = "none";
+      return;
+    }
+
+    // 중요(★) 장소 우선 추출, 부족하면 이미지가 있거나 상위에 있는 장소로 최대 4곳 구성
+    const starred = items.filter(x => x.star);
+    const others = items.filter(x => !x.star);
+    const picks = [...starred, ...others].slice(0, 4);
+    if (picks.length < 2) {
+      if (wrap) wrap.style.display = "none";
+      return;
+    }
+
+    if (!wrap) {
+      wrap = document.createElement("div");
+      wrap.id = "v39ExpandShowcase";
+      topCard.insertAdjacentElement("afterend", wrap);
+    }
+    wrap.style.display = "flex";
+
+    if (!activeShowcaseId || !picks.some(p => String(p.id) === String(activeShowcaseId))) {
+      activeShowcaseId = String(picks[0].id);
+    }
+
+    const fallbackImgs = {
+      FOOD: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=600&q=75",
+      CAFE: "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=600&q=75",
+      SHOP: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=600&q=75",
+      PLACE: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=600&q=75"
+    };
+
+    wrap.innerHTML = `
+      <div class="v39-sh-head">
+        <b><span class="ms fill" style="font-size:15px;color:#f59e0b">auto_awesome</span>${starred.length ? `중요 ★ 북마크 쇼케이스 (${picks.length})` : `추천 하이라이트 (${picks.length})`}</b>
+        <button type="button" class="mb" id="v39ToggleShowcase" style="min-height:24px;padding:2px 8px;font-size:11px">${showcaseCollapsed ? "펼치기 ▾" : "접기 ▴"}</button>
+      </div>
+      ${showcaseCollapsed ? "" : `
+        <div class="v39-expand-deck">
+          ${picks.map((it, idx) => {
+            const isAct = String(it.id) === String(activeShowcaseId);
+            const bgSrc = (typeof getThumbSrc === "function" ? getThumbSrc(it) : "") || it.img || fallbackImgs[it.category] || fallbackImgs.PLACE;
+            const subInfo = [it.price, it.visitTime, it.address ? String(it.address).replace(/〒?\s*\d{3}-\d{4}\s*/g, "").slice(0, 18) : ""].filter(Boolean).join(" · ") || "터치하여 상세 보기";
+            return `
+              <div class="v39-exp-card ${isAct ? "active" : ""}" data-v39-exp-id="${esc(it.id)}">
+                <img class="v39-exp-bg" src="${esc(bgSrc)}" alt="" loading="lazy" onerror="this.src='${fallbackImgs.PLACE}'" />
+                <div class="v39-exp-grad"></div>
+                <span class="v39-exp-num">.${String(idx + 1).padStart(2, "0")}${it.star ? " ★" : ""}</span>
+                <div class="v39-exp-body">
+                  <div class="v39-exp-title">${esc(it.name || "장소")}</div>
+                  <div class="v39-exp-sub">${esc(subInfo)}</div>
+                  <div class="v39-exp-actions">
+                    <button type="button" class="v39-exp-btn pr" data-v39-act="detail" data-id="${esc(it.id)}">상세</button>
+                    ${Number(it.lat) && Number(it.lng) ? `<button type="button" class="v39-exp-btn" data-v39-act="map" data-id="${esc(it.id)}">지도</button>` : ""}
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `}
+    `;
+
+    const togBtn = wrap.querySelector("#v39ToggleShowcase");
+    if (togBtn) {
+      togBtn.onclick = (e) => {
+        e.stopPropagation();
+        showcaseCollapsed = !showcaseCollapsed;
+        localStorage.setItem("TRIP_V39_SHOWCASE_HIDE", showcaseCollapsed ? "1" : "0");
+        renderExpandShowcase();
+      };
+    }
+
+    wrap.querySelectorAll(".v39-exp-card").forEach(card => {
+      card.addEventListener("click", (e) => {
+        const actBtn = e.target.closest("[data-v39-act]");
+        const id = card.dataset.v39ExpId;
+        if (actBtn) {
+          e.stopPropagation();
+          const act = actBtn.dataset.v39Act;
+          const target = items.find(x => String(x.id) === String(id));
+          if (!target) return;
+          if (act === "detail") {
+            cur = target.id;
+            if (typeof showSheet === "function") showSheet();
+          } else if (act === "map") {
+            if (typeof focusMapOnItem === "function") focusMapOnItem(target);
+            if (innerWidth <= 820 && typeof tab === "function") tab("map");
+          }
+          return;
+        }
+        if (!card.classList.contains("active")) {
+          activeShowcaseId = id;
+          wrap.querySelectorAll(".v39-exp-card").forEach(c => c.classList.toggle("active", c === card));
+          if (window.v8Haptic) window.v8Haptic(10);
+        } else {
+          cur = id;
+          if (typeof showSheet === "function") showSheet();
+        }
+      });
+    });
+  }
+
+  /* =========================================================================
+   * D. [Tween UI] 홈 대시보드 일차별 코스 Single-Open FAQ 아코디언 업그레이드
+   * ========================================================================= */
+  let openDayAcc = 1;
+  if (typeof window.renderV32Dashboard === "function") {
+    const _origDash = window.renderV32Dashboard;
+    window.renderV32Dashboard = function(...args) {
+      const r = _origDash.apply(this, args);
+      const dash = document.getElementById("v32Dashboard");
+      if (!dash) return r;
+
+      // 일차별 코스 카드들을 싱글 오픈 아코디언으로 변환
+      const dayBtns = Array.from(dash.querySelectorAll("[data-v32-dmap]"));
+      dayBtns.forEach((btn, idx) => {
+        const dayNum = Number(btn.dataset.v32Dmap) || (idx + 1);
+        const box = btn.closest("div[style*='border-radius:14px']");
+        if (!box || box.dataset.v39AccBound) return;
+        box.dataset.v39AccBound = "1";
+        box.classList.add("v39-day-acc-item");
+        if (dayNum === openDayAcc || (idx === 0 && !openDayAcc)) box.classList.add("open");
+
+        const headerRow = box.firstElementChild;
+        const bodyRow = box.lastElementChild;
+        if (headerRow && bodyRow && headerRow !== bodyRow) {
+          bodyRow.classList.add("v39-day-acc-body");
+          headerRow.style.cursor = "pointer";
+          const titleEl = headerRow.querySelector("b");
+          if (titleEl && !headerRow.querySelector(".v39-day-acc-toggle")) {
+            const plus = document.createElement("span");
+            plus.className = "v39-day-acc-toggle";
+            plus.textContent = "+";
+            titleEl.style.display = "inline-flex";
+            titleEl.style.alignItems = "center";
+            titleEl.style.gap = "6px";
+            titleEl.insertBefore(plus, titleEl.firstChild);
+          }
+          headerRow.addEventListener("click", (e) => {
+            if (e.target.closest("button")) return;
+            const isOpen = box.classList.contains("open");
+            dash.querySelectorAll(".v39-day-acc-item").forEach(el => el.classList.remove("open"));
+            if (!isOpen) {
+              box.classList.add("open");
+              openDayAcc = dayNum;
+            } else {
+              openDayAcc = 0;
+            }
+            if (window.v8Haptic) window.v8Haptic(10);
+          });
+        }
+      });
+      return r;
+    };
+  }
+
+  // renderListTab 및 tab 전환 시 자동 동기화
+  if (typeof renderListTab === "function") {
+    const _origRenderListV39 = renderListTab;
+    renderListTab = function(...args) {
+      const r = _origRenderListV39.apply(this, args);
+      renderExpandShowcase();
+      upgradeNavIconsAndPillGlide();
+      return r;
+    };
+  }
+
+  if (typeof tab === "function") {
+    const _origTabV39 = tab;
+    tab = function(...args) {
+      const r = _origTabV39.apply(this, args);
+      requestAnimationFrame(syncNavGlidePill);
+      setTimeout(syncNavGlidePill, 60);
+      return r;
+    };
+  }
+
+  const bootV39 = () => {
+    upgradeNavIconsAndPillGlide();
+    renderExpandShowcase();
+    if (typeof window.renderV32Dashboard === "function") window.renderV32Dashboard();
+  };
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bootV39);
+  } else {
+    bootV39();
+  }
+  setTimeout(bootV39, 280);
 })();
 </script>
-
+<!-- === V39_TWEEN_UI_AND_ANIMATEICONS_SUITE_END === -->
 </body>
 </html>
