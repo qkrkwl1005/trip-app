@@ -14320,5 +14320,242 @@ ${caption || rawText}
 })();
 </script>
 <!-- === V36_EYE_COMFORT_PATCH_END === -->
+<!-- === V37_IOS_FOLD8_CROSS_PATCH_START === -->
+<style>
+  /* 1. iOS & 안드로이드(삼성 One UI) 폰트 렌더링 및 줄바꿈 깨짐 방지 */
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  button, .btn, .mb, .chip, .lchip, .tab-btn, .seg div, .v32-base-btn {
+    word-break: keep-all !important;
+    overflow-wrap: break-word;
+  }
+
+  /* 2. 갤럭시 폴드 8 커버 화면(접었을 때 340px~380px) 초슬림 대응 */
+  @media (max-width: 390px) {
+    #ux7TopUtilBar {
+      padding-left: 10px !important;
+      padding-right: 10px !important;
+    }
+    #ux7TopUtilBar .ux7-title span:first-of-type {
+      font-size: 13.5px !important;
+    }
+    #ux7TopUtilBar .ux7-actions .mb {
+      padding: 3px 6px !important;
+      font-size: 10px !important;
+    }
+    #listCatSeg.seg.seg5 div {
+      font-size: 11px !important;
+      letter-spacing: -0.03em !important;
+    }
+    .v32-bento-card {
+      padding: 12px !important;
+    }
+    .v32-bento-card b {
+      font-size: 18px !important;
+    }
+  }
+
+  /* 3. 갤럭시 폴드 8 펼침 화면(내부 대화면 700px ~ 1180px) 듀얼 스플릿 뷰 최적화 */
+  @media (min-width: 700px) and (max-width: 1180px) {
+    body {
+      display: flex !important;
+      flex-direction: row !important;
+      overflow: hidden !important;
+    }
+    #side {
+      width: 46% !important;
+      min-width: 340px !important;
+      max-width: 480px !important;
+      height: 100dvh !important;
+      border-right: 1px solid var(--bd2) !important;
+    }
+    #map-wrap {
+      flex: 1 !important;
+      position: relative !important;
+      height: 100dvh !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+      pointer-events: auto !important;
+      z-index: 10 !important;
+    }
+    /* 폴드 펼침 상태에서 지도 전체화면 모드 토글 지원 */
+    body.v37-fold-fullmap #side {
+      display: none !important;
+    }
+    #nav {
+      position: static !important;
+      grid-template-columns: repeat(4, 1fr) !important;
+      border-radius: 0 !important;
+      padding: calc(8px + env(safe-area-inset-top)) 10px 8px !important;
+      box-shadow: none !important;
+    }
+    .tab-btn[data-tab="map"] {
+      display: flex !important;
+    }
+    .tab-content {
+      padding-bottom: 40px !important;
+    }
+    #v32FabBtn {
+      left: calc(46% - 72px) !important;
+      right: auto !important;
+      bottom: 24px !important;
+    }
+  }
+
+  /* 4. 안드로이드 15+ / iOS 가상 키보드 활성화 시 하단 고정 푸터 가림 방지 */
+  body.v37-kb-open .ux-sheet-footer,
+  body.v37-kb-open #nav,
+  body.v37-kb-open #v32FabBtn {
+    position: static !important;
+    margin-top: 12px !important;
+    box-shadow: none !important;
+  }
+  body.v37-kb-open #sheet .sh {
+    max-height: 98dvh !important;
+    padding-bottom: 24px !important;
+  }
+</style>
+
+<script>
+(function initV37CrossPlatformAndFold8() {
+  /* -----------------------------------------------------------------------
+   * 1. 갤럭시 폴드 8 펼침/접힘 실시간 감지 및 탭 전환 호환
+   * ----------------------------------------------------------------------- */
+  function isFoldUnfolded() {
+    return window.innerWidth >= 700 && window.innerWidth <= 1180;
+  }
+
+  if (typeof tab === "function") {
+    const _origTabV37 = tab;
+    tab = function(k, ...rest) {
+      if (isFoldUnfolded()) {
+        if (k === "map") {
+          const full = document.body.classList.toggle("v37-fold-fullmap");
+          setTimeout(() => {
+            if (typeof gmap !== "undefined" && gmap && window.google?.maps) google.maps.event.trigger(gmap, "resize");
+            if (typeof lm !== "undefined" && lm) lm.invalidateSize();
+            if (typeof fit === "function") fit();
+          }, 80);
+          if (typeof toast === "function") {
+            toast(full ? "🗺️ 지도를 전체 화면으로 넓혔습니다 (다시 누르면 분할 화면)" : "📱 좌측 목록 + 우측 지도 분할 화면으로 돌아왔습니다");
+          }
+          return;
+        } else {
+          document.body.classList.remove("v37-fold-fullmap");
+        }
+      }
+      return _origTabV37.apply(this, [k, ...rest]);
+    };
+  }
+
+  // 폴드 기기를 접거나 펼칠 때(화면 크기 변경) 지도 타일 깨짐 및 잘림 즉시 복구
+  let resizeTimer = null;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (!isFoldUnfolded()) document.body.classList.remove("v37-fold-fullmap");
+      if (typeof gmap !== "undefined" && gmap && window.google?.maps) google.maps.event.trigger(gmap, "resize");
+      if (typeof lm !== "undefined" && lm) lm.invalidateSize();
+    }, 150);
+  });
+
+  /* -----------------------------------------------------------------------
+   * 2. iOS & 안드로이드 뒤로가기(제스처/하단 버튼) 완벽 통일
+   * ----------------------------------------------------------------------- */
+  let modalDepth = 0;
+  function pushSafeBackState() {
+    try {
+      history.pushState({ v37Modal: true }, "");
+      modalDepth++;
+    } catch (_) {}
+  }
+
+  // 장소 가져오기 시트, 지도 추가 모달, 1/N 정산 드로어 열릴 때도 히스토리 푸시
+  document.addEventListener("click", (e) => {
+    if (e.target.closest("#v32FabBtn, #v32HeroAdd")) {
+      pushSafeBackState();
+    }
+  }, true);
+
+  window.addEventListener("popstate", (e) => {
+    const importSheet = document.getElementById("v32ImportSheetWrap");
+    if (importSheet && importSheet.classList.contains("on")) {
+      importSheet.classList.remove("on");
+      return;
+    }
+    const mapAddModal = document.getElementById("v8MapAddModal");
+    if (mapAddModal && mapAddModal.classList.contains("on")) {
+      mapAddModal.classList.remove("on");
+      return;
+    }
+    const budgetDrawer = document.getElementById("v32ListBudgetDrawer");
+    if (budgetDrawer && budgetDrawer.classList.contains("on")) {
+      budgetDrawer.classList.remove("on");
+      return;
+    }
+    if (document.body.classList.contains("v37-fold-fullmap")) {
+      document.body.classList.remove("v37-fold-fullmap");
+      return;
+    }
+    if (window.innerWidth <= 820 && typeof activeTab !== "undefined" && activeTab !== "add") {
+      if (typeof tab === "function") tab("add");
+    }
+  });
+
+  /* -----------------------------------------------------------------------
+   * 3. 가상 키보드 높이 감지 (안드로이드 15+ & iOS 저장 버튼 가림 해결)
+   * ----------------------------------------------------------------------- */
+  if (window.visualViewport) {
+    const onViewportChange = () => {
+      const kbHeight = window.innerHeight - window.visualViewport.height;
+      const isKbOpen = kbHeight > 140;
+      document.body.classList.toggle("v37-kb-open", isKbOpen);
+      if (isKbOpen && document.activeElement && ["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) {
+        setTimeout(() => {
+          try {
+            document.activeElement.scrollIntoView({ block: "center", behavior: "smooth" });
+          } catch (_) {}
+        }, 80);
+      }
+    };
+    window.visualViewport.addEventListener("resize", onViewportChange);
+  }
+
+  /* -----------------------------------------------------------------------
+   * 4. 위치 권한 안내 개선 ('한 번 허용' 또는 거부 시 친절한 복구 안내)
+   * ----------------------------------------------------------------------- */
+  const locBtn = document.getElementById("locBtn");
+  if (locBtn) {
+    locBtn.onclick = () => {
+      if (!navigator.geolocation) return toast("위치 기능이 지원되지 않는 브라우저입니다");
+      toast("📍 현재 위치를 확인하는 중...");
+      navigator.geolocation.getCurrentPosition(
+        (p) => {
+          const { latitude: lat, longitude: lng } = p.coords;
+          userPos = { lat, lng, at: Date.now() };
+          if (typeof gmap !== "undefined" && gmap) { gmap.panTo({ lat, lng }); gmap.setZoom(15); }
+          else if (typeof nmap !== "undefined" && nmap) { nmap.setCenter(new naver.maps.LatLng(lat, lng)); nmap.setZoom(15); }
+          else if (typeof lm !== "undefined" && lm) {
+            lm.setView([lat, lng], 15);
+            L.circleMarker([lat, lng], { radius: 8, color: "#3b82f6", fillOpacity: 0.9 }).addTo(lm);
+          }
+          toast("📍 내 위치로 이동했습니다");
+        },
+        (err) => {
+          if (err && err.code === 1) {
+            toast("🔒 위치 권한이 꺼져 있어요. 브라우저 주소창 옆 권한 설정에서 위치를 '허용'해 주세요.");
+          } else {
+            toast("📍 신호가 약해 위치를 찾지 못했어요. 잠시 후 다시 눌러주세요.");
+          }
+        },
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+      );
+    };
+  }
+})();
+</script>
+<!-- === V37_IOS_FOLD8_CROSS_PATCH_END === -->
 </body>
 </html>
