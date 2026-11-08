@@ -16939,5 +16939,700 @@ ${caption || rawText}
 })();
 </script>
 <!-- === V40_DEEP_UX_AUDIT_POLISH_END === -->
+
+<!-- === V41_21ST_DEV_PRACTICAL_UI_SUITE_START === -->
+<style id="v41-21st-practical-suite-style">
+  /* =========================================================================
+   * 1. [21st.dev / Aceternity] Spotlight Card (터치/마우스 추적 은은한 광채)
+   * ========================================================================= */
+  #list-LIST .item,
+  .v32-bento-card,
+  .v32-sec-card {
+    position: relative;
+    overflow: hidden;
+  }
+  #list-LIST .item::after,
+  .v32-bento-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: radial-gradient(
+      340px circle at var(--v41-spot-x, -999px) var(--v41-spot-y, -999px),
+      rgba(59, 130, 246, 0.14),
+      transparent 65%
+    );
+    opacity: var(--v41-spot-op, 0);
+    transition: opacity 0.28s ease;
+    z-index: 1;
+  }
+  [data-theme="light"] #list-LIST .item::after,
+  [data-theme="light"] .v32-bento-card::after {
+    background: radial-gradient(
+      320px circle at var(--v41-spot-x, -999px) var(--v41-spot-y, -999px),
+      rgba(37, 99, 235, 0.09),
+      transparent 65%
+    );
+  }
+
+  /* =========================================================================
+   * 2. [21st.dev / Magic UI] Border Beam (핵심 액션 버튼 테두리 빛 순환)
+   * ========================================================================= */
+  @keyframes v41BorderBeamSpin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  #analyzeShare,
+  #v32HeroAdd {
+    position: relative !important;
+    isolation: isolate;
+  }
+  #analyzeShare::after,
+  #v32HeroAdd::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1.5px;
+    background: conic-gradient(
+      from 0deg,
+      transparent 0%,
+      transparent 68%,
+      #93c5fd 84%,
+      #ffffff 94%,
+      transparent 100%
+    );
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    opacity: 0.85;
+  }
+
+  /* =========================================================================
+   * 3. [21st.dev] Interactive Metro Route Timeline (지하철 노선형 동선 타임라인)
+   * ========================================================================= */
+  .v41-timeline-list {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 6px 0 4px 4px;
+    margin-top: 6px;
+  }
+  .v41-timeline-list::before {
+    content: "";
+    position: absolute;
+    left: 13px;
+    top: 14px;
+    bottom: 14px;
+    width: 2px;
+    background: linear-gradient(180deg, #3b82f6 0%, rgba(59, 130, 246, 0.35) 100%);
+    border-radius: 2px;
+  }
+  .v41-tl-node {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding-left: 26px;
+    cursor: pointer;
+  }
+  .v41-tl-dot {
+    position: absolute;
+    left: 5px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    background: var(--s);
+    border: 2.5px solid #3b82f6;
+    font-size: 9.5px;
+    font-weight: 900;
+    color: var(--tx);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+    box-shadow: 0 2px 6px rgba(59, 130, 246, 0.25);
+  }
+  .v41-tl-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--s);
+    border: 1px solid var(--bd);
+    border-radius: 10px;
+    padding: 6px 10px;
+    transition: border-color 0.2s ease, transform 0.18s ease;
+  }
+  .v41-tl-node:active .v41-tl-main {
+    transform: scale(0.98);
+    border-color: var(--pr);
+  }
+  .v41-tl-time {
+    font-size: 11px;
+    font-weight: 900;
+    color: var(--pr);
+    background: var(--pr-soft);
+    padding: 2px 6px;
+    border-radius: 6px;
+    flex: none;
+  }
+  .v41-tl-name {
+    font-size: 12.5px;
+    font-weight: 800;
+    color: var(--tx);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .v41-tl-dist {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--sub);
+    flex: none;
+  }
+
+  /* =========================================================================
+   * 4. [21st.dev] Instant FX Slider (엔화 ⇄ 원화 즉시 드래그 환율 슬라이더)
+   * ========================================================================= */
+  .v41-fx-slider-box {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--bd2);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .v41-fx-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12.5px;
+    font-weight: 800;
+  }
+  .v41-fx-val {
+    color: var(--pr);
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+  }
+  .v41-fx-range {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 7px;
+    border-radius: 999px;
+    background: var(--s3);
+    outline: none;
+    margin: 2px 0;
+  }
+  .v41-fx-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--pr);
+    border: 3px solid #fff;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.45);
+    cursor: pointer;
+  }
+  .v41-fx-presets {
+    display: flex;
+    gap: 5px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .v41-fx-presets::-webkit-scrollbar { display: none; }
+  .v41-fx-chip {
+    flex: none;
+    padding: 4px 9px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    background: var(--s);
+    border: 1px solid var(--bd2);
+    color: var(--sub);
+    cursor: pointer;
+  }
+  .v41-fx-chip:active {
+    background: var(--pr);
+    color: #fff;
+    border-color: var(--pr);
+  }
+
+  /* =========================================================================
+   * 5. [21st.dev] Dynamic Quick Phrase & Pass Helper Card (원터치 생존 일본어 음성 & 패스)
+   * ========================================================================= */
+  .v41-phrase-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 7px;
+    margin-top: 8px;
+  }
+  .v41-phrase-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 9px 11px;
+    border-radius: 12px;
+    background: var(--s2);
+    border: 1px solid var(--bd);
+    color: var(--tx);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: transform 0.18s ease, border-color 0.2s ease, background 0.2s ease;
+  }
+  .v41-phrase-btn:active,
+  .v41-phrase-btn.speaking {
+    transform: scale(0.97);
+    border-color: var(--pr);
+    background: var(--pr-soft);
+  }
+  .v41-phrase-kr {
+    font-size: 12px;
+    font-weight: 800;
+    display: block;
+  }
+  .v41-phrase-jp {
+    font-size: 10.5px;
+    font-weight: 600;
+    color: var(--sub);
+    display: block;
+    margin-top: 1px;
+  }
+  .v41-voice-orb {
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    background: rgba(59, 130, 246, 0.14);
+    color: var(--pr);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+  }
+  .v41-phrase-btn.speaking .v41-voice-orb {
+    background: var(--pr);
+    color: #fff;
+    animation: v41OrbPulse 0.7s infinite alternate ease-in-out;
+  }
+  @keyframes v41OrbPulse {
+    from { transform: scale(0.92); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5); }
+    to { transform: scale(1.12); box-shadow: 0 0 0 8px rgba(59, 130, 246, 0); }
+  }
+
+  /* =========================================================================
+   * 6. [21st.dev] Radial Speed Dial Quick Menu (플로팅 버튼 퀵 액션 트레이)
+   * ========================================================================= */
+  #v41SpeedDialMenu {
+    position: fixed;
+    right: 16px;
+    bottom: calc(140px + env(safe-area-inset-bottom));
+    z-index: 206;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(12px) scale(0.92);
+    transform-origin: bottom right;
+    transition: opacity 0.22s ease, transform 0.26s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  #v41SpeedDialMenu.on {
+    pointer-events: auto;
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  .v41-sd-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.94);
+    color: #fff;
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.38);
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 800;
+    cursor: pointer;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  [data-theme="light"] .v41-sd-item {
+    background: rgba(255, 255, 255, 0.96);
+    color: #0f172a;
+    border-color: rgba(15, 23, 42, 0.12);
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.14);
+  }
+  .v41-sd-item:active {
+    transform: scale(0.95);
+  }
+</style>
+
+<script id="v41-21st-practical-suite-script">
+(function initV41PracticalSuite() {
+  /* =========================================================================
+   * 1. [Spotlight Card] 카드 위 터치/마우스 좌표 추적 (--v41-spot-x, --v41-spot-y)
+   * ========================================================================= */
+  const handleSpotlightMove = (clientX, clientY, target) => {
+    const card = target?.closest?.("#list-LIST .item, .v32-bento-card");
+    if (!card) return;
+    const r = card.getBoundingClientRect();
+    card.style.setProperty("--v41-spot-x", `${clientX - r.left}px`);
+    card.style.setProperty("--v41-spot-y", `${clientY - r.top}px`);
+    card.style.setProperty("--v41-spot-op", "1");
+  };
+  document.addEventListener("pointermove", (e) => {
+    handleSpotlightMove(e.clientX, e.clientY, e.target);
+  }, { passive: true });
+  document.addEventListener("pointerdown", (e) => {
+    handleSpotlightMove(e.clientX, e.clientY, e.target);
+  }, { passive: true });
+  document.addEventListener("pointerout", (e) => {
+    const card = e.target?.closest?.("#list-LIST .item, .v32-bento-card");
+    if (card && !card.contains(e.relatedTarget)) {
+      card.style.setProperty("--v41-spot-op", "0");
+    }
+  }, { passive: true });
+
+  /* =========================================================================
+   * 2. [Animated Number Ticker] 벤토 그리드 통계 수치 부드러운 카운팅
+   * ========================================================================= */
+  const prevStats = { total: -1, coords: -1, scheduled: -1, km: -1 };
+  function animateNumberTicker(el, fromVal, toVal, suffix, isFloat = false) {
+    if (!el) return;
+    if (fromVal === toVal || fromVal < 0) {
+      el.textContent = (isFloat ? toVal.toFixed(1) : Math.round(toVal)) + suffix;
+      return;
+    }
+    const dur = 480;
+    const start = performance.now();
+    const step = (now) => {
+      const p = Math.min(1, (now - start) / dur);
+      const ease = 1 - Math.pow(1 - p, 3);
+      const curVal = fromVal + (toVal - fromVal) * ease;
+      el.textContent = (isFloat ? curVal.toFixed(1) : Math.round(curVal)) + suffix;
+      if (p < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
+  /* =========================================================================
+   * 3. [Interactive Route Timeline & Survival Voice Orb] 대시보드 실용 업그레이드
+   * ========================================================================= */
+  const SURVIVAL_PHRASES = [
+    { kr: "저기요 / 주문할게요", jp: "すみません、注文お願いします", pron: "스미마센, 츄-몬 오네가이시마스" },
+    { kr: "계산 부탁드립니다", jp: "お会計お願いします", pron: "오카이케이 오네가이시마스" },
+    { kr: "추천 메뉴는 뭔가요?", jp: "おすすめは何ですか？", pron: "오스스메와 난데스카?" },
+    { kr: "화장실이 어디인가요?", jp: "トイレはどこですか？", pron: "토이레와 도코데스카?" }
+  ];
+
+  function speakJapanesePhrase(jpText, pronText, btnEl) {
+    try {
+      if ("speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(jpText);
+        u.lang = "ja-JP";
+        u.rate = 0.92;
+        document.querySelectorAll(".v41-phrase-btn.speaking").forEach(b => b.classList.remove("speaking"));
+        if (btnEl) btnEl.classList.add("speaking");
+        u.onend = () => btnEl?.classList.remove("speaking");
+        u.onerror = () => btnEl?.classList.remove("speaking");
+        window.speechSynthesis.speak(u);
+      }
+    } catch (_) {}
+    if (typeof toast === "function") {
+      toast(`🔊 "${jpText}" (${pronText})`);
+    }
+  }
+
+  function upgradeDashboardV41() {
+    const dash = document.getElementById("v32Dashboard");
+    if (!dash) return;
+
+    const list = Array.isArray(items) ? items : [];
+    const total = list.length;
+    const coords = list.filter(i => Number(i.lat) && Number(i.lng)).length;
+    const scheduled = list.filter(i => Number(i.day) > 0).length;
+
+    // 2-1) 벤토 그리드 숫자 롤링 카운터 적용
+    const bentoVals = dash.querySelectorAll(".v32-bento-card b");
+    if (bentoVals.length >= 4) {
+      const kmVal = parseFloat(bentoVals[3].textContent) || 0;
+      animateNumberTicker(bentoVals[0], prevStats.total, total, "곳", false);
+      animateNumberTicker(bentoVals[1], prevStats.coords, coords, "곳", false);
+      animateNumberTicker(bentoVals[2], prevStats.scheduled, scheduled, "곳", false);
+      animateNumberTicker(bentoVals[3], prevStats.km, kmVal, "km", true);
+      prevStats.total = total;
+      prevStats.coords = coords;
+      prevStats.scheduled = scheduled;
+      prevStats.km = kmVal;
+    }
+
+    // 3-1) 일차별 코스 텍스트를 지하철 노선형 인터랙티브 타임라인으로 업그레이드
+    dash.querySelectorAll(".v39-day-acc-item").forEach(box => {
+      const mapBtn = box.querySelector("[data-v32-dmap]");
+      const bodyEl = box.querySelector(".v39-day-acc-body");
+      if (!mapBtn || !bodyEl || bodyEl.dataset.v41TimelineDone) return;
+      bodyEl.dataset.v41TimelineDone = "1";
+
+      const dayNum = Number(mapBtn.dataset.v32Dmap) || 0;
+      const dList = list
+        .filter(x => Number(x.day) === dayNum)
+        .sort((a, b) => String(a.visitTime || "99:99").localeCompare(String(b.visitTime || "99:99")));
+
+      if (!dList.length) return;
+
+      const nodesHtml = dList.slice(0, 6).map((it, idx) => {
+        let stepDist = "";
+        if (idx > 0 && typeof distKm === "function" && Number(dList[idx - 1].lat) && Number(it.lat)) {
+          const d = distKm(Number(dList[idx - 1].lat), Number(dList[idx - 1].lng), Number(it.lat), Number(it.lng));
+          if (d > 0 && d < 50) {
+            const wMin = Math.max(1, Math.round((d * 1000 * 1.3) / 80));
+            stepDist = wMin <= 25 ? `도보 ${wMin}분` : `${d.toFixed(1)}km`;
+          }
+        }
+        return `
+          <div class="v41-tl-node" data-v41-tl-id="${esc(it.id)}">
+            <span class="v41-tl-dot">${idx + 1}</span>
+            <div class="v41-tl-main">
+              ${it.visitTime ? `<span class="v41-tl-time">${esc(it.visitTime)}</span>` : ""}
+              <span class="v41-tl-name">${esc(it.name || "장소")}</span>
+              ${stepDist ? `<span class="v41-tl-dist">· ${stepDist}</span>` : ""}
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      bodyEl.innerHTML = `<div class="v41-timeline-list">${nodesHtml}</div>`;
+      bodyEl.querySelectorAll(".v41-tl-node").forEach(node => {
+        node.onclick = (e) => {
+          e.stopPropagation();
+          const targetId = node.dataset.v41TlId;
+          const found = list.find(x => String(x.id) === String(targetId));
+          if (!found) return;
+          cur = found.id;
+          if (typeof showSheet === "function") showSheet();
+        };
+      });
+    });
+
+    // 5-1) 홈 하단에 원터치 현지 생존 일본어 음성(Voice Orb) 섹션 추가
+    if (!dash.querySelector("#v41SurvivalVoiceCard")) {
+      const voiceCard = document.createElement("div");
+      voiceCard.id = "v41SurvivalVoiceCard";
+      voiceCard.className = "v32-sec-card";
+      voiceCard.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <b style="font-size:15px">🔊 원터치 현지 주문·길찾기 회화</b>
+          <span style="font-size:11px;font-weight:700;color:var(--sub)">터치 시 일본어 음성 재생</span>
+        </div>
+        <div class="v41-phrase-grid">
+          ${SURVIVAL_PHRASES.map((p, i) => `
+            <button type="button" class="v41-phrase-btn" data-v41-phrase="${i}">
+              <div style="min-width:0">
+                <span class="v41-phrase-kr">${p.kr}</span>
+                <span class="v41-phrase-jp">${p.pron}</span>
+              </div>
+              <span class="v41-voice-orb"><span class="ms" style="font-size:15px">volume_up</span></span>
+            </button>
+          `).join("")}
+        </div>
+      `;
+      dash.appendChild(voiceCard);
+
+      voiceCard.querySelectorAll(".v41-phrase-btn").forEach(btn => {
+        btn.onclick = () => {
+          const p = SURVIVAL_PHRASES[Number(btn.dataset.v41Phrase)];
+          if (p) speakJapanesePhrase(p.jp, p.pron, btn);
+        };
+      });
+    }
+  }
+
+  /* =========================================================================
+   * 4. [Instant FX Slider] 목록 1/N 정산 서랍에 엔화 드래그 즉시 환율 슬라이더 장착
+   * ========================================================================= */
+  function injectInstantFxSlider() {
+    const drawer = document.getElementById("v32ListBudgetDrawer");
+    if (!drawer || drawer.querySelector(".v41-fx-slider-box")) return;
+
+    const fxBox = document.createElement("div");
+    fxBox.className = "v41-fx-slider-box";
+    fxBox.innerHTML = `
+      <div class="v41-fx-head">
+        <span>💴 엔화 드래그 즉시 환산</span>
+        <span class="v41-fx-val" id="v41FxReadout">¥1,000 ≈ ₩8,480</span>
+      </div>
+      <input type="range" class="v41-fx-range" id="v41FxRange" min="0" max="30000" step="100" value="1000" />
+      <div class="v41-fx-presets">
+        <button type="button" class="v41-fx-chip" data-jpy="500">¥500 (편의점)</button>
+        <button type="button" class="v41-fx-chip" data-jpy="1200">¥1,200 (라멘)</button>
+        <button type="button" class="v41-fx-chip" data-jpy="3500">¥3,500 (이자카야)</button>
+        <button type="button" class="v41-fx-chip" data-jpy="5500">¥5,500 (면세기준)</button>
+        <button type="button" class="v41-fx-chip" data-jpy="10000">¥10,000 (쇼핑)</button>
+      </div>
+    `;
+    drawer.appendChild(fxBox);
+
+    const rangeEl = fxBox.querySelector("#v41FxRange");
+    const readoutEl = fxBox.querySelector("#v41FxReadout");
+    const amtInput = document.getElementById("v32Amt");
+    const curSelect = document.getElementById("v32Cur");
+
+    const syncFxVal = (jpyVal) => {
+      const jpy = Number(jpyVal) || 0;
+      const krw = Math.round(jpy * 8.48);
+      if (readoutEl) readoutEl.textContent = `¥${jpy.toLocaleString()} ≈ ₩${krw.toLocaleString()}`;
+      if (amtInput && curSelect) {
+        curSelect.value = "JPY";
+        amtInput.value = String(jpy);
+        amtInput.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    };
+
+    rangeEl?.addEventListener("input", (e) => syncFxVal(e.target.value));
+    fxBox.querySelectorAll(".v41-fx-chip").forEach(chip => {
+      chip.onclick = (e) => {
+        e.stopPropagation();
+        const v = Number(chip.dataset.jpy) || 1000;
+        if (rangeEl) rangeEl.value = String(v);
+        syncFxVal(v);
+      };
+    });
+  }
+
+  /* =========================================================================
+   * 6. [Radial Speed Dial] 우측 하단 플로팅 버튼(+) 길게 누르기 or 더블탭 메뉴 보강
+   * ========================================================================= */
+  function setupSpeedDialQuickActions() {
+    if (document.getElementById("v41SpeedDialMenu")) return;
+    const menu = document.createElement("div");
+    menu.id = "v41SpeedDialMenu";
+    menu.innerHTML = `
+      <button type="button" class="v41-sd-item" data-sd="import"><span class="ms" style="font-size:17px;color:#60a5fa">add_link</span>링크·텍스트로 장소 추가</button>
+      <button type="button" class="v41-sd-item" data-sd="ocr"><span class="ms" style="font-size:17px;color:#34d399">imagesmode</span>스크린샷 사진 분석</button>
+      <button type="button" class="v41-sd-item" data-sd="fx"><span class="ms" style="font-size:17px;color:#fbbf24">currency_yen</span>엔화 1/N 환율 계산기</button>
+      <button type="button" class="v41-sd-item" data-sd="route"><span class="ms" style="font-size:17px;color:#a78bfa">route</span>전체 최단 동선 보기</button>
+    `;
+    document.body.appendChild(menu);
+
+    menu.querySelectorAll(".v41-sd-item").forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        menu.classList.remove("on");
+        const act = btn.dataset.sd;
+        if (act === "import") {
+          document.getElementById("v32ImportSheetWrap")?.classList.add("on");
+        } else if (act === "ocr") {
+          document.getElementById("shareFile")?.click();
+        } else if (act === "fx") {
+          if (typeof tab === "function") tab("list");
+          setTimeout(() => {
+            injectInstantFxSlider();
+            const d = document.getElementById("v32ListBudgetDrawer");
+            if (d) {
+              d.classList.add("on");
+              d.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            }
+          }, 90);
+        } else if (act === "route") {
+          mapRouteOn = true;
+          if (typeof draw === "function") draw(true);
+          if (innerWidth <= 820 && typeof tab === "function") tab("map");
+          if (typeof fit === "function") setTimeout(fit, 90);
+        }
+      };
+    });
+
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest("#v41SpeedDialMenu") && !e.target.closest("#v32FabBtn")) {
+        menu.classList.remove("on");
+      }
+    });
+
+    const fab = document.getElementById("v32FabBtn");
+    if (fab && !fab.dataset.v41SdBound) {
+      fab.dataset.v41SdBound = "1";
+      let pressTimer = null;
+      fab.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        menu.classList.toggle("on");
+      });
+      fab.addEventListener("touchstart", () => {
+        pressTimer = setTimeout(() => {
+          menu.classList.add("on");
+          if (window.v8Haptic) window.v8Haptic(18);
+        }, 420);
+      }, { passive: true });
+      fab.addEventListener("touchend", () => clearTimeout(pressTimer), { passive: true });
+      fab.addEventListener("touchmove", () => clearTimeout(pressTimer), { passive: true });
+    }
+  }
+
+  /* =========================================================================
+   * 7. [3D Tilt Card] 주요 거점 숙소 & 벤토 카드 입체 틸트 반응
+   * ========================================================================= */
+  document.addEventListener("pointermove", (e) => {
+    const tiltEl = e.target?.closest?.(".v32-base-btn, .v32-bento-card");
+    if (!tiltEl) return;
+    const r = tiltEl.getBoundingClientRect();
+    const x = (e.clientX - r.left) / Math.max(1, r.width) - 0.5;
+    const y = (e.clientY - r.top) / Math.max(1, r.height) - 0.5;
+    tiltEl.style.transform = `perspective(520px) rotateX(${(-y * 7).toFixed(2)}deg) rotateY(${(x * 7).toFixed(2)}deg) translateY(-1px)`;
+  }, { passive: true });
+
+  document.addEventListener("pointerout", (e) => {
+    const tiltEl = e.target?.closest?.(".v32-base-btn, .v32-bento-card");
+    if (tiltEl && !tiltEl.contains(e.relatedTarget)) {
+      tiltEl.style.transform = "";
+    }
+  }, { passive: true });
+
+  // 기존 대시보드 및 목록 렌더링과 자동 연동
+  if (typeof window.renderV32Dashboard === "function") {
+    const _origDashV41 = window.renderV32Dashboard;
+    window.renderV32Dashboard = function(...args) {
+      const r = _origDashV41.apply(this, args);
+      upgradeDashboardV41();
+      return r;
+    };
+  }
+
+  if (typeof renderListTab === "function") {
+    const _origListV41 = renderListTab;
+    renderListTab = function(...args) {
+      const r = _origListV41.apply(this, args);
+      injectInstantFxSlider();
+      return r;
+    };
+  }
+
+  const bootV41 = () => {
+    upgradeDashboardV41();
+    injectInstantFxSlider();
+    setupSpeedDialQuickActions();
+  };
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bootV41);
+  } else {
+    bootV41();
+  }
+  setTimeout(bootV41, 220);
+})();
+</script>
+<!-- === V41_21ST_DEV_PRACTICAL_UI_SUITE_END === -->
 </body>
 </html>
