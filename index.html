@@ -18151,5 +18151,353 @@ ${caption || rawText}
 })();
 </script>
 <!-- === V42_REAL_APIS_AND_HOME_CLEANUP_SUITE_END === -->
+
+<!-- === V43_SLEEK_REDESIGN_AND_DECLUTTER_SUITE_START === -->
+<style id="v43-sleek-redesign-style">
+  /* =========================================================================
+   * 1. 앱 최초 실행 스플래시(#v8Splash): 텍스트·퍼센트·바 완전 제거, 오직 로고만 표시
+   * ========================================================================= */
+  #v8Splash .v8-sp-meta {
+    display: none !important;
+  }
+  #v8Splash .v8-sp-logo {
+    width: 104px !important;
+    height: 104px !important;
+    border-radius: 28px !important;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(255, 255, 255, 0.14) !important;
+  }
+
+  /* =========================================================================
+   * 2. 상단 헤더 바(#ux7TopUtilBar): 좁은 화면에서 찌그러지는 '온라인' 배지 숨김 및 정돈
+   * ========================================================================= */
+  #ux7TopUtilBar #ux8SyncBadge {
+    display: none !important;
+  }
+  #ux7TopUtilBar {
+    padding: 12px 16px 6px !important;
+  }
+  #ux7TopUtilBar .ux7-title span {
+    font-size: 16px !important;
+    font-weight: 900 !important;
+    letter-spacing: -0.03em !important;
+  }
+
+  /* =========================================================================
+   * 3. 홈 화면(#v32Dashboard): 히어로 사진 대폭 확대 & 빈 여백 없이 꽉 찬 레이아웃
+   * ========================================================================= */
+  @media (max-width: 820px) {
+    #tab-add #v32Dashboard {
+      display: flex !important;
+      flex-direction: column !important;
+      gap: 14px !important;
+      min-height: calc(100dvh - 155px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+      justify-content: space-between !important;
+    }
+  }
+  .v32-hero {
+    min-height: 330px !important;
+    flex: 1 1 auto !important;
+    padding: 22px 20px !important;
+    border-radius: 26px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    box-shadow: 0 20px 44px rgba(0, 0, 0, 0.45) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  }
+  .v32-hero-grad {
+    background: linear-gradient(
+      180deg,
+      rgba(8, 12, 22, 0.25) 0%,
+      rgba(8, 12, 22, 0.35) 45%,
+      rgba(8, 12, 22, 0.92) 100%
+    ) !important;
+  }
+  .v32-hero .v43-hero-title {
+    font-size: 30px !important;
+    font-weight: 900 !important;
+    letter-spacing: -0.03em !important;
+    color: #ffffff !important;
+    margin-bottom: 14px !important;
+    text-shadow: 0 4px 18px rgba(0, 0, 0, 0.55) !important;
+  }
+  .v32-bento-grid {
+    gap: 12px !important;
+  }
+  .v32-bento-card {
+    padding: 18px 20px !important;
+    border-radius: 22px !important;
+  }
+  .v32-bento-card span {
+    font-size: 12.5px !important;
+    font-weight: 700 !important;
+  }
+  .v32-bento-card b {
+    font-size: 28px !important;
+    margin-top: 6px !important;
+  }
+  .v32-sec-card {
+    padding: 18px !important;
+    border-radius: 22px !important;
+  }
+  .v32-base-btn {
+    padding: 15px 8px !important;
+    border-radius: 16px !important;
+    gap: 7px !important;
+  }
+
+  /* =========================================================================
+   * 4. 목록 탭(#tab-list): 잘리는 하단 시간/일차 드롭다운 및 어수선한 배지 정리
+   * ========================================================================= */
+  #v39ExpandShowcase {
+    display: none !important;
+  }
+  /* 카드 하단에서 오른쪽으로 삐져나가 반쪽만 보이던 일차/시간 셀렉트 숨김 (상세창에서 깔끔하게 설정) */
+  #list-LIST .item .ux7-day-select,
+  #list-LIST .item .v32-time-select {
+    display: none !important;
+  }
+  /* 선택 모드가 아닐 때는 우측의 빈 네모 체크박스를 숨겨서 카드 우측 여백을 깔끔하게 확보 */
+  #list-LIST:not(.v35-select-mode) .item input[data-act="done"] {
+    display: none !important;
+  }
+  #list-LIST .item {
+    padding: 14px 15px !important;
+    border-radius: 20px !important;
+    gap: 13px !important;
+  }
+  #list-LIST .item .th {
+    width: 74px !important;
+    height: 74px !important;
+    border-radius: 16px !important;
+  }
+  #list-LIST .item .v33-card-ctrl-row {
+    gap: 8px !important;
+    margin-top: 8px !important;
+  }
+  #list-LIST .item .v33-card-ctrl-row .mb {
+    padding: 5px 12px !important;
+    min-height: 31px !important;
+    font-size: 12px !important;
+    border-radius: 999px !important;
+  }
+
+  /* =========================================================================
+   * 5. 상세 시트(#sheet): 지저분한 좌표 숫자·지도등록 중복 버튼·영문 생주소·11개 도구버튼 정리
+   * ========================================================================= */
+  /* 촌스러운 초록/빨강 좌표 숫자 배지 및 중복 지도 등록/숨김 버튼줄 제거 */
+  #sbody .bstat,
+  #sbody button[data-act="registerMapItem"],
+  #sbody button[data-act="regeo"],
+  #sbody button[data-act="hideMapItem"],
+  #sbody button[data-act="addEditAddress"],
+  #v33ToolWrap {
+    display: none !important;
+  }
+  /* 상세창 내 릴스 링크 입력 박스는 링크가 없을 때만 노출하고, 링크가 있으면 깔끔한 열기 버튼만 표시 */
+  #sbody .v43-clean-reel-box input#sh-vid,
+  #sbody .v43-clean-reel-box button[data-act="pasteVidInSheet"],
+  #sbody .v43-clean-reel-box label {
+    display: none !important;
+  }
+  #sbody .v43-clean-reel-box {
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    margin: 10px 0 !important;
+  }
+  #sbody .v43-clean-reel-box .reel-jump {
+    margin-bottom: 0 !important;
+    min-height: 44px !important;
+    border-radius: 14px !important;
+    font-size: 14px !important;
+    font-weight: 800 !important;
+  }
+
+  /* =========================================================================
+   * 6. 지도 탭(#map-wrap): 상단 2줄 필터칩을 1줄로 통합 & 겹치는 큰 사진핀을 세련된 미니 핀으로 기본화
+   * ========================================================================= */
+  /* 지도 상단 2번째 줄(릴스·쇼츠만/동선선/미방문만/가까운순) 숨김 -> 1줄만 남겨 시야 확보 */
+  #mapChips .chip-row:nth-of-type(2) {
+    display: none !important;
+  }
+  #mapChips {
+    padding: calc(10px + env(safe-area-inset-top)) 12px 6px !important;
+  }
+  /* 하단 '현재 지도 장소 목록 (75곳) · 길게 눌러 장소 추가' 긴 문구를 심플한 알약 버튼으로 축소 */
+  #mapStrip .strip-head {
+    padding: 10px 16px !important;
+  }
+  /* 지도가 좁을 때 사진 카드가 수십 개 겹쳐 지저분해지지 않도록 세련된 원형 뱃지 핀 스타일 강화 */
+  #map-wrap.v35-compact-pins .pinCard {
+    width: 30px !important;
+    height: 30px !important;
+    border-radius: 999px !important;
+    border: 2.5px solid #ffffff !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45) !important;
+  }
+</style>
+
+<script id="v43-sleek-redesign-script">
+(function initV43SleekRedesign() {
+  /* =========================================================================
+   * 1. 홈 화면 타이틀 "오사카·교토 여행"으로 변경 & 히어로 고화질화
+   * ========================================================================= */
+  function polishHomeHeroV43() {
+    const dash = document.getElementById("v32Dashboard");
+    if (!dash) return;
+    const hero = dash.querySelector(".v32-hero");
+    if (!hero) return;
+
+    // "오사카·교토 여행 플랜" -> "오사카·교토 여행"
+    const titleDiv = Array.from(hero.querySelectorAll("div")).find(
+      el => el.textContent.trim() === "오사카·교토 여행 플랜" || el.textContent.trim() === "오사카·교토 여행"
+    );
+    if (titleDiv) {
+      titleDiv.textContent = "오사카·교토 여행";
+      titleDiv.classList.add("v43-hero-title");
+    }
+  }
+
+  /* =========================================================================
+   * 2. 목록 카드 영문 생주소(5 Chome-6-13...) 한글/간결 주소로 정돈
+   * ========================================================================= */
+  function cleanEnglishAddress(rawAddr) {
+    if (!rawAddr) return "";
+    let s = String(rawAddr)
+      .replace(/〒?\s*\d{3}-\d{4}\s*/g, "")
+      .replace(/,?\s*Japan$/i, "")
+      .replace(/^일본\s*/, "")
+      .trim();
+    // 영문 주소가 너무 길면 핵심 구/동(Ward/Chome)만 깔끔하게 정리
+    if (/[A-Za-z]{4,}/.test(s)) {
+      s = s
+        .replace(/\bOsaka\b/gi, "오사카")
+        .replace(/\bKyoto\b/gi, "교토")
+        .replace(/\bWard\b/gi, "구")
+        .replace(/\bChuo\s*구/gi, "주오구")
+        .replace(/\bKita\s*구/gi, "기타구")
+        .replace(/\bNaniwa\s*구/gi, "나니와구")
+        .replace(/\bFukushima\s*구/gi, "후쿠시마구")
+        .replace(/\bNishi\s*구/gi, "니시구")
+        .replace(/\bTennoji\s*구/gi, "덴노지구");
+    }
+    return s;
+  }
+
+  function polishListCardsV43() {
+    const listEl = document.getElementById("list-LIST");
+    if (!listEl || !Array.isArray(items)) return;
+    const itemMap = new Map(items.map(it => [String(it.id), it]));
+
+    listEl.querySelectorAll(".item[data-id]").forEach(cardEl => {
+      const it = itemMap.get(String(cardEl.dataset.id));
+      if (!it) return;
+      const metaRow = cardEl.querySelector(".ux7-meta-row");
+      if (!metaRow) return;
+
+      const lastSpan = metaRow.querySelector("span:last-child");
+      if (lastSpan && !lastSpan.classList.contains("v32-station-badge") && !lastSpan.classList.contains("v42-gplaces-badge")) {
+        const cleanAddr = cleanEnglishAddress(it.address);
+        const summary = [it.price, cleanAddr].filter(Boolean).join(" · ") || "터치하여 상세 정보 보기";
+        lastSpan.textContent = summary;
+      }
+    });
+  }
+
+  /* =========================================================================
+   * 3. 상세 시트(#sheet) 군더더기 정리 (릴스 영역 슬림화 & 불필요한 컨트롤 숨김)
+   * ========================================================================= */
+  function polishSheetV43() {
+    const sbody = document.getElementById("sbody");
+    if (!sbody) return;
+
+    // 릴스 버튼이 있는 박스는 입력창을 숨기고 깔끔한 버튼 1개만 남김
+    const reelBtn = sbody.querySelector(".reel-jump");
+    if (reelBtn && reelBtn.parentElement) {
+      reelBtn.parentElement.classList.add("v43-clean-reel-box");
+    }
+
+    // 영문 주소 표기 다듬기
+    const addrEl = sbody.querySelector(".ds");
+    if (addrEl && addrEl.textContent) {
+      addrEl.textContent = cleanEnglishAddress(addrEl.textContent);
+    }
+
+    // 상세 수정 아코디언은 기본적으로 접어두어 첫 화면이 깔끔하게 보이도록 처리
+    sbody.querySelectorAll("details.acc").forEach(d => {
+      d.open = false;
+    });
+  }
+
+  /* =========================================================================
+   * 4. 지도 탭(#map-wrap): 핀 75개 중첩 방지(기본 컴팩트 핀 활성화) & 하단 바 문구 심플화
+   * ========================================================================= */
+  function polishMapV43() {
+    const mapWrap = document.getElementById("map-wrap");
+    if (mapWrap && !mapWrap.dataset.v43CompactInit) {
+      mapWrap.dataset.v43CompactInit = "1";
+      // 75개 사진 카드가 겹쳐 지저분해지지 않도록 기본값을 세련된 원형 번호 핀으로 설정
+      mapWrap.classList.add("v35-compact-pins");
+    }
+
+    const stripHead = document.querySelector("#mapStrip .strip-head span");
+    if (stripHead && stripHead.textContent.includes("길게 눌러")) {
+      stripHead.textContent = stripHead.textContent.replace(/\s*·\s*길게 눌러 장소 추가/g, "");
+    }
+  }
+
+  // 기존 렌더링 훅에 연결
+  if (typeof window.renderV32Dashboard === "function") {
+    const _origDashV43 = window.renderV32Dashboard;
+    window.renderV32Dashboard = function(...args) {
+      const r = _origDashV43.apply(this, args);
+      polishHomeHeroV43();
+      return r;
+    };
+  }
+
+  if (typeof renderListTab === "function") {
+    const _origListV43 = renderListTab;
+    renderListTab = function(...args) {
+      const r = _origListV43.apply(this, args);
+      polishListCardsV43();
+      return r;
+    };
+  }
+
+  if (typeof showSheet === "function") {
+    const _origSheetV43 = showSheet;
+    showSheet = function(...args) {
+      const r = _origSheetV43.apply(this, args);
+      polishSheetV43();
+      return r;
+    };
+  }
+
+  if (typeof draw === "function") {
+    const _origDrawV43 = draw;
+    draw = function(...args) {
+      polishMapV43();
+      const r = _origDrawV43.apply(this, args);
+      polishMapV43();
+      return r;
+    };
+  }
+
+  const bootV43 = () => {
+    polishHomeHeroV43();
+    polishListCardsV43();
+    polishMapV43();
+  };
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bootV43);
+  } else {
+    bootV43();
+  }
+  setTimeout(bootV43, 300);
+})();
+</script>
+<!-- === V43_SLEEK_REDESIGN_AND_DECLUTTER_SUITE_END === -->
 </body>
 </html>
