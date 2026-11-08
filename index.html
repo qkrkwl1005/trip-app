@@ -1422,15 +1422,6 @@
     <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png?v=8">
     <link rel="shortcut icon" type="image/png" href="./favicon.png?v=8">
     <!-- === V8_APP_ICON_LINKS_END === -->
-<style>
-  @keyframes v8SplashForceHide {
-    0%, 70% { opacity: 1; visibility: visible; }
-    100% { opacity: 0; visibility: hidden; pointer-events: none; display: none; }
-  }
-  #v8Splash {
-    animation: v8SplashForceHide 0.9s ease forwards !important;
-  }
-</style>
 </head>
   <body>
 <!-- === V8_SPLASH_START === -->
@@ -1439,30 +1430,33 @@
     position: fixed;
     inset: 0;
     z-index: 9999999;
-    background: #080a0f;
+    background: radial-gradient(circle at 50% 38%, #131c2e 0%, #080a0f 75%);
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 18px;
     padding: 24px;
-    transition: opacity 0.32s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.32s;
+    transition: opacity 0.42s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.42s, transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
   }
   [data-theme="light"] #v8Splash {
-    background: #f1f5f9;
+    background: radial-gradient(circle at 50% 38%, #ffffff 0%, #e2e8f0 80%);
   }
   #v8Splash.hide {
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    transform: scale(1.03);
   }
   .v8-sp-logo {
-    width: 84px;
-    height: 84px;
-    border-radius: 22px;
+    width: 88px;
+    height: 88px;
+    border-radius: 24px;
     overflow: hidden;
     display: grid;
     place-items: center;
-    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.5);
-    animation: v8Pulse 1.4s ease-in-out infinite;
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.12);
+    animation: v8Pulse 1.5s ease-in-out infinite;
   }
   .v8-sp-logo img {
     width: 100%;
@@ -1470,14 +1464,60 @@
     object-fit: cover;
     display: block;
   }
+  .v8-sp-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 180px;
+  }
+  .v8-sp-title {
+    font-size: 16px;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    color: #f8fafc;
+  }
+  [data-theme="light"] .v8-sp-title {
+    color: #0f172a;
+  }
+  .v8-sp-bar-wrap {
+    width: 100%;
+    height: 5px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.22);
+    overflow: hidden;
+  }
+  #v8SpBar {
+    width: 12%;
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #3b82f6, #60a5fa);
+    transition: width 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .v8-sp-sub-row {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    font-size: 11px;
+    font-weight: 700;
+    color: #94a3b8;
+  }
   @keyframes v8Pulse {
     0%, 100% { transform: scale(1); }
     50% { transform: scale(1.05); }
   }
 </style>
-<div id="v8Splash" style="display:none!important" style="display:none!important" style="display:none!important" role="status" aria-live="polite">
+<div id="v8Splash" role="status" aria-live="polite">
   <div class="v8-sp-logo">
     <img src="./icon-192.png?v=8" onerror="this.onerror=null;this.src='./apple-touch-icon.png?v=8';" alt="앱 로고" />
+  </div>
+  <div class="v8-sp-meta">
+    <div class="v8-sp-title">오사카 · 교토 여행플래너</div>
+    <div class="v8-sp-bar-wrap"><div id="v8SpBar"></div></div>
+    <div class="v8-sp-sub-row">
+      <span id="v8SpStep">여행 데이터 준비 중...</span>
+      <span id="v8SpPct">12%</span>
+    </div>
   </div>
 </div>
 <!-- === V8_SPLASH_END === -->
@@ -11793,20 +11833,36 @@ ${caption || rawText}
   const spBar = document.getElementById("v8SpBar");
   const spPct = document.getElementById("v8SpPct");
   const spStep = document.getElementById("v8SpStep");
-  let curPct = 8;
+  let curPct = 12;
+  let targetBootPct = 28;
+  let bootLabel = "저장된 여행 데이터 불러오는 중...";
 
-  function setSplashProgress(pct, label) {
-    if (!spEl) return;
-    curPct = Math.max(curPct, Math.min(100, Math.round(pct)));
-    if (spBar) spBar.style.width = curPct + "%";
-    if (spPct) spPct.textContent = curPct + "%";
-    if (label && spStep) spStep.textContent = label;
+  const bootTicker = setInterval(() => {
+    if (!spEl) {
+      clearInterval(bootTicker);
+      return;
+    }
+    if (curPct < targetBootPct) {
+      curPct = Math.min(targetBootPct, curPct + Math.max(1, (targetBootPct - curPct) * 0.25));
+      if (spBar) spBar.style.width = Math.round(curPct) + "%";
+      if (spPct) spPct.textContent = Math.round(curPct) + "%";
+      if (spStep) spStep.textContent = bootLabel;
+    }
     if (curPct >= 100) {
+      clearInterval(bootTicker);
       setTimeout(() => {
         spEl.classList.add("hide");
         forceMapResizeAndFit();
-      }, 180);
+        setTimeout(() => spEl.remove(), 480);
+      }, 160);
     }
+  }, 35);
+
+  function setSplashProgress(pct, label) {
+    if (!spEl) return;
+    targetBootPct = Math.max(targetBootPct, Math.min(100, Math.round(pct)));
+    if (label) bootLabel = label;
+    if (spStep && label) spStep.textContent = label;
   }
 
   function forceMapResizeAndFit() {
@@ -11823,41 +11879,39 @@ ${caption || rawText}
   }
 
   async function runRealBootSequence() {
-    setSplashProgress(25, "저장된 여행 데이터 불러오는 중...");
+    setSplashProgress(35, "저장된 여행 데이터 불러오는 중...");
     try {
       if (typeof idb !== "undefined" && idb.init) await idb.init();
     } catch (_) {}
 
-    setSplashProgress(50, "폰트 및 아이콘 렌더링 중...");
+    setSplashProgress(65, "폰트 및 아이콘 렌더링 중...");
     try {
       if (document.fonts && document.fonts.ready) {
-        await Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 1000))]);
+        await Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 700))]);
       }
     } catch (_) {}
 
-    setSplashProgress(78, "지도 엔진 및 타일 초기화 중...");
+    setSplashProgress(88, "지도 엔진 및 타일 초기화 중...");
     await new Promise(resolve => {
       let tries = 0;
       const checkMap = () => {
         tries++;
         const mapReady = (typeof lm !== "undefined" && lm) || (typeof gmap !== "undefined" && gmap) || (typeof nmap !== "undefined" && nmap);
-        if (mapReady || tries > 18) {
+        if (mapReady || tries > 8) {
           forceMapResizeAndFit();
           resolve();
         } else {
-          setTimeout(checkMap, 100);
+          setTimeout(checkMap, 70);
         }
       };
       checkMap();
     });
 
-    setSplashProgress(92, "화면 구성 마무리 중...");
-    await new Promise(r => setTimeout(r, 150));
     setSplashProgress(100, "준비 완료!");
   }
 
-  // 안전 타임아웃 (최대 3.2초 내 무조건 진입 보장)
-  setTimeout(() => setSplashProgress(100, "준비 완료!"), 3200);
+  // 안전 타임아웃 (최대 1.8초 내 무조건 진입 보장)
+  setTimeout(() => setSplashProgress(100, "준비 완료!"), 1800);
   if (document.readyState === "complete") {
     runRealBootSequence();
   } else {
@@ -12456,7 +12510,7 @@ ${caption || rawText}
   }
 
   /* 불필요 요소 및 구간 경로 배지 숨김 */
-  #v8Splash, .item .star-btn, #lchips-LIST .lchip[data-f="STAR"],
+  .item .star-btn, #lchips-LIST .lchip[data-f="STAR"],
   #mapChips [data-act="mapStarToggle"], #mapChips [data-act="mapDayCycle"],
   #smartFilterBar, #v8QuickDayBar, #uxGuideSteps,
   #tab-list .search-row > #q-LIST, #tab-list .search-row > .clear-search,
@@ -12721,9 +12775,6 @@ ${caption || rawText}
 
 <script>
 (function initV32FinalUX() {
-  const sp = document.getElementById("v8Splash");
-  if (sp) sp.remove();
-
   /* =========================================================================
    * 1. 상단 온라인 상태 배지 주입 및 실시간 네트워크 연동
    * ========================================================================= */
@@ -14423,8 +14474,8 @@ ${caption || rawText}
     }
   }
 
-  /* 3. 갤럭시 폴드 8 펼침 화면(내부 대화면 700px ~ 1180px) 듀얼 스플릿 뷰 최적화 */
-  @media (min-width: 700px) and (max-width: 1180px) {
+  /* 3. 갤럭시 폴드 8 펼침 화면(내부 대화면 821px ~ 1180px) 듀얼 스플릿 뷰 최적화 */
+  @media (min-width: 821px) and (max-width: 1180px) {
     body {
       display: flex !important;
       flex-direction: row !important;
@@ -14451,7 +14502,7 @@ ${caption || rawText}
       display: none !important;
     }
     #nav {
-      position: static !important;
+      position: relative !important;
       grid-template-columns: repeat(4, 1fr) !important;
       border-radius: 0 !important;
       padding: calc(8px + env(safe-area-inset-top)) 10px 8px !important;
@@ -14470,13 +14521,14 @@ ${caption || rawText}
     }
   }
 
-  /* 4. 안드로이드 15+ / iOS 가상 키보드 활성화 시 하단 고정 푸터 가림 방지 */
-  body.v37-kb-open .ux-sheet-footer,
-  body.v37-kb-open #nav,
-  body.v37-kb-open #v32FabBtn {
-    position: static !important;
-    margin-top: 12px !important;
-    box-shadow: none !important;
+  /* 4. 안드로이드 15+ / iOS 가상 키보드 활성화 시 하단 고정 푸터 가림 방지 (#nav가 상단으로 튀는 현상 완전 방지) */
+  @media (max-width: 820px) {
+    body.v37-kb-open #nav,
+    body.v37-kb-open #v32FabBtn {
+      opacity: 0 !important;
+      pointer-events: none !important;
+      transform: translateY(100px) !important;
+    }
   }
   body.v37-kb-open #sheet .sh {
     max-height: 98dvh !important;
@@ -14490,7 +14542,7 @@ ${caption || rawText}
    * 1. 갤럭시 폴드 8 펼침/접힘 실시간 감지 및 탭 전환 호환
    * ----------------------------------------------------------------------- */
   function isFoldUnfolded() {
-    return window.innerWidth >= 700 && window.innerWidth <= 1180;
+    return window.innerWidth >= 821 && window.innerWidth <= 1180;
   }
 
   if (typeof tab === "function") {
@@ -15865,55 +15917,8 @@ ${caption || rawText}
     handleEmptyStateAction(btn.dataset.code, btn.dataset.v38Act);
   });
 
-  // 목록 탭 상단 카드에 '빈 화면 9가지 & 프로그레스' 실시간 작동/점검 바 주입
-  function injectStateInspectorBar() {
-    const topCard = document.querySelector("#tab-list > .card:first-of-type");
-    if (!topCard || document.getElementById("v38StateInspectorBar")) return;
-
-    const bar = document.createElement("div");
-    bar.id = "v38StateInspectorBar";
-    const states = [
-      ["AUTO", "⚡ 자동감지"],
-      ["PROG", "📊 실제 데이터·좌표 동기화(0~100%)"],
-      ["01", "01 첫 사용"],
-      ["02", "02 검색결과없음"],
-      ["03", "03 필터결과없음"],
-      ["04", "04 오프라인"],
-      ["05", "05 권한필요"],
-      ["06", "06 모두완료"],
-      ["07", "07 삭제직후"],
-      ["08", "08 오류화면"],
-      ["09", "09 잠김"]
-    ];
-    bar.innerHTML = states.map(([code, label]) =>
-      `<button type="button" class="v38-state-pill ${code === "AUTO" ? "on" : ""}" data-v38-pill="${code}">${esc(label)}</button>`
-    ).join("");
-    topCard.appendChild(bar);
-
-    bar.addEventListener("click", (e) => {
-      const pill = e.target.closest("[data-v38-pill]");
-      if (!pill) return;
-      const code = pill.dataset.v38Pill;
-      if (code === "PROG") {
-        runRealDataAuditAndSync();
-        return;
-      }
-      window.__v38EmptyStateMeta.previewForceCode = (code === "AUTO") ? null : code;
-      syncInspectorPills();
-      renderListTab();
-    });
-  }
-
-  function syncInspectorPills() {
-    const bar = document.getElementById("v38StateInspectorBar");
-    if (!bar) return;
-    const curCode = window.__v38EmptyStateMeta.previewForceCode || "AUTO";
-    bar.querySelectorAll("[data-v38-pill]").forEach(p => {
-      if (p.dataset.v38Pill !== "PROG") {
-        p.classList.toggle("on", p.dataset.v38Pill === curCode);
-      }
-    });
-  }
+  function injectStateInspectorBar() {}
+  function syncInspectorPills() {}
 
   // 4) 실제 네트워크(fetch) 스트리밍 바이트(Content-Length / ReadableStream) 및 요청 단계 진행률 + 오류(08) 자동 감지
   const _origFetchV38 = window.fetch ? window.fetch.bind(window) : null;
@@ -16116,8 +16121,6 @@ ${caption || rawText}
     const _origRenderListV38 = renderListTab;
     renderListTab = function(...args) {
       const r = _origRenderListV38.apply(this, args);
-      injectStateInspectorBar();
-      syncInspectorPills();
 
       const listEl = document.getElementById("list-LIST");
       if (!listEl) return r;
@@ -16125,16 +16128,9 @@ ${caption || rawText}
       const allCat = listCat === "ALL" ? (items || []) : (items || []).filter(i => i.category === listCat);
       const visibleCards = Array.from(listEl.querySelectorAll(".item[data-id]")).filter(el => el.style.display !== "none");
       const oldEmpty = listEl.querySelector(".empty");
-      const forcedCode = window.__v38EmptyStateMeta.previewForceCode;
 
       // 기존 안내 카드 제거 후 다시 계산
       listEl.querySelectorAll(".v38-empty-card").forEach(el => el.remove());
-
-      if (forcedCode) {
-        if (oldEmpty) oldEmpty.remove();
-        listEl.insertAdjacentHTML("afterbegin", renderEmptyStateCardHtml(forcedCode));
-        return r;
-      }
 
       if (oldEmpty || visibleCards.length === 0) {
         if (oldEmpty) oldEmpty.remove();
@@ -16149,9 +16145,9 @@ ${caption || rawText}
   window.addEventListener("online", () => { if (typeof renderListTab === "function") renderListTab(); });
   window.addEventListener("offline", () => { if (typeof renderListTab === "function") renderListTab(); });
 
-  // 앱 시작 시 상단 점검 바 초기화 및 빈 화면 렌더링
+  // 앱 시작 시 빈 화면 감지 초기화 (불필요한 상단 점검 칩 바 완전 제거됨)
   const initV38OnReady = () => {
-    injectStateInspectorBar();
+    document.getElementById("v38StateInspectorBar")?.remove();
     if (typeof renderListTab === "function") renderListTab();
   };
   if (document.readyState === "complete") {
@@ -16165,12 +16161,34 @@ ${caption || rawText}
 
 <!-- === V39_TWEEN_UI_AND_ANIMATEICONS_SUITE_START === -->
 <style id="v39-tween-animateicons-style">
+  /* 불필요한 상단 상태 점검 칩 바 영구 숨김 */
+  #v38StateInspectorBar {
+    display: none !important;
+  }
+
   /* =========================================================================
-   * 1. [Tween UI] Navbar Pill Glide (하단 탭 바 & 카테고리 세그먼트 슬라이딩 알약 인디케이터)
+   * 1. [Tween UI] Navbar Pill Glide (모바일은 하단 고정 Dock 유지, 데스크톱만 relative)
    * ========================================================================= */
   #nav {
-    position: relative !important;
     isolation: isolate;
+  }
+  @media (min-width: 821px) {
+    #nav {
+      position: relative !important;
+    }
+  }
+  @media (max-width: 820px) {
+    #nav {
+      position: fixed !important;
+      left: 12px !important;
+      right: 12px !important;
+      top: auto !important;
+      bottom: calc(8px + env(safe-area-inset-bottom)) !important;
+      z-index: 210 !important;
+      grid-template-columns: repeat(4, 1fr) !important;
+      border-radius: 24px !important;
+      padding: 6px !important;
+    }
   }
   .v39-nav-glide-pill {
     position: absolute;
@@ -16808,5 +16826,118 @@ ${caption || rawText}
 })();
 </script>
 <!-- === V39_TWEEN_UI_AND_ANIMATEICONS_SUITE_END === -->
+
+<!-- === V40_DEEP_UX_AUDIT_POLISH_START === -->
+<style id="v40-deep-ux-polish-style">
+  /* 1. iOS Safari 입력창 터치 시 자동 화면 확대(Zoom-in) 방지: 최소 16px 보장 */
+  @media (max-width: 820px) {
+    input[type="text"],
+    input[type="search"],
+    input[type="number"],
+    input[type="url"],
+    textarea {
+      font-size: 16px !important;
+    }
+    #v35SearchInput {
+      font-size: 15px !important;
+    }
+  }
+
+  /* 2. 가로 스크롤 영역(카테고리/필터 칩) 지저분한 스크롤바 완전 숨김 */
+  .chips, .lchips, .sfb-row, #sfb-days, #mapChips, #mapStrip {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+  .chips::-webkit-scrollbar,
+  .lchips::-webkit-scrollbar,
+  .sfb-row::-webkit-scrollbar,
+  #sfb-days::-webkit-scrollbar,
+  #mapChips::-webkit-scrollbar,
+  #mapStrip::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  /* 3. 모바일 하단 네비게이션 독(#nav) 절대 하단 고정 보장 & 플로팅 + 버튼 위치 간섭 방지 */
+  @media (max-width: 820px) {
+    #nav {
+      position: fixed !important;
+      left: 12px !important;
+      right: 12px !important;
+      top: auto !important;
+      bottom: calc(8px + env(safe-area-inset-bottom)) !important;
+      z-index: 215 !important;
+    }
+    #v32FabBtn {
+      bottom: calc(78px + env(safe-area-inset-bottom)) !important;
+      right: 16px !important;
+      z-index: 205 !important;
+    }
+    /* 상세 시트나 가져오기 시트가 열렸을 때 플로팅 + 버튼 숨김 */
+    body.v40-modal-open #v32FabBtn {
+      opacity: 0 !important;
+      pointer-events: none !important;
+      transform: scale(0.7) !important;
+    }
+    #toast {
+      bottom: calc(82px + env(safe-area-inset-bottom)) !important;
+      z-index: 99999 !important;
+    }
+  }
+</style>
+<script id="v40-deep-ux-polish-script">
+(function initV40DeepUxPolish() {
+  // 1) 모달/시트 열림 상태 감지하여 플로팅 버튼(#v32FabBtn) 겹침 차단
+  const syncModalState = () => {
+    const sheetOpen = document.getElementById("sheet")?.classList.contains("on");
+    const importOpen = document.getElementById("v32ImportSheetWrap")?.classList.contains("on");
+    const mapModalOpen = document.getElementById("v8MapAddModal")?.classList.contains("on");
+    document.body.classList.toggle("v40-modal-open", Boolean(sheetOpen || importOpen || mapModalOpen));
+  };
+  document.addEventListener("click", () => setTimeout(syncModalState, 30), true);
+
+  // 2) 키보드 ESC 키로 열린 시트/모달 즉시 닫기
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    const importWrap = document.getElementById("v32ImportSheetWrap");
+    if (importWrap && importWrap.classList.contains("on")) {
+      importWrap.classList.remove("on");
+      syncModalState();
+      return;
+    }
+    const mapModal = document.getElementById("v8MapAddModal");
+    if (mapModal && mapModal.classList.contains("on")) {
+      mapModal.classList.remove("on");
+      syncModalState();
+      return;
+    }
+    const sheet = document.getElementById("sheet");
+    if (sheet && sheet.classList.contains("on") && typeof hideSheet === "function") {
+      hideSheet();
+      syncModalState();
+    }
+  });
+
+  // 3) 탭 전환 시 스크롤 위치를 최상단으로 부드럽게 정렬 & 지도 탭 진입 시 타일 깨짐 자동 복구
+  if (typeof tab === "function") {
+    const _origTabV40 = tab;
+    tab = function(k, ...rest) {
+      const r = _origTabV40.apply(this, [k, ...rest]);
+      syncModalState();
+      const activeSection = document.querySelector(".tab-content.active");
+      if (activeSection) activeSection.scrollTop = 0;
+      if (k === "map") {
+        setTimeout(() => {
+          try {
+            if (typeof gmap !== "undefined" && gmap && window.google?.maps) google.maps.event.trigger(gmap, "resize");
+            if (typeof lm !== "undefined" && lm) lm.invalidateSize();
+          } catch (_) {}
+        }, 90);
+      }
+      return r;
+    };
+  }
+})();
+</script>
+<!-- === V40_DEEP_UX_AUDIT_POLISH_END === -->
 </body>
 </html>
