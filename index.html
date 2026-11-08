@@ -13383,29 +13383,34 @@ ${caption || rawText}
 })();
 </script>
 <!-- === V32_FINAL_UX_PATCH_END === -->
-<!-- === V33_UI_AND_DRAG_FIX_START === -->
+
+<!-- === V35_CLEAN_STRUCTURE_PATCH_START === -->
 <style>
-  /* 1. 상단 유틸리티 바 줄바꿈 깨짐 완벽 교정 */
+  /* 1. 상단 유틸리티 바: 줄바꿈 방지 및 미니멀 헤더화 */
   #ux7TopUtilBar {
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
     gap: 6px !important;
-    padding: calc(10px + env(safe-area-inset-top)) 12px 10px !important;
+    padding: calc(10px + env(safe-area-inset-top)) 14px 10px !important;
     flex-wrap: nowrap !important;
+    background: rgba(18, 21, 30, 0.92) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+  }
+  [data-theme="light"] #ux7TopUtilBar {
+    background: rgba(255, 255, 255, 0.92) !important;
   }
   #ux7TopUtilBar .ux7-title {
     display: flex !important;
     align-items: center !important;
-    gap: 5px !important;
+    gap: 6px !important;
     white-space: nowrap !important;
     flex-shrink: 0 !important;
-    font-size: 14.5px !important;
+    font-size: 15px !important;
     font-weight: 900 !important;
   }
-  #ux7TopUtilBar .ux7-title > span {
-    white-space: nowrap !important;
-  }
+  #ux7TopUtilBar .ux7-title > span { white-space: nowrap !important; }
   #v32TopOnlineBadge {
     padding: 3px 7px !important;
     font-size: 10.5px !important;
@@ -13415,36 +13420,75 @@ ${caption || rawText}
   #ux7TopUtilBar .ux7-actions {
     display: flex !important;
     align-items: center !important;
-    gap: 4px !important;
+    gap: 5px !important;
     flex-wrap: nowrap !important;
     overflow-x: auto !important;
     scrollbar-width: none !important;
   }
-  #ux7TopUtilBar .ux7-actions::-webkit-scrollbar {
-    display: none !important;
-  }
+  #ux7TopUtilBar .ux7-actions::-webkit-scrollbar { display: none !important; }
   #ux7TopUtilBar .ux7-actions .mb {
     white-space: nowrap !important;
     flex-shrink: 0 !important;
     min-height: 30px !important;
-    padding: 4px 8px !important;
+    padding: 4px 9px !important;
     font-size: 11px !important;
     gap: 3px !important;
     border-radius: 999px !important;
   }
-  #ux7TopUtilBar .ux7-actions .mb .ms {
-    font-size: 15px !important;
+  #ux7TopUtilBar .ux7-actions .mb .ms { font-size: 15px !important; }
+
+  /* 2. 목록 상단 컨트롤 카드 슬림화 & 검색창 복원 */
+  #tab-list > .card:first-of-type {
+    padding: 12px 14px !important;
+    border-radius: 20px !important;
+  }
+  #listCatSeg.seg.seg5 {
+    margin-bottom: 8px !important;
+    padding: 4px !important;
+    border-radius: 14px !important;
+  }
+  #listCatSeg.seg.seg5 div {
+    min-height: 34px !important;
+    font-size: 12px !important;
+    padding: 4px 2px !important;
+  }
+  #v35SearchRow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  #v35SearchInput {
+    flex: 1;
+    min-height: 38px !important;
+    padding: 7px 14px !important;
+    margin: 0 !important;
+    border-radius: 12px !important;
+    font-size: 13.5px !important;
+    background: var(--s2) !important;
+    border: 1px solid var(--bd2) !important;
   }
 
-  /* 2. 목록 카드 제목 줄(.nm) 및 좌측 체크 아이콘 정렬 */
+  /* 3. 목록 카드: 불필요한 노이즈 배지 제거, 1줄 주소 요약, 1줄 버튼 정렬 */
+  .v8-live-pill { display: none !important; }
+  #list-LIST .item {
+    padding: 14px 14px !important;
+    border-radius: 20px !important;
+    gap: 12px !important;
+    align-items: center !important;
+  }
+  #list-LIST .item .pic {
+    width: 72px !important;
+    height: 72px !important;
+    border-radius: 16px !important;
+  }
   #list-LIST .item .mid .nm {
     display: flex !important;
     align-items: flex-start !important;
-    gap: 6px !important;
-    font-size: 16px !important;
-    line-height: 1.35 !important;
+    gap: 5px !important;
+    font-size: 15.5px !important;
+    line-height: 1.32 !important;
     word-break: keep-all !important;
-    overflow-wrap: anywhere !important;
   }
   .v32-coord-check {
     display: inline-flex !important;
@@ -13452,56 +13496,78 @@ ${caption || rawText}
     justify-content: center !important;
     color: #34d399 !important;
     flex: none !important;
-    margin-top: 2px !important;
-    margin-right: 1px !important;
+    margin-top: 1px !important;
   }
-  .v33-card-ctrl-row {
-    margin-top: 10px !important;
-    display: flex !important;
-    align-items: center !important;
-    gap: 6px !important;
+  #list-LIST .item .ux7-meta-row {
+    margin-top: 5px !important;
+    gap: 5px !important;
     flex-wrap: wrap !important;
   }
-  .ux7-day-select, .v32-time-select {
-    min-height: 32px !important;
-    padding: 4px 8px !important;
+  #list-LIST .item .ux7-meta-row > span:last-child {
+    display: block !important;
+    width: 100% !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    font-size: 12px !important;
+    color: var(--sub) !important;
+    margin-top: 2px !important;
+  }
+  .v33-card-ctrl-row {
+    margin-top: 8px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    scrollbar-width: none !important;
+  }
+  .v33-card-ctrl-row::-webkit-scrollbar { display: none !important; }
+  .v33-card-ctrl-row .mb {
+    min-height: 30px !important;
+    padding: 4px 10px !important;
     font-size: 11.5px !important;
     border-radius: 10px !important;
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+  }
+  .v33-card-ctrl-row .ux7-day-select,
+  .v33-card-ctrl-row .v32-time-select {
+    min-height: 30px !important;
+    padding: 3px 7px !important;
+    font-size: 11px !important;
+    border-radius: 10px !important;
+    flex-shrink: 0 !important;
   }
 
-  /* 3. 네이티브 드래그 앤 드롭 시각 피드백 */
-  .v8-drag-handle {
-    cursor: grab !important;
-    padding: 10px 4px !important;
-    margin-left: -6px !important;
-    color: var(--sub) !important;
-    touch-action: none !important;
-    user-select: none !important;
-    -webkit-user-select: none !important;
-  }
-  .item.v33-dragging {
-    opacity: 0.92 !important;
-    transform: scale(1.02) !important;
-    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.55) !important;
-    border-color: var(--pr) !important;
-    background: var(--s2) !important;
-    z-index: 50 !important;
+  /* 선택 모드 활성화 시 우측 방문완료 체크박스 숨김 */
+  #list-LIST.v35-select-mode .item input[data-act="done"] {
+    display: none !important;
   }
 
-  /* 4. 상세창 통합 도구 메뉴 버튼 & 팝오버 그리드 */
-  #v33ToolWrap {
-    margin-top: 12px;
+  /* 4. 홈 탭에서는 중복 플로팅 + 버튼 숨김, 목록 탭에서만 우측 하단 미니멀 표시 */
+  #v32FabBtn {
+    width: 50px !important;
+    height: 50px !important;
+    right: 16px !important;
+    bottom: calc(82px + env(safe-area-inset-bottom)) !important;
   }
+  #v32FabBtn.v35-hide-on-home {
+    display: none !important;
+  }
+
+  /* 5. 상세창 통합 도구 메뉴 및 타이틀 정돈 */
+  #v33ToolWrap { margin-top: 12px; }
   #v33ToolToggleBtn {
     width: 100%;
-    min-height: 44px;
-    padding: 10px 14px;
+    min-height: 42px;
+    padding: 9px 14px;
     border-radius: 14px;
     background: var(--s2);
     border: 1px solid var(--bd2);
     color: var(--tx);
     font: inherit;
-    font-size: 13.5px;
+    font-size: 13px;
     font-weight: 800;
     display: flex;
     align-items: center;
@@ -13516,26 +13582,22 @@ ${caption || rawText}
   #v33ToolMenuBox {
     display: none;
     grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
+    gap: 7px;
     margin-top: 8px;
     padding: 12px;
     border-radius: 16px;
     background: var(--s2);
     border: 1px solid var(--bd2);
   }
-  #v33ToolMenuBox.on {
-    display: grid;
-  }
+  #v33ToolMenuBox.on { display: grid; }
   #v33ToolMenuBox .mb {
     width: 100% !important;
     justify-content: flex-start !important;
-    padding: 9px 12px !important;
-    border-radius: 12px !important;
-    font-size: 12.5px !important;
-    min-height: 38px !important;
+    padding: 8px 11px !important;
+    border-radius: 11px !important;
+    font-size: 12px !important;
+    min-height: 36px !important;
   }
-
-  /* 5. 상세창 타이틀 로컬 상호명 줄바꿈 정돈 */
   #sbody .v33-sheet-title {
     display: block !important;
     font-weight: 800 !important;
@@ -13545,18 +13607,166 @@ ${caption || rawText}
   }
   #sbody .v33-sheet-sub {
     display: block !important;
-    margin-top: 4px !important;
+    margin-top: 3px !important;
     font-size: 13px !important;
     font-weight: 600 !important;
     color: var(--sub) !important;
-    word-break: break-all !important;
+  }
+
+  /* 6. 지도 탭: 드래그 깜빡임 제거 및 컴팩트 핀 모드 */
+  #map-wrap.ux-map-interacting #mapChips,
+  #map-wrap.ux-map-interacting #mapStrip,
+  #map-wrap.ux-map-interacting #locBtn,
+  #map-wrap.ux-map-interacting #myMapsBtn {
+    opacity: 1 !important;
+    transform: none !important;
+    pointer-events: auto !important;
+  }
+  #mapChips {
+    gap: 5px !important;
+    padding: calc(8px + env(safe-area-inset-top)) 10px 6px !important;
+  }
+  #mapChips .chip {
+    min-height: 32px !important;
+    padding: 5px 11px !important;
+    font-size: 12px !important;
+  }
+  #map-wrap.v35-compact-pins .pinCard {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 50% !important;
+  }
+  #map-wrap.v35-compact-pins .pinCard img,
+  #map-wrap.v35-compact-pins .pinCard b {
+    display: none !important;
+  }
+  #map-wrap.v35-compact-pins .pinCard .pinNum {
+    position: static !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    font-size: 12.5px !important;
+  }
+
+  /* 7. 모달/시트 부드러운 트랜지션 및 지도 토스트 위치 보정 */
+  #v32ImportSheetWrap {
+    display: flex !important;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.22s ease, visibility 0.22s ease;
+  }
+  #v32ImportSheetWrap.on {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+  #v32ImportSheet {
+    transform: translateY(32px);
+    transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  #v32ImportSheetWrap.on #v32ImportSheet {
+    transform: translateY(0);
+  }
+  body.show-map #toast {
+    bottom: calc(140px + env(safe-area-inset-bottom)) !important;
+  }
+  .item.v33-dragging {
+    opacity: 0.92 !important;
+    transform: scale(1.02) !important;
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.55) !important;
+    border-color: var(--pr) !important;
+    z-index: 50 !important;
   }
 </style>
 
 <script>
-(function initV33UiAndDragFix() {
+(function initV35CleanStructure() {
   /* =========================================================================
-   * 1. 공유 방 병합 시 로컬 드래그 순서 보호 (원격 스냅샷이 순서를 되돌리는 현상 차단)
+   * 1. 목록 탭 상단에 슬림 검색창 복원 (#v35SearchRow)
+   * ========================================================================= */
+  function injectCleanSearchBar() {
+    const topCard = document.querySelector("#tab-list > .card:first-of-type");
+    const catSeg = document.getElementById("listCatSeg");
+    const origQ = document.getElementById("q-LIST");
+    if (!topCard || !catSeg || !origQ || document.getElementById("v35SearchRow")) return;
+
+    const row = document.createElement("div");
+    row.id = "v35SearchRow";
+    row.innerHTML = `
+      <input type="text" id="v35SearchInput" placeholder="🔍 장소명·지역·메뉴 빠른 검색..." />
+      <button type="button" class="mb" id="v35SearchClear" style="display:none;min-height:38px;padding:0 10px"><span class="ms">close</span></button>
+    `;
+    catSeg.insertAdjacentElement("afterend", row);
+
+    const inp = row.querySelector("#v35SearchInput");
+    const clr = row.querySelector("#v35SearchClear");
+    inp.addEventListener("input", () => {
+      origQ.value = inp.value;
+      clr.style.display = inp.value ? "inline-flex" : "none";
+      if (typeof renderListTab === "function") renderListTab();
+    });
+    clr.addEventListener("click", () => {
+      inp.value = "";
+      origQ.value = "";
+      clr.style.display = "none";
+      if (typeof renderListTab === "function") renderListTab();
+    });
+  }
+
+  /* =========================================================================
+   * 2. 목록 카드 정돈: 체크 아이콘 좌측 배치 + 우편번호 노이즈 제거 + 1줄 컨트롤
+   * ========================================================================= */
+  function refineListCardsV35() {
+    const listEl = document.getElementById("list-LIST");
+    if (!listEl || !Array.isArray(items)) return;
+
+    if (typeof editMode !== "undefined") {
+      listEl.classList.toggle("v35-select-mode", Boolean(editMode.LIST));
+    }
+
+    const itemMap = new Map(items.map(it => [String(it.id), it]));
+    listEl.querySelectorAll(".item[data-id]").forEach(cardEl => {
+      const mid = cardEl.querySelector(".mid");
+      const nmRow = mid?.querySelector(".nm");
+      if (!mid || !nmRow) return;
+
+      // 체크 표시를 제목 좌측 맨 앞으로 고정
+      const chk = nmRow.querySelector(".v32-coord-check");
+      if (chk && nmRow.firstChild !== chk) {
+        nmRow.insertBefore(chk, nmRow.firstChild);
+      }
+
+      // 주소/메타 요약에서 일본 우편번호(〒000-0000) 노이즈 제거하여 깔끔하게 표시
+      const it = itemMap.get(String(cardEl.dataset.id));
+      const metaRow = mid.querySelector(".ux7-meta-row");
+      if (it && metaRow) {
+        const txtSpan = metaRow.querySelector("span:last-child");
+        if (txtSpan && !txtSpan.classList.contains("ux7-badge") && !txtSpan.classList.contains("v32-station-badge")) {
+          const cleanAddr = String(it.address || "")
+            .replace(/〒?\s*\d{3}-\d{4}\s*/g, "")
+            .replace(/^일본\s*/, "")
+            .trim();
+          const summary = [cleanAddr, it.price, it.info || it.note].filter(Boolean).join(" · ");
+          txtSpan.textContent = summary || "상세 정보 보기";
+        }
+      }
+
+      // 하단 컨트롤 줄([릴스] [길찾기] [D1] [시간]) 1줄 통합
+      const btnRow = Array.from(mid.querySelectorAll(":scope > div")).find(
+        d => d !== nmRow && !d.classList.contains("ux7-meta-row") && !d.classList.contains("sfb-badge")
+      );
+      if (btnRow) {
+        btnRow.classList.add("v33-card-ctrl-row");
+        const daySel = nmRow.querySelector(".ux7-day-select") || mid.querySelector(".ux7-day-select");
+        const timeSel = nmRow.querySelector(".v32-time-select") || mid.querySelector(".v32-time-select");
+        if (daySel && daySel.parentElement !== btnRow) btnRow.appendChild(daySel);
+        if (timeSel && timeSel.parentElement !== btnRow) btnRow.appendChild(timeSel);
+      }
+    });
+  }
+
+  /* =========================================================================
+   * 3. 네이티브 드래그 앤 드롭 정렬 + 공유 방 순서 유지
    * ========================================================================= */
   window.__lastManualReorderAt = 0;
   if (typeof mergeSharedItems === "function") {
@@ -13580,51 +13790,12 @@ ${caption || rawText}
     };
   }
 
-  /* =========================================================================
-   * 2. 목록 카드 레이아웃 정돈: 체크 표시를 이름 좌측으로, 일차/시간은 하단 버튼 줄로 이동
-   * ========================================================================= */
-  function fixCardLayoutV33() {
+  function initNativeDragSortV35() {
     const listEl = document.getElementById("list-LIST");
-    if (!listEl || !Array.isArray(items)) return;
+    if (!listEl || listEl._v35DragBound) return;
+    listEl._v35DragBound = true;
 
-    listEl.querySelectorAll(".item[data-id]").forEach(cardEl => {
-      const mid = cardEl.querySelector(".mid");
-      const nmRow = mid?.querySelector(".nm");
-      if (!mid || !nmRow) return;
-
-      // 체크 표시를 이름 좌측 맨 앞으로 이동
-      const chk = nmRow.querySelector(".v32-coord-check");
-      if (chk && nmRow.firstChild !== chk) {
-        nmRow.insertBefore(chk, nmRow.firstChild);
-      }
-
-      // 하단 버튼 컨테이너 찾기 ([릴스] [길찾기] 줄)
-      const btnRow = Array.from(mid.querySelectorAll(":scope > div")).find(
-        d => d !== nmRow && !d.classList.contains("ux7-meta-row") && !d.classList.contains("sfb-badge")
-      );
-      if (btnRow) {
-        btnRow.classList.add("v33-card-ctrl-row");
-        const daySel = nmRow.querySelector(".ux7-day-select") || mid.querySelector(".ux7-day-select");
-        const timeSel = nmRow.querySelector(".v32-time-select") || mid.querySelector(".v32-time-select");
-        if (daySel && daySel.parentElement !== btnRow) btnRow.appendChild(daySel);
-        if (timeSel && timeSel.parentElement !== btnRow) btnRow.appendChild(timeSel);
-      }
-    });
-  }
-
-  /* =========================================================================
-   * 3. 네이티브 터치 & 마우스 드래그 앤 드롭 정렬 엔진 (.v8-drag-handle)
-   * ========================================================================= */
-  function initNativeDragSortV33() {
-    const listEl = document.getElementById("list-LIST");
-    if (!listEl || listEl._v33DragBound) return;
-    listEl._v33DragBound = true;
-
-    let dragCard = null;
-    let pointerId = null;
-    let autoScrollRaf = null;
-    let lastClientY = 0;
-
+    let dragCard = null, autoScrollRaf = null, lastClientY = 0;
     const scrollContainer = () => document.getElementById("tab-list") || listEl.parentElement;
 
     const runAutoScroll = () => {
@@ -13632,10 +13803,8 @@ ${caption || rawText}
       const sc = scrollContainer();
       if (sc) {
         const rect = sc.getBoundingClientRect();
-        const topZone = rect.top + 65;
-        const botZone = rect.bottom - 90;
-        if (lastClientY < topZone) sc.scrollTop -= 8;
-        else if (lastClientY > botZone) sc.scrollTop += 8;
+        if (lastClientY < rect.top + 65) sc.scrollTop -= 8;
+        else if (lastClientY > rect.bottom - 90) sc.scrollTop += 8;
       }
       autoScrollRaf = requestAnimationFrame(runAutoScroll);
     };
@@ -13648,8 +13817,7 @@ ${caption || rawText}
       );
       for (const sib of siblings) {
         const r = sib.getBoundingClientRect();
-        const midY = r.top + r.height / 2;
-        if (clientY < midY) {
+        if (clientY < r.top + r.height / 2) {
           if (sib.previousElementSibling !== dragCard) {
             listEl.insertBefore(dragCard, sib);
             if (window.v8Haptic) window.v8Haptic(8);
@@ -13669,9 +13837,7 @@ ${caption || rawText}
       cancelAnimationFrame(autoScrollRaf);
       dragCard.classList.remove("v33-dragging");
       dragCard = null;
-      pointerId = null;
 
-      // DOM 순서를 items 배열에 정확히 반영 (필터링 상태에서도 안전하게 슬롯 교체)
       const domIds = Array.from(listEl.querySelectorAll(".item[data-id]"))
         .filter(el => el.style.display !== "none")
         .map(el => String(el.dataset.id));
@@ -13680,7 +13846,6 @@ ${caption || rawText}
         const visibleSet = new Set(domIds);
         const itemMap = new Map(items.map(it => [String(it.id), it]));
         const reorderedVisible = domIds.map(id => itemMap.get(id)).filter(Boolean);
-
         let vIdx = 0;
         const now = Date.now();
         items = items.map(it => {
@@ -13692,17 +13857,14 @@ ${caption || rawText}
           }
           return it;
         });
-
         window.__lastManualReorderAt = now;
-        if (window.v8Haptic) window.v8Haptic(18);
         if (typeof persistNow === "function") persistNow();
         if (typeof save === "function") save();
         if (typeof draw === "function") draw(true);
-        if (typeof toast === "function") toast("↕️ 목록 순서가 변경되었습니다");
+        if (typeof toast === "function") toast("↕️ 목록 순서가 저장되었습니다");
       }
     };
 
-    // 모바일 Touch 이벤트 바인딩
     listEl.addEventListener("touchstart", (e) => {
       const handle = e.target.closest(".v8-drag-handle");
       if (!handle || e.touches.length !== 1) return;
@@ -13726,39 +13888,15 @@ ${caption || rawText}
 
     window.addEventListener("touchend", () => { if (dragCard) finishDrag(); }, { passive: true });
     window.addEventListener("touchcancel", () => { if (dragCard) finishDrag(); }, { passive: true });
-
-    // 데스크톱 Mouse 이벤트 바인딩
-    listEl.addEventListener("mousedown", (e) => {
-      const handle = e.target.closest(".v8-drag-handle");
-      if (!handle || e.button !== 0) return;
-      const card = handle.closest(".item[data-id]");
-      if (!card) return;
-      e.preventDefault();
-      e.stopPropagation();
-      dragCard = card;
-      lastClientY = e.clientY;
-      dragCard.classList.add("v33-dragging");
-      cancelAnimationFrame(autoScrollRaf);
-      autoScrollRaf = requestAnimationFrame(runAutoScroll);
-    });
-
-    window.addEventListener("mousemove", (e) => {
-      if (!dragCard) return;
-      e.preventDefault();
-      onMove(e.clientY);
-    });
-
-    window.addEventListener("mouseup", () => { if (dragCard) finishDrag(); });
   }
 
   /* =========================================================================
-   * 4. 상세창(#sbody) 10개 도구 버튼을 단일 메뉴 버튼으로 통합 + 제목 괄호 줄바꿈 교정
+   * 4. 상세창 도구 1버튼 통합 및 권역 분리형 스마트 자동 배정
    * ========================================================================= */
-  function upgradeSheetToolsV33() {
+  function upgradeSheetToolsV35() {
     const sbody = document.getElementById("sbody");
     if (!sbody) return;
 
-    // 4-1. 제목 줄 로컬 상호명 괄호 줄바꿈 깨짐 교정
     const curItem = (typeof items !== "undefined" && Array.isArray(items)) ? items.find(x => x.id === cur) : null;
     const titleEl = sbody.querySelector(".nm");
     if (titleEl && curItem && !titleEl.classList.contains("v33-sheet-title")) {
@@ -13769,7 +13907,6 @@ ${caption || rawText}
       titleEl.innerHTML = `${esc(curItem.name)}${subHtml}`;
     }
 
-    // 4-2. 상세 도구 버튼들을 단일 토글 메뉴 안에 통합
     const infoPane = sbody.querySelector('.ux-stab-pane[data-pane="info"]') || sbody;
     const viewerDetails = infoPane.querySelector("details.acc");
     if (!viewerDetails || document.getElementById("v33ToolWrap")) return;
@@ -13782,13 +13919,12 @@ ${caption || rawText}
     wrap.innerHTML = `
       <button type="button" id="v33ToolToggleBtn">
         <span style="display:flex;align-items:center;gap:6px">
-          <span class="ms">tune</span>도구 및 화면 전환 (${btns.length}개 기능)
+          <span class="ms">tune</span>도구 및 화면 전환 메뉴 (${btns.length}개 기능)
         </span>
         <span class="ms" id="v33ToolArrow">expand_more</span>
       </button>
       <div id="v33ToolMenuBox"></div>
     `;
-
     const menuBox = wrap.querySelector("#v33ToolMenuBox");
     btns.forEach(btn => {
       menuBox.appendChild(btn);
@@ -13797,7 +13933,6 @@ ${caption || rawText}
         wrap.querySelector("#v33ToolToggleBtn")?.classList.remove("on");
       });
     });
-
     viewerDetails.replaceWith(wrap);
 
     const toggleBtn = wrap.querySelector("#v33ToolToggleBtn");
@@ -13809,220 +13944,18 @@ ${caption || rawText}
     };
   }
 
-  if (typeof renderListTab === "function") {
-    const _origRenderListV33 = renderListTab;
-    renderListTab = function(...args) {
-      const r = _origRenderListV33.apply(this, args);
-      fixCardLayoutV33();
-      initNativeDragSortV33();
-      return r;
-    };
-  }
-
-  if (typeof showSheet === "function") {
-    const _origShowSheetV33 = showSheet;
-    showSheet = function(...args) {
-      const r = _origShowSheetV33.apply(this, args);
-      upgradeSheetToolsV33();
-      return r;
-    };
-  }
-
-  setTimeout(() => {
-    fixCardLayoutV33();
-    initNativeDragSortV33();
-  }, 200);
-})();
-</script>
-<!-- === V33_UI_AND_DRAG_FIX_END === -->
-<!-- === V34_UX_MOTION_SHARE_PATCH_START === -->
-<style>
-  /* 1. 무의미하게 전 카드에 도배되던 '방금 수정됨' 배지 숨김 */
-  .v8-live-pill {
-    display: none !important;
-  }
-
-  /* 2. 카드 하단 컨트롤 줄(릴스·길찾기·일차·시간) 1줄 고정 및 컴팩트 정렬 */
-  #list-LIST .item .v33-card-ctrl-row {
-    display: flex !important;
-    align-items: center !important;
-    gap: 5px !important;
-    flex-wrap: nowrap !important;
-    margin-top: 9px !important;
-    overflow-x: auto !important;
-    scrollbar-width: none !important;
-  }
-  #list-LIST .item .v33-card-ctrl-row::-webkit-scrollbar {
-    display: none !important;
-  }
-  #list-LIST .item .v33-card-ctrl-row .mb {
-    min-height: 31px !important;
-    padding: 4px 10px !important;
-    font-size: 11.5px !important;
-    border-radius: 10px !important;
-    flex-shrink: 0 !important;
-    white-space: nowrap !important;
-  }
-  #list-LIST .item .v33-card-ctrl-row .ux7-day-select,
-  #list-LIST .item .v33-card-ctrl-row .v32-time-select {
-    min-height: 31px !important;
-    padding: 3px 7px !important;
-    font-size: 11px !important;
-    border-radius: 10px !important;
-    flex-shrink: 0 !important;
-  }
-
-  /* 3. 선택 모드(editMode) 시 우측 방문완료 체크박스 숨김 (체크박스 2개 중복 혼란 방지) */
-  #list-LIST.v34-select-mode .item input[data-act="done"] {
-    display: none !important;
-  }
-
-  /* 4. 지도 드래그 시 상단 칩/버튼 깜빡임 현상 제거 */
-  #map-wrap.ux-map-interacting #mapChips,
-  #map-wrap.ux-map-interacting #mapStrip,
-  #map-wrap.ux-map-interacting #locBtn,
-  #map-wrap.ux-map-interacting #myMapsBtn {
-    opacity: 1 !important;
-    transform: none !important;
-    pointer-events: auto !important;
-  }
-
-  /* 5. 지도 컴팩트 핀 모드 (밀집 지역 겹침 해소용) */
-  #map-wrap.v34-compact-pins .pinCard {
-    width: 34px !important;
-    height: 34px !important;
-    border-radius: 50% !important;
-  }
-  #map-wrap.v34-compact-pins .pinCard img,
-  #map-wrap.v34-compact-pins .pinCard b {
-    display: none !important;
-  }
-  #map-wrap.v34-compact-pins .pinCard .pinNum {
-    position: static !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    font-size: 13px !important;
-  }
-
-  /* 6. 가져오기 바텀 시트 부드러운 열기/닫기 모션 적용 */
-  #v32ImportSheetWrap {
-    display: flex !important;
-    opacity: 0;
-    visibility: hidden;
-    pointer-events: none;
-    transition: opacity 0.24s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.24s;
-  }
-  #v32ImportSheetWrap.on {
-    opacity: 1;
-    visibility: visible;
-    pointer-events: auto;
-  }
-  #v32ImportSheet {
-    transform: translateY(36px);
-    transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
-  }
-  #v32ImportSheetWrap.on #v32ImportSheet {
-    transform: translateY(0);
-  }
-
-  /* 7. 지도 화면에서 토스트 메시지가 하단 버튼을 가리지 않도록 위치 상향 */
-  body.show-map #toast {
-    bottom: calc(142px + env(safe-area-inset-bottom)) !important;
-  }
-
-  /* 8. 인스타 복사 링크 자동 감지 원터치 분석 배너 */
-  #v34ClipBanner {
-    position: fixed;
-    left: 14px;
-    right: 14px;
-    bottom: calc(84px + env(safe-area-inset-bottom));
-    z-index: 1900;
-    background: linear-gradient(135deg, #1e293b, #0f172a);
-    border: 1.5px solid #3b82f6;
-    border-radius: 18px;
-    padding: 11px 14px;
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    opacity: 0;
-    visibility: hidden;
-    transform: translateY(16px);
-    pointer-events: none;
-    transition: opacity 0.22s ease, transform 0.22s ease, visibility 0.22s;
-  }
-  #v34ClipBanner.on {
-    opacity: 1;
-    visibility: visible;
-    transform: translateY(0);
-    pointer-events: auto;
-  }
-</style>
-
-<div id="v34ClipBanner">
-  <div style="min-width:0;flex:1">
-    <div style="font-size:12.5px;font-weight:900;color:#93c5fd">📋 복사한 릴스·쇼츠 링크 감지됨</div>
-    <div id="v34ClipUrlTxt" style="font-size:11px;color:#cbd5e1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px"></div>
-  </div>
-  <div style="display:flex;gap:6px;flex:none">
-    <button type="button" class="mb pr" id="v34ClipAnalyzeBtn" style="min-height:34px;padding:5px 12px;font-size:12px">바로 분석</button>
-    <button type="button" class="mb" id="v34ClipCloseBtn" style="min-height:34px;padding:5px 9px;font-size:12px">✕</button>
-  </div>
-</div>
-
-<script>
-(function initV34UxMotionSharePatch() {
-  /* =========================================================================
-   * 1. 선택 모드(editMode.LIST) 상태 동기화 및 탭 전환 시 자동 해제
-   * ========================================================================= */
-  function syncSelectModeClass() {
-    const listEl = document.getElementById("list-LIST");
-    if (listEl && typeof editMode !== "undefined") {
-      listEl.classList.toggle("v34-select-mode", Boolean(editMode.LIST));
-    }
-  }
-
-  if (typeof renderListTab === "function") {
-    const _origRenderListV34 = renderListTab;
-    renderListTab = function(...args) {
-      const r = _origRenderListV34.apply(this, args);
-      syncSelectModeClass();
-      return r;
-    };
-  }
-
-  if (typeof tab === "function") {
-    const _origTabV34 = tab;
-    tab = function(k, ...rest) {
-      const targetKey = (typeof CATS !== "undefined" && CATS[k]) ? "list" : k;
-      if (targetKey !== "list" && typeof editMode !== "undefined" && editMode.LIST) {
-        editMode.LIST = false;
-        if (typeof selected !== "undefined") selected.clear();
-        syncSelectModeClass();
-      }
-      return _origTabV34.apply(this, [k, ...rest]);
-    };
-  }
-
-  /* =========================================================================
-   * 2. 권역 분리형(교토 북부/오사카 남부) 스마트 자동 일차 배정
-   * ========================================================================= */
   window.autoAssignDaysV32 = function() {
     if (!Array.isArray(items) || !items.length) return toast("저장된 장소가 없습니다");
     const slots = ["09:30", "11:00", "12:30", "14:30", "16:30", "18:30", "20:00"];
-
     const withCoord = items.filter(x => Number(x.lat) && Number(x.lng));
     const noCoord = items.filter(x => !Number(x.lat) || !Number(x.lng));
 
-    // 위도 34.82 기준으로 북부(교토·이네·아라시야마)와 남부(오사카·구라시키) 분리 후 각각 최단 동선 정렬
     const northGroup = withCoord.filter(x => Number(x.lat) >= 34.82);
     const southGroup = withCoord.filter(x => Number(x.lat) < 34.82);
 
-    const sortCluster = (arr, startLat, startLng) => {
-      const pool = [...arr];
-      const out = [];
-      let cLat = startLat, cLng = startLng;
+    const sortCluster = (arr, sLat, sLng) => {
+      const pool = [...arr], out = [];
+      let cLat = sLat, cLng = sLng;
       while (pool.length) {
         let bIdx = 0, bDist = Infinity;
         for (let i = 0; i < pool.length; i++) {
@@ -14031,14 +13964,13 @@ ${caption || rawText}
         }
         const p = pool.splice(bIdx, 1)[0];
         out.push(p);
-        cLat = Number(p.lat);
-        cLng = Number(p.lng);
+        cLat = Number(p.lat); cLng = Number(p.lng);
       }
       return out;
     };
 
-    const orderedNorth = sortCluster(northGroup, 34.9858, 135.7588); // 교토역 기점
-    const orderedSouth = sortCluster(southGroup, 34.6685, 135.5013); // 난바역 기점
+    const orderedNorth = sortCluster(northGroup, 34.9858, 135.7588);
+    const orderedSouth = sortCluster(southGroup, 34.6685, 135.5013);
     const combined = [...orderedNorth, ...orderedSouth, ...noCoord];
 
     const total = combined.length;
@@ -14066,7 +13998,7 @@ ${caption || rawText}
   };
 
   /* =========================================================================
-   * 3. 지도 상단 칩에 [핀 작게/크게] 토글 버튼 추가 (밀집 구역 겹침 해소)
+   * 5. 지도 컴팩트 핀 토글 및 탭 전환 정리
    * ========================================================================= */
   if (typeof renderMapChips === "function") {
     const _origRenderMapChips = renderMapChips;
@@ -14075,19 +14007,19 @@ ${caption || rawText}
       const rows = document.querySelectorAll("#mapChips .chip-row");
       const subRow = rows[1];
       const mapWrap = document.getElementById("map-wrap");
-      if (subRow && mapWrap && !subRow.querySelector('[data-act="v34CompactPin"]')) {
-        const isCompact = mapWrap.classList.contains("v34-compact-pins");
+      if (subRow && mapWrap && !subRow.querySelector('[data-act="v35CompactPin"]')) {
+        const isCompact = mapWrap.classList.contains("v35-compact-pins");
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "chip sub";
-        btn.dataset.act = "v34CompactPin";
+        btn.dataset.act = "v35CompactPin";
         if (isCompact) btn.style.cssText = "background:var(--pr);color:#fff;border-color:transparent";
-        btn.innerHTML = `<span class="ms">pin_drop</span>${isCompact ? "사진핀 보기" : "작은핀 보기"}`;
+        btn.innerHTML = `<span class="ms">pin_drop</span>${isCompact ? "사진핀" : "작은핀"}`;
         btn.onclick = (e) => {
           e.stopPropagation();
-          const on = mapWrap.classList.toggle("v34-compact-pins");
+          const on = mapWrap.classList.toggle("v35-compact-pins");
           renderMapChips();
-          toast(on ? "📍 겹침 방지를 위해 작은 번호 핀으로 전환했습니다" : "🖼️ 사진 카드 핀으로 전환했습니다");
+          toast(on ? "📍 작은 번호 핀으로 전환했습니다" : "🖼️ 사진 카드 핀으로 전환했습니다");
         };
         subRow.appendChild(btn);
       }
@@ -14095,72 +14027,55 @@ ${caption || rawText}
     };
   }
 
-  /* =========================================================================
-   * 4. 클립보드 인스타/유튜브 링크 자동 감지 배너 (복사 후 앱 진입 시 원터치 분석)
-   * ========================================================================= */
-  let lastDismissedClipUrl = sessionStorage.getItem("V34_LAST_CLIP_URL") || "";
-  const banner = document.getElementById("v34ClipBanner");
-  const urlTxt = document.getElementById("v34ClipUrlTxt");
-  let detectedUrl = "";
-
-  async function checkClipboardForReel() {
-    if (!navigator.clipboard || !navigator.clipboard.readText) return;
-    if (document.visibilityState !== "visible") return;
-    try {
-      const txt = (await navigator.clipboard.readText() || "").trim();
-      if (!txt) return;
-      const meta = typeof parseVideoMeta === "function" ? parseVideoMeta(txt) : null;
-      if (!meta || !meta.url) return;
-      if (meta.url === lastDismissedClipUrl) return;
-      const alreadySaved = Array.isArray(items) && items.some(
-        x => (typeof normalizeVidUrl === "function" ? normalizeVidUrl(getVidUrlStr(x.vid)) : x.vid) === meta.url
-      );
-      if (alreadySaved) return;
-
-      detectedUrl = txt;
-      if (urlTxt) urlTxt.textContent = meta.url;
-      banner?.classList.add("on");
-    } catch (_) {}
+  function syncFabVisibility(tabKey) {
+    const fab = document.getElementById("v32FabBtn");
+    if (fab) {
+      fab.classList.toggle("v35-hide-on-home", tabKey === "add");
+    }
   }
 
-  document.getElementById("v34ClipCloseBtn").onclick = () => {
-    const meta = typeof parseVideoMeta === "function" ? parseVideoMeta(detectedUrl) : null;
-    if (meta?.url) {
-      lastDismissedClipUrl = meta.url;
-      sessionStorage.setItem("V34_LAST_CLIP_URL", meta.url);
-    }
-    banner?.classList.remove("on");
-  };
-
-  document.getElementById("v34ClipAnalyzeBtn").onclick = () => {
-    const meta = typeof parseVideoMeta === "function" ? parseVideoMeta(detectedUrl) : null;
-    if (meta?.url) {
-      lastDismissedClipUrl = meta.url;
-      sessionStorage.setItem("V34_LAST_CLIP_URL", meta.url);
-    }
-    banner?.classList.remove("on");
-    const shareBox = document.getElementById("shareBox");
-    const reelBox = document.getElementById("reelLinkBox");
-    if (shareBox) shareBox.value = detectedUrl;
-    if (reelBox && meta?.url) reelBox.value = meta.url;
-    document.getElementById("v32ImportSheetWrap")?.classList.add("on");
-    if (typeof runAnalyzeShare === "function") runAnalyzeShare();
-  };
-
-  window.addEventListener("focus", () => setTimeout(checkClipboardForReel, 350));
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") setTimeout(checkClipboardForReel, 350);
-  });
-
-  // + 버튼을 눌렀을 때도 입력칸이 비어있다면 클립보드 확인 유도
-  const fab = document.getElementById("v32FabBtn");
-  if (fab) {
-    fab.addEventListener("click", () => {
-      setTimeout(checkClipboardForReel, 150);
-    });
+  if (typeof renderListTab === "function") {
+    const _origRenderListV35 = renderListTab;
+    renderListTab = function(...args) {
+      const r = _origRenderListV35.apply(this, args);
+      injectCleanSearchBar();
+      refineListCardsV35();
+      initNativeDragSortV35();
+      return r;
+    };
   }
+
+  if (typeof showSheet === "function") {
+    const _origShowSheetV35 = showSheet;
+    showSheet = function(...args) {
+      const r = _origShowSheetV35.apply(this, args);
+      upgradeSheetToolsV35();
+      return r;
+    };
+  }
+
+  if (typeof tab === "function") {
+    const _origTabV35 = tab;
+    tab = function(k, ...rest) {
+      const targetKey = (typeof CATS !== "undefined" && CATS[k]) ? "list" : k;
+      if (targetKey !== "list" && typeof editMode !== "undefined" && editMode.LIST) {
+        editMode.LIST = false;
+        if (typeof selected !== "undefined") selected.clear();
+      }
+      const r = _origTabV35.apply(this, [k, ...rest]);
+      syncFabVisibility(targetKey);
+      return r;
+    };
+  }
+
+  setTimeout(() => {
+    injectCleanSearchBar();
+    refineListCardsV35();
+    initNativeDragSortV35();
+    syncFabVisibility(typeof activeTab !== "undefined" ? activeTab : "add");
+  }, 200);
 })();
 </script>
-<!-- === V34_UX_MOTION_SHARE_PATCH_END === -->
+<!-- === V35_CLEAN_STRUCTURE_PATCH_END === -->
 </body>
 </html>
