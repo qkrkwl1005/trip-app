@@ -9871,7 +9871,7 @@ ${caption || rawText}
               "Google Maps 인증에 실패했습니다. 키, 결제 설정, Maps JavaScript API 활성화 및 HTTP 리퍼러 제한을 확인하세요.",
             );
           const s = document.createElement("script");
-          s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(gkey)}&loading=async&callback=initGoogleMap`;
+          s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(gkey)}&libraries=places&loading=async&callback=initGoogleMap`;
           s.async = true;
           s.onerror = () =>
             failGoogle(
@@ -13174,7 +13174,8 @@ ${caption || rawText}
       topCard.appendChild(drawer);
     }
 
-    const tKrw = calcCur === "JPY" ? Math.round(calcAmt * jpyRate) : Math.round(calcAmt);
+    const activeRate = Number(window.__realJpyRate) || jpyRate;
+    const tKrw = calcCur === "JPY" ? Math.round(calcAmt * activeRate) : Math.round(calcAmt);
     const pKrw = Math.round(tKrw / Math.max(1, splitCnt));
 
     bar.innerHTML = `<span style="font-size:13px;font-weight:900">1인 ₩${pKrw.toLocaleString()} (${splitCnt}명)</span><span class="ux7-badge places">1/N 정산 ▾</span>`;
@@ -17494,7 +17495,8 @@ ${caption || rawText}
 
     const syncFxVal = (jpyVal) => {
       const jpy = Number(jpyVal) || 0;
-      const krw = Math.round(jpy * 8.48);
+      const liveRate = Number(window.__realJpyRate) || 8.58;
+      const krw = Math.round(jpy * liveRate);
       if (readoutEl) readoutEl.textContent = `¥${jpy.toLocaleString()} ≈ ₩${krw.toLocaleString()}`;
       if (amtInput && curSelect) {
         curSelect.value = "JPY";
@@ -17634,5 +17636,520 @@ ${caption || rawText}
 })();
 </script>
 <!-- === V41_21ST_DEV_PRACTICAL_UI_SUITE_END === -->
+
+<!-- === V42_REAL_APIS_AND_HOME_CLEANUP_SUITE_START === -->
+<style id="v42-real-apis-and-cleanup-style">
+  /* 1. 홈 화면: 일차 배정 완료(b-purple) & 최단 동선 총거리(b-amber / #v32GoRoute) 완전 제거 */
+  .v32-bento-card.b-purple,
+  .v32-bento-card.b-amber,
+  #v32GoRoute {
+    display: none !important;
+  }
+  .v32-bento-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* 2. 홈 화면: 일차별 코스 & 동선 지도 섹션 및 하단 회화 카드 숨김 */
+  #v41SurvivalVoiceCard,
+  .v42-hidden-course-sec {
+    display: none !important;
+  }
+
+  /* 3. 상단 바 [회화] 버튼 클릭 시 열리는 깔끔한 팝오버 드로어 */
+  #v42VoicePopover {
+    position: fixed;
+    top: calc(52px + env(safe-area-inset-top));
+    right: 12px;
+    width: min(350px, calc(100vw - 24px));
+    background: var(--s);
+    border: 1px solid var(--bd2);
+    border-radius: 18px;
+    padding: 14px;
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.48);
+    z-index: 9995;
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+  #v42VoicePopover.on {
+    display: flex;
+    animation: v42PopIn 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  @keyframes v42PopIn {
+    from { opacity: 0; transform: translateY(-8px) scale(0.96); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  /* 4. Google Places API 실시간 별점 · 영업중 배지 */
+  .v42-gplaces-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 7px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 800;
+    background: rgba(245, 158, 11, 0.14);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+  }
+  [data-theme="light"] .v42-gplaces-badge {
+    background: rgba(245, 158, 11, 0.12);
+    color: #b45309;
+  }
+  .v42-gplaces-open {
+    color: #10b981;
+    font-weight: 900;
+  }
+  .v42-gplaces-closed {
+    color: #ef4444;
+    font-weight: 900;
+  }
+  #v42SheetPlacesBox {
+    margin-top: 10px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: var(--s2);
+    border: 1px solid var(--bd2);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12.5px;
+  }
+</style>
+
+<script id="v42-real-apis-and-cleanup-script">
+(function initV42RealApisAndHomeCleanup() {
+  /* =========================================================================
+   * 1. 홈 화면 정돈:
+   *    - '일차별 코스 & 동선 지도' 카드 제거
+   *    - '일차 배정 완료' & '최단 동선 총거리' 제거
+   *    - '원터치 현지 회화'를 상단 바 기존 [복사] 버튼 위치로 이동하여 숨김
+   * ========================================================================= */
+  const VOICE_PHRASES = [
+    { kr: "저기요 / 주문할게요", jp: "すみません、注文お願いします", pron: "스미마센, 츄-몬 오네가이시마스" },
+    { kr: "계산 부탁드립니다", jp: "お会計お願いします", pron: "오카이케이 오네가이시마스" },
+    { kr: "추천 메뉴는 뭔가요?", jp: "おすすめは何ですか？", pron: "오스스메와 난데스카?" },
+    { kr: "화장실이 어디인가요?", jp: "トイレはどこですか？", pron: "토이레와 도코데스카?" },
+    { kr: "이거 주세요", jp: "これください", pron: "고레 구다사이" },
+    { kr: "여기까지 가주세요", jp: "ここまでお願いします", pron: "고코마데 오네가이시마스" }
+  ];
+
+  function speakJpV42(jp, pron, btnEl) {
+    try {
+      if ("speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(jp);
+        u.lang = "ja-JP";
+        u.rate = 0.92;
+        document.querySelectorAll(".v41-phrase-btn.speaking").forEach(b => b.classList.remove("speaking"));
+        if (btnEl) btnEl.classList.add("speaking");
+        u.onend = () => btnEl?.classList.remove("speaking");
+        u.onerror = () => btnEl?.classList.remove("speaking");
+        window.speechSynthesis.speak(u);
+      }
+    } catch (_) {}
+    if (typeof toast === "function") toast(`🔊 "${jp}" (${pron})`);
+  }
+
+  function ensureVoicePopover() {
+    let pop = document.getElementById("v42VoicePopover");
+    if (pop) return pop;
+    pop = document.createElement("div");
+    pop.id = "v42VoicePopover";
+    pop.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <b style="font-size:14px">🔊 원터치 현지 주문·길찾기 회화</b>
+        <button type="button" class="mb" id="v42CloseVoicePop" style="min-height:26px;padding:2px 8px;font-size:11px">닫기</button>
+      </div>
+      <div class="v41-phrase-grid" style="margin-top:2px">
+        ${VOICE_PHRASES.map((p, i) => `
+          <button type="button" class="v41-phrase-btn" data-v42-phrase="${i}">
+            <div style="min-width:0">
+              <span class="v41-phrase-kr">${p.kr}</span>
+              <span class="v41-phrase-jp">${p.pron}</span>
+            </div>
+            <span class="v41-voice-orb"><span class="ms" style="font-size:15px">volume_up</span></span>
+          </button>
+        `).join("")}
+      </div>
+    `;
+    document.body.appendChild(pop);
+
+    pop.querySelector("#v42CloseVoicePop").onclick = (e) => {
+      e.stopPropagation();
+      pop.classList.remove("on");
+    };
+    pop.querySelectorAll("[data-v42-phrase]").forEach(btn => {
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        const p = VOICE_PHRASES[Number(btn.dataset.v42Phrase)];
+        if (p) speakJpV42(p.jp, p.pron, btn);
+      };
+    });
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest("#v42VoicePopover") && !e.target.closest("#ux7QuickCopyPlanBtn")) {
+        pop.classList.remove("on");
+      }
+    });
+    return pop;
+  }
+
+  function applyHomeCleanupAndVoiceBtn() {
+    // 1) 상단 바 [복사] 버튼(#ux7QuickCopyPlanBtn)을 [회화] 토글 버튼으로 교체
+    const copyBtn = document.getElementById("ux7QuickCopyPlanBtn");
+    if (copyBtn) {
+      copyBtn.title = "원터치 현지 주문·길찾기 회화";
+      copyBtn.innerHTML = `<span class="ms">record_voice_over</span>회화`;
+      copyBtn.onclick = (e) => {
+        e.stopPropagation();
+        const pop = ensureVoicePopover();
+        pop.classList.toggle("on");
+      };
+    }
+
+    // 2) 홈 대시보드에서 '일차별 코스 & 동선 지도' 섹션 및 하단 회화 카드 제거
+    const dash = document.getElementById("v32Dashboard");
+    if (dash) {
+      dash.querySelectorAll(".v32-sec-card").forEach(sec => {
+        if (sec.querySelector("#v32AutoDay") || sec.textContent.includes("일차별 코스")) {
+          sec.classList.add("v42-hidden-course-sec");
+          sec.style.display = "none";
+        }
+      });
+      const oldVoice = document.getElementById("v41SurvivalVoiceCard");
+      if (oldVoice) oldVoice.remove();
+    }
+
+    // 3) 우측 하단 스피드 다이얼에서도 불필요한 동선 버튼 대신 회화 열기로 연결
+    const sdRouteBtn = document.querySelector('#v41SpeedDialMenu [data-sd="route"]');
+    if (sdRouteBtn) {
+      sdRouteBtn.innerHTML = `<span class="ms" style="font-size:17px;color:#a78bfa">record_voice_over</span>현지 주문·길찾기 회화`;
+      sdRouteBtn.onclick = (e) => {
+        e.stopPropagation();
+        document.getElementById("v41SpeedDialMenu")?.classList.remove("on");
+        ensureVoicePopover().classList.add("on");
+      };
+    }
+  }
+
+  /* =========================================================================
+   * 2. [Open-Meteo API] 실시간 오사카·교토 기온 및 날씨 배지 자동 연동 (무료·무인증)
+   * ========================================================================= */
+  let cachedWeatherText = localStorage.getItem("TRIP_V42_WEATHER_TEXT") || "";
+  function wmoToEmoji(code) {
+    if (code === 0) return "☀️ 맑음";
+    if (code <= 3) return "⛅ 구름조금";
+    if (code <= 48) return "🌫️ 안개";
+    if (code <= 67) return "🌧️ 비";
+    if (code <= 77) return "❄️ 눈";
+    if (code <= 82) return "🌦️ 소나기";
+    return "⛈️ 뇌우";
+  }
+
+  function updateHeroWeatherBadge() {
+    const dash = document.getElementById("v32Dashboard");
+    if (!dash || !cachedWeatherText) return;
+    const badges = dash.querySelectorAll(".v32-hero .ux7-badge");
+    if (badges.length >= 2) {
+      badges[1].textContent = cachedWeatherText;
+    }
+  }
+
+  async function fetchRealTimeOsakaWeather() {
+    try {
+      const r = await fetch("https://api.open-meteo.com/v1/forecast?latitude=34.6685&longitude=135.5013&current_weather=true");
+      if (!r.ok) return;
+      const d = await r.json();
+      if (d && d.current_weather) {
+        const temp = Math.round(d.current_weather.temperature);
+        const desc = wmoToEmoji(Number(d.current_weather.weathercode));
+        cachedWeatherText = `${desc} · 오사카 ${temp}°C`;
+        localStorage.setItem("TRIP_V42_WEATHER_TEXT", cachedWeatherText);
+        updateHeroWeatherBadge();
+      }
+    } catch (_) {}
+  }
+
+  /* =========================================================================
+   * 3. [Frankfurter API] 유럽중앙은행 실시간 엔화(JPY ➔ KRW) 환율 자동 반영
+   * ========================================================================= */
+  window.__realJpyRate = Number(localStorage.getItem("TRIP_V42_JPY_RATE")) || 8.58;
+  async function fetchRealTimeJpyRate() {
+    try {
+      const r = await fetch("https://api.frankfurter.app/latest?from=JPY&to=KRW");
+      if (!r.ok) return;
+      const d = await r.json();
+      const krw = Number(d?.rates?.KRW);
+      if (krw && krw > 5 && krw < 15) {
+        window.__realJpyRate = krw;
+        localStorage.setItem("TRIP_V42_JPY_RATE", String(krw));
+        const rangeEl = document.getElementById("v41FxRange");
+        const readoutEl = document.getElementById("v41FxReadout");
+        if (rangeEl && readoutEl) {
+          const jpy = Number(rangeEl.value) || 1000;
+          readoutEl.textContent = `¥${jpy.toLocaleString()} ≈ ₩${Math.round(jpy * krw).toLocaleString()} (실시간 100엔=${Math.round(krw * 100)}원)`;
+        }
+      }
+    } catch (_) {}
+  }
+
+  /* =========================================================================
+   * 4. [OSRM API] 지도 위 직선 동선을 실제 오사카·교토 골목길 도보 폴리라인으로 업그레이드
+   * ========================================================================= */
+  const osrmRouteCache = new Map();
+  if (typeof updateRouteLine === "function") {
+    const _origUpdateRouteLine = updateRouteLine;
+    updateRouteLine = function(valid) {
+      const baseKm = _origUpdateRouteLine.apply(this, [valid]);
+      if (!mapRouteOn || !Array.isArray(valid) || valid.length < 2) return baseKm;
+
+      const ordered = typeof buildOrderedRoutePoints === "function" ? buildOrderedRoutePoints(valid) : null;
+      const pts = ordered?.pts;
+      if (!Array.isArray(pts) || pts.length < 2) return baseKm;
+
+      // 최대 25개 경유지까지 OSRM 실제 보행자 도로망 요청
+      const slicePts = pts.slice(0, 25);
+      const coordKey = slicePts.map(p => `${Number(p[1]).toFixed(4)},${Number(p[0]).toFixed(4)}`).join(";");
+
+      const applyRoadGeometry = (roadLatLngs) => {
+        if (!mapRouteOn || !Array.isArray(roadLatLngs) || roadLatLngs.length < 2) return;
+        if (typeof gmap !== "undefined" && gmap && window.google?.maps && typeof gRoute !== "undefined" && gRoute) {
+          gRoute.setPath(roadLatLngs.map(c => ({ lat: c[0], lng: c[1] })));
+        } else if (typeof lm !== "undefined" && lm && window.L && typeof lRoute !== "undefined" && lRoute) {
+          lRoute.setLatLngs(roadLatLngs);
+          lRoute.setStyle({ dashArray: null, weight: 4, opacity: 0.92 });
+        }
+      };
+
+      if (osrmRouteCache.has(coordKey)) {
+        applyRoadGeometry(osrmRouteCache.get(coordKey));
+        return baseKm;
+      }
+
+      fetch(`https://router.project-osrm.org/route/v1/walking/${coordKey}?overview=full&geometries=geojson`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          const coords = data?.routes?.[0]?.geometry?.coordinates;
+          if (Array.isArray(coords) && coords.length >= 2) {
+            const roadLatLngs = coords.map(c => [c[1], c[0]]);
+            osrmRouteCache.set(coordKey, roadLatLngs);
+            applyRoadGeometry(roadLatLngs);
+          }
+        })
+        .catch(() => {});
+
+      return baseKm;
+    };
+  }
+
+  /* =========================================================================
+   * 5. [Google Places API] 실시간 별점 · 리뷰수 · 영업중 여부 · 실제 매장 사진 자동 연동
+   * ========================================================================= */
+  let gPlacesService = null;
+  const gPlacesPending = new Set();
+
+  function getPlacesService() {
+    if (gPlacesService) return gPlacesService;
+    if (window.google?.maps?.places?.PlacesService) {
+      const container = (typeof gmap !== "undefined" && gmap) ? gmap : document.createElement("div");
+      gPlacesService = new google.maps.places.PlacesService(container);
+    }
+    return gPlacesService;
+  }
+
+  function enrichItemWithGooglePlaces(it, onDone) {
+    if (!it || !it.name) return;
+    if (it.gRating && it.gPlaceId) {
+      if (onDone) onDone(it);
+      return;
+    }
+    const svc = getPlacesService();
+    if (!svc) return;
+
+    const key = String(it.id);
+    if (gPlacesPending.has(key)) return;
+    gPlacesPending.add(key);
+
+    const query = [it.localName || it.name, it.address || "Osaka Japan"].filter(Boolean).join(" ");
+    const req = { query };
+    if (Number(it.lat) && Number(it.lng) && window.google?.maps?.LatLng) {
+      req.location = new google.maps.LatLng(Number(it.lat), Number(it.lng));
+      req.radius = 2500;
+    }
+
+    svc.textSearch(req, (results, status) => {
+      gPlacesPending.delete(key);
+      if (status !== google.maps.places.PlacesServiceStatus.OK || !results || !results[0]) return;
+      const top = results[0];
+      it.gPlaceId = top.place_id || "";
+      if (top.rating) it.gRating = Number(top.rating).toFixed(1);
+      if (top.user_ratings_total) it.gReviews = Number(top.user_ratings_total);
+      if (typeof top.opening_hours?.isOpen === "function") {
+        try { it.gOpenNow = top.opening_hours.isOpen(); } catch (_) {}
+      } else if (typeof top.opening_hours?.open_now === "boolean") {
+        it.gOpenNow = top.opening_hours.open_now;
+      }
+      if (!it.img && top.photos && top.photos.length > 0) {
+        try {
+          const photoUrl = top.photos[0].getUrl({ maxWidth: 640, maxHeight: 480 });
+          if (photoUrl) it.img = photoUrl;
+        } catch (_) {}
+      }
+      if ((!Number(it.lat) || !Number(it.lng)) && top.geometry?.location) {
+        it.lat = top.geometry.location.lat();
+        it.lng = top.geometry.location.lng();
+        it.mapVisible = true;
+      }
+      if (typeof save === "function") save();
+      if (onDone) onDone(it);
+    });
+  }
+
+  function renderGooglePlacesBadgesOnList() {
+    const listEl = document.getElementById("list-LIST");
+    if (!listEl || !Array.isArray(items)) return;
+    const itemMap = new Map(items.map(it => [String(it.id), it]));
+
+    listEl.querySelectorAll(".item[data-id]").forEach((cardEl, idx) => {
+      const it = itemMap.get(String(cardEl.dataset.id));
+      if (!it) return;
+      const metaRow = cardEl.querySelector(".ux7-meta-row");
+      if (!metaRow) return;
+
+      metaRow.querySelectorAll(".v42-gplaces-badge").forEach(el => el.remove());
+      if (it.gRating) {
+        const badge = document.createElement("span");
+        badge.className = "v42-gplaces-badge";
+        const openTxt = it.gOpenNow === true
+          ? `<span class="v42-gplaces-open">· 영업중</span>`
+          : it.gOpenNow === false
+            ? `<span class="v42-gplaces-closed">· 영업종료</span>`
+            : "";
+        badge.innerHTML = `★ ${it.gRating}${it.gReviews ? ` (${it.gReviews.toLocaleString()})` : ""} ${openTxt}`;
+        metaRow.prepend(badge);
+      } else if (idx < 8 && window.google?.maps?.places) {
+        // 화면 상위 카드부터 순차적으로 Google Places 데이터 자동 보강
+        setTimeout(() => {
+          enrichItemWithGooglePlaces(it, () => {
+            if (typeof renderGooglePlacesBadgesOnList === "function") renderGooglePlacesBadgesOnList();
+          });
+        }, idx * 350);
+      }
+    });
+  }
+
+  // 상세 시트(#sheet) 열릴 때 Google Places 상세 영업시간표·전화번호·평점 표시
+  if (typeof showSheet === "function") {
+    const _origShowSheetV42 = showSheet;
+    showSheet = function(...args) {
+      const r = _origShowSheetV42.apply(this, args);
+      const it = (items || []).find(x => String(x.id) === String(cur));
+      const sbody = document.getElementById("sbody");
+      if (!it || !sbody) return r;
+
+      const renderSheetPlacesBox = () => {
+        sbody.querySelector("#v42SheetPlacesBox")?.remove();
+        if (!it.gRating && !it.gWeekdayText && !it.gPhone) return;
+        const box = document.createElement("div");
+        box.id = "v42SheetPlacesBox";
+        const statusHtml = it.gOpenNow === true
+          ? `<span class="v42-gplaces-open">🟢 현재 영업중</span>`
+          : it.gOpenNow === false
+            ? `<span class="v42-gplaces-closed">🔴 현재 영업종료</span>`
+            : "";
+        box.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+            <b style="color:var(--tx)">📍 Google Places 실시간 정보</b>
+            ${statusHtml}
+          </div>
+          ${it.gRating ? `<div style="font-weight:800;color:#fbbf24">⭐ ${it.gRating}점 <span style="color:var(--sub);font-weight:600">(구글 리뷰 ${(it.gReviews || 0).toLocaleString()}개)</span></div>` : ""}
+          ${it.gPhone ? `<div style="color:var(--sub)">📞 전화번호: <a href="tel:${esc(it.gPhone)}" style="color:var(--pr);font-weight:800">${esc(it.gPhone)}</a></div>` : ""}
+          ${Array.isArray(it.gWeekdayText) && it.gWeekdayText.length ? `
+            <details style="margin-top:2px">
+              <summary style="cursor:pointer;font-weight:800;color:var(--pr);font-size:12px">🕒 요일별 영업시간 펼쳐보기</summary>
+              <div style="margin-top:6px;display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:var(--sub)">
+                ${it.gWeekdayText.map(line => `<div>${esc(line)}</div>`).join("")}
+              </div>
+            </details>
+          ` : ""}
+        `;
+        const targetAnchor = sbody.querySelector(".ds");
+        if (targetAnchor && targetAnchor.parentElement) {
+          targetAnchor.parentElement.insertAdjacentElement("afterend", box);
+        } else {
+          sbody.prepend(box);
+        }
+      };
+
+      renderSheetPlacesBox();
+
+      const svc = getPlacesService();
+      if (svc) {
+        enrichItemWithGooglePlaces(it, () => {
+          if (it.gPlaceId && !it.gWeekdayText) {
+            svc.getDetails(
+              { placeId: it.gPlaceId, fields: ["opening_hours", "formatted_phone_number", "rating", "user_ratings_total", "photos"] },
+              (place, status) => {
+                if (status === google.maps.places.PlacesServiceStatus.OK && place) {
+                  if (place.formatted_phone_number) it.gPhone = place.formatted_phone_number;
+                  if (place.opening_hours?.weekday_text) it.gWeekdayText = place.opening_hours.weekday_text;
+                  if (typeof place.opening_hours?.isOpen === "function") {
+                    try { it.gOpenNow = place.opening_hours.isOpen(); } catch (_) {}
+                  }
+                  if (typeof save === "function") save();
+                  renderSheetPlacesBox();
+                  renderGooglePlacesBadgesOnList();
+                }
+              }
+            );
+          } else {
+            renderSheetPlacesBox();
+          }
+        });
+      }
+      return r;
+    };
+  }
+
+  // 대시보드 및 목록 렌더링 훅 연결
+  if (typeof window.renderV32Dashboard === "function") {
+    const _origDashV42 = window.renderV32Dashboard;
+    window.renderV32Dashboard = function(...args) {
+      const r = _origDashV42.apply(this, args);
+      applyHomeCleanupAndVoiceBtn();
+      updateHeroWeatherBadge();
+      return r;
+    };
+  }
+
+  if (typeof renderListTab === "function") {
+    const _origListV42 = renderListTab;
+    renderListTab = function(...args) {
+      const r = _origListV42.apply(this, args);
+      renderGooglePlacesBadgesOnList();
+      return r;
+    };
+  }
+
+  const bootV42 = () => {
+    applyHomeCleanupAndVoiceBtn();
+    updateHeroWeatherBadge();
+    fetchRealTimeOsakaWeather();
+    fetchRealTimeJpyRate();
+    renderGooglePlacesBadgesOnList();
+  };
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bootV42);
+  } else {
+    bootV42();
+  }
+  setTimeout(bootV42, 400);
+  setTimeout(renderGooglePlacesBadgesOnList, 2200);
+})();
+</script>
+<!-- === V42_REAL_APIS_AND_HOME_CLEANUP_SUITE_END === -->
 </body>
 </html>
