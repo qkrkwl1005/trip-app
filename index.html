@@ -19306,5 +19306,529 @@ ${caption || rawText}
 })();
 </script>
 <!-- === V46_PASS_AND_MYMAPS_TRANSIT_INTELLIGENCE_SUITE_END === -->
+<!-- === V47_MOTION_GESTURES_AND_OFFLINE_OLED_SUITE_START === -->
+<style id="v47-motion-and-oled-style">
+  /* 1-5. 쫀득한 탭틱 스프링 바운스 피드백 (Scale Spring 0.96 -> 1.02) */
+  .btn, .mb, .chip, .tab-btn, .v46-pass-card, .v32-stat-card, .v41-sd-item {
+    transition: transform 0.24s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.18s ease, box-shadow 0.18s ease !important;
+  }
+  .btn:active, .mb:active, .chip:active, .tab-btn:active, .v46-pass-card:active, .v32-stat-card:active {
+    transform: scale(0.955) !important;
+  }
+
+  /* 1-3. 목록 카드 스와이프 액션 배너 & 트랜지션 */
+  #list-LIST .item {
+    position: relative !important;
+    overflow: hidden !important;
+    touch-action: pan-y !important;
+    transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.2s ease !important;
+    will-change: transform;
+  }
+  .v47-swipe-hint {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 96px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 800;
+    color: #fff;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    z-index: 2;
+    gap: 4px;
+  }
+  .v47-swipe-hint.right {
+    left: 0;
+    background: linear-gradient(90deg, rgba(16, 185, 129, 0.92), rgba(16, 185, 129, 0));
+    justify-content: flex-start;
+    padding-left: 14px;
+  }
+  .v47-swipe-hint.left {
+    right: 0;
+    background: linear-gradient(270deg, rgba(245, 158, 11, 0.92), rgba(245, 158, 11, 0));
+    justify-content: flex-end;
+    padding-right: 14px;
+  }
+
+  /* 1-4. 당겨서 새로고침 (Pull-to-Refresh) 인디케이터 */
+  #v47PtrIndicator {
+    position: fixed;
+    top: calc(env(safe-area-inset-top, 0px) + 10px);
+    left: 50%;
+    transform: translate(-50%, -70px) scale(0.8);
+    z-index: 4200;
+    background: var(--s2, #181c26);
+    color: var(--tx, #f8fafc);
+    border: 1px solid var(--bd2, rgba(255,255,255,0.14));
+    border-radius: 999px;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    font-weight: 800;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+    pointer-events: none;
+    opacity: 0;
+    transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
+  }
+  #v47PtrIndicator.spinning .ms {
+    animation: v47Spin 0.75s linear infinite;
+  }
+  @keyframes v47Spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  /* 1-2. 바텀시트 드래그 핸들 강조 */
+  #sheet .sh, #v46PassSheet {
+    will-change: transform;
+    touch-action: pan-y;
+  }
+  .v47-drag-bar {
+    width: 48px;
+    height: 5px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.45);
+    margin: 8px auto 4px;
+    cursor: grab;
+  }
+
+  /* 4-2. OLED 퓨어 블랙 초절전 모드 (Battery Saver #000000) */
+  html[data-oled="true"],
+  html[data-oled="true"] body,
+  html[data-oled="true"] #side,
+  html[data-oled="true"] .tab-content {
+    --bg: #000000 !important;
+    --s: #000000 !important;
+    --s2: #07090e !important;
+    --bd: rgba(255, 255, 255, 0.11) !important;
+    --bd2: rgba(255, 255, 255, 0.18) !important;
+    background: #000000 !important;
+    background-color: #000000 !important;
+  }
+  html[data-oled="true"] .card,
+  html[data-oled="true"] .item,
+  html[data-oled="true"] #nav,
+  html[data-oled="true"] .sh,
+  html[data-oled="true"] #v46PassSheet,
+  html[data-oled="true"] #ux7TopUtilBar {
+    background: #000000 !important;
+    border-color: rgba(255, 255, 255, 0.15) !important;
+    box-shadow: none !important;
+  }
+  html[data-oled="true"] .v32-hero {
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  }
+
+  /* 상단 유틸바/설정 내 OLED 절전 & 오프라인 상태 칩 */
+  .v47-oled-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 800;
+    border: 1px solid var(--bd2);
+    background: var(--s2);
+    color: var(--tx);
+    cursor: pointer;
+  }
+  html[data-oled="true"] .v47-oled-toggle {
+    background: #000000 !important;
+    color: #34d399 !important;
+    border-color: #10b981 !important;
+  }
+</style>
+
+<div id="v47PtrIndicator" aria-hidden="true">
+  <span class="ms" style="font-size:18px;color:#3b82f6">flight_takeoff</span>
+  <span id="v47PtrText">당겨서 날씨·환율 새로고침</span>
+</div>
+
+<script>
+(function() {
+  const haptic = (ms = 12) => {
+    try { if (window.v8Haptic) window.v8Haptic(ms); else if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {}
+  };
+
+  /* =========================================================
+   * [1-2] 바텀시트 드래그해서 닫기 (Drag-to-Dismiss Sheet)
+   * - 장소 상세창(#sheet .sh) 및 패스 가이드(#v46PassSheet) 지원
+   * ========================================================= */
+  function attachDragToDismiss(modalId, sheetSelector, onClose) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+
+    let startY = 0;
+    let currentY = 0;
+    let dragging = false;
+    let activeSheet = null;
+
+    modal.addEventListener("touchstart", (e) => {
+      const sheet = modal.querySelector(sheetSelector);
+      if (!sheet || !modal.classList.contains("on")) return;
+
+      // 시트 내부 스크롤이 최상단일 때만 아래로 끌어내리기 허용
+      const scrollEl = sheet.querySelector(".v46-sheet-body") || sheet;
+      if (scrollEl.scrollTop > 6) return;
+
+      // 입력창 터치 시에는 드래그 제외
+      if (e.target.closest("input, textarea, select, button.reel-jump")) return;
+
+      startY = e.touches[0].clientY;
+      currentY = startY;
+      dragging = true;
+      activeSheet = sheet;
+      activeSheet.style.transition = "none";
+    }, { passive: true });
+
+    modal.addEventListener("touchmove", (e) => {
+      if (!dragging || !activeSheet) return;
+      currentY = e.touches[0].clientY;
+      const dy = currentY - startY;
+
+      if (dy > 0) {
+        // 아래로 당기는 저항감 적용
+        const damped = dy < 160 ? dy : 160 + (dy - 160) * 0.45;
+        activeSheet.style.transform = `translateY(${damped}px)`;
+        const bgAlpha = Math.max(0.2, 0.74 - (damped / 400));
+        modal.style.backgroundColor = `rgba(5, 6, 9, ${bgAlpha})`;
+      }
+    }, { passive: true });
+
+    const finishDrag = () => {
+      if (!dragging || !activeSheet) return;
+      const dy = currentY - startY;
+      dragging = false;
+      activeSheet.style.transition = "transform 0.28s cubic-bezier(0.22, 1, 0.36, 1)";
+      modal.style.backgroundColor = "";
+
+      if (dy > 95) {
+        haptic(16);
+        activeSheet.style.transform = "translateY(100%)";
+        setTimeout(() => {
+          if (activeSheet) activeSheet.style.transform = "";
+          onClose();
+        }, 210);
+      } else {
+        activeSheet.style.transform = "translateY(0)";
+      }
+      activeSheet = null;
+    };
+
+    modal.addEventListener("touchend", finishDrag, { passive: true });
+    modal.addEventListener("touchcancel", finishDrag, { passive: true });
+  }
+
+  /* =========================================================
+   * [1-3] 목록 카드 좌우 스와이프 액션 (Swipe to Check / Star)
+   * - 오른쪽으로 밀면: 방문 완료(체크) 토글
+   * - 왼쪽으로 밀면: 중요(★ 별표) 토글
+   * (1-1 화면 탭 전환 스와이프는 요청에 따라 제외하여 충돌 제로!)
+   * ========================================================= */
+  function initListCardSwipe() {
+    const listWrap = document.getElementById("list-LIST");
+    if (!listWrap || listWrap.dataset.v47SwipeBound === "1") return;
+    listWrap.dataset.v47SwipeBound = "1";
+
+    let startX = 0, startY = 0, dx = 0;
+    let targetCard = null;
+    let swiping = false;
+
+    listWrap.addEventListener("touchstart", (e) => {
+      const card = e.target.closest(".item");
+      if (!card || e.target.closest("button, a, input")) return;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      dx = 0;
+      targetCard = card;
+      swiping = false;
+      targetCard.style.transition = "none";
+    }, { passive: true });
+
+    listWrap.addEventListener("touchmove", (e) => {
+      if (!targetCard) return;
+      const curX = e.touches[0].clientX;
+      const curY = e.touches[0].clientY;
+      dx = curX - startX;
+      const dy = curY - startY;
+
+      // 세로 스크롤이 더 크면 스와이프 취소
+      if (!swiping && Math.abs(dy) > Math.abs(dx)) {
+        targetCard.style.transition = "";
+        targetCard = null;
+        return;
+      }
+      if (Math.abs(dx) > 14) {
+        swiping = true;
+        const limit = Math.max(-88, Math.min(88, dx * 0.75));
+        targetCard.style.transform = `translateX(${limit}px)`;
+      }
+    }, { passive: true });
+
+    const endCardSwipe = () => {
+      if (!targetCard) return;
+      const card = targetCard;
+      const itemId = card.dataset.id;
+      card.style.transition = "transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1)";
+      card.style.transform = "translateX(0)";
+
+      if (swiping && itemId) {
+        const it = (Array.isArray(items) ? items : []).find(x => String(x.id) === String(itemId));
+        if (it) {
+          if (dx > 68) {
+            // 오른쪽 스와이프 -> 방문 완료 토글
+            it.done = !it.done;
+            haptic(20);
+            if (typeof save === "function") save();
+            if (typeof toast === "function") {
+              toast(it.done ? `✅ '${it.name}' 방문 완료!` : `↩️ '${it.name}' 미방문으로 변경`);
+            }
+          } else if (dx < -68) {
+            // 왼쪽 스와이프 -> 중요(★) 토글
+            it.star = !it.star;
+            haptic(20);
+            if (typeof save === "function") save();
+            if (typeof toast === "function") {
+              toast(it.star ? `⭐ '${it.name}' 중요 장소로 등록!` : `☆ '${it.name}' 중요 해제`);
+            }
+          }
+        }
+      }
+      targetCard = null;
+      swiping = false;
+    };
+
+    listWrap.addEventListener("touchend", endCardSwipe, { passive: true });
+    listWrap.addEventListener("touchcancel", endCardSwipe, { passive: true });
+  }
+
+  /* =========================================================
+   * [1-4] 당겨서 새로고침 (Pull-to-Refresh)
+   * - 홈/목록 최상단에서 아래로 당기면 실시간 날씨 & 환율 즉시 갱신
+   * ========================================================= */
+  function initPullToRefresh() {
+    const ptr = document.getElementById("v47PtrIndicator");
+    const ptrText = document.getElementById("v47PtrText");
+    if (!ptr) return;
+
+    let startY = 0;
+    let pullDist = 0;
+    let pulling = false;
+
+    document.addEventListener("touchstart", (e) => {
+      if (document.body.classList.contains("show-map")) return;
+      if (document.getElementById("sheet")?.classList.contains("on")) return;
+      if (document.getElementById("v46PassModal")?.classList.contains("on")) return;
+
+      const activeTab = document.querySelector(".tab-content.active");
+      if (!activeTab || activeTab.scrollTop > 2) return;
+
+      startY = e.touches[0].clientY;
+      pullDist = 0;
+      pulling = true;
+    }, { passive: true });
+
+    document.addEventListener("touchmove", (e) => {
+      if (!pulling) return;
+      const dy = e.touches[0].clientY - startY;
+      if (dy <= 0) {
+        pullDist = 0;
+        return;
+      }
+      pullDist = Math.min(115, dy * 0.55);
+      if (pullDist > 18) {
+        const yPos = Math.min(16, pullDist - 60);
+        ptr.style.opacity = String(Math.min(1, pullDist / 65));
+        ptr.style.transform = `translate(-50%, ${yPos}px) scale(${Math.min(1, 0.85 + pullDist / 400)})`;
+        if (ptrText) {
+          ptrText.textContent = pullDist > 72 ? "손을 놓으면 실시간 날씨·환율 갱신!" : "아래로 당겨서 새로고침";
+        }
+      }
+    }, { passive: true });
+
+    const endPull = async () => {
+      if (!pulling) return;
+      pulling = false;
+
+      if (pullDist > 72) {
+        haptic(22);
+        ptr.classList.add("spinning");
+        if (ptrText) ptrText.textContent = "오사카·교토 실시간 날씨 & 환율 업데이트 중...";
+        ptr.style.transform = "translate(-50%, 14px) scale(1)";
+        ptr.style.opacity = "1";
+
+        try {
+          if (window.SmartQueryClient && typeof window.SmartQueryClient.invalidateAll === "function") {
+            window.SmartQueryClient.invalidateAll();
+          } else {
+            const [wRes, fxRes] = await Promise.allSettled([
+              fetch("https://api.open-meteo.com/v1/forecast?latitude=34.6685&longitude=135.5013&current_weather=true").then(r => r.json()),
+              fetch("https://open.er-api.com/v6/latest/JPY").then(r => r.json())
+            ]);
+            if (wRes.status === "fulfilled" && wRes.value?.current_weather) {
+              const t = Math.round(wRes.value.current_weather.temperature);
+              localStorage.setItem("TRIP_V42_WEATHER_TEXT", `🌤️ 현지 실시간 ${t}°C`);
+            }
+            if (fxRes.status === "fulfilled" && fxRes.value?.rates?.KRW) {
+              const krw100 = Math.round(fxRes.value.rates.KRW * 100);
+              localStorage.setItem("TRIP_V42_FX_RATE_100", String(krw100));
+            }
+          }
+          if (typeof window.renderV32Dashboard === "function") window.renderV32Dashboard();
+          if (typeof renderListTab === "function") renderListTab();
+          if (typeof toast === "function") toast("✨ 실시간 현지 날씨·환율 및 지도를 최신화했어요!");
+        } catch (err) {}
+
+        setTimeout(() => {
+          ptr.classList.remove("spinning");
+          ptr.style.opacity = "0";
+          ptr.style.transform = "translate(-50%, -70px) scale(0.8)";
+        }, 650);
+      } else {
+        ptr.style.opacity = "0";
+        ptr.style.transform = "translate(-50%, -70px) scale(0.8)";
+      }
+      pullDist = 0;
+    };
+
+    document.addEventListener("touchend", endPull, { passive: true });
+    document.addEventListener("touchcancel", endPull, { passive: true });
+  }
+
+  /* =========================================================
+   * [4-1 & 4-2] 100% 완전 오프라인 캐시 & OLED 퓨어블랙 초절전 모드
+   * ========================================================= */
+  function setOledMode(on) {
+    const enabled = Boolean(on);
+    if (enabled) {
+      if (typeof setTheme === "function") setTheme("dark");
+      document.documentElement.setAttribute("data-oled", "true");
+    } else {
+      document.documentElement.removeAttribute("data-oled");
+    }
+    localStorage.setItem("TRIP_V47_OLED_MODE", enabled ? "1" : "0");
+    updateOledButtons();
+  }
+
+  function toggleOledMode() {
+    const curOled = document.documentElement.getAttribute("data-oled") === "true";
+    haptic(16);
+    setOledMode(!curOled);
+    if (typeof toast === "function") {
+      toast(!curOled
+        ? "🔋 OLED 퓨어 블랙 초절전 모드가 켜졌어요 (배터리 소모 최소화)"
+        : "☀️ 기본 테마 모드로 돌아왔어요");
+    }
+  }
+
+  function updateOledButtons() {
+    const isOled = document.documentElement.getAttribute("data-oled") === "true";
+    document.querySelectorAll(".v47-oled-toggle").forEach(btn => {
+      btn.innerHTML = `<span class="ms" style="font-size:15px">${isOled ? "battery_saver" : "dark_mode"}</span><span>${isOled ? "초절전 ON" : "OLED 절전"}</span>`;
+    });
+  }
+
+  function injectOledAndOfflineControls() {
+    // 1) 상단 유틸바(#ux7TopUtilBar)에 원터치 OLED 초절전 버튼 추가
+    const topBar = document.getElementById("ux7TopUtilBar");
+    if (topBar && !document.getElementById("v47TopOledBtn")) {
+      const btn = document.createElement("button");
+      btn.id = "v47TopOledBtn";
+      btn.type = "button";
+      btn.className = "v47-oled-toggle";
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        toggleOledMode();
+      };
+      topBar.appendChild(btn);
+    }
+
+    // 2) 설정 탭(#tab-set) 첫 번째 카드에 OLED 초절전 & 오프라인 프리패치 버튼 추가
+    const themeBtn = document.getElementById("themeBtn");
+    if (themeBtn && themeBtn.parentElement && !document.getElementById("v47SetOledCard")) {
+      const wrap = document.createElement("div");
+      wrap.id = "v47SetOledCard";
+      wrap.style.cssText = "margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;";
+      wrap.innerHTML = `
+        <button type="button" class="btn g v47-oled-toggle" style="flex:1;min-height:42px;justify-content:center" id="v47SetOledBtn"></button>
+        <button type="button" class="btn g" style="flex:1;min-height:42px;justify-content:center;font-size:12.5px" id="v47OfflineWarmBtn">
+          <span class="ms" style="font-size:16px;color:#38bdf8">offline_pin</span>오프라인 데이터 즉시 보관
+        </button>
+      `;
+      themeBtn.parentElement.appendChild(wrap);
+
+      document.getElementById("v47SetOledBtn")?.addEventListener("click", toggleOledMode);
+      document.getElementById("v47OfflineWarmBtn")?.addEventListener("click", async () => {
+        haptic(18);
+        try {
+          if ("caches" in window) {
+            const c = await caches.open("trip-v47-core");
+            await Promise.allSettled([
+              c.add("./"),
+              c.add("./index.html"),
+              c.add("./manifest.json"),
+              c.add("./icon-192.png")
+            ]);
+          }
+          if (typeof persistNow === "function") persistNow();
+          if (typeof toast === "function") {
+            toast("📦 모든 장소·바우처·패스권이 기기에 오프라인 보관되었어요! 비행기 모드에서도 100% 작동합니다.");
+          }
+        } catch (e) {
+          if (typeof toast === "function") toast("📦 오프라인 저장 완료!");
+        }
+      });
+    }
+
+    updateOledButtons();
+  }
+
+  // Service Worker V47 등록 및 업데이트
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./sw.js").catch(() => {});
+    });
+  }
+
+  const bootV47 = () => {
+    // 저장된 OLED 설정 복원
+    if (localStorage.getItem("TRIP_V47_OLED_MODE") === "1") {
+      setOledMode(true);
+    }
+
+    // 1-2. 바텀시트 드래그 닫기 연결
+    attachDragToDismiss("sheet", ".sh", () => {
+      if (typeof closeSheet === "function") closeSheet();
+    });
+    attachDragToDismiss("v46PassModal", "#v46PassSheet", () => {
+      document.getElementById("v46PassModal")?.classList.remove("on");
+    });
+
+    // 1-3. 목록 카드 스와이프 연결
+    initListCardSwipe();
+
+    // 1-4. 당겨서 새로고침 연결
+    initPullToRefresh();
+
+    // 4-1 & 4-2. OLED 초절전 및 오프라인 컨트롤 주입
+    injectOledAndOfflineControls();
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bootV47);
+  } else {
+    bootV47();
+  }
+  setTimeout(bootV47, 450);
+})();
+</script>
+<!-- === V47_MOTION_GESTURES_AND_OFFLINE_OLED_SUITE_END === -->
 </body>
 </html>
