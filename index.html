@@ -1424,7 +1424,43 @@
 </head>
   <body>
 <!-- === V8_SPLASH_START === -->
-<!-- Native Instant Boot: Fullscreen splash removed -->
+<style id="v55-instant-boot-skeleton-style">
+  /* 0ms 즉시 렌더링: 구형 릴스/쇼츠 분석 카드가 부팅 중 깜빡이며 노출되는 현상 원천 차단 */
+  #tab-add > .card {
+    display: none !important;
+  }
+  @keyframes v55SkelPulse {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 0.95; }
+  }
+  .v55-skel-box {
+    background: linear-gradient(90deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.11) 50%, rgba(255,255,255,0.05) 100%);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 18px;
+    animation: v55SkelPulse 1.3s ease-in-out infinite;
+  }
+  [data-theme="light"] .v55-skel-box {
+    background: linear-gradient(90deg, rgba(15,23,42,0.04) 0%, rgba(15,23,42,0.08) 50%, rgba(15,23,42,0.04) 100%);
+    border-color: rgba(15,23,42,0.06);
+  }
+  #v55BootSkeleton {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 4px 0 20px;
+    transition: opacity 0.18s ease;
+  }
+  body.v55-boot-ready #v55BootSkeleton {
+    display: none !important;
+  }
+  #v32Dashboard {
+    animation: v55FadeIn 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  @keyframes v55FadeIn {
+    from { opacity: 0.01; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
 <!-- === V8_SPLASH_END === -->
     <aside id="side">
       <!-- 상단 헤더(여행플래너/일정복사/온라인/테마) 완전 제거됨 -->
@@ -1432,7 +1468,19 @@
 
       <!-- 홈 탭 -->
       <section id="tab-add" class="tab-content active">
-        <div class="card">
+        <!-- 0ms 즉시 표시되는 네이티브 스켈레톤 플레이스홀더 (실제 대시보드와 1:1 높이 매칭으로 덜컥거림 제로) -->
+        <div id="v55BootSkeleton" aria-hidden="true">
+          <div class="v55-skel-box" style="height: 178px; border-radius: 22px;"></div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="v55-skel-box" style="height: 76px;"></div>
+            <div class="v55-skel-box" style="height: 76px;"></div>
+            <div class="v55-skel-box" style="height: 76px;"></div>
+            <div class="v55-skel-box" style="height: 76px;"></div>
+          </div>
+          <div class="v55-skel-box" style="height: 72px;"></div>
+          <div class="v55-skel-box" style="height: 190px;"></div>
+        </div>
+        <div class="card" style="display:none">
           <div class="sec-title">
             <span style="display: flex; align-items: center; gap: 6px"
               ><span class="ms fill" style="color: var(--pr)">auto_awesome</span
@@ -20441,181 +20489,162 @@ ${JSON.stringify(payload, null, 2)}
 
 <!-- === V53_LIQUID_GLASS_AND_IOS_REFINEMENT_SUITE_START === -->
 <style id="v53-liquid-glass-style">
-  /* 0. SVG 리퀴드 굴절/프리즘 필터 준비 및 모바일 레이아웃 보정 */
   @media (max-width: 820px) {
-    /*1. 하단 탭바(#nav) - iOS 26 진짜 리퀴드 글래스(Liquid Glass) 플로팅 독 (뒤에 글자·이미지·색상이 선명하게 투과됨) */
+    /* 1. 하단 탭바(#nav) - GitHub Mobile iOS 26 공식 리퀴드 글래스(Liquid Glass) 플로팅 도크 완벽 재현 */
     #nav,
     html[data-oled="true"] #nav {
       position: fixed !important;
-      left: 14px !important;
-      right: 14px !important;
+      left: 16px !important;
+      right: 16px !important;
       bottom: calc(10px + env(safe-area-inset-bottom)) !important;
       z-index: 220 !important;
       height: 62px !important;
       display: grid !important;
       grid-template-columns: repeat(4, 1fr) !important;
-      padding: 5px 6px !important;
+      padding: 4px !important;
       border-radius: 999px !important;
       isolation: auto !important;
-      /* 핵심: 불투명 배경을 완전히 걷어내고 투명한 유리 굴절 그라데이션 적용 */
+      /* GitHub iOS 실측 픽셀: 상단 1px 밝은 유리 스펙큘러 림(RGB 98,101,110) + 반투명 스모키 글래스 바디(뒤의 카드·컬러가 부드럽게 굴절 투과) */
       background: linear-gradient(
-        135deg,
-        rgba(255, 255, 255, 0.14) 0%,
-        rgba(255, 255, 255, 0.05) 45%,
-        rgba(15, 23, 42, 0.22) 100%
+        180deg,
+        rgba(64, 68, 78, 0.46) 0%,
+        rgba(38, 42, 49, 0.42) 52%,
+        rgba(44, 48, 56, 0.46) 100%
       ) !important;
-      background-color: rgba(15, 23, 42, 0.18) !important;
-      backdrop-filter: blur(16px) saturate(220%) brightness(1.12) contrast(1.06) !important;
-      -webkit-backdrop-filter: blur(16px) saturate(220%) brightness(1.12) contrast(1.06) !important;
-      border: 1px solid rgba(255, 255, 255, 0.28) !important;
+      backdrop-filter: blur(22px) saturate(210%) brightness(1.1) !important;
+      -webkit-backdrop-filter: blur(22px) saturate(210%) brightness(1.1) !important;
+      border: 1px solid rgba(255, 255, 255, 0.22) !important;
       box-shadow:
-        0 14px 34px rgba(0, 0, 0, 0.38),
-        inset 0 1.5px 1px rgba(255, 255, 255, 0.42),
-        inset 0 -1px 1px rgba(255, 255, 255, 0.12),
-        inset 1px 0 1px rgba(255, 255, 255, 0.16),
-        inset -1px 0 1px rgba(255, 255, 255, 0.16) !important;
+        0 14px 36px rgba(0, 0, 0, 0.42),
+        inset 0 1px 0.5px rgba(255, 255, 255, 0.38),
+        inset 0 -1px 0.5px rgba(255, 255, 255, 0.14) !important;
       transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease !important;
     }
 
     [data-theme="light"] #nav,
     html[data-oled="true"][data-theme="light"] #nav {
       background: linear-gradient(
-        135deg,
-        rgba(255, 255, 255, 0.48) 0%,
-        rgba(255, 255, 255, 0.22) 55%,
-        rgba(255, 255, 255, 0.34) 100%
+        180deg,
+        rgba(255, 255, 255, 0.58) 0%,
+        rgba(242, 245, 250, 0.48) 100%
       ) !important;
-      background-color: rgba(255, 255, 255, 0.24) !important;
-      backdrop-filter: blur(16px) saturate(200%) brightness(1.05) !important;
-      -webkit-backdrop-filter: blur(16px) saturate(200%) brightness(1.05) !important;
-      border: 1px solid rgba(255, 255, 255, 0.75) !important;
+      backdrop-filter: blur(22px) saturate(200%) brightness(1.04) !important;
+      -webkit-backdrop-filter: blur(22px) saturate(200%) brightness(1.04) !important;
+      border: 1px solid rgba(255, 255, 255, 0.82) !important;
       box-shadow:
-        0 10px 28px rgba(15, 23, 42, 0.12),
-        inset 0 1.5px 1.5px rgba(255, 255, 255, 0.95),
-        inset 0 -1px 1px rgba(255, 255, 255, 0.5) !important;
+        0 12px 30px rgba(15, 23, 42, 0.12),
+        inset 0 1px 1px rgba(255, 255, 255, 0.95),
+        inset 0 -1px 0.5px rgba(15, 23, 42, 0.06) !important;
     }
 
-    /* 탭바 내부에서 이동하는 액티브 캡슐(Pill)도 투명한 물방울 유리 질감으로 변경 */
+    /* 2. GitHub iOS 핵심 디테일: 선택된 탭 캡슐(.v39-nav-glide-pill)은 파란색 테두리가 아니라 독 내부에 깊게 파인 다크 리세스(Recessed) 글래스 필! */
     .v39-nav-glide-pill {
       border-radius: 999px !important;
-      background: linear-gradient(
-        180deg,
-        rgba(255, 255, 255, 0.22) 0%,
-        rgba(255, 255, 255, 0.08) 100%
-      ) !important;
-      border: 1px solid rgba(255, 255, 255, 0.34) !important;
+      background: rgba(13, 17, 23, 0.68) !important;
+      border: 1px solid rgba(255, 255, 255, 0.08) !important;
       box-shadow:
-        0 4px 14px rgba(0, 0, 0, 0.18),
-        inset 0 1px 1px rgba(255, 255, 255, 0.45) !important;
+        inset 0 1px 2px rgba(0, 0, 0, 0.45),
+        0 1px 0 rgba(255, 255, 255, 0.1) !important;
     }
     [data-theme="light"] .v39-nav-glide-pill {
-      background: linear-gradient(
-        180deg,
-        rgba(255, 255, 255, 0.72) 0%,
-        rgba(255, 255, 255, 0.42) 100%
-      ) !important;
-      border: 1px solid rgba(255, 255, 255, 0.9) !important;
+      background: rgba(15, 23, 42, 0.08) !important;
+      border: 1px solid rgba(15, 23, 42, 0.06) !important;
       box-shadow:
-        0 3px 10px rgba(15, 23, 42, 0.08),
-        inset 0 1px 1px rgba(255, 255, 255, 1) !important;
+        inset 0 1px 2px rgba(15, 23, 42, 0.08),
+        0 1px 0 rgba(255, 255, 255, 0.8) !important;
     }
 
+    /* 3. 탭 버튼 텍스트 & 아이콘: GitHub iOS처럼 비활성 탭은 선명한 화이트(#f0f6fc), 활성 탭은 깔끔한 GitHub 블루(#4996ff) */
     .tab-btn {
       border-radius: 999px !important;
-      font-size: 11px !important;
-      font-weight: 700 !important;
-      color: rgba(255, 255, 255, 0.75) !important;
-      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45) !important;
+      font-size: 10.5px !important;
+      font-weight: 600 !important;
+      color: rgba(240, 246, 252, 0.88) !important;
       gap: 2px !important;
       padding: 4px 0 !important;
-      transition: color 0.2s ease, transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+      transition: color 0.18s ease, transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
       background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
     }
     .tab-btn:active {
-      transform: scale(0.9) !important;
+      transform: scale(0.91) !important;
     }
     .tab-btn.active {
-      color: #60a5fa !important;
-      font-weight: 800 !important;
+      color: #4996ff !important;
+      font-weight: 700 !important;
       background: transparent !important;
+      border: none !important;
+      box-shadow: none !important;
     }
     [data-theme="light"] .tab-btn {
-      color: rgba(15, 23, 42, 0.72) !important;
-      text-shadow: 0 1px 1px rgba(255, 255, 255, 0.6) !important;
+      color: rgba(31, 35, 40, 0.78) !important;
     }
     [data-theme="light"] .tab-btn.active {
-      color: #2563eb !important;
+      color: #0969da !important;
       background: transparent !important;
     }
 
-    /* 상단 헤더(#ux7TopUtilBar)도 스크롤 시 뒤가 다 비치는 플로팅 리퀴드 글래스 바 적용 */
+    /* 상단 헤더(#ux7TopUtilBar)도 스크롤 시 뒤가 은은하게 비치는 리퀴드 글래스 바 적용 */
     #ux7TopUtilBar,
     html[data-oled="true"] #ux7TopUtilBar {
       position: sticky !important;
       top: 0 !important;
       z-index: 190 !important;
-      background: linear-gradient(
-        180deg,
-        rgba(15, 23, 42, 0.32) 0%,
-        rgba(15, 23, 42, 0.14) 100%
-      ) !important;
-      backdrop-filter: blur(14px) saturate(200%) !important;
-      -webkit-backdrop-filter: blur(14px) saturate(200%) !important;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+      background: rgba(13, 17, 23, 0.55) !important;
+      backdrop-filter: blur(20px) saturate(200%) !important;
+      -webkit-backdrop-filter: blur(20px) saturate(200%) !important;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
     }
     [data-theme="light"] #ux7TopUtilBar {
-      background: rgba(255, 255, 255, 0.35) !important;
+      background: rgba(255, 255, 255, 0.62) !important;
       border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
     }
   }
 
-  /* 2. 우측 하단 [+] 플로팅 액션 버튼 - 물방울처럼 뒤가 투명하게 비치는 진짜 리퀴드 글래스 원형 버튼 */
+  /* 4. 우측 하단 [+] 플로팅 액션 버튼 - GitHub iOS의 리퀴드 글래스 원형/캡슐 버튼과 1:1 동일한 유리 굴절 + 상단 스펙큘러 림 */
   #v32FabBtn,
   html[data-oled="true"] #v32FabBtn {
-    width: 54px !important;
-    height: 54px !important;
+    width: 52px !important;
+    height: 52px !important;
     border-radius: 999px !important;
     right: 18px !important;
     bottom: calc(84px + env(safe-area-inset-bottom)) !important;
-    background: radial-gradient(
-      120% 120% at 30% 20%,
-      rgba(255, 255, 255, 0.28) 0%,
-      rgba(255, 255, 255, 0.08) 50%,
-      rgba(15, 23, 42, 0.22) 100%
+    background: linear-gradient(
+      180deg,
+      rgba(68, 74, 84, 0.54) 0%,
+      rgba(44, 49, 57, 0.48) 100%
     ) !important;
-    background-color: rgba(15, 23, 42, 0.15) !important;
-    backdrop-filter: blur(14px) saturate(220%) brightness(1.15) !important;
-    -webkit-backdrop-filter: blur(14px) saturate(220%) brightness(1.15) !important;
-    border: 1px solid rgba(255, 255, 255, 0.38) !important;
+    backdrop-filter: blur(20px) saturate(210%) brightness(1.12) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(210%) brightness(1.12) !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
     color: #ffffff !important;
     box-shadow:
-      0 10px 26px rgba(0, 0, 0, 0.36),
-      inset 0 1.5px 1.5px rgba(255, 255, 255, 0.55),
-      inset 0 -1.5px 2px rgba(255, 255, 255, 0.18) !important;
-    transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease !important;
+      0 10px 28px rgba(0, 0, 0, 0.42),
+      inset 0 1px 0.5px rgba(255, 255, 255, 0.42),
+      inset 0 -1px 0.5px rgba(255, 255, 255, 0.14) !important;
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease !important;
   }
   #v32FabBtn:active {
-    transform: scale(0.86) !important;
+    transform: scale(0.88) !important;
   }
   [data-theme="light"] #v32FabBtn {
-    background: radial-gradient(
-      120% 120% at 30% 20%,
-      rgba(255, 255, 255, 0.72) 0%,
-      rgba(255, 255, 255, 0.28) 60%,
-      rgba(255, 255, 255, 0.42) 100%
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.68) 0%,
+      rgba(242, 245, 250, 0.56) 100%
     ) !important;
-    background-color: rgba(255, 255, 255, 0.25) !important;
-    border: 1px solid rgba(255, 255, 255, 0.85) !important;
-    color: #0f172a !important;
+    border: 1px solid rgba(255, 255, 255, 0.88) !important;
+    color: #1f2328 !important;
     box-shadow:
-      0 10px 24px rgba(15, 23, 42, 0.15),
-      inset 0 1.5px 1.5px rgba(255, 255, 255, 0.98) !important;
+      0 10px 24px rgba(15, 23, 42, 0.14),
+      inset 0 1px 1px rgba(255, 255, 255, 0.98) !important;
   }
 
-  /* 3. 전체 카드 & 리스트 아이템 - iOS 인셋 그룹(Inset Grouped) 네이티브 감성 */
+  /* 5. 전체 카드 & 리스트 아이템 - iOS 인셋 그룹(Inset Grouped) 네이티브 감성 */
   .card, .item {
     border-radius: 18px !important;
-    border: 1px solid rgba(255, 255, 255, 0.09) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
     background: var(--s, #161b22) !important;
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18) !important;
   }
@@ -20630,9 +20659,9 @@ ${JSON.stringify(payload, null, 2)}
   #v32ListBudgetBar {
     border-radius: 16px !important;
     background: rgba(255, 255, 255, 0.04) !important;
-    border: 1px solid rgba(255, 255, 255, 0.12) !important;
-    backdrop-filter: blur(12px) !important;
-    -webkit-backdrop-filter: blur(12px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.11) !important;
+    backdrop-filter: blur(14px) !important;
+    -webkit-backdrop-filter: blur(14px) !important;
   }
   [data-theme="light"] #v32ListBudgetBar {
     background: rgba(0, 0, 0, 0.03) !important;
@@ -20641,20 +20670,38 @@ ${JSON.stringify(payload, null, 2)}
 </style>
 
 <script>
-(function initV53LiquidGlassSuite() {
-  function polishLiquidGlassControls() {
+(function initV55LiquidGlassAndSmoothBoot() {
+  function finalizeSmoothBoot() {
     const fab = document.getElementById("v32FabBtn");
     if (fab) {
-      fab.innerHTML = '<span class="ms" style="font-size:26px;font-weight:600;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.35))">add</span>';
+      fab.innerHTML = '<span class="ms" style="font-size:25px;font-weight:600">add</span>';
+    }
+    // 홈 대시보드가 준비되면 스켈레톤(#v55BootSkeleton)을 부드럽게 걷어내고 완성된 화면만 노출 (뚝뚝 끊김 제로)
+    if (document.getElementById("v32Dashboard")) {
+      document.body.classList.add("v55-boot-ready");
+      document.getElementById("v55BootSkeleton")?.remove();
     }
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", polishLiquidGlassControls);
+    document.addEventListener("DOMContentLoaded", finalizeSmoothBoot);
   } else {
-    polishLiquidGlassControls();
+    finalizeSmoothBoot();
   }
-  setTimeout(polishLiquidGlassControls, 200);
+  requestAnimationFrame(finalizeSmoothBoot);
+
+  // 서비스 워커가 새 버전을 감지하면 즉시 활성화하고 구버전 캐시 화면을 자동 갱신
+  if ("serviceWorker" in navigator) {
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
+    navigator.serviceWorker.getRegistration().then((reg) => {
+      if (reg) reg.update().catch(() => {});
+    });
+  }
 })();
 </script>
 <!-- === V53_LIQUID_GLASS_AND_IOS_REFINEMENT_SUITE_END === -->

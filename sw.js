@@ -1,7 +1,7 @@
-// V54 True See-Through Liquid Glass Suite (App Shell + Map Tiles + Images + Fonts)
-const CACHE_CORE = "trip-v54-core";
-const CACHE_ASSETS = "trip-v54-assets";
-const CACHE_TILES = "trip-v54-tiles";
+// V55 GitHub iOS Liquid Glass & Zero-Jank Instant Skeleton Suite
+const CACHE_CORE = "trip-v55-core";
+const CACHE_ASSETS = "trip-v55-assets";
+const CACHE_TILES = "trip-v55-tiles";
 
 const CORE_URLS = [
   "./",
@@ -17,7 +17,9 @@ self.addEventListener("install", (e) => {
   self.skipWaiting();
   e.waitUntil(
     caches.open(CACHE_CORE).then((cache) => {
-      return Promise.allSettled(CORE_URLS.map((u) => cache.add(u)));
+      return Promise.allSettled(
+        CORE_URLS.map((u) => fetch(u, { cache: "reload" }).then((res) => (res.ok ? cache.put(u, res) : null)))
+      );
     })
   );
 });
@@ -53,10 +55,10 @@ self.addEventListener("fetch", (e) => {
     return;
   }
 
-  // 1) HTML / App Shell: Network-First, 오프라인 시 캐시 즉시 반환
-  if (req.mode === "navigate" || url.pathname.endsWith("/index.html") || url.pathname === "/") {
+  // 1) HTML / App Shell: Network-First (브라우저 디스크 캐시 우회하여 최신 배포본 즉시 반영), 오프라인 시 캐시 반환
+  if (req.mode === "navigate" || url.pathname.endsWith("/index.html") || url.pathname.endsWith("/trip-app/") || url.pathname === "/") {
     e.respondWith(
-      fetch(req)
+      fetch(req, { cache: "no-cache" })
         .then((res) => {
           if (res && res.ok) {
             const copy = res.clone();
