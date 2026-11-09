@@ -19157,7 +19157,8 @@ ${caption || rawText}
     }
 
     // 2) JR 간사이 와이드 패스 핵심 역/노선 권역
-    const isJrTarget = /(간사이\s*공항|교토역|후시미\s*이나리|이나리역|아라시야마|사가아라시야마|우지역|신오사카|오사카역|덴노지역|고베|히메지|나라역|유니버설\s*시티|関西空港|京都駅|伏見稲荷|嵐山|宇治|新大阪|大阪駅|天王寺)/.test(nameAndAddr);
+    // (주의: '天王寺区'(덴노지구) 같은 일반 구 주소가 '天王寺'에 걸리지 않도록 '天王寺駅' 등 정확한 역/노선만 매칭)
+    const isJrTarget = /(간사이\s*공항|교토역|후시미\s*이나리|이나리역|아라시야마|사가아라시야마|우지역|신오사카역|오사카역|덴노지역|고베역|히메지|나라역|유니버설\s*시티|関西空港|京都駅|伏見稲荷|嵐山|宇治駅|新大阪駅|大阪駅|天王寺駅)/.test(nameAndAddr);
     if (isJrTarget) {
       return { type: "jr", label: "JR 와이드패스 노선", icon: "train" };
     }
@@ -19210,13 +19211,12 @@ ${caption || rawText}
     const itemMap = new Map(items.map(it => [String(it.id), it]));
 
     listEl.querySelectorAll(".item[data-id]").forEach(cardEl => {
-      // 기존에 잘못 붙어있던 배지 모두 제거
       cardEl.querySelectorAll(".v46-transit-badge").forEach(el => el.remove());
 
       const it = itemMap.get(String(cardEl.dataset.id));
       if (!it) return;
       const passInfo = judgeTransitPass(it);
-      if (!passInfo) return; // 일반 시내 맛집/매장은 배지를 붙이지 않아 깔끔하게 유지!
+      if (!passInfo) return;
 
       const metaRow = cardEl.querySelector(".ux7-meta-row");
       if (metaRow) {
@@ -19233,11 +19233,10 @@ ${caption || rawText}
     const sbody = document.getElementById("sbody");
     if (!sbody || !it) return;
 
-    // 기존에 제목(.nm) 옆 flex row 안에 들어가서 찌그러졌던 요소 제거
     sbody.querySelectorAll("#v46SheetPassTip").forEach(el => el.remove());
 
     const passInfo = judgeTransitPass(it);
-    if (!passInfo) return; // 패스 해당 구역(이네/미야즈/JR 주요역)일 때만 깔끔한 가로 바 형태로 표시
+    if (!passInfo) return;
 
     const nm = sbody.querySelector(".nm");
     const headerRow = nm ? nm.parentElement : null;
@@ -19254,7 +19253,6 @@ ${caption || rawText}
       <button type="button" class="mb" id="v46OpenGuideFromSheet" style="flex:none;min-height:28px;padding:3px 10px;font-size:11.5px;border-radius:999px;white-space:nowrap">패스 가이드</button>
     `;
 
-    // 제목+중요 버튼 flex 박스의 바깥(바로 아래 줄)에 삽입하여 절대 찌그러지지 않게 처리!
     headerRow.insertAdjacentElement("afterend", passBox);
 
     document.getElementById("v46OpenGuideFromSheet")?.addEventListener("click", (e) => {
@@ -19264,17 +19262,30 @@ ${caption || rawText}
   }
 
   /* =========================================================================
-   * 4. [V48] 캡션 & AI 기반 한국어 상호명 (대표 음식·판매 물건) 자동 변환 엔진
-   * - 'いいね！', 'CHIYOMATSU Dotonbori', '青竈', 'Yakiniku Kojima' 등을
-   *   캡션과 카테고리·메뉴를 분석하여 직관적인 한국어 제목으로 즉시 변환합니다.
+   * 4. [V48] 캡션 & AI 기반 한국어 상호명 (대표 음식·판매 물건) 정밀 변환 엔진
+   * - 일본어/영어만 있는 항목뿐 아니라:
+   *   1) '오사카グルメ', '도쿠라 교토 산조점 #とくら京都三条店 외 6곳'처럼 일본어/해시태그가 섞인 이름
+   *   2) '카시와야초 173-2', '천왕지 생탑町 9-192F (음식점)'처럼 주소 번지수가 이름으로 들어간 항목
+   *   3) '이 점', '맛집', '추천'처럼 의미가 잘린 불완전한 한국어 이름
+   *   4) 'Charcoal Grilled Eel Doikatsuman Kinkakuji Branch 외 8곳'처럼 영어+외 N곳 항목
+   *   전부 깔끔한 한국어 상호명(대표 음식·품목)으로 변환합니다!
    * ========================================================================= */
   const KNOWN_KR_NAME_PATTERNS = [
     { test: /이오시스|イオシス|iosys|아이폰.*공기계|공기계.*매장/i, ko: "이오시스 난바점 (중고 아이폰·공기계 매장)", local: "イオシス なんば店" },
     { test: /chiyomatsu|치요마츠|ちよ松|katsu\s*sandwich/i, ko: "치요마츠 도톤보리 (두꺼운 가츠동·가츠산도)", local: "大阪とんかつ ちよ松 道頓堀本店" },
     { test: /青竈|아오쿠도|aokudo|69\s*hirata,\s*ine/i, ko: "아오쿠도 이네 (바다뷰 감성 카페)", local: "青竈 (Aokudo)" },
     { test: /kojima\s*fukushima|야키니쿠\s*코지마|焼肉こじま/i, ko: "야키니쿠 코지마 후쿠시마점 (우설·야키니쿠)", local: "焼肉こじま 離れ 福島店" },
+    { test: /doikatsuman|도이카츠만|土井活鰻|장어\s*숯불구이/i, ko: "도이카츠만 킨카쿠지점 (장어 숯불구이 덮밥)", local: "炭火焼鰻 土井活鰻 金閣寺店" },
+    { test: /과자|茶寮\s*翠泉|사료스이센|모리한|morihan|말차.*디저트/i, ko: "교토 말차 디저트 카페", local: "" },
+    { test: /도쿠라|とくら|tokura.*sanjo/i, ko: "도쿠라 교토 산조점 (육즙 함박스테이크)", local: "とくら 京都三条店" },
+    { test: /生玉町9-192|생탑町\s*9-192|모미지|もみじ|몬자야키.*돈페야키/i, ko: "모미지 츠루하시·다니마치점 (오코노미야키·몬자야키)", local: "お好み焼き もみじ" },
+    { test: /traditional\s*교토-style\s*okono|교토\s*전통\s*스타일.*오코노미야키|이\s*점/i, ko: "교토 산조 오코노미야키 맛집 (교토식 철판요리)", local: "" },
+    { test: /173-2\s*kashiwayacho|카시와야초\s*173-2|kashiwayacho/i, ko: "교토 기온 강변 카모가와 다이닝 (전통 일식 한 끼)", local: "173-2 Kashiwayacho" },
+    { test: /45-1\s*sagayanagidacho|오사카グルメ|sagayanagidacho/i, ko: "아라시야마 로컬 정식 맛집 (교토 가정식 한 상)", local: "45-1 Sagayanagidacho" },
+    { test: /행자교|잇폰바시\s*다리|inaricho\s*kitagumi|히가시야마.*스팟/i, ko: "교토 기온 백천 다리 (행자교 포토스팟·산책로)", local: "行者橋 (一本橋)" },
+    { test: /matsuyacho.*치즈케이크|51\s*matsuyacho/i, ko: "교토 마츠야초 수제 치즈케이크 카페", local: "51 Matsuyacho" },
     { test: /ine\s*cafe|이네\s*카페|舟屋日和/i, ko: "이네 카페 (후나야 수상 바다뷰 카페)", local: "INE CAFE" },
-    { test: /katsukura|카츠쿠라|명대\s*돈카츠|かつくら/i, ko: "카츠쿠라 교토역점 (교토 명물 돈카츠)", local: "명대 돈카츠 카츠쿠라" },
+    { test: /katsukura|카츠쿠라|명대\s*돈카츠|かつくら/i, ko: "카츠쿠라 교토역점 (교토 명물 돈카츠)", local: "名代とんかつ かつくら" },
     { test: /donguri\s*kyowakoku|동구리\s*공화국|지브리/i, ko: "동구리 공화국 (지브리 캐릭터 굿즈샵)", local: "どんぐり共和国" },
     { test: /mugiwara|무기와라\s*스토어|원피스\s*샵/i, ko: "무기와라 스토어 (원피스 공식 굿즈샵)", local: "麦わらストア" },
     { test: /ichiran|이치란/i, ko: "이치란 라멘 (돈코츠 라멘)", local: "一蘭" },
@@ -19288,76 +19299,155 @@ ${caption || rawText}
     { test: /kaldi|칼디/i, ko: "칼디 커피팜 (수입과자·스프레드 쇼핑)", local: "KALDI" }
   ];
 
-  function needsKoreanRename(name) {
-    const n = String(name || "").trim();
-    if (!n) return true;
-    // 'いいね！' 같은 인스타 감탄사나 일반 문구
-    if (/^(?:いいね|좋아요|추천|맛집|오사카|교토|일본)[!！\s]*$/i.test(n)) return true;
-    // 한글이 한 글자도 없고 일본어(히라가나/가타카나/한자)나 영어로만 된 경우
-    if (!/[가-힣]/.test(n)) return true;
+  // 이름이 이상하거나 정리가 필요한 모든 케이스를 감지
+  function needsKoreanRename(name, item) {
+    const raw = String(name || "").trim();
+    if (!raw) return true;
+
+    // '외 6곳', '외 8곳' 같은 접미사를 떼어낸 본래 이름으로 검사
+    const core = raw.replace(/\s*외\s*\d+\s*곳\s*$/, "").trim();
+    if (!core) return true;
+
+    // 1) 일본어 히라가나/가타카나/한자가 1글자라도 섞여 있는 경우 (예: '오사카グルメ', '생탑町', '#とくら京都三条店')
+    if (/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(core)) return true;
+
+    // 2) 해시태그(#)가 이름에 그대로 남아 있는 경우
+    if (/#/.test(core)) return true;
+
+    // 3) 한글이 아예 없거나, 영어 알파벳이 5글자 이상 연속으로 들어간 경우 (예: 'Charcoal Grilled Eel ... 외 8곳')
+    if (!/[가-힣]/.test(core) || /[A-Za-z]{5,}/.test(core)) return true;
+
+    // 4) 번지수 숫자(예: '카시와야초 173-2', '9-192F')나 '(음식점)' 같은 기계적 주소 번역인 경우
+    if (/\d+\s*-\s*\d+|\(음식점\)|\(카페\)|\(매장\)/.test(core)) return true;
+
+    // 5) '이 점', '그곳', '좋아요' 등 2~3글자 불완전 절단 이름인 경우
+    if (/^(?:이\s*점|그\s*점|이\s*곳|그\s*곳|여기|맛집|추천|오사카|교토|일본|가게|식당|카페)[!！\s]*$/.test(core)) return true;
+
     return false;
   }
 
   function inferKoreanNameFromCaption(item) {
-    const hay = `${item.name || ""} ${item.localName || ""} ${item.address || ""} ${item.price || ""} ${item.info || ""} ${item.note || ""}`;
+    const rawName = String(item.name || "").trim();
+    // '외 N곳' 접미사 보존용 추출
+    const groupSuffixMatch = rawName.match(/(\s*외\s*\d+\s*곳)\s*$/);
+    const groupSuffix = groupSuffixMatch ? groupSuffixMatch[1] : "";
 
-    // 1) 알려진 유명 맛집/매장 패턴 즉시 매칭
+    // 해시태그 제거 버전
+    const cleanedHash = rawName
+      .replace(/#[^\s]+/g, "")
+      .replace(/\s*외\s*\d+\s*곳\s*$/, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    const hay = `${rawName} ${item.localName || ""} ${item.address || ""} ${item.price || ""} ${item.info || ""} ${item.note || ""}`;
+
+    // 1) 알려진 유명 맛집/매장/주소 패턴 즉시 매칭
     for (const pat of KNOWN_KR_NAME_PATTERNS) {
       if (pat.test.test(hay)) {
-        if (!item.localName && !/[가-힣]/.test(item.name || "") && !/いいね/.test(item.name || "")) {
-          item.localName = item.name;
+        if (!item.localName && pat.local) {
+          item.localName = pat.local;
         }
-        return pat.ko;
+        return pat.ko + groupSuffix;
       }
     }
 
-    // 2) 캡션/메모 안에 '📍 한국어 상호명' 이 적혀 있는 경우 추출
-    const pinMatch = hay.match(/📍\s*([가-힣0-9a-zA-Z\s·()]{2,25}?)(?=\s+[一-龯ぁ-んァ-ヶ〒\d]|$|\n)/);
-    let baseKoName = pinMatch ? pinMatch[1].trim() : "";
-
-    // 3) 음식/디저트/쇼핑 키워드로 품목 추론
+    // 2) 음식/디저트/쇼핑 키워드로 품목 추론
     let itemTag = "";
-    if (/katsu\s*sandwich|가츠산도|카츠산도|산도/i.test(hay)) itemTag = "가츠산도·타마고산도";
-    else if (/yakiniku|야키니쿠|焼肉|와규|우설/i.test(hay)) itemTag = "야키니쿠·와규 구이";
-    else if (/sushi|스시|초밥|오마카세|寿司/i.test(hay)) itemTag = "스시·초밥 맛집";
-    else if (/ramen|라멘|츠케멘|소바|우동|ラーメン|うどん/i.test(hay)) itemTag = "일본 라멘·면요리";
-    else if (/takoyaki|타코야키|오코노미야키/i.test(hay)) itemTag = "타코야키·철판요리";
-    else if (/tonkatsu|돈카츠|돈까스|규카츠|とんかつ/i.test(hay)) itemTag = "돈카츠·규카츠 맛집";
-    else if (/izakaya|이자카야|야키토리|꼬치|居酒屋/i.test(hay)) itemTag = "이자카야·꼬치구이";
-    else if (/cafe|coffee|카페|커피|라떼|말차|케이크|디저트|푸딩|빙수/i.test(hay) || item.category === "CAFE") itemTag = "감성 카페·디저트";
-    else if (/아이폰|공기계|중고폰|애플|전자제품/i.test(hay)) itemTag = "중고폰·전자기기 매장";
-    else if (/빈티지|구제|옷가게|편집샵|스트릿|의류|신발/i.test(hay) || item.category === "SHOP") itemTag = "쇼핑·브랜드 매장";
+    if (/장어|우나기|eel|鰻/i.test(hay)) itemTag = "장어 덮밥·숯불구이";
+    else if (/함박|햄버그|hamburg|ハンバーグ|도쿠라/i.test(hay)) itemTag = "육즙 함박스테이크";
+    else if (/katsu\s*sandwich|가츠산도|카츠산도|산도/i.test(hay)) itemTag = "가츠산도·타마고산도";
+    else if (/yakiniku|야키니쿠|焼肉|와규|우설|호르몬/i.test(hay)) itemTag = "야키니쿠·와규 구이";
+    else if (/sushi|스시|초밥|오마카세|카이센동|해산물|寿司|海鮮/i.test(hay)) itemTag = "스시·카이센동 맛집";
+    else if (/ramen|라멘|츠케멘|소바|우동|ラーメン|うどん|そば/i.test(hay)) itemTag = "라멘·면요리 맛집";
+    else if (/takoyaki|타코야키|오코노미야키|몬자야키|돈페야키|okonomiyaki|お好み焼き/i.test(hay)) itemTag = "오코노미야키·철판요리";
+    else if (/tonkatsu|돈카츠|돈까스|규카츠|가츠동|とんかつ|牛カツ/i.test(hay)) itemTag = "돈카츠·규카츠 맛집";
+    else if (/izakaya|이자카야|야키토리|꼬치|오뎅|居酒屋|焼き鳥/i.test(hay)) itemTag = "이자카야·꼬치구이";
+    else if (/치즈케이크|케이크|푸딩|파르페|도넛|베이커리|빵집|말차|디저트/i.test(hay)) itemTag = "디저트·베이커리 카페";
+    else if (/cafe|coffee|카페|커피|라떼|로스터리|킷사텐/i.test(hay) || item.category === "CAFE") itemTag = "감성 카페·커피";
+    else if (/아이폰|공기계|중고폰|애플|전자제품|카메라/i.test(hay)) itemTag = "중고폰·전자기기 매장";
+    else if (/빈티지|구제|옷가게|편집샵|스트릿|의류|신발|쇼핑/i.test(hay) || item.category === "SHOP") itemTag = "쇼핑·패션 매장";
+    else if (/다리|신사|사찰|절|전망대|공원|거리|산책|포토스팟/i.test(hay) || item.category === "PLACE") itemTag = "여행 명소·포토스팟";
 
-    if (baseKoName && /[가-힣]/.test(baseKoName)) {
-      if (!item.localName && !/[가-힣]/.test(item.name || "") && !/いいね/.test(item.name || "")) {
-        item.localName = item.name;
-      }
-      return itemTag && !baseKoName.includes(itemTag.split("·")[0])
-        ? `${baseKoName} (${itemTag})`
-        : baseKoName;
+    // 3) 이름에서 해시태그나 일본어만 걷어냈을 때 훌륭한 한국어 상호명이 남는 경우 (예: '도쿠라 교토 산조점 #とくら京都三条店 외 6곳')
+    const koOnly = cleanedHash
+      .replace(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]+/g, "")
+      .replace(/\(음식점\)|\(카페\)|\(매장\)/g, "")
+      .replace(/\d+\s*-\s*\d+[A-Za-z]*/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (koOnly.length >= 3 && /[가-힣]{2,}/.test(koOnly) && !/^(?:오사카|교토|카시와야초|천왕지\s*생탑|이\s*점)$/.test(koOnly)) {
+      const withTag = itemTag && !koOnly.includes(itemTag.split("·")[0])
+        ? `${koOnly} (${itemTag})`
+        : koOnly;
+      return withTag + groupSuffix;
     }
 
-    return null;
+    // 4) 캡션/메모 안에 '📍 한국어 상호명' 이 적혀 있는 경우 추출
+    const pinMatch = hay.match(/📍\s*([가-힣0-9\s·()]{2,22}?)(?=\s+[一-龯ぁ-んァ-ヶ〒\dA-Za-z]|$|\n)/);
+    if (pinMatch && /[가-힣]{2,}/.test(pinMatch[1])) {
+      const pinKo = pinMatch[1].trim();
+      return (itemTag ? `${pinKo} (${itemTag})` : pinKo) + groupSuffix;
+    }
+
+    // 5) 주소/지역명 + 음식/품목 조합으로 자연스러운 한국어 제목 생성 (번지수나 영어/일본어 대신!)
+    let areaKo = "오사카·교토";
+    if (/기온|가와라마치|산조|nakagyo|higashiyama|kashiwayacho|inaricho/i.test(hay)) areaKo = "교토 기온·산조";
+    else if (/아라시야마|ukyo|sagayanagida/i.test(hay)) areaKo = "교토 아라시야마";
+    else if (/킨카쿠지|금각사|kinkakuji/i.test(hay)) areaKo = "교토 금각사";
+    else if (/교토|kyoto|京都/i.test(hay)) areaKo = "교토";
+    else if (/도톤보리|난바|신사이바시|닛폰바시|namba|dotonbori|shinsaibashi/i.test(hay)) areaKo = "오사카 난바·도톤보리";
+    else if (/우메다|후쿠시마|umeda|fukushima/i.test(hay)) areaKo = "오사카 우메다·후쿠시마";
+    else if (/텐노지|덴노지|츠루하시|生玉町|tennoji/i.test(hay)) areaKo = "오사카 덴노지·다니마치";
+    else if (/이네|미야즈|아마노하시다테|ine|miyazu/i.test(hay)) areaKo = "이네·아마노하시다테";
+
+    const fallbackCategoryLabel =
+      itemTag ||
+      (item.category === "CAFE" ? "감성 카페·디저트" :
+       item.category === "SHOP" ? "추천 쇼핑 매장" :
+       item.category === "PLACE" ? "추천 여행 스팟" : "로컬 맛집");
+
+    return `${areaKo} ${fallbackCategoryLabel}${groupSuffix}`;
   }
 
-  // 즉시 로컬 규칙으로 1차 한국어 변환 실행
+  // 다중 묶음 장소(it.places) 내부 서브 장소들의 이름도 깔끔하게 한글 정리
   function applyInstantKoreanNames() {
     if (!Array.isArray(items)) return false;
     let changed = false;
     items.forEach(it => {
-      if (needsKoreanRename(it.name)) {
+      if (needsKoreanRename(it.name, it)) {
         const ko = inferKoreanNameFromCaption(it);
         if (ko && ko !== it.name) {
+          if (!it.localName && !/いいね|이\s*점/.test(it.name || "")) {
+            it.localName = it.name.replace(/\s*외\s*\d+\s*곳\s*$/, "").trim();
+          }
           it.name = ko;
           changed = true;
         }
       }
-      // 영어 메뉴 설명도 자연스러운 한국어로 보조 변환
-      if (it.price && /Katsu Sandwich/i.test(it.price)) {
+      // 내부 묶음 장소(places 배열)도 정리
+      if (Array.isArray(it.places)) {
+        it.places.forEach(p => {
+          if (p && needsKoreanRename(p.name, p)) {
+            const pKo = inferKoreanNameFromCaption({ ...it, ...p, name: p.name });
+            if (pKo && pKo !== p.name) {
+              if (!p.localName) p.localName = p.name;
+              p.name = pKo.replace(/\s*외\s*\d+\s*곳\s*$/, "").trim();
+              changed = true;
+            }
+          }
+        });
+      }
+      // 영어 메뉴 설명 한글화
+      if (it.price && /Katsu Sandwich|Traditional/i.test(it.price)) {
         it.price = it.price
           .replace(/Katsu Sandwich/gi, "가츠산도")
           .replace(/Egg Sandwich/gi, "타마고산도")
           .replace(/Wagyu/gi, "와규");
+        changed = true;
+      }
+      if (it.info && /Traditional\s*교토-style\s*Okonomiyaki/i.test(it.info)) {
+        it.info = it.info.replace(/Traditional\s*교토-style\s*Okonomiyaki/gi, "교토 전통 스타일 오코노미야키");
         changed = true;
       }
     });
@@ -19367,15 +19457,15 @@ ${caption || rawText}
     return changed;
   }
 
-  // 설정된 AI API 키(Gemini/OpenRouter/Groq/OpenAI)를 사용해 아직 일본어/영어로 남은 모든 항목을 한국어(음식/물건 포함)로 일괄 번역
+  // 설정된 AI API 키를 사용해 전체 항목의 한국어 상호명(음식/물건)을 정밀 보정
   window.translateAllItemsToKoreanWithAI = async function(silent = false) {
     if (!Array.isArray(items) || !items.length) return;
     applyInstantKoreanNames();
 
-    const targets = items.filter(it => needsKoreanRename(it.name));
+    const targets = items.filter(it => needsKoreanRename(it.name, it));
     if (!targets.length) {
       if (!silent && typeof toast === "function") {
-        toast("✨ 모든 장소가 이미 한국어(음식·물건 이름 포함)로 깔끔하게 정리되어 있어요!");
+        toast("✨ 전체 목록이 한국어 상호명(음식·물건 이름)으로 깔끔하게 정리되었습니다!");
       }
       if (typeof renderListTab === "function") renderListTab();
       return;
@@ -19383,24 +19473,17 @@ ${caption || rawText}
 
     const hasAi = typeof AI_DEFS !== "undefined" && typeof aiCfg !== "undefined" && AI_DEFS.some(d => aiCfg[d.id]?.key);
     if (!hasAi || typeof askAI !== "function") {
-      if (!silent && typeof toast === "function") {
-        toast("💡 기본 한국어 변환을 적용했어요! (설정에서 AI API 키를 넣으면 전 항목 정밀 번역이 가능합니다)");
-      }
       if (typeof renderListTab === "function") renderListTab();
       return;
     }
 
-    if (!silent && typeof toast === "function") {
-      toast(`🤖 AI가 ${targets.length}곳의 일본어·영어 이름을 한국어(대표 음식/물건)로 변환 중입니다...`);
-    }
-
     try {
-      // 15개씩 나누어 AI에 요청
       for (let i = 0; i < targets.length; i += 15) {
         const chunk = targets.slice(i, i + 15);
         const payload = chunk.map(x => ({
           id: x.id,
           name: x.name,
+          localName: x.localName || "",
           category: x.category,
           address: x.address || "",
           price: x.price || "",
@@ -19408,11 +19491,9 @@ ${caption || rawText}
           note: x.note || ""
         }));
 
-        const prompt = `아래 일본 여행 장소 목록의 "name"(이름)이 일본어, 한자, 영어이거나 'いいね！'처럼 부정확합니다.
-각 항목의 캡션/메뉴(price, info, note)와 주소, 카테고리를 분석해서 한국인이 한눈에 알아볼 수 있는 **[한국어 상호명 (대표 음식 또는 파는 물건)]** 형태로 변환해주세요.
-- 음식점/카페 예시: "치요마츠 도톤보리 (두꺼운 가츠동·산도)", "야키니쿠 코지마 후쿠시마점 (우설·야키니쿠)", "아오쿠도 이네 (바다뷰 카페)"
-- 쇼핑/매장 예시: "이오시스 난바점 (중고 아이폰·공기계 매장)"
-- price(가격/메뉴)도 영어나 일본어면 한국어로 번역해주세요.
+        const prompt = `아래 일본 여행 장소 목록의 이름을 한국인이 한눈에 알아볼 수 있는 **[한국어 상호명 (대표 음식 또는 파는 물건)]** 형태로 변환해주세요.
+- 일본어(グルメ, 町 등), 영어(Charcoal Grilled Eel...), 해시태그(#), 번지수 주소(173-2, 9-192F)가 이름에 남아 있으면 절대 안 됩니다!
+- 원래 이름 끝에 '외 N곳'이 있었다면 변환된 이름 끝에도 '외 N곳'을 유지하세요.
 
 입력 JSON:
 ${JSON.stringify(payload, null, 2)}
@@ -19428,7 +19509,7 @@ ${JSON.stringify(payload, null, 2)}
           parsed.forEach(row => {
             const target = items.find(it => String(it.id) === String(row.id));
             if (target && row.koName && /[가-힣]/.test(row.koName)) {
-              if (!target.localName && target.name && !/いいね/.test(target.name)) {
+              if (!target.localName && target.name) {
                 target.localName = target.name;
               }
               target.name = row.koName.trim();
@@ -19441,36 +19522,29 @@ ${JSON.stringify(payload, null, 2)}
       if (typeof persistNow === "function") persistNow();
       if (typeof renderListTab === "function") renderListTab();
       if (typeof draw === "function") draw();
-      if (!silent && typeof toast === "function") {
-        toast("✅ 모든 목록을 한국어 상호명 + 음식/물건 이름으로 깔끔하게 변환했어요!");
-      }
     } catch (e) {
-      if (!silent && typeof toast === "function") {
-        toast("기본 한국어 변환이 적용되었습니다.");
-      }
       if (typeof renderListTab === "function") renderListTab();
     }
   };
 
-  // 목록 탭 상단 컨트롤에 [한국어 이름 자동정리] 원터치 버튼 추가
-  function injectKoreanRenameButton() {
-    const listSec = document.getElementById("tab-list");
-    if (!listSec || document.getElementById("v48KoRenameBtn")) return;
-    const searchRow = listSec.querySelector(".search-row");
-    if (!searchRow) return;
+  /* =========================================================================
+   * 5. 1/N 정산 바 찌그러짐 완벽 복구!
+   * - 원인: .search-row 안에 #v48KoRenameBtn 버튼을 넣어서 #v32ListBudgetBar 가
+   *   좁은 폭에 갇혀 '1인 ₩0 (3명)' 글자가 세로로 깨졌습니다.
+   * - 해결: .search-row 안의 불필요한 버튼을 즉시 제거하고, #v32ListBudgetBar 에
+   *   white-space: nowrap 및 넉넉한 가로 폭을 강제 보장합니다!
+   * ========================================================================= */
+  function fixSplitBarLayout() {
+    // 혹시라도 남아 있는 버튼 즉시 제거
+    document.getElementById("v48KoRenameBtn")?.remove();
 
-    const btn = document.createElement("button");
-    btn.id = "v48KoRenameBtn";
-    btn.type = "button";
-    btn.className = "mb";
-    btn.style.cssText = "flex:none;min-height:36px;padding:0 11px;font-size:12px;font-weight:800;color:#60a5fa;border-color:rgba(59,130,246,0.35);background:rgba(59,130,246,0.12);border-radius:12px;white-space:nowrap";
-    btn.innerHTML = `<span class="ms" style="font-size:15px">translate</span>한글 이름 정리`;
-    btn.title = "일본어·영어 장소명을 캡션 기반 한국어(음식/물건 이름)로 일괄 변환합니다";
-    btn.onclick = (e) => {
-      e.stopPropagation();
-      window.translateAllItemsToKoreanWithAI(false);
-    };
-    searchRow.appendChild(btn);
+    const bar = document.getElementById("v32ListBudgetBar");
+    if (bar) {
+      bar.style.cssText = "flex:1 1 auto !important;min-width:175px !important;min-height:40px !important;display:flex !important;align-items:center !important;justify-content:space-between !important;gap:8px !important;padding:6px 14px !important;border-radius:14px !important;white-space:nowrap !important;";
+      bar.querySelectorAll("span").forEach(sp => {
+        sp.style.whiteSpace = "nowrap";
+      });
+    }
   }
 
   // 모달 닫기 이벤트
@@ -19499,7 +19573,7 @@ ${JSON.stringify(payload, null, 2)}
       applyInstantKoreanNames();
       const r = _origList.apply(this, args);
       decorateListWithPassBadges();
-      injectKoreanRenameButton();
+      fixSplitBarLayout();
       return r;
     };
   }
@@ -19518,13 +19592,13 @@ ${JSON.stringify(payload, null, 2)}
     applyInstantKoreanNames();
     injectPassCardOnHome();
     decorateListWithPassBadges();
-    injectKoreanRenameButton();
-    // 백그라운드에서 AI 키가 있으면 아직 안 바뀐 일본어/영어 이름도 조용히 한글화
+    fixSplitBarLayout();
+    if (typeof renderListTab === "function") renderListTab();
     setTimeout(() => {
-      if (Array.isArray(items) && items.some(it => needsKoreanRename(it.name))) {
+      if (Array.isArray(items) && items.some(it => needsKoreanRename(it.name, it))) {
         window.translateAllItemsToKoreanWithAI(true);
       }
-    }, 1200);
+    }, 800);
   };
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", bootV46);
