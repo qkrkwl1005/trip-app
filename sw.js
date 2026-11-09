@@ -1,7 +1,7 @@
-// V47 Offline-First Smart Service Worker (App Shell + Map Tiles + Images + Fonts)
-const CACHE_CORE = "trip-v47-core";
-const CACHE_ASSETS = "trip-v47-assets";
-const CACHE_TILES = "trip-v47-tiles";
+// V51 Instant Skeleton Screen & Code Cleanup (App Shell + Map Tiles + Images + Fonts)
+const CACHE_CORE = "trip-v51-core";
+const CACHE_ASSETS = "trip-v51-assets";
+const CACHE_TILES = "trip-v51-tiles";
 
 const CORE_URLS = [
   "./",
