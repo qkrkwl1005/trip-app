@@ -1,7 +1,7 @@
-// V53 Liquid Glass & iOS Refinement Suite (App Shell + Map Tiles + Images + Fonts)
-const CACHE_CORE = "trip-v53-core";
-const CACHE_ASSETS = "trip-v53-assets";
-const CACHE_TILES = "trip-v53-tiles";
+// V54 True See-Through Liquid Glass Suite (App Shell + Map Tiles + Images + Fonts)
+const CACHE_CORE = "trip-v54-core";
+const CACHE_ASSETS = "trip-v54-assets";
+const CACHE_TILES = "trip-v54-tiles";
 
 const CORE_URLS = [
   "./",
