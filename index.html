@@ -1567,135 +1567,82 @@
           <button id="themeBtn" class="btn g" style="margin-bottom: 0"></button>
         </div>
 
-        <!-- 카드 그룹 1: 친구들과 실시간 공유 방 -->
-        <div class="card">
+        <!-- 카드 그룹 1: 우리 여행 실시간 공유 방 (간편 모드) -->
+        <div class="card" id="v49SharedRoomCard">
           <div class="sec-title">
-            <span style="display: flex; align-items: center; gap: 6px"
-              ><span class="ms">group</span>실시간 공유 방</span
-            >
-            <small
-              id="appVersionChip"
-              style="font-size: 11.5px; color: var(--sub); font-weight: 600"
-            ></small>
+            <span style="display: flex; align-items: center; gap: 6px">
+              <span class="ms" style="color:#3b82f6">group</span>우리 여행 실시간 공유
+            </span>
+            <small id="appVersionChip" style="font-size: 11.5px; color: var(--sub); font-weight: 600"></small>
           </div>
-          <div
-            id="sharedRoomStatus"
-            class="ds"
-            style="margin-bottom: 10px; font-weight: 700"
-          >
-            공유 방에 연결되지 않았어요.
-          </div>
-          <button id="googleLoginBtn" class="btn" style="margin-bottom: 8px">
-            <span class="ms">login</span>Google 계정으로 로그인
-          </button>
-          <small
-            id="sharedUserStatus"
-            style="
-              display: block;
-              margin: 4px 0 12px;
-              color: var(--sub);
-              font-size: 12.5px;
-            "
-            >방 권한 관리를 위해 Google 로그인이 필요합니다.</small
-          >
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
-            <button id="createRoomBtn" class="btn g" style="margin-bottom: 0">
-              <span class="ms">add_circle</span>공유 방 만들기
-            </button>
-            <button id="joinRoomBtn" class="btn g" style="margin-bottom: 0">
-              <span class="ms">link</span>방 링크 열기
-            </button>
-          </div>
-          <button
-            id="copyRoomBtn"
-            class="btn g"
-            style="margin-top: 8px; margin-bottom: 0"
-          >
-            <span class="ms">content_copy</span>현재 방 링크 복사
-          </button>
-          <small
-            id="roomSyncInfo"
-            style="
-              display: block;
-              margin: 8px 0 4px;
-              color: var(--sub);
-              font-size: 12px;
-              min-height: 16px;
-            "
-          ></small>
-          <div
-            id="roomMembers"
-            class="ds"
-            style="margin-top: 8px; white-space: pre-line"
-          >
-            참여자 정보를 불러오는 중...
-          </div>
-          <div
-            id="joinRequests"
-            class="ds"
-            style="margin-top: 8px; white-space: pre-line"
-          ></div>
-          <div
-            id="joinBadge"
-            class="ds"
-            style="margin-top: 8px; display: none"
-          ></div>
-          <div
-            id="roomGuide"
-            class="ds"
-            style="margin-top: 8px; display: none"
-          ></div>
-          <div
-            id="roomConflict"
-            class="ds"
-            style="margin-top: 8px; display: none"
-          ></div>
 
-          <details class="acc" style="margin-top: 14px; margin-bottom: 0">
-            <summary>
-              <span class="ms">manage_accounts</span>방 멤버 권한 · 되돌리기 ·
-              로그인 진단
+          <!-- 연결 상태 및 방 번호 칩 -->
+          <div style="background:var(--s2);border:1px solid var(--bd2);border-radius:18px;padding:14px 16px;margin-bottom:12px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+              <span id="sharedRoomStatus" style="font-weight:800;font-size:13.5px;color:var(--tx)">● 우리 여행방 실시간 동기화 중</span>
+              <span id="v49RoomBadge" style="font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;background:rgba(59,130,246,0.18);color:#60a5fa;border:1px solid rgba(59,130,246,0.35)">방 번호: 1124</span>
+            </div>
+            <div style="font-size:12px;color:var(--sub);line-height:1.5">
+              친구들과 장소를 추가하거나 체크하면 모든 폰에 1초 만에 똑같이 실시간 반영돼요.
+            </div>
+            <small id="roomSyncInfo" style="display:block;margin-top:6px;color:var(--sub);font-size:11.5px"></small>
+          </div>
+
+          <!-- 메인 액션 1: 원터치 카카오톡 / 친구 초대 링크 공유 버튼 -->
+          <button id="v49KakaoShareBtn" type="button" class="btn" style="background:#fee500;color:#191919;font-weight:900;margin-bottom:10px;border:none;box-shadow:0 4px 14px rgba(254,229,0,0.25)">
+            <span class="ms" style="color:#191919">share</span>💬 카카오톡으로 친구 초대하기
+          </button>
+
+          <!-- 메인 액션 2: 4자리 방 번호 또는 링크로 바로 입장하기 -->
+          <div style="display:flex;gap:8px;margin-bottom:8px">
+            <button id="v49QuickJoinBtn" type="button" class="btn g" style="flex:1;margin:0;min-height:42px;font-size:12.5px;font-weight:800">
+              <span class="ms">pin</span>방 번호(1124)로 입장
+            </button>
+            <button id="copyRoomBtn" type="button" class="btn g" style="flex:1;margin:0;min-height:42px;font-size:12.5px">
+              <span class="ms">content_copy</span>초대 링크 복사
+            </button>
+          </div>
+
+          <!-- 참여자 목록 -->
+          <div id="roomMembers" class="ds" style="margin-top:8px;font-size:12px;white-space:pre-line">참여 멤버 확인 중...</div>
+
+          <!-- 숨겨진 필수 DOM 유지 (기존 JS 에러 방지용 display:none) -->
+          <div id="joinRequests" style="display:none"></div>
+          <div id="joinBadge" style="display:none"></div>
+          <div id="roomGuide" style="display:none"></div>
+          <div id="roomConflict" style="display:none"></div>
+          <button id="createRoomBtn" style="display:none"></button>
+          <button id="joinRoomBtn" style="display:none"></button>
+
+          <!-- 고급 관리 (필요할 때만 펼치는 접이식) -->
+          <details class="acc" style="margin-top:12px;margin-bottom:0">
+            <summary style="font-size:12px;color:var(--sub)">
+              <span class="ms" style="font-size:16px">tune</span>방 설정 · 새 방 만들기 · 되돌리기
             </summary>
-            <div class="acc-in">
-              <button id="requestJoinBtn" class="btn g">
-                <span class="ms">person_raised_hand</span>방장에게 참여 요청
+            <div class="acc-in" style="padding-top:10px">
+              <button id="googleLoginBtn" class="btn g" style="margin-bottom:8px">
+                <span class="ms">login</span>Google 계정 연결 / 변경
               </button>
-              <button id="addMemberBtn" class="btn g">
-                <span class="ms">person_add</span>친구 사용자 ID 승인
+              <small id="sharedUserStatus" style="display:block;margin:2px 0 10px;color:var(--sub);font-size:11.5px"></small>
+              <button id="v49MakeNewRoomBtn" class="btn g" style="margin-bottom:8px">
+                <span class="ms">add_circle</span>완전 새로운 새 여행방 만들기
               </button>
-              <button id="copyUserIdBtn" class="btn g">
-                <span class="ms">badge</span>내 사용자 ID 복사
-              </button>
-              <button id="undoRoomBtn" class="btn g">
+              <button id="undoRoomBtn" class="btn g" style="margin-bottom:8px">
                 <span class="ms">undo</span>마지막 변경 되돌리기
               </button>
-              <button id="leaveRoomBtn" class="btn g">
+              <button id="leaveRoomBtn" class="btn g" style="margin-bottom:8px">
                 <span class="ms">logout</span>이 기기에서 방 연결 끊기
               </button>
-              <button id="deleteRoomBtn" class="btn g" style="color: var(--dg)">
-                <span class="ms">delete</span>이 공유 방 삭제
+              <button id="deleteRoomBtn" class="btn g" style="color:var(--dg);margin-bottom:8px">
+                <span class="ms">delete</span>공유 방 완전 삭제
               </button>
-              <button
-                id="loginDiagCopyBtn"
-                class="mb"
-                style="margin-top: 6px; width: 100%"
-              >
+              <button id="requestJoinBtn" style="display:none"></button>
+              <button id="addMemberBtn" style="display:none"></button>
+              <button id="copyUserIdBtn" style="display:none"></button>
+              <button id="loginDiagCopyBtn" class="mb" style="width:100%;margin-top:4px;font-size:11px">
                 <span class="ms">content_copy</span>로그인 진단 기록 복사
               </button>
-              <small
-                id="loginDiagOut"
-                style="
-                  display: block;
-                  margin-top: 6px;
-                  color: var(--sub);
-                  font-size: 11.5px;
-                  line-height: 1.6;
-                  white-space: pre-wrap;
-                  word-break: break-all;
-                "
-                >로그인이 막히면 위 버튼을 눌러 진단 내용을 복사해
-                확인하세요.</small
-              >
+              <small id="loginDiagOut" style="display:none"></small>
             </div>
           </details>
         </div>
@@ -3265,14 +3212,20 @@
           try {
             text = decodeURIComponent(text);
           } catch (_) {}
-          if (/^[A-Za-z0-9_-]{8,100}$/.test(text)) return text;
+          if (text === "1124" || text === "1124호") return "OSAKA-2026";
+          if (/^[A-Za-z0-9_-]{4,100}$/.test(text)) {
+            if (text === "1124") return "OSAKA-2026";
+            if (text.length >= 8) return text;
+          }
           const match = text.match(/[?&]room=([^&#]+)/);
           if (match) {
             text = match[1];
+            if (text === "1124" || text === "1124호") return "OSAKA-2026";
             continue;
           }
           break;
         }
+        if (text === "1124" || text === "1124호") return "OSAKA-2026";
         return /^[A-Za-z0-9_-]{8,100}$/.test(text) ? text : "";
       }
       function setSharedRoomStatus(message, kind = "") {
@@ -9272,17 +9225,48 @@ ${caption || rawText}
         } catch (_) {}
         location.href = roomUrl(id);
       };
+      $("v49MakeNewRoomBtn") && ($("v49MakeNewRoomBtn").onclick = $("createRoomBtn").onclick);
       $("joinRoomBtn").onclick = () => {
         const id = prompt(
-          "친구에게 받은 방 링크 또는 방 코드를 입력하세요:",
-          "",
+          "친구에게 받은 방 번호(예: 1124) 또는 방 링크를 입력하세요:",
+          "1124",
         );
         if (!id) return;
         const roomId = extractRoomId(id);
         if (!roomId)
-          return toast("올바른 공유 방 링크나 방 코드를 입력해 주세요.");
+          return toast("올바른 공유 방 번호나 링크를 입력해 주세요.");
         location.href = roomUrl(roomId);
       };
+      $("v49QuickJoinBtn") && ($("v49QuickJoinBtn").onclick = $("joinRoomBtn").onclick);
+
+      // 원터치 카카오톡 / 친구 초대 공유
+      const handleKakaoShare = async () => {
+        const targetRoom = sharedRoomId || "OSAKA-2026";
+        const inviteUrl = `${location.origin}${location.pathname}?room=${encodeURIComponent(targetRoom)}`;
+        const shareData = {
+          title: "오사카·교토 3인 여행 실시간 플래너",
+          text: `✈️ 오사카·교토 여행 일정 같이 보기!\n링크를 누르면 바로 실시간 공유 방(번호: 1124)으로 연결돼요:\n${inviteUrl}`,
+          url: inviteUrl
+        };
+        try {
+          if (navigator.share) {
+            await navigator.share(shareData);
+          } else {
+            await navigator.clipboard.writeText(inviteUrl);
+            toast("💬 카톡 초대 링크가 복사되었어요! 카톡 대화방에 붙여넣어 보내세요.");
+          }
+        } catch (e) {
+          if (e.name !== "AbortError") {
+            try {
+              await navigator.clipboard.writeText(inviteUrl);
+              toast("💬 초대 링크가 복사되었어요!");
+            } catch (_) {
+              prompt("이 초대 링크를 친구에게 보내세요:", inviteUrl);
+            }
+          }
+        }
+      };
+      $("v49KakaoShareBtn") && ($("v49KakaoShareBtn").onclick = handleKakaoShare);
       $("copyRoomBtn").onclick = copyRoomLink;
       $("googleLoginBtn").onclick = handleGoogleLoginBtn;
       $("loginDiagCopyBtn").onclick = async () => {
@@ -9971,19 +9955,10 @@ ${caption || rawText}
         new URLSearchParams(location.search).get("room"),
       );
       if (!initialRoom) {
-        initialRoom = extractRoomId(ls.get(TRIP_LAST_ROOM_KEY) || "");
-        if (initialRoom)
-          setSharedRoomStatus(
-            "이전에 접속했던 공유 방에 다시 연결하는 중…",
-            "",
-          );
+        initialRoom = extractRoomId(ls.get(TRIP_LAST_ROOM_KEY) || "") || "OSAKA-2026";
       }
       if (new URLSearchParams(location.search).get("room") && !initialRoom) {
         history.replaceState(null, "", location.pathname);
-        setSharedRoomStatus(
-          "공유 방 링크 형식이 올바르지 않습니다. 방장에게 새 링크를 받아 주세요.",
-          "error",
-        );
       }
       const appVersionChip = $("appVersionChip");
       if (appVersionChip)
@@ -9998,18 +9973,15 @@ ${caption || rawText}
           updateGoogleLoginBtn(user);
           if (user) {
             setSharedUserStatus(
-              `✅ 로그인됨 · ${user.email || user.uid}`,
+              user.isAnonymous
+                ? `⚡ 게스트 자동 연결됨`
+                : `✅ 로그인됨 · ${user.email || user.uid}`,
               "ok",
             );
             if (initialRoom) connectSharedRoom(initialRoom);
-          } else if (
-            initialRoom &&
-            !sessionStorage.getItem("TRIP_GOOGLE_REDIRECT_PENDING")
-          ) {
-            setSharedUserStatus(
-              "방에 참여하려면 Google 계정으로 로그인해 주세요.",
-              "error",
-            );
+          } else {
+            // 구글 로그인 미완료 시 게스트(익명)로 자동 연결하여 친구가 로그인 없이도 바로 동기화 참여!
+            firebase.auth().signInAnonymously().catch(() => {});
           }
         });
         completeGoogleRedirectLogin();
