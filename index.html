@@ -1424,141 +1424,7 @@
 </head>
   <body>
 <!-- === V8_SPLASH_START === -->
-<style id="v51-skeleton-splash-style">
-  #v8Splash {
-    position: fixed;
-    inset: 0;
-    z-index: 9999999;
-    background: var(--bg, #0b0f19);
-    display: flex;
-    flex-direction: column;
-    padding: calc(14px + env(safe-area-inset-top)) 16px calc(14px + env(safe-area-inset-bottom));
-    box-sizing: border-box;
-    transition: opacity 0.28s ease, visibility 0.28s ease;
-    overflow: hidden;
-  }
-  [data-theme="light"] #v8Splash {
-    background: #f8fafc;
-  }
-  #v8Splash.hide {
-    opacity: 0 !important;
-    visibility: hidden !important;
-    pointer-events: none !important;
-  }
-
-  /* 스켈레톤 반짝임(Shimmer) 애니메이션 */
-  .v51-sk-bone {
-    position: relative;
-    overflow: hidden;
-    background: rgba(255, 255, 255, 0.06);
-    border-radius: 16px;
-  }
-  [data-theme="light"] .v51-sk-bone {
-    background: rgba(0, 0, 0, 0.06);
-  }
-  .v51-sk-bone::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    transform: translateX(-100%);
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
-    animation: v51Shimmer 1.4s infinite ease-in-out;
-  }
-  [data-theme="light"] .v51-sk-bone::after {
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
-  }
-  @keyframes v51Shimmer {
-    100% { transform: translateX(100%); }
-  }
-
-  /* 헤더 스켈레톤 */
-  .v51-sk-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16px;
-  }
-  .v51-sk-brand {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .v51-sk-icon {
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
-  }
-  .v51-sk-title {
-    width: 110px;
-    height: 18px;
-    border-radius: 6px;
-  }
-  .v51-sk-actions {
-    display: flex;
-    gap: 6px;
-  }
-  .v51-sk-btn {
-    width: 52px;
-    height: 32px;
-    border-radius: 10px;
-  }
-
-  /* 대시보드 히어로 스켈레톤 */
-  .v51-sk-hero {
-    width: 100%;
-    height: 180px;
-    border-radius: 22px;
-    margin-bottom: 14px;
-  }
-
-  /* 2열 벤토 스켈레톤 */
-  .v51-sk-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-bottom: 14px;
-  }
-  .v51-sk-card {
-    height: 74px;
-    border-radius: 16px;
-  }
-
-  /* 리스트 아이템 스켈레톤 */
-  .v51-sk-list {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    flex: 1;
-    overflow: hidden;
-  }
-  .v51-sk-item {
-    height: 82px;
-    border-radius: 18px;
-    width: 100%;
-  }
-</style>
-<div id="v8Splash" role="status" aria-live="polite">
-  <div class="v51-sk-header">
-    <div class="v51-sk-brand">
-      <div class="v51-sk-bone v51-sk-icon"></div>
-      <div class="v51-sk-bone v51-sk-title"></div>
-    </div>
-    <div class="v51-sk-actions">
-      <div class="v51-sk-bone v51-sk-btn"></div>
-      <div class="v51-sk-bone v51-sk-btn"></div>
-    </div>
-  </div>
-  <div class="v51-sk-bone v51-sk-hero"></div>
-  <div class="v51-sk-grid">
-    <div class="v51-sk-bone v51-sk-card"></div>
-    <div class="v51-sk-bone v51-sk-card"></div>
-  </div>
-  <div class="v51-sk-list">
-    <div class="v51-sk-bone v51-sk-item"></div>
-    <div class="v51-sk-bone v51-sk-item"></div>
-    <div class="v51-sk-bone v51-sk-item"></div>
-  </div>
-</div>
+<!-- Native Instant Boot: Fullscreen splash removed -->
 <!-- === V8_SPLASH_END === -->
     <aside id="side">
       <!-- 상단 헤더(여행플래너/일정복사/온라인/테마) 완전 제거됨 -->
@@ -1650,41 +1516,39 @@
           <button id="themeBtn" class="btn g" style="margin-bottom: 0"></button>
         </div>
 
-        <!-- 카드 그룹 1: 우리 여행 실시간 공유 방 (간편 모드) -->
+        <!-- 카드 그룹 1: 공유 방 (간편 모드) -->
         <div class="card" id="v49SharedRoomCard">
           <div class="sec-title">
             <span style="display: flex; align-items: center; gap: 6px">
-              <span class="ms" style="color:#3b82f6">group</span>우리 여행 실시간 공유
+              <span class="ms" style="color:var(--pr)">group</span>공유 방
             </span>
             <small id="appVersionChip" style="font-size: 11.5px; color: var(--sub); font-weight: 600"></small>
           </div>
 
           <!-- 연결 상태 및 방 번호 칩 -->
-          <div style="background:var(--s2);border:1px solid var(--bd2);border-radius:18px;padding:14px 16px;margin-bottom:12px">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-              <span id="sharedRoomStatus" style="font-weight:800;font-size:13.5px;color:var(--tx)">● 우리 여행방 실시간 동기화 중</span>
-              <span id="v49RoomBadge" style="font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;background:rgba(59,130,246,0.18);color:#60a5fa;border:1px solid rgba(59,130,246,0.35)">방 번호: 1124</span>
+          <div style="background:var(--s2);border:1px solid var(--bd2);border-radius:18px;padding:12px 14px;margin-bottom:12px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+              <span id="sharedRoomStatus" style="font-weight:800;font-size:13.5px;color:var(--tx)">● 실시간 동기화 중</span>
+              <span id="v49RoomBadge" style="font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;background:var(--s);color:var(--tx);border:1px solid var(--bd)">PIN 1124</span>
             </div>
-            <div style="font-size:12px;color:var(--sub);line-height:1.5">
-              친구들과 장소를 추가하거나 체크하면 모든 폰에 1초 만에 똑같이 실시간 반영돼요.
+            <div style="font-size:12px;color:var(--sub);line-height:1.45">
+              함께하는 친구와 일정 및 가계부를 실시간으로 같이 봅니다.
             </div>
-            <small id="roomSyncInfo" style="display:block;margin-top:6px;color:var(--sub);font-size:11.5px"></small>
+            <small id="roomSyncInfo" style="display:block;margin-top:4px;color:var(--sub);font-size:11.5px"></small>
           </div>
 
-          <!-- 메인 액션 1: 원터치 카카오톡 / 친구 초대 링크 공유 버튼 -->
-          <button id="v49KakaoShareBtn" type="button" class="btn" style="background:#fee500;color:#191919;font-weight:900;margin-bottom:10px;border:none;box-shadow:0 4px 14px rgba(254,229,0,0.25)">
-            <span class="ms" style="color:#191919">share</span>💬 카카오톡으로 친구 초대하기
+          <!-- 메인 액션: 차분하고 모던한 친구 초대 & 입장 버튼 바 -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+            <button id="v49KakaoShareBtn" type="button" class="btn" style="margin:0;min-height:42px;background:var(--s2);color:var(--tx);border:1px solid var(--bd2);font-weight:800;font-size:12.5px;box-shadow:none">
+              <span class="ms" style="color:#f59e0b;font-size:16px">share</span>카톡 친구 초대
+            </button>
+            <button id="copyRoomBtn" type="button" class="btn g" style="margin:0;min-height:42px;font-size:12.5px">
+              <span class="ms">link</span>초대 링크 복사
+            </button>
+          </div>
+          <button id="v49QuickJoinBtn" type="button" class="btn g" style="width:100%;margin:0 0 8px;min-height:38px;font-size:12px;font-weight:700">
+            <span class="ms">pin</span>방 번호(1124) 직접 입력
           </button>
-
-          <!-- 메인 액션 2: 4자리 방 번호 또는 링크로 바로 입장하기 -->
-          <div style="display:flex;gap:8px;margin-bottom:8px">
-            <button id="v49QuickJoinBtn" type="button" class="btn g" style="flex:1;margin:0;min-height:42px;font-size:12.5px;font-weight:800">
-              <span class="ms">pin</span>방 번호(1124)로 입장
-            </button>
-            <button id="copyRoomBtn" type="button" class="btn g" style="flex:1;margin:0;min-height:42px;font-size:12.5px">
-              <span class="ms">content_copy</span>초대 링크 복사
-            </button>
-          </div>
 
           <!-- 참여자 목록 -->
           <div id="roomMembers" class="ds" style="margin-top:8px;font-size:12px;white-space:pre-line">참여 멤버 확인 중...</div>
@@ -11377,8 +11241,8 @@ ${caption || rawText}
         <span>여행플래너</span>
       </div>
       <div class="ux7-actions">
-        <button type="button" class="mb" id="ux7InviteBtn" title="친구 초대 (카카오톡/링크)">
-          <span class="ms" style="color:#fee500">share</span>초대
+        <button type="button" class="mb" id="ux7InviteBtn" title="친구 초대 (링크 복사/공유)">
+          <span class="ms">share</span>초대
         </button>
         <button type="button" class="mb" id="ux7QuickCopyPlanBtn" title="카톡용 일정 복사">
           <span class="ms">content_copy</span>일정복사
@@ -20298,32 +20162,11 @@ ${JSON.stringify(payload, null, 2)}
   };
 
   /* =========================================================================
-   * 2. 홈 화면에 '오사카·교토 실시간 공유방' 환영 & 초대 배너 자동 주입
+   * 2. 홈 화면 깔끔 유지 (불필요한 배너 제거)
    * ========================================================================= */
   function injectHomeFriendBar() {
-    const dash = document.getElementById("v32Dashboard");
-    if (!dash || document.getElementById("v50FriendHomeBar")) return;
-
-    const bar = document.createElement("div");
-    bar.id = "v50FriendHomeBar";
-    bar.innerHTML = `
-      <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1">
-        <span class="v50-live-pulse" style="flex:none"></span>
-        <div style="min-width:0">
-          <b style="font-size:13.5px;color:var(--tx);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">오사카·교토 3인 실시간 여행방</b>
-          <span style="font-size:11.5px;color:var(--sub);white-space:nowrap">방 번호 <b style="color:#3b82f6">1124</b> · 친구와 실시간 동기화 중</span>
-        </div>
-      </div>
-      <button type="button" class="btn" id="v50HomeInviteBtn" style="min-height:36px;padding:0 14px;border-radius:12px;background:#fee500;color:#191919;font-weight:900;border:none;margin:0;box-shadow:0 2px 8px rgba(254,229,0,0.3);flex:none">
-        <span class="ms" style="font-size:16px;color:#191919">share</span>친구 초대
-      </button>
-    `;
-
-    dash.insertBefore(bar, dash.firstChild);
-    document.getElementById("v50HomeInviteBtn").onclick = () => {
-      if (typeof window.handleKakaoShare === "function") window.handleKakaoShare();
-      else if (typeof tab === "function") tab("set");
-    };
+    // 사용자가 원치 않는 홈 화면의 침범성 공유 배너 완전 제거
+    document.getElementById("v50FriendHomeBar")?.remove();
   }
 
   /* =========================================================================

@@ -1,7 +1,7 @@
-// V51 Instant Skeleton Screen & Code Cleanup (App Shell + Map Tiles + Images + Fonts)
-const CACHE_CORE = "trip-v51-core";
-const CACHE_ASSETS = "trip-v51-assets";
-const CACHE_TILES = "trip-v51-tiles";
+// V52 Clean UI & Instant Native Boot (App Shell + Map Tiles + Images + Fonts)
+const CACHE_CORE = "trip-v52-core";
+const CACHE_ASSETS = "trip-v52-assets";
+const CACHE_TILES = "trip-v52-tiles";
 
 const CORE_URLS = [
   "./",
