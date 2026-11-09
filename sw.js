@@ -1,7 +1,7 @@
-// V52 Clean UI & Instant Native Boot (App Shell + Map Tiles + Images + Fonts)
-const CACHE_CORE = "trip-v52-core";
-const CACHE_ASSETS = "trip-v52-assets";
-const CACHE_TILES = "trip-v52-tiles";
+// V53 Liquid Glass & iOS Refinement Suite (App Shell + Map Tiles + Images + Fonts)
+const CACHE_CORE = "trip-v53-core";
+const CACHE_ASSETS = "trip-v53-assets";
+const CACHE_TILES = "trip-v53-tiles";
 
 const CORE_URLS = [
   "./",

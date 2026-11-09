@@ -20438,5 +20438,137 @@ ${JSON.stringify(payload, null, 2)}
 })();
 </script>
 <!-- === V50_FRIEND_USABILITY_UPGRADE_SUITE_END === -->
+
+<!-- === V53_LIQUID_GLASS_AND_IOS_REFINEMENT_SUITE_START === -->
+<style id="v53-liquid-glass-style">
+  /* 1. 하단 탭바(#nav) - GitHub iOS 공식 앱과 동일한 리퀴드 글래스 도크 */
+  @media (max-width: 820px) {
+    #nav {
+      position: fixed !important;
+      left: 14px !important;
+      right: 14px !important;
+      bottom: calc(10px + env(safe-area-inset-bottom)) !important;
+      z-index: 220 !important;
+      height: 60px !important;
+      display: grid !important;
+      grid-template-columns: repeat(4, 1fr) !important;
+      padding: 4px 6px !important;
+      border-radius: 28px !important;
+      background: rgba(22, 27, 34, 0.72) !important;
+      backdrop-filter: blur(28px) saturate(210%) !important;
+      -webkit-backdrop-filter: blur(28px) saturate(210%) !important;
+      border: 1px solid rgba(255, 255, 255, 0.12) !important;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.52), inset 0 1px 0.5px rgba(255, 255, 255, 0.16) !important;
+      transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease !important;
+    }
+    [data-theme="light"] #nav {
+      background: rgba(255, 255, 255, 0.76) !important;
+      border: 1px solid rgba(0, 0, 0, 0.08) !important;
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14), inset 0 1px 0.5px rgba(255, 255, 255, 0.9) !important;
+    }
+    .tab-btn {
+      border-radius: 20px !important;
+      font-size: 11px !important;
+      font-weight: 700 !important;
+      color: rgba(240, 246, 252, 0.6) !important;
+      gap: 3px !important;
+      padding: 4px 0 !important;
+      transition: color 0.2s ease, transform 0.15s ease !important;
+      background: transparent !important;
+    }
+    .tab-btn:active {
+      transform: scale(0.92) !important;
+    }
+    .tab-btn.active {
+      color: #58a6ff !important;
+      font-weight: 800 !important;
+      background: rgba(255, 255, 255, 0.06) !important;
+    }
+    [data-theme="light"] .tab-btn {
+      color: rgba(36, 41, 47, 0.65) !important;
+    }
+    [data-theme="light"] .tab-btn.active {
+      color: #0969da !important;
+      background: rgba(0, 0, 0, 0.05) !important;
+    }
+  }
+
+  /* 2. 우측 하단 [+] 플로팅 액션 버튼 - 리퀴드 글래스 필/원형 버튼 */
+  #v32FabBtn {
+    width: 52px !important;
+    height: 52px !important;
+    border-radius: 999px !important;
+    right: 18px !important;
+    bottom: calc(84px + env(safe-area-inset-bottom)) !important;
+    background: rgba(33, 38, 45, 0.78) !important;
+    backdrop-filter: blur(24px) saturate(200%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(200%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.16) !important;
+    color: #f0f6fc !important;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45), inset 0 1px 1px rgba(255, 255, 255, 0.2) !important;
+    transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s ease !important;
+  }
+  #v32FabBtn:active {
+    transform: scale(0.88) !important;
+    background: rgba(48, 54, 61, 0.9) !important;
+  }
+  [data-theme="light"] #v32FabBtn {
+    background: rgba(255, 255, 255, 0.82) !important;
+    border-color: rgba(0, 0, 0, 0.1) !important;
+    color: #1f2328 !important;
+    box-shadow: 0 10px 24px rgba(31, 35, 40, 0.14), inset 0 1px 1px rgba(255, 255, 255, 0.9) !important;
+  }
+  [data-theme="light"] #v32FabBtn:active {
+    background: rgba(246, 248, 250, 0.95) !important;
+  }
+
+  /* 3. 전체 카드 & 리스트 아이템 - iOS 인셋 그룹(Inset Grouped) 네이티브 감성 */
+  .card, .item {
+    border-radius: 18px !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    background: var(--s, #161b22) !important;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18) !important;
+  }
+  [data-theme="light"] .card,
+  [data-theme="light"] .item {
+    border: 1px solid rgba(0, 0, 0, 0.07) !important;
+    background: #ffffff !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+  }
+
+  /* 목록 탭 검색바 & 1/N 정산 바도 리퀴드 글래스 라운드 처리 */
+  #v32ListBudgetBar {
+    border-radius: 16px !important;
+    background: rgba(255, 255, 255, 0.04) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    backdrop-filter: blur(14px) !important;
+    -webkit-backdrop-filter: blur(14px) !important;
+  }
+  [data-theme="light"] #v32ListBudgetBar {
+    background: rgba(0, 0, 0, 0.03) !important;
+    border-color: rgba(0, 0, 0, 0.08) !important;
+  }
+</style>
+
+<script>
+(function initV53LiquidGlassSuite() {
+  function polishLiquidGlassControls() {
+    const nav = document.getElementById("nav");
+    const fab = document.getElementById("v32FabBtn");
+
+    if (fab) {
+      fab.innerHTML = '<span class="ms" style="font-size:24px;font-weight:700">add</span>';
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", polishLiquidGlassControls);
+  } else {
+    polishLiquidGlassControls();
+  }
+  setTimeout(polishLiquidGlassControls, 200);
+})();
+</script>
+<!-- === V53_LIQUID_GLASS_AND_IOS_REFINEMENT_SUITE_END === -->
 </body>
 </html>
