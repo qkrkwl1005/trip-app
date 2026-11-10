@@ -1,7 +1,7 @@
-// V64 Reel/Shorts Intro Cover Prioritization & Home Dashboard Percentage Removal
-const CACHE_CORE = "trip-v64-core";
-const CACHE_ASSETS = "trip-v64-assets";
-const CACHE_TILES = "trip-v64-tiles";
+// V65 High-Speed Shorts/Reels Importer & Reliable Cover Thumbnail Recovery
+const CACHE_CORE = "trip-v65-core";
+const CACHE_ASSETS = "trip-v65-assets";
+const CACHE_TILES = "trip-v65-tiles";
 
 const CORE_URLS = [
   "./",

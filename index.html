@@ -2692,7 +2692,7 @@
       const TRIP_PENDING_CONFLICT_KEY = "TRIP_PENDING_CONFLICT";
       const TRIP_LAST_ROOM_KEY = "TRIP_LAST_ROOM";
       const TRIP_CREATING_ROOM_KEY = "TRIP_CREATING_ROOM";
-      const APP_VERSION = "v64";
+      const APP_VERSION = "v65";
       const TRANSIENT_NET_RE =
         /unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
       let _offlineFlushBusy = false,
@@ -3250,6 +3250,13 @@
       }
 
       const KNOWN_KR_NAME_PATTERNS = [
+        {
+          test: /maguro\s*maru|마구로\s*마루|참치\s*덮밥.*(hub|kitchen|교타로|kyutaro)/i,
+          ko: "마구로 마루 (생참치 덮밥 맛집)",
+          local: "MAGURO MARU",
+          addr: "Japan, Osaka, Chuo Ward, Kyutaromachi 3-1-27 HUB KITCHEN",
+          lat: 34.68136, lng: 135.50291
+        },
         {
           test: /닌텐도\s*오사카|nintendo\s*osaka|루쿠아.*13층/i,
           ko: "닌텐도 오사카 (오사카역 루쿠아 13층)",
@@ -5070,11 +5077,9 @@
                 add(raw);
               }
             }
-            // 인스타그램 릴스 공식 미디어 다이렉트 프록시
-            add(`https://images.weserv.nl/?url=${encodeURIComponent(`https://www.instagram.com/reel/${meta.id}/media/?size=l`)}&w=480&h=640&fit=cover&output=jpg`);
             // 캐시 없으면 백그라운드에서 바로 고해상도 인트로 커버 조회
             if (!cached) {
-              setTimeout(() => hydrateInstagramThumb(i), 50);
+              setTimeout(() => hydrateInstagramThumb(i), 30);
             }
           }
           if (meta && meta.platform === "tt") {
@@ -5139,7 +5144,7 @@
             const r = await fetchTO(
               `https://www.tiktok.com/oembed?url=${encodeURIComponent(meta.url)}`,
               {},
-              4500,
+              3000,
             );
             if (r.ok) {
               const d = await r.json();
@@ -5156,7 +5161,6 @@
 
         if (meta.platform !== "ig" || !meta.id || reelThumbCache[meta.id])
           return false;
-        const reelUrl = `https://www.instagram.com/reel/${meta.id}/`;
         const embedUrl = `https://www.instagram.com/p/${meta.id}/embed/captioned/`;
         const cfBase = normalizeCfProxy(
           ls.get("TRIP_CF_PROXY") || ls.get("TRIP_WORKER_URL") || "",
@@ -5166,8 +5170,9 @@
           ? ""
           : "https://trip-app-psi-two.vercel.app";
 
+        // 1순위: 초고속 Vercel 서버리스 /api/ig 직접 조회
         try {
-          const ir = await fetchTO(`${apiBase}/api/ig?code=${encodeURIComponent(meta.id)}`, {}, 5000);
+          const ir = await fetchTO(`${apiBase}/api/ig?code=${encodeURIComponent(meta.id)}`, {}, 3000);
           if (ir.ok) {
             const idata = await ir.json();
             const thumb = idata.weservThumb || idata.thumb;
@@ -5179,45 +5184,32 @@
           }
         } catch (_) {}
 
-        try {
-          const mr = await fetchTO(
-            `https://api.microlink.io/?url=${encodeURIComponent(reelUrl)}`,
-            {},
-            5000,
-          );
-          if (mr.ok) {
-            const md = await mr.json();
-            const imgUrl = md?.data?.image?.url || "";
-            if (
-              /^https?:\/\//i.test(imgUrl) &&
-              !/static\.cdninstagram\.com|rsrc\.php/i.test(imgUrl)
-            ) {
-              reelThumbCache[meta.id] = imgUrl;
-              saveReelThumbCache();
-              return true;
-            }
-          }
-        } catch (_) {}
-
+        // 2순위: 병렬 프록시를 통해 Instagram Embed HTML에서 실시간 인트로 썸네일 고속 추출
         const sources = [
           ...(cfBase ? [cfBase + encodeURIComponent(embedUrl)] : []),
           `https://api.allorigins.win/raw?url=${encodeURIComponent(embedUrl)}`,
           `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(embedUrl)}`,
           `https://corsproxy.io/?url=${encodeURIComponent(embedUrl)}`,
         ];
-        for (const source of sources) {
-          try {
-            const r = await fetchTO(source, {}, 5000);
-            if (!r.ok) continue;
-            const html = await r.text();
-            const rawUrl = extractIgThumbFromHtml(html);
-            if (rawUrl) {
-              reelThumbCache[meta.id] = rawUrl;
-              saveReelThumbCache();
-              return true;
-            }
-          } catch (_) {}
-        }
+
+        try {
+          const rawUrl = await Promise.any(
+            sources.map(async (src) => {
+              const r = await fetchTO(src, {}, 3200);
+              if (!r.ok) throw new Error("proxy error");
+              const html = await r.text();
+              const u = extractIgThumbFromHtml(html);
+              if (u && !isAvatarOrBadUrl(u)) return u;
+              throw new Error("no thumb in html");
+            })
+          );
+          if (rawUrl) {
+            const weservUrl = `https://images.weserv.nl/?url=${encodeURIComponent(rawUrl)}&w=480&h=640&fit=cover&output=jpg`;
+            reelThumbCache[meta.id] = weservUrl;
+            saveReelThumbCache();
+            return true;
+          }
+        } catch (_) {}
         return false;
       }
 
@@ -7603,11 +7595,13 @@
         const isCodeGarbage = (s) => {
           if (!s || typeof s !== "string") return true;
           const trimmed = s.trim();
-          if (trimmed.length < 8) return true;
+          if (trimmed.length < 5) return true;
+          if (/^(?:YouTube|Shorts|Instagram|404 Not Found|Not Found|Error)$/i.test(trimmed)) return true;
           if (/^\(?https?:\/\/[^\s\)]+\)?$/i.test(trimmed)) return true;
           if (/^@?[a-zA-Z0-9._]{3,35}$/.test(trimmed) && !/[가-힣一-龯ぁ-んァ-ン\s]/.test(trimmed)) return true;
           if (/fetchTO\(|parseIgEmbedHtml|allorigins\s*empty|async\s*\(\)|TRIP_MASTER_ITEMS/i.test(s)) return true;
-          if (/Create an account or log in|Log in to Instagram|See more posts from/i.test(s) && s.length < 250) return true;
+          if (/Create an account or log in|Log in to Instagram|See more posts from|Post isn't available|antibot protection/i.test(s) && s.length < 350) return true;
+          if (/Video unavailable|This video is unavailable|동영상을 재생할 수 없음|이 동영상은 볼 수 없습니다|Sign in to confirm|Tap to unmute|Skip navigation|You're signed out|404 Not Found/i.test(s)) return true;
           return false;
         };
 
@@ -7701,13 +7695,13 @@
                 fetchTO(
                   `https://${stableHost}/get_media_data.php?reel_post_code_or_url=${encodeURIComponent(reelUrl)}&type=reel`,
                   { headers: { "x-rapidapi-key": rapidKey, "x-rapidapi-host": stableHost } },
-                  6500
+                  2000
                 ),
               () =>
                 fetchTO(
                   `https://${stableHost}/get_media_data_v2.php?media_code=${encodeURIComponent(igId)}`,
                   { headers: { "x-rapidapi-key": rapidKey, "x-rapidapi-host": stableHost } },
-                  6500
+                  2000
                 ),
               () =>
                 fetchTO(
@@ -7725,13 +7719,13 @@
                       type: "reel",
                     }).toString(),
                   },
-                  6500
+                  2000
                 ),
               () =>
                 fetchTO(
                   `https://${stableHost}/get_ig_reel_info.php?reel_post_code_or_url=${encodeURIComponent(reelUrl)}`,
                   { headers: { "x-rapidapi-key": rapidKey, "x-rapidapi-host": stableHost } },
-                  6500
+                  2000
                 ),
             ];
 
@@ -7739,7 +7733,7 @@
               const rapidCap = await Promise.any(
                 stableCalls.map(async (callFn) => {
                   const rr = await callFn();
-                  if (!rr.ok) throw new Error("status " + rr.status);
+                  if (!rr || !rr.ok) throw new Error("status error");
                   const rd = await rr.json();
                   const capTxt = extractCaptionFromRapidJson(rd);
                   if (capTxt && !isCodeGarbage(capTxt)) return capTxt;
@@ -7927,8 +7921,11 @@
       }
 
       function isLikelyAddressLine(s) {
+        const str = String(s || "").trim();
+        if (!str || str.length < 3) return false;
+        if (/(?:입니다|합니다|있습니다|했어요|추천|취재|밀착|손질|경매|만드는|즐길|별미|물림|덜한|좋았어요|안녕하세요|팔로우|감사합니다|구독|좋아요|공유|방문|느낌|분위기)/i.test(str)) return false;
         return /(?:\b\d{3}-\d{4}\b|\b\d+\s*-\s*\d+|\bWard\b|\bChuo\b|\bKita\b|\bOsaka\b|\bTokyo\b|\bKyoto\b|\bFukuoka\b|\bKyutaromachi\b|\bHonmachi\b|\bShinsaibashi\b|\bFukushima\b|\bUmeda\b|\bNamba\b|\bDotonbori\b|\bIne\b|\bArashiyama\b|\bGion\b|\bHUB\s*KITCHEN\b|丁目|番地?|千日前|中央区|北区|難波|梅田|[시군구]\s+\S+[동로길]\s*\d+|(?:오사카|우메다|난바|도톤보리|신사이바시|교토|도쿄|신주쿠|시부야|후쿠오카|하카타|삿포로).*(?:역|백화점|프라자|플라자|파르코|루쿠아|한큐|한신|다이마루|타카시마야|난바워크|빌딩|타워|상점가|지하|B\d|\d+층|안|내)|(?:백화점|프라자|플라자|파르코|루쿠아|난바워크|역)\s*(?:B?\d+\s*층|지하\s*\d+층|안에|내))/i.test(
-          String(s || ""),
+          str
         );
       }
 
@@ -8612,6 +8609,27 @@ ${caption || rawText}
               },
             ];
           }
+        }
+
+        if (!cands.length && vidUrl) {
+          const vMeta = parseVideoMeta(vidUrl);
+          const platformLabel = vMeta?.platform === "yt" ? "유튜브 쇼츠 저장 장소" : "인스타그램 릴스 저장 장소";
+          const defaultAddr = hint || (cat === "FOOD" ? "오사카 맛집" : "오사카");
+          cands = [
+            {
+              name: platformLabel,
+              localName: "",
+              address: defaultAddr,
+              postal: "",
+              price: "",
+              info: "영상 링크 저장 완료 · 상세 정보는 본문 복사 붙여넣기로 자동 보완 가능",
+              note: "영상 링크 저장 완료",
+              category: cat || "PLACE",
+              lat: null,
+              lng: null,
+              vid: vidUrl,
+            }
+          ];
         }
 
         const totalCands = Math.max(1, cands.length);
@@ -19824,6 +19842,7 @@ ${caption || rawText}
    *   전부 깔끔한 한국어 상호명(대표 음식·품목)으로 변환합니다!
    * ========================================================================= */
   const KNOWN_KR_NAME_PATTERNS = [
+    { test: /maguro\s*maru|마구로\s*마루|참치\s*덮밥.*(hub|kitchen|교타로|kyutaro)/i, ko: "마구로 마루 (생참치 덮밥 맛집)", local: "MAGURO MARU", addr: "Japan, Osaka, Chuo Ward, Kyutaromachi 3-1-27 HUB KITCHEN", lat: 34.68136, lng: 135.50291 },
     { test: /이오시스|イオシス|iosys|아이폰.*공기계|공기계.*매장/i, ko: "이오시스 난바점 (중고 아이폰·공기계 매장)", local: "イオシス なんば店" },
     { test: /chiyomatsu|치요마츠|ちよ松|katsu\s*sandwich/i, ko: "치요마츠 도톤보리 (두꺼운 가츠동·가츠산도)", local: "大阪とんかつ ちよ松 道頓堀本店" },
     { test: /青竈|아오쿠도|aokudo|69\s*hirata,\s*ine/i, ko: "아오쿠도 이네 (바다뷰 감성 카페)", local: "青竈 (Aokudo)" },
@@ -19860,8 +19879,7 @@ ${caption || rawText}
     const core = raw.replace(/#[^\s]+/g, "").replace(/\s*외\s*\d+\s*곳\s*$/, "").trim();
     if (!core) return true;
     if (/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(core)) return true;
-    if (!/[가-힣]/.test(core) || /[A-Za-z]{5,}/.test(core)) return true;
-    if (/\d+\s*-\s*\d+|\(음식점\)|\(카페\)|\(매장\)/.test(core)) return true;
+    if (/^\d+\s*-\s*\d+/.test(core)) return true;
     if (/^(?:이\s*점|그\s*점|이\s*곳|그\s*곳|여기|맛집|추천|오사카|교토|일본|가게|식당|카페|저장된\s*장소)[!！\s]*$/.test(core)) return true;
     return false;
   }
@@ -19886,7 +19904,8 @@ ${caption || rawText}
     }
 
     let itemTag = "";
-    if (/장어|우나기|eel|鰻/i.test(hay)) itemTag = "장어 덮밥·숯불구이";
+    if (/참치|마구로|혼마구로|tuna|maguro|생참치/i.test(hay)) itemTag = "생참치 덮밥·참치 맛집";
+    else if (/장어|우나기|eel|鰻/i.test(hay)) itemTag = "장어 덮밥·숯불구이";
     else if (/함박|햄버그|hamburg|ハンバーグ|도쿠라/i.test(hay)) itemTag = "육즙 함박스테이크";
     else if (/katsu\s*sandwich|가츠산도|카츠산도|산도/i.test(hay)) itemTag = "가츠산도·타마고산도";
     else if (/yakiniku|야키니쿠|焼肉|와규|우설|호르몬/i.test(hay)) itemTag = "야키니쿠·와규 구이";
@@ -19913,6 +19932,11 @@ ${caption || rawText}
         ? `${koOnly} (${itemTag})`
         : koOnly;
       return withTag;
+    }
+
+    if (!koOnly && cleanedHash && cleanedHash.length >= 3 && !/^(?:오사카|교토|일본)$/.test(cleanedHash)) {
+      if (!item.localName) item.localName = cleanedHash;
+      return itemTag ? `${cleanedHash} (${itemTag})` : cleanedHash;
     }
 
     const pinMatch = hay.match(/📍\s*([가-힣0-9\s·()]{2,22}?)(?=\s+[一-龯ぁ-んァ-ヶ〒\dA-Za-z]|$|\n)/);
