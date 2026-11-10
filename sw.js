@@ -1,7 +1,7 @@
-// V72 UI/UX Motion Design Suite (Spring Star, Slide Sheet, Scale Popup, Check Bounce)
-const CACHE_CORE = "trip-v72-core";
-const CACHE_ASSETS = "trip-v72-assets";
-const CACHE_TILES = "trip-v72-tiles";
+// V73 Exact Video UI/UX Motion Specification Implementation
+const CACHE_CORE = "trip-v73-core";
+const CACHE_ASSETS = "trip-v73-assets";
+const CACHE_TILES = "trip-v73-tiles";
 
 const CORE_URLS = [
   "./",
