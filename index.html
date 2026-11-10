@@ -2692,7 +2692,7 @@
       const TRIP_PENDING_CONFLICT_KEY = "TRIP_PENDING_CONFLICT";
       const TRIP_LAST_ROOM_KEY = "TRIP_LAST_ROOM";
       const TRIP_CREATING_ROOM_KEY = "TRIP_CREATING_ROOM";
-      const APP_VERSION = "v63";
+      const APP_VERSION = "v64";
       const TRANSIENT_NET_RE =
         /unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
       let _offlineFlushBusy = false,
@@ -5045,13 +5045,11 @@
         if (!i) return [];
         const out = [];
         const add = (u) => {
-          if (u && !out.includes(u)) out.push(u);
+          if (u && typeof u === "string" && !out.includes(u)) out.push(u);
         };
-        if (i.img) add(i.img);
-        if ((i.v || 0) > 0) {
-          const q = getValidSearchQuery(i) || i.name || i.address || "";
-          if (q && !isGenericSharedName(q)) add(pic(q, i.v));
-        }
+
+        // 1순위: 영상(쇼츠/릴스) 링크가 있는 항목은 해당 영상의 실제 오피셜 인트로 썸네일을 무조건 1순위로 채택!
+        // (구글 리뷰 인물 셀카/먹방 사진이나 빙 검색의 이상한 밥먹는 인물 사진이 덮어쓰지 못하도록 보장)
         if (i.vid) {
           const meta = parseVideoMeta(i.vid);
           if (meta && meta.platform === "yt" && meta.id) {
@@ -5068,11 +5066,15 @@
                   )
                 : cached;
               if (raw) {
-                add(
-                  `https://wsrv.nl/?url=${encodeURIComponent(raw)}&w=480&h=640&fit=cover&output=jpg`,
-                );
+                add(`https://images.weserv.nl/?url=${encodeURIComponent(raw)}&w=480&h=640&fit=cover&output=jpg`);
                 add(raw);
               }
+            }
+            // 인스타그램 릴스 공식 미디어 다이렉트 프록시
+            add(`https://images.weserv.nl/?url=${encodeURIComponent(`https://www.instagram.com/reel/${meta.id}/media/?size=l`)}&w=480&h=640&fit=cover&output=jpg`);
+            // 캐시 없으면 백그라운드에서 바로 고해상도 인트로 커버 조회
+            if (!cached) {
+              setTimeout(() => hydrateInstagramThumb(i), 50);
             }
           }
           if (meta && meta.platform === "tt") {
@@ -5080,8 +5082,19 @@
             if (reelThumbCache[key]) add(reelThumbCache[key]);
           }
         }
-        const q = getValidSearchQuery(i) || i.name || i.address || "";
-        if (q && !isGenericSharedName(q)) add(pic(q, i.v || 0));
+
+        // 2순위: 사용자가 직접 지정했거나 명확한 장소 전용 이미지 (단, Bing 자동검색 이미지나 인물 먹방 제외)
+        if (i.img && !/mm\.bing\.net/i.test(i.img)) {
+          add(i.img);
+        }
+
+        // 3순위: 영상이 전혀 없는 장소에 한해서만 보조 사진 검색
+        if (!i.vid) {
+          if (i.img) add(i.img);
+          const q = getValidSearchQuery(i) || i.name || i.address || "";
+          if (q && !isGenericSharedName(q)) add(pic(q, i.v || 0));
+        }
+
         return out;
       }
 
@@ -5148,6 +5161,23 @@
         const cfBase = normalizeCfProxy(
           ls.get("TRIP_CF_PROXY") || ls.get("TRIP_WORKER_URL") || "",
         );
+
+        const apiBase = location.hostname.includes("vercel.app")
+          ? ""
+          : "https://trip-app-psi-two.vercel.app";
+
+        try {
+          const ir = await fetchTO(`${apiBase}/api/ig?code=${encodeURIComponent(meta.id)}`, {}, 5000);
+          if (ir.ok) {
+            const idata = await ir.json();
+            const thumb = idata.weservThumb || idata.thumb;
+            if (thumb && !isAvatarOrBadUrl(thumb)) {
+              reelThumbCache[meta.id] = thumb;
+              saveReelThumbCache();
+              return true;
+            }
+          }
+        } catch (_) {}
 
         try {
           const mr = await fetchTO(
@@ -13780,7 +13810,6 @@ ${caption || rawText}
             <div class="v32-card-icon"><span class="ms">bookmark</span></div>
           </div>
           <b class="v32-card-val">${total}곳</b>
-          <div class="v32-card-badge"><span class="ms">north_east</span>${total > 0 ? "+100%" : "0%"}</div>
         </div>
         <div class="v32-bento-card b-green" data-v32-go="ALL">
           <div class="v32-card-head">
@@ -13788,7 +13817,6 @@ ${caption || rawText}
             <div class="v32-card-icon"><span class="ms">near_me</span></div>
           </div>
           <b class="v32-card-val">${coords}곳</b>
-          <div class="v32-card-badge"><span class="ms">north_east</span>${total ? Math.round(coords / total * 100) : 0}%</div>
         </div>
       </div>
 
@@ -18463,7 +18491,7 @@ ${caption || rawText}
       } else if (typeof top.opening_hours?.open_now === "boolean") {
         it.gOpenNow = top.opening_hours.open_now;
       }
-      if (!it.img && top.photos && top.photos.length > 0) {
+      if (!it.img && !it.vid && top.photos && top.photos.length > 0) {
         try {
           const photoUrl = top.photos[0].getUrl({ maxWidth: 640, maxHeight: 480 });
           if (photoUrl) it.img = photoUrl;
@@ -21210,23 +21238,9 @@ ${JSON.stringify(payload, null, 2)}
     text-shadow: none !important;
   }
 
-  /* 영상의 에메랄드 상승 뱃지 (<p className="text-emerald-400 ..."> <ArrowUpRight /> {change}%</p>) */
+  /* 홈 대시보드 벤토 카드 퍼센테이지 배지 완전 제거 */
   .v32-card-badge {
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 3px !important;
-    font-size: 11px !important;
-    font-weight: 600 !important;
-    color: #34d399 !important;
-    background: rgba(16, 185, 129, 0.12) !important;
-    border: 1px solid rgba(52, 211, 153, 0.25) !important;
-    padding: 2px 8px !important;
-    border-radius: 999px !important;
-    align-self: flex-start !important;
-    margin-top: 4px !important;
-  }
-  .v32-card-badge .ms {
-    font-size: 12px !important;
+    display: none !important;
   }
 
   [data-theme="light"] .v32-card-title {

@@ -1,7 +1,7 @@
-// V63 Detail Sheet Layout Rescue, High-Contrast Map Pin InfoWindow & Resilient YouTube Caption Scraper
-const CACHE_CORE = "trip-v63-core";
-const CACHE_ASSETS = "trip-v63-assets";
-const CACHE_TILES = "trip-v63-tiles";
+// V64 Reel/Shorts Intro Cover Prioritization & Home Dashboard Percentage Removal
+const CACHE_CORE = "trip-v64-core";
+const CACHE_ASSETS = "trip-v64-assets";
+const CACHE_TILES = "trip-v64-tiles";
 
 const CORE_URLS = [
   "./",
