@@ -2692,7 +2692,7 @@
       const TRIP_PENDING_CONFLICT_KEY = "TRIP_PENDING_CONFLICT";
       const TRIP_LAST_ROOM_KEY = "TRIP_LAST_ROOM";
       const TRIP_CREATING_ROOM_KEY = "TRIP_CREATING_ROOM";
-      const APP_VERSION = "v65";
+      const APP_VERSION = "v66";
       const TRANSIENT_NET_RE =
         /unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
       let _offlineFlushBusy = false,
@@ -4679,7 +4679,6 @@
 
       (function immediateQuotaRescue() {
         try {
-          localStorage.removeItem("TRIP_GEO_CACHE");
           items = sanitizeSharedItems(items);
           if (typeof applyInstantKoreanNames === "function") {
             applyInstantKoreanNames();
@@ -4764,10 +4763,41 @@
       }
       function saveGeoCache() {
         const keys = Object.keys(geoCache);
-        if (keys.length > 250) {
-          keys.slice(0, keys.length - 250).forEach((k) => delete geoCache[k]);
+        if (keys.length > 300) {
+          keys.slice(0, keys.length - 300).forEach((k) => delete geoCache[k]);
         }
         ls.set("TRIP_GEO_CACHE", JSON.stringify(geoCache));
+      }
+
+      // [V66 API 절약 캐시] 릴스·쇼츠 캡션 / AI 분석 / 미디어 영구 기억 캐시
+      let mediaCaptionCache = {};
+      try {
+        mediaCaptionCache = JSON.parse(ls.get("TRIP_MEDIA_CAPTION_CACHE") || "{}");
+      } catch (_) { mediaCaptionCache = {}; }
+      function saveMediaCaptionCache() {
+        const keys = Object.keys(mediaCaptionCache);
+        if (keys.length > 300) keys.slice(0, keys.length - 300).forEach(k => delete mediaCaptionCache[k]);
+        ls.set("TRIP_MEDIA_CAPTION_CACHE", JSON.stringify(mediaCaptionCache));
+      }
+
+      let aiResponseCache = {};
+      try {
+        aiResponseCache = JSON.parse(ls.get("TRIP_AI_CACHE") || "{}");
+      } catch (_) { aiResponseCache = {}; }
+      function saveAiResponseCache() {
+        const keys = Object.keys(aiResponseCache);
+        if (keys.length > 250) keys.slice(0, keys.length - 250).forEach(k => delete aiResponseCache[k]);
+        ls.set("TRIP_AI_CACHE", JSON.stringify(aiResponseCache));
+      }
+
+      let mediaAnalysisCache = {};
+      try {
+        mediaAnalysisCache = JSON.parse(ls.get("TRIP_ANALYSIS_CACHE") || "{}");
+      } catch (_) { mediaAnalysisCache = {}; }
+      function saveMediaAnalysisCache() {
+        const keys = Object.keys(mediaAnalysisCache);
+        if (keys.length > 250) keys.slice(0, keys.length - 250).forEach(k => delete mediaAnalysisCache[k]);
+        ls.set("TRIP_ANALYSIS_CACHE", JSON.stringify(mediaAnalysisCache));
       }
 
       function compressDataUrl(dataUrl, maxW = 320, quality = 0.55) {
@@ -7588,6 +7618,11 @@
       async function fetchVideoCaption(vUrl) {
         const meta = parseVideoMeta(vUrl);
         if (!meta) return "";
+        const cKey = `${meta.platform}:${meta.id || meta.shareId || meta.url}`;
+        if (mediaCaptionCache[cKey] && mediaCaptionCache[cKey].length >= 8) {
+          console.log("[Cache] Hit mediaCaptionCache for", cKey);
+          return mediaCaptionCache[cKey];
+        }
         const cfBase = normalizeCfProxy(
           ls.get("TRIP_CF_PROXY") || ls.get("TRIP_WORKER_URL") || ""
         );
@@ -7815,6 +7850,12 @@
 
           try {
             const out = await Promise.any(jobs.map((fn) => fn()));
+            if (typeof out === "string" && !isCodeGarbage(out) && out.trim().length >= 8) {
+              const resText = out.trim();
+              mediaCaptionCache[cKey] = resText;
+              saveMediaCaptionCache();
+              return resText;
+            }
             return typeof out === "string" && !isCodeGarbage(out) ? out : "";
           } catch (e) {
             return "";
@@ -7899,6 +7940,12 @@
 
           try {
             const out = await Promise.any(jobs.map((fn) => fn()));
+            if (typeof out === "string" && !isCodeGarbage(out) && out.trim().length >= 8) {
+              const resText = out.trim();
+              mediaCaptionCache[cKey] = resText;
+              saveMediaCaptionCache();
+              return resText;
+            }
             return typeof out === "string" && !isCodeGarbage(out) ? out.trim() : "";
           } catch (_) {
             return "";
@@ -8529,11 +8576,21 @@ ${caption || rawText}
     "lng": 135.5038
   }
 ]`;
-            const txt = await askAI(
-              prompt,
-              images.slice(0, MAX_MULTI_PLACES),
-              needWebSearch,
-            );
+            const aiKey = (!images || images.length === 0) ? `ai|${prompt.trim()}` : "";
+            let txt = aiKey && aiResponseCache[aiKey] ? aiResponseCache[aiKey] : "";
+            if (txt) {
+              console.log("[Cache] Hit aiResponseCache, saved API call!");
+            } else {
+              txt = await askAI(
+                prompt,
+                images.slice(0, MAX_MULTI_PLACES),
+                needWebSearch,
+              );
+              if (aiKey && txt && txt.length >= 10) {
+                aiResponseCache[aiKey] = txt;
+                saveAiResponseCache();
+              }
+            }
             if (typeof window.__v8AiSetStep === "function") {
               window.__v8AiSetStep("2단계: AI 장소 추출 완료! 좌표 매핑 중...", 78);
             }
@@ -8733,6 +8790,36 @@ ${caption || rawText}
           if (vidUrl) {
             lastSharedVid = vidUrl;
             $("reelLinkBox").value = vidUrl;
+          }
+
+          // [0단계: 기존 저장 장소 즉시 재활용 (API 소모 0회)]
+          if (vidUrl && !files.length) {
+            const vMeta = parseVideoMeta(vidUrl);
+            const existingItem = items.find((it) => {
+              if (!it.vid) return false;
+              if (it.vid === vidUrl) return true;
+              const itMeta = parseVideoMeta(it.vid);
+              return itMeta && vMeta && itMeta.platform === vMeta.platform && itMeta.id && itMeta.id === vMeta.id;
+            });
+
+            if (existingItem) {
+              res = [{
+                ...existingItem,
+                vid: vidUrl,
+                _saved: true,
+                _itemId: existingItem.id
+              }];
+              renderCandidates("⚡ 이미 저장된 장소입니다 (API 소모 0회)");
+              toast(`⚡ 이미 등록된 '${existingItem.name || "장소"}' 정보를 즉시 복원했습니다! (API 소모 0회)`);
+              $("shareBox").value = "";
+              $("reelLinkBox").value = "";
+              lastSharedVid = "";
+              btn.disabled = false;
+              btn.innerHTML = `<span class="ms">search</span><span>가져오기</span>`;
+              draw(true);
+              fit();
+              return;
+            }
           }
 
           const images = [];

@@ -1,7 +1,7 @@
-// V65 High-Speed Shorts/Reels Importer & Reliable Cover Thumbnail Recovery
-const CACHE_CORE = "trip-v65-core";
-const CACHE_ASSETS = "trip-v65-assets";
-const CACHE_TILES = "trip-v65-tiles";
+// V66 Zero-API Memory & Permanent Multi-Tier Cache Engine
+const CACHE_CORE = "trip-v66-core";
+const CACHE_ASSETS = "trip-v66-assets";
+const CACHE_TILES = "trip-v66-tiles";
 
 const CORE_URLS = [
   "./",
