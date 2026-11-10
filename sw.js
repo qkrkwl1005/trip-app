@@ -1,7 +1,7 @@
-// V71 Smooth Targeted Thumbnail Loading Without Page Flicker
-const CACHE_CORE = "trip-v71-core";
-const CACHE_ASSETS = "trip-v71-assets";
-const CACHE_TILES = "trip-v71-tiles";
+// V72 UI/UX Motion Design Suite (Spring Star, Slide Sheet, Scale Popup, Check Bounce)
+const CACHE_CORE = "trip-v72-core";
+const CACHE_ASSETS = "trip-v72-assets";
+const CACHE_TILES = "trip-v72-tiles";
 
 const CORE_URLS = [
   "./",

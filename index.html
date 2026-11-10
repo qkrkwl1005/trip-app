@@ -2729,7 +2729,7 @@
       const TRIP_PENDING_CONFLICT_KEY = "TRIP_PENDING_CONFLICT";
       const TRIP_LAST_ROOM_KEY = "TRIP_LAST_ROOM";
       const TRIP_CREATING_ROOM_KEY = "TRIP_CREATING_ROOM";
-      const APP_VERSION = "v71";
+      const APP_VERSION = "v72";
       const TRANSIENT_NET_RE =
         /unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
       let _offlineFlushBusy = false,
@@ -22064,5 +22064,292 @@ ${JSON.stringify(payload, null, 2)}
 })();
 </script>
 <!-- === V53_LIQUID_GLASS_AND_IOS_REFINEMENT_SUITE_END === -->
+<!-- === V72_MOTION_DESIGN_SUITE_START === -->
+<style id="v72-motion-design-style">
+  /* 1. 스낵바 & 토스트: 슬라이드 인/아웃 (Slide in Ease-Out, Slide out Ease-In) */
+  #toast {
+    transform: translate(-50%, calc(100% + 40px)) scale(0.96) !important;
+    opacity: 0 !important;
+    transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s ease !important;
+    will-change: transform, opacity;
+  }
+  #toast.show {
+    transform: translate(-50%, 0) scale(1) !important;
+    opacity: 1 !important;
+  }
+  #toast:not(.show) {
+    transition: transform 0.24s cubic-bezier(0.7, 0, 0.84, 0), opacity 0.2s ease !important;
+  }
+
+  /* 2. 바텀시트: 아래에서 Slide in + 배경 흐림/Fade */
+  #sheet {
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.28s ease, visibility 0.28s ease;
+    will-change: opacity;
+  }
+  #sheet.on {
+    display: flex !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+  #sheet .sh {
+    transform: translateY(100%);
+    transition: transform 0.34s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    will-change: transform;
+    animation: none !important;
+  }
+  #sheet.on .sh {
+    transform: translateY(0) !important;
+  }
+
+  /* 3. 팝업 / 다이얼로그 모달: Scale in + Ease-out (Spring 느낌의 매끄러운 줌) */
+  .v72-popup-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: rgba(4, 6, 12, 0.72);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.24s ease, visibility 0.24s ease;
+  }
+  .v72-popup-backdrop.on {
+    opacity: 1;
+    visibility: visible;
+  }
+  .v72-popup-card {
+    width: 100%;
+    max-width: 360px;
+    background: rgba(18, 24, 38, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 24px;
+    padding: 24px 20px 18px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+    text-align: center;
+    transform: scale(0.85);
+    opacity: 0;
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s ease;
+  }
+  .v72-popup-backdrop.on .v72-popup-card {
+    transform: scale(1);
+    opacity: 1;
+  }
+  .v72-popup-title {
+    font-size: 17px;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 8px;
+    word-break: keep-all;
+    line-height: 1.35;
+  }
+  .v72-popup-desc {
+    font-size: 13.5px;
+    color: var(--sub);
+    line-height: 1.5;
+    margin-bottom: 20px;
+    word-break: keep-all;
+    white-space: pre-line;
+  }
+  .v72-popup-btns {
+    display: flex;
+    gap: 8px;
+  }
+  .v72-popup-btn {
+    flex: 1;
+    min-height: 44px;
+    border-radius: 14px;
+    border: 0;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.14s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .v72-popup-btn:active {
+    transform: scale(0.94);
+  }
+  .v72-popup-btn.cancel {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--tx);
+  }
+  .v72-popup-btn.confirm {
+    background: var(--pr);
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4);
+  }
+  .v72-popup-btn.danger {
+    background: #ef4444;
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4);
+  }
+
+  /* 택시 모달도 Scale in + Ease-out 일체화 */
+  #taxiModal {
+    transition: opacity 0.22s ease, visibility 0.22s ease;
+  }
+  #taxiModal .taxi-card {
+    animation: none !important;
+    transform: scale(0.88);
+    opacity: 0;
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s ease;
+  }
+  #taxiModal.show .taxi-card {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  /* 4. 좋아요 / 즐겨찾기(별): Scale + Spring 톡 튕김 모션 */
+  @keyframes v72StarSpring {
+    0% { transform: scale(1); }
+    30% { transform: scale(0.72); }
+    60% { transform: scale(1.42); }
+    80% { transform: scale(0.92); }
+    100% { transform: scale(1.15); }
+  }
+  .star-btn {
+    transition: color 0.2s ease, transform 0.24s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+  }
+  .star-btn:active {
+    transform: scale(0.75) !important;
+  }
+  .star-btn.v72-spring {
+    animation: v72StarSpring 0.44s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+  }
+
+  /* 5. 체크박스: 선 그리기(SVG Stroke Animation) + Ease-in-out 모션 */
+  input[type="checkbox"] {
+    position: relative;
+    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+  }
+  input[type="checkbox"]:active {
+    transform: scale(0.82) !important;
+  }
+  input[type="checkbox"]:checked {
+    animation: v72CheckBounce 0.26s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  @keyframes v72CheckBounce {
+    0% { transform: scale(0.85); }
+    50% { transform: scale(1.18); }
+    100% { transform: scale(1); }
+  }
+
+  /* 6. 로딩: 정속 회전 (Linear Rotate) 모션 */
+  .spinner,
+  .v72-linear-spin {
+    animation: v72LinearSpin 0.75s linear infinite !important;
+  }
+  @keyframes v72LinearSpin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  /* 7. 타이틀 & 리스트: 순차적 Fade in Up (Stagger Animation) */
+  @keyframes v72StaggerUp {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .v72-stagger-1 { animation: v72StaggerUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.04s both; }
+  .v72-stagger-2 { animation: v72StaggerUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.09s both; }
+  .v72-stagger-3 { animation: v72StaggerUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.14s both; }
+  .v72-stagger-4 { animation: v72StaggerUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.19s both; }
+  .v72-stagger-5 { animation: v72StaggerUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.24s both; }
+</style>
+
+<div id="v72PopupBackdrop" class="v72-popup-backdrop" role="dialog" aria-modal="true">
+  <div class="v72-popup-card">
+    <div id="v72PopupTitle" class="v72-popup-title">알림</div>
+    <div id="v72PopupDesc" class="v72-popup-desc">내용</div>
+    <div class="v72-popup-btns">
+      <button type="button" id="v72PopupCancel" class="v72-popup-btn cancel">취소</button>
+      <button type="button" id="v72PopupConfirm" class="v72-popup-btn confirm">확인</button>
+    </div>
+  </div>
+</div>
+
+<script id="v72-motion-design-script">
+(function initV72MotionSuite() {
+  // 1) 비디오 가이드에 나온 커스텀 Scale in 팝업 (window.showAppPopup)
+  let _popupResolver = null;
+  window.showAppPopup = function(opts) {
+    return new Promise((resolve) => {
+      _popupResolver = resolve;
+      const bd = document.getElementById("v72PopupBackdrop");
+      const titleEl = document.getElementById("v72PopupTitle");
+      const descEl = document.getElementById("v72PopupDesc");
+      const cancelBtn = document.getElementById("v72PopupCancel");
+      const confirmBtn = document.getElementById("v72PopupConfirm");
+      if (!bd) return resolve(false);
+
+      titleEl.textContent = opts.title || "확인";
+      descEl.textContent = opts.desc || "";
+      cancelBtn.textContent = opts.cancelText || "취소";
+      confirmBtn.textContent = opts.confirmText || "확인";
+      cancelBtn.style.display = opts.hideCancel ? "none" : "";
+
+      confirmBtn.className = "v72-popup-btn " + (opts.danger ? "danger" : "confirm");
+
+      bd.classList.add("on");
+    });
+  };
+
+  const closePopup = (res) => {
+    const bd = document.getElementById("v72PopupBackdrop");
+    if (bd) bd.classList.remove("on");
+    if (_popupResolver) {
+      _popupResolver(res);
+      _popupResolver = null;
+    }
+  };
+
+  document.getElementById("v72PopupCancel")?.addEventListener("click", () => closePopup(false));
+  document.getElementById("v72PopupConfirm")?.addEventListener("click", () => closePopup(true));
+  document.getElementById("v72PopupBackdrop")?.addEventListener("click", (e) => {
+    if (e.target === e.currentTarget) closePopup(false);
+  });
+
+  // 2) 좋아요(별) 클릭 시 Scale + Spring 톡 튕김 모션 트리거
+  document.addEventListener("click", (e) => {
+    const starBtn = e.target.closest(".star-btn, [data-act='toggleStar'], [data-act='toggleStarSheet']");
+    if (starBtn) {
+      starBtn.classList.remove("v72-spring");
+      void starBtn.offsetWidth; // trigger reflow
+      starBtn.classList.add("v72-spring");
+      setTimeout(() => starBtn.classList.remove("v72-spring"), 500);
+    }
+  }, true);
+
+  // 3) 대시보드 및 카드 타이틀 등장 시 Stagger Up 애니메이션 클래스 주입
+  window.applyStaggerMotion = function() {
+    const targets = [
+      document.querySelector("#v32HeroTitle"),
+      document.querySelector("#v32HeroDesc"),
+      document.querySelector(".v32-bento-grid"),
+      document.querySelector(".v32-base-grid")
+    ].filter(Boolean);
+    targets.forEach((el, idx) => {
+      el.classList.add("v72-stagger-" + Math.min(idx + 1, 5));
+    });
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => setTimeout(window.applyStaggerMotion, 80));
+  } else {
+    setTimeout(window.applyStaggerMotion, 80);
+  }
+})();
+</script>
+<!-- === V72_MOTION_DESIGN_SUITE_END === -->
+
 </body>
 </html>
