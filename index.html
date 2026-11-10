@@ -1831,22 +1831,33 @@
                 </button>
               </div>
               <label>인스타 캡션 추출용 RapidAPI 키 (선택 · 차단 우회)</label>
-              <div style="display: flex; gap: 6px; align-items: stretch; margin-bottom: 8px;">
-                <input
-                  type="text"
-                  id="rapidkey"
-                  placeholder="RapidAPI Application Key 입력"
-                  autocomplete="off"
-                  autocorrect="off"
-                  autocapitalize="off"
-                  spellcheck="false"
-                  style="flex: 1; margin: 0; min-height: 44px; -webkit-user-select: text !important; user-select: text !important; -webkit-touch-callout: default !important; font-family: monospace; font-size: 13.5px;"
-                />
-                <button type="button" id="pasteRapidKey" class="btn" style="flex: none; min-height: 44px; padding: 0 14px; margin: 0; background: var(--s2); color: var(--tx); border: 1px solid var(--b2); border-radius: 12px; display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 700;">
-                  <span class="ms" style="font-size: 16px;">content_paste</span>붙여넣기
+              <input
+                type="text"
+                id="rapidkey"
+                placeholder="RapidAPI Application Key 입력"
+                autocomplete="off"
+                autocorrect="off"
+                autocapitalize="off"
+                spellcheck="false"
+                style="width: 100%; min-height: 46px; -webkit-user-select: text !important; user-select: text !important; -webkit-touch-callout: default !important; font-family: monospace; font-size: 13.5px; margin-bottom: 8px;"
+              />
+              <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                <button
+                  type="button"
+                  id="pasteRapidKey"
+                  class="btn g"
+                  style="flex: 1; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 14px; font-weight: 700; margin: 0;"
+                >
+                  <span class="ms" style="font-size: 18px;">content_paste</span>붙여넣기
+                </button>
+                <button
+                  id="saverapid"
+                  class="btn"
+                  style="flex: 1; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 14px; font-weight: 700; margin: 0;"
+                >
+                  <span class="ms" style="font-size: 18px;">save</span>RapidAPI 키 저장
                 </button>
               </div>
-              <button id="saverapid" class="btn g">RapidAPI 키 저장</button>
               <label style="margin-top: 8px">나만의 CORS 프록시 주소 (선택)</label>
               <input
                 type="text"
@@ -2710,7 +2721,7 @@
       const TRIP_PENDING_CONFLICT_KEY = "TRIP_PENDING_CONFLICT";
       const TRIP_LAST_ROOM_KEY = "TRIP_LAST_ROOM";
       const TRIP_CREATING_ROOM_KEY = "TRIP_CREATING_ROOM";
-      const APP_VERSION = "v68";
+      const APP_VERSION = "v69";
       const TRANSIENT_NET_RE =
         /unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
       let _offlineFlushBusy = false,
@@ -14162,7 +14173,14 @@ ${caption || rawText}
     renderHotelPinsAll();
     window.renderV32Dashboard?.();
     decorateCardsV32();
-    tab("add");
+    if (!activeTab) {
+      const savedTab = ls.get("TRIP_LAST_TAB");
+      if (savedTab && ["add", "list", "PLACE", "CAFE", "FOOD", "SHOP", "set", "map"].includes(savedTab)) {
+        tab(savedTab);
+      } else {
+        tab("add");
+      }
+    }
   }
 
   if (document.readyState === "loading") {
@@ -15295,7 +15313,8 @@ ${caption || rawText}
       document.body.classList.remove("v37-fold-fullmap");
       return;
     }
-    if (window.innerWidth <= 820 && typeof activeTab !== "undefined" && activeTab !== "add") {
+    if (modalDepth > 0 && window.innerWidth <= 820 && typeof activeTab !== "undefined" && activeTab !== "add") {
+      modalDepth--;
       if (typeof tab === "function") tab("add");
     }
   });
@@ -21879,14 +21898,8 @@ ${JSON.stringify(payload, null, 2)}
   }
   requestAnimationFrame(finalizeSmoothBoot);
 
-  // 서비스 워커가 새 버전을 감지하면 즉시 활성화하고 구버전 캐시 화면을 자동 갱신
+  // 서비스 워커 새 버전 등록 (사용 중 강제 새로고침으로 인한 화면 튕김 방지)
   if ("serviceWorker" in navigator) {
-    let refreshing = false;
-    navigator.serviceWorker.addEventListener("controllerchange", () => {
-      if (refreshing) return;
-      refreshing = true;
-      window.location.reload();
-    });
     navigator.serviceWorker.getRegistration().then((reg) => {
       if (reg) reg.update().catch(() => {});
     });

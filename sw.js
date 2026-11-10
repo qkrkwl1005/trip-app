@@ -1,7 +1,7 @@
-// V68 1-Touch Paste & Native Callout for API Key Inputs
-const CACHE_CORE = "trip-v68-core";
-const CACHE_ASSETS = "trip-v68-assets";
-const CACHE_TILES = "trip-v68-tiles";
+// V69 RapidAPI UI Polishing & Tab Bounce Prevention
+const CACHE_CORE = "trip-v69-core";
+const CACHE_ASSETS = "trip-v69-assets";
+const CACHE_TILES = "trip-v69-tiles";
 
 const CORE_URLS = [
   "./",
