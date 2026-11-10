@@ -254,6 +254,14 @@
       }
       input[type="text"],
       input[type="password"],
+      input:not([type]),
+      textarea {
+        -webkit-user-select: text !important;
+        user-select: text !important;
+        -webkit-touch-callout: default !important;
+      }
+      input[type="text"],
+      input[type="password"],
       textarea,
       select.btn.g {
         width: 100%;
@@ -1823,11 +1831,21 @@
                 </button>
               </div>
               <label>인스타 캡션 추출용 RapidAPI 키 (선택 · 차단 우회)</label>
-              <input
-                type="password"
-                id="rapidkey"
-                placeholder="RapidAPI Application Key 입력"
-              />
+              <div style="display: flex; gap: 6px; align-items: stretch; margin-bottom: 8px;">
+                <input
+                  type="text"
+                  id="rapidkey"
+                  placeholder="RapidAPI Application Key 입력"
+                  autocomplete="off"
+                  autocorrect="off"
+                  autocapitalize="off"
+                  spellcheck="false"
+                  style="flex: 1; margin: 0; min-height: 44px; -webkit-user-select: text !important; user-select: text !important; -webkit-touch-callout: default !important; font-family: monospace; font-size: 13.5px;"
+                />
+                <button type="button" id="pasteRapidKey" class="btn" style="flex: none; min-height: 44px; padding: 0 14px; margin: 0; background: var(--s2); color: var(--tx); border: 1px solid var(--b2); border-radius: 12px; display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 700;">
+                  <span class="ms" style="font-size: 16px;">content_paste</span>붙여넣기
+                </button>
+              </div>
               <button id="saverapid" class="btn g">RapidAPI 키 저장</button>
               <label style="margin-top: 8px">나만의 CORS 프록시 주소 (선택)</label>
               <input
@@ -2692,7 +2710,7 @@
       const TRIP_PENDING_CONFLICT_KEY = "TRIP_PENDING_CONFLICT";
       const TRIP_LAST_ROOM_KEY = "TRIP_LAST_ROOM";
       const TRIP_CREATING_ROOM_KEY = "TRIP_CREATING_ROOM";
-      const APP_VERSION = "v67";
+      const APP_VERSION = "v68";
       const TRANSIENT_NET_RE =
         /unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
       let _offlineFlushBusy = false,
@@ -10161,7 +10179,30 @@ ${caption || rawText}
         toast("Naver Maps 키 저장됨");
         location.reload();
       };
-      if ($("rapidkey")) $("rapidkey").value = ls.get("TRIP_RAPIDAPI_KEY") || DEFAULT_RAPID_KEY;
+      if ($("rapidkey")) {
+        $("rapidkey").value = ls.get("TRIP_RAPIDAPI_KEY") || DEFAULT_RAPID_KEY;
+        $("rapidkey").addEventListener("click", function() { this.focus(); });
+      }
+      if ($("pasteRapidKey")) {
+        $("pasteRapidKey").onclick = async () => {
+          try {
+            if (navigator.clipboard && navigator.clipboard.readText) {
+              const text = await navigator.clipboard.readText();
+              if (text && text.trim()) {
+                $("rapidkey").value = text.trim();
+                $("rapidkey").focus();
+                toast("📋 클립보드에서 API 키를 붙여넣었습니다!");
+                return;
+              }
+            }
+          } catch (_) {}
+          // Fallback if clipboard read is restricted by browser
+          $("rapidkey").focus();
+          $("rapidkey").select();
+          try { document.execCommand("paste"); } catch (_) {}
+          toast("입력창을 터치하여 붙여넣기를 완료해 주세요");
+        };
+      }
       if ($("saverapid")) {
         $("saverapid").onclick = () => {
           ls.set("TRIP_RAPIDAPI_KEY", ($("rapidkey")?.value || "").trim());

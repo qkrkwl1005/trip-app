@@ -1,7 +1,7 @@
-// V67 Zero-API App Startup & Permanent Local Thumbnail Architecture
-const CACHE_CORE = "trip-v67-core";
-const CACHE_ASSETS = "trip-v67-assets";
-const CACHE_TILES = "trip-v67-tiles";
+// V68 1-Touch Paste & Native Callout for API Key Inputs
+const CACHE_CORE = "trip-v68-core";
+const CACHE_ASSETS = "trip-v68-assets";
+const CACHE_TILES = "trip-v68-tiles";
 
 const CORE_URLS = [
   "./",
