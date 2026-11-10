@@ -1,7 +1,7 @@
-// V69 RapidAPI UI Polishing & Tab Bounce Prevention
-const CACHE_CORE = "trip-v69-core";
-const CACHE_ASSETS = "trip-v69-assets";
-const CACHE_TILES = "trip-v69-tiles";
+// V70 RapidAPI Auto-Restore & Full Instagram Thumbnail Recovery
+const CACHE_CORE = "trip-v70-core";
+const CACHE_ASSETS = "trip-v70-assets";
+const CACHE_TILES = "trip-v70-tiles";
 
 const CORE_URLS = [
   "./",

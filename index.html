@@ -1858,6 +1858,14 @@
                   <span class="ms" style="font-size: 18px;">save</span>RapidAPI 키 저장
                 </button>
               </div>
+              <button
+                type="button"
+                id="refreshAllIgThumbsBtn"
+                class="btn g"
+                style="width: 100%; min-height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13.5px; font-weight: 700; margin-bottom: 8px;"
+              >
+                <span class="ms" style="font-size: 18px;">sync</span>릴스 썸네일 사진 전체 다시 가져오기
+              </button>
               <label style="margin-top: 8px">나만의 CORS 프록시 주소 (선택)</label>
               <input
                 type="text"
@@ -2721,7 +2729,7 @@
       const TRIP_PENDING_CONFLICT_KEY = "TRIP_PENDING_CONFLICT";
       const TRIP_LAST_ROOM_KEY = "TRIP_LAST_ROOM";
       const TRIP_CREATING_ROOM_KEY = "TRIP_CREATING_ROOM";
-      const APP_VERSION = "v69";
+      const APP_VERSION = "v70";
       const TRANSIENT_NET_RE =
         /unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
       let _offlineFlushBusy = false,
@@ -10215,10 +10223,36 @@ ${caption || rawText}
         };
       }
       if ($("saverapid")) {
-        $("saverapid").onclick = () => {
-          ls.set("TRIP_RAPIDAPI_KEY", ($("rapidkey")?.value || "").trim());
+        $("saverapid").onclick = async () => {
+          const val = ($("rapidkey")?.value || "").trim();
+          ls.set("TRIP_RAPIDAPI_KEY", val);
+          ls.set("TRIP_RAPID_API_KEY", val);
+          try {
+            localStorage.setItem("TRIP_RAPIDAPI_KEY", val);
+            localStorage.setItem("TRIP_RAPID_API_KEY", val);
+          } catch (_) {}
           syncSharedSettings();
-          toast("✅ RapidAPI 키가 저장되었어요!");
+          if (val) {
+            toast("✅ RapidAPI 키 저장 완료! 릴스 썸네일을 복구합니다...");
+            if (typeof window.restoreAllInstagramThumbs === "function") {
+              await window.restoreAllInstagramThumbs(val);
+            }
+          } else {
+            toast("RapidAPI 키가 저장되었습니다");
+          }
+        };
+      }
+      if ($("refreshAllIgThumbsBtn")) {
+        $("refreshAllIgThumbsBtn").onclick = async () => {
+          const key = (ls.get("TRIP_RAPIDAPI_KEY") || "").trim();
+          if (!key) {
+            toast("⚠️ 먼저 RapidAPI 키를 입력하고 저장해 주세요.");
+            $("rapidkey")?.focus();
+            return;
+          }
+          if (typeof window.restoreAllInstagramThumbs === "function") {
+            await window.restoreAllInstagramThumbs(key);
+          }
         };
       }
       $("savecfproxy").onclick = () => {
@@ -11168,12 +11202,38 @@ ${caption || rawText}
   const IG_THUMB_MARKER = "ig_cover=2"; // 이전 꼬리표(ig_thumb=1)를 가진 오염 사진을 모두 박멸하기 위한 새 규격
 
   function getRapidKey() {
-    const keys = ["RAPID_API_KEY", "rapidApiKey", "rapidapi_key", "TRIP_RAPID_API_KEY"];
+    const keys = ["TRIP_RAPIDAPI_KEY", "TRIP_RAPID_API_KEY", "RAPID_API_KEY", "rapidApiKey", "rapidapi_key"];
     for (const k of keys) {
       const v = (localStorage.getItem(k) || "").trim();
       if (v) return v;
     }
-    return window.RAPID_API_KEY || "";
+    return (window.RAPID_API_KEY || "").trim();
+  }
+
+  function extractThumbFromRapidJson(obj) {
+    if (!obj || typeof obj !== "object") return "";
+    let thumb = "";
+    function walk(node, depth) {
+      if (!node || typeof node !== "object" || depth > 8 || thumb) return;
+      const candidates = [
+        node.cover_media?.cropped_image_version?.url,
+        node.thumbnail_src, node.display_url, node.thumbnail_url, node.cover_url,
+        node.display_src, node.image_url, node.picture,
+        node.media?.display_url, node.media?.thumbnail_url,
+        node.images?.standard_resolution?.url,
+        ...(Array.isArray(node.image_versions2?.candidates) ? node.image_versions2.candidates.map(c => c?.url) : [])
+      ];
+      for (const c of candidates) {
+        if (typeof c === "string" && !isAvatarOrBadUrl(c)) { thumb = c; break; }
+      }
+      if (thumb) return;
+      for (const k of Object.keys(node)) {
+        if (k === "owner" || k === "user" || k === "profile_pic_url") continue;
+        if (node[k] && typeof node[k] === "object") walk(node[k], depth + 1);
+      }
+    }
+    walk(obj, 0);
+    return thumb;
   }
 
   function extractShortcode(input) {
@@ -11258,15 +11318,52 @@ ${caption || rawText}
   }
 
   // =========================================================================
-  // Vercel 서버 API 호출 (RapidAPI 키 전달)
+  // Vercel 서버 및 RapidAPI 직접 호출 (릴스 썸네일 복구)
   // =========================================================================
-  async function fetchTrueCoverV6(code) {
+  async function fetchTrueCoverV6(code, explicitKey) {
     if (!code) return "";
+    const key = (explicitKey || getRapidKey()).trim();
+
+    // 1순위: 클라이언트에서 RapidAPI 직접 호출 (가장 빠르고 프록시 장애 없음)
+    if (key) {
+      try {
+        const reelUrl = `https://www.instagram.com/reel/${code}/`;
+        const stableHost = "instagram-scraper-stable-api.p.rapidapi.com";
+        const r = await fetchTO(
+          `https://${stableHost}/get_media_data.php?reel_post_code_or_url=${encodeURIComponent(reelUrl)}&type=reel`,
+          { headers: { "x-rapidapi-key": key, "x-rapidapi-host": stableHost } },
+          4500
+        );
+        if (r.ok) {
+          const json = await r.json();
+          const raw = extractThumbFromRapidJson(json);
+          if (raw && !isAvatarOrBadUrl(raw)) {
+            return `https://images.weserv.nl/?url=${encodeURIComponent(raw)}&w=480&h=640&fit=cover&output=jpg&ig_cover=2`;
+          }
+        }
+      } catch (_) {}
+
+      try {
+        const stableHost = "instagram-scraper-stable-api.p.rapidapi.com";
+        const r = await fetchTO(
+          `https://${stableHost}/get_media_data_v2.php?media_code=${encodeURIComponent(code)}`,
+          { headers: { "x-rapidapi-key": key, "x-rapidapi-host": stableHost } },
+          4500
+        );
+        if (r.ok) {
+          const json = await r.json();
+          const raw = extractThumbFromRapidJson(json);
+          if (raw && !isAvatarOrBadUrl(raw)) {
+            return `https://images.weserv.nl/?url=${encodeURIComponent(raw)}&w=480&h=640&fit=cover&output=jpg&ig_cover=2`;
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 2순위: Vercel 서버리스 /api/ig 호출
     const apiBase = location.hostname.includes("vercel.app") ? "" : "https://trip-app-psi-two.vercel.app";
-    const key = getRapidKey();
     try {
-      // V6 핵심: 드디어 서버로 key가 전달됨!
-      const res = await fetch(`${apiBase}/api/ig?code=${encodeURIComponent(code)}&key=${encodeURIComponent(key)}`);
+      const res = await fetchTO(`${apiBase}/api/ig?code=${encodeURIComponent(code)}&key=${encodeURIComponent(key)}`, {}, 6000);
       if (res.ok) {
         const data = await res.json();
         if (data.weservThumb) return data.weservThumb;
@@ -11276,24 +11373,72 @@ ${caption || rawText}
   }
 
   // =========================================================================
-  // 초기화: 앱 시작 시 오염된 사진 즉시 파괴 및 재추출
+  // 전체 릴스 썸네일 복구 엔진
   // =========================================================================
-  let isPurged = false;
-  function purgeAndRebuildIgImages() {
-    if (isPurged || typeof items === "undefined" || !Array.isArray(items)) return;
-    isPurged = true;
+  async function restoreAllInstagramThumbs(explicitKey) {
+    if (!Array.isArray(items)) return 0;
+    const key = (explicitKey || getRapidKey()).trim();
+    if (!key) {
+      showNotice("⚠️ 먼저 RapidAPI 키를 저장해 주세요.");
+      return 0;
+    }
 
+    const igItems = items.filter(it => Boolean(extractShortcode(it)));
+    if (!igItems.length) {
+      showNotice("인스타그램 릴스 장소가 없습니다.");
+      return 0;
+    }
+
+    showNotice(`📸 릴스 ${igItems.length}곳의 썸네일을 불러오는 중...`);
+    let restored = 0;
+
+    for (const it of igItems) {
+      const code = extractShortcode(it);
+      if (!code) continue;
+      try {
+        const url = await fetchTrueCoverV6(code, key);
+        if (url) {
+          it.img = url;
+          it.useCustomImg = true;
+          if (typeof reelThumbCache === "object") reelThumbCache[code] = url;
+          restored++;
+          refreshMapAndDom();
+        }
+      } catch (_) {}
+    }
+
+    if (typeof saveReelThumbCache === "function") saveReelThumbCache();
+    refreshMapAndDom();
+
+    if (restored > 0) {
+      showNotice(`🎉 총 ${restored}곳의 릴스 썸네일 복구 완료!`);
+    } else {
+      showNotice("⚠️ 썸네일을 가져오지 못했습니다. RapidAPI 키가 올바른지 확인해 주세요.");
+    }
+    return restored;
+  }
+  window.restoreAllInstagramThumbs = restoreAllInstagramThumbs;
+
+  // =========================================================================
+  // 초기화: 앱 시작 시 오염된 사진 즉시 파괴 및 키가 있으면 재추출
+  // =========================================================================
+  function purgeAndRebuildIgImages() {
+    if (typeof items === "undefined" || !Array.isArray(items)) return;
+
+    const key = getRapidKey();
     for (const it of items) {
       const code = extractShortcode(it);
       if (!code) continue;
 
       applyUltimateShield(it);
       
-      // 방어막에 의해 사진이 빈칸이 된 릴스(오염되었던 항목)만 서버에 재요청
-      if (!it.img) {
-        fetchTrueCoverV6(code).then(url => {
+      // 사진이 비어있는 릴스 항목이 있고 키가 있으면 자동으로 커버 복원 시도
+      if (!it.img && key) {
+        fetchTrueCoverV6(code, key).then(url => {
           if (url) {
-            it.img = url; // 방어막 통과!
+            it.img = url;
+            it.useCustomImg = true;
+            if (typeof reelThumbCache === "object") reelThumbCache[code] = url;
             refreshMapAndDom();
           }
         });

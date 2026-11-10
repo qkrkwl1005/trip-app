@@ -21,6 +21,9 @@ function parseJsonMedia(obj) {
       const candidates = [
         node.cover_media?.cropped_image_version?.url,
         node.thumbnail_src, node.display_url, node.thumbnail_url, node.cover_url,
+        node.display_src, node.image_url, node.picture,
+        node.media?.display_url, node.media?.thumbnail_url,
+        node.images?.standard_resolution?.url,
         ...(Array.isArray(node.image_versions2?.candidates) ? node.image_versions2.candidates.map(c => c?.url) : [])
       ];
       for (const c of candidates) {
@@ -55,6 +58,19 @@ function extractCaptionFromJson(obj) {
   return "";
 }
 
+async function fetchTO(url, opts = {}, ms = 4500) {
+  const ctrl = new AbortController();
+  const tm = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const res = await fetch(url, { ...opts, signal: ctrl.signal });
+    clearTimeout(tm);
+    return res;
+  } catch (e) {
+    clearTimeout(tm);
+    throw e;
+  }
+}
+
 async function resolveIgData(code, rapidKey) {
   let thumb = "";
   let caption = "";
@@ -63,13 +79,14 @@ async function resolveIgData(code, rapidKey) {
   if (rapidKey) {
     const reelUrl = `https://www.instagram.com/reel/${code}/`;
     const endpoints = [
+      { host: "instagram-scraper-stable-api.p.rapidapi.com", url: `https://instagram-scraper-stable-api.p.rapidapi.com/get_media_data.php?reel_post_code_or_url=${encodeURIComponent(reelUrl)}&type=reel` },
+      { host: "instagram-scraper-stable-api.p.rapidapi.com", url: `https://instagram-scraper-stable-api.p.rapidapi.com/get_media_data_v2.php?media_code=${encodeURIComponent(code)}` },
       { host: "instagram-scraper-api2.p.rapidapi.com", url: `https://instagram-scraper-api2.p.rapidapi.com/v1/post_info?code_or_id_or_url=${encodeURIComponent(code)}` },
-      { host: "instagram-looter2.p.rapidapi.com", url: `https://instagram-looter2.p.rapidapi.com/post?url=${encodeURIComponent(reelUrl)}` },
-      { host: "instagram-scraper-stable-api.p.rapidapi.com", url: `https://instagram-scraper-stable-api.p.rapidapi.com/get_media_data.php?reel_post_code_or_url=${encodeURIComponent(reelUrl)}&type=reel` }
+      { host: "instagram-looter2.p.rapidapi.com", url: `https://instagram-looter2.p.rapidapi.com/post?url=${encodeURIComponent(reelUrl)}` }
     ];
     for (const ep of endpoints) {
       try {
-        const r = await fetch(ep.url, { headers: { "x-rapidapi-key": rapidKey, "x-rapidapi-host": ep.host } });
+        const r = await fetchTO(ep.url, { headers: { "x-rapidapi-key": rapidKey, "x-rapidapi-host": ep.host } }, 4500);
         if (r.ok) {
           const json = await r.json();
           if (!thumb) {
