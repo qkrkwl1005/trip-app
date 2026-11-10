@@ -2614,7 +2614,7 @@
       const TRIP_PENDING_CONFLICT_KEY = "TRIP_PENDING_CONFLICT";
       const TRIP_LAST_ROOM_KEY = "TRIP_LAST_ROOM";
       const TRIP_CREATING_ROOM_KEY = "TRIP_CREATING_ROOM";
-      const APP_VERSION = "v60";
+      const APP_VERSION = "v61";
       const TRANSIENT_NET_RE =
         /unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
       let _offlineFlushBusy = false,
@@ -3155,6 +3155,299 @@
         gRoute = null,
         nRoute = null,
         _undoFn = null;
+      function isValidCoord(lat, lng, requireJapan = true) {
+        const la = Number(lat), lo = Number(lng);
+        if (!Number.isFinite(la) || !Number.isFinite(lo) || !la || !lo) return false;
+        if (Math.abs(la) > 90 || Math.abs(lo) > 180) return false;
+        if (requireJapan && (la < 24 || la > 46 || lo < 122 || lo > 154)) return false;
+        return true;
+      }
+
+      function distKm(la1, lo1, la2, lo2) {
+        const R = 6371, toR = (x) => (x * Math.PI) / 180;
+        const dL = toR(la2 - la1), dO = toR(lo2 - lo1);
+        const a = Math.sin(dL / 2) * Math.sin(dL / 2) +
+          Math.cos(toR(la1)) * Math.cos(toR(la2)) * Math.sin(dO / 2) * Math.sin(dO / 2);
+        return 2 * R * Math.asin(Math.sqrt(a));
+      }
+
+      const KNOWN_KR_NAME_PATTERNS = [
+        {
+          test: /닌텐도\s*오사카|nintendo\s*osaka|루쿠아.*13층/i,
+          ko: "닌텐도 오사카 (오사카역 루쿠아 13층)",
+          local: "Nintendo OSAKA",
+          addr: "大阪府大阪市北区梅田3-1-3 ルクア イーレ 13F",
+          lat: 34.7025, lng: 135.4960
+        },
+        {
+          test: /이오시스|イオシス|iosys|아이폰.*공기계|공기계.*매장/i,
+          ko: "이오시스 난바점 (중고 아이폰·공기계 매장)",
+          local: "イオシス なんば店",
+          addr: "大阪市浪速区日本橋4-15-18",
+          lat: 34.6628, lng: 135.5052
+        },
+        {
+          test: /chiyomatsu|치요마츠|ちよ松|두꺼운\s*가츠동|katsu\s*sandwich/i,
+          ko: "치요마츠 도톤보리 (두꺼운 가츠동·가츠산도)",
+          local: "大阪とんかつ ちよ松 道頓堀本店",
+          addr: "大阪市中央区道頓堀1-1-10",
+          lat: 34.6687, lng: 135.5054
+        },
+        {
+          test: /青竈|아오쿠도|aokudo|69\s*hirata,\s*ine/i,
+          ko: "아오쿠도 이네 (바다뷰 감성 카페)",
+          local: "青竈 (Aokudo)",
+          addr: "京都府与謝郡伊根町平田69",
+          lat: 35.6695, lng: 135.2911
+        },
+        {
+          test: /ine\s*cafe|이네\s*카페|舟屋日和|후나야\s*히요리/i,
+          ko: "이네 카페 (후나야 수상 바다뷰 카페)",
+          local: "INE CAFE",
+          addr: "京都府与謝郡伊根町平田593-1",
+          lat: 35.6702, lng: 135.2925
+        },
+        {
+          test: /kojima|야키니쿠\s*코지마|焼肉こじま|5\s*chome-6-13\s*fukushima/i,
+          ko: "야키니쿠 코지마 후쿠시마점 (우설·야키니쿠)",
+          local: "焼肉こじま 離れ 福島店",
+          addr: "大阪市福島区福島5-14-6",
+          lat: 34.6975, lng: 135.4870
+        },
+        {
+          test: /돈타쿠|どんたく|dontaku|도야마점|堂山町/i,
+          ko: "오코노미야끼 돈타쿠 도야마점 (오코노미야키·철판요리)",
+          local: "お好み焼き どんたく",
+          addr: "大阪市北区堂山町1-14",
+          lat: 34.7042, lng: 135.5035
+        },
+        {
+          test: /쿠로게와규|흑우\s*함바그|kurogewagyu|와규\s*함바그/i,
+          ko: "쿠로게와규 함바그 신사이바시점 (와규 수제 함바그)",
+          local: "黒毛和牛ハンバーグ",
+          addr: "大阪市中央区心斎橋筋1-3-29",
+          lat: 34.6725, lng: 135.5008
+        },
+        {
+          test: /maguro\s*maru|마구로\s*마루|鮪丸|kyutaromachi|hub\s*kitchen/i,
+          ko: "마구로 마루 (생참치 덮밥·카이센동)",
+          local: "生マグロ専門 鮪丸",
+          addr: "大阪府大阪市中央区久太郎町3-1-27 HUB KITCHEN",
+          lat: 34.6819, lng: 135.5005
+        },
+        {
+          test: /生玉町\s*9-19|생탑町|모미지|もみじ|ikutamacho/i,
+          ko: "모미지 츠루하시·다니마치점 (오코노미야키·몬자야키)",
+          local: "お好み焼き もみじ",
+          addr: "大阪市天王寺区生玉町9-19",
+          lat: 34.6672, lng: 135.5181
+        },
+        {
+          test: /도게츠교|도월교|togetsukyo|渡月橋|아라시야마.*다리/i,
+          ko: "아라시야마 도게츠교 (교토 명소·도게츠교)",
+          local: "渡月橋 (Togetsukyo)",
+          addr: "京都市右京区嵯峨中ノ島町",
+          lat: 35.0129, lng: 135.6777
+        },
+        {
+          test: /도쿠라|とくら|tokura.*sanjo|masuyacho.*57|57\s*코레|桝屋町\s*57/i,
+          ko: "도쿠라 교토 산조점 (육즙 함박스테이크)",
+          local: "とくら 京都三条店",
+          addr: "京都市中京区三条通高倉東入桝屋町57",
+          lat: 35.0089, lng: 135.7618
+        },
+        {
+          test: /doikatsuman|도이카츠만|土井活鰻|kinugasa.*tenjinmori/i,
+          ko: "도이카츠만 킨카쿠지점 (장어 숯불구이 덮밥)",
+          local: "炭火焼鰻 土井活鰻 金閣寺店",
+          addr: "京都市北区衣笠北天神森町26",
+          lat: 35.0375, lng: 135.7312
+        },
+        {
+          test: /행자교|잇폰바시|一本橋|行者橋|inaricho\s*kitagumi|히가시야마.*스팟/i,
+          ko: "교토 기온 백천 다리 (행자교 포토스팟·산책로)",
+          local: "行者橋 (一本橋)",
+          addr: "京都市동山区稲荷町北組",
+          lat: 35.0076, lng: 135.7792
+        },
+        {
+          test: /173-2\s*kashiwayacho|카시와야초\s*173-2|kashiwayacho/i,
+          ko: "교토 기온 강변 카모가와 다이닝 (전통 일식 한 끼)",
+          local: "173-2 Kashiwayacho",
+          addr: "京都市東山区柏屋町173-2",
+          lat: 35.0042, lng: 135.7712
+        },
+        {
+          test: /45-1\s*sagayanagidacho|sagayanagidacho|오사카グルメ/i,
+          ko: "아라시야마 로컬 정식 맛집 (교토 가정식 한 상)",
+          local: "45-1 Sagayanagidacho",
+          addr: "京都市右京区嵯峨柳田町45-1",
+          lat: 35.0165, lng: 135.6795
+        },
+        {
+          test: /matsuyacho.*치즈케이크|51\s*matsuyacho/i,
+          ko: "교토 마츠야초 수제 치즈케이크 카페",
+          local: "51 Matsuyacho",
+          addr: "京都市中京区松屋町51",
+          lat: 35.0075, lng: 135.7620
+        },
+        {
+          test: /katsukura|카츠쿠라|명대\s*돈카츠|かつくら/i,
+          ko: "카츠쿠라 교토역점 (교토 명물 돈카츠)",
+          local: "名代とんかつ かつくら 京都駅ビル店",
+          addr: "京都市下京区烏丸通塩小路下ル東塩小路町901",
+          lat: 34.9858, lng: 135.7588
+        },
+        {
+          test: /motomura|모토무라|규카츠\s*모토무라|牛かつ\s*もと村/i,
+          ko: "규카츠 모토무라 난바점 (소고기 규카츠 맛집)",
+          local: "牛かつ もと村 難波店",
+          addr: "大阪市中央区難波3-3-1",
+          lat: 34.6667, lng: 135.5015
+        },
+        {
+          test: /ichiran|이치란|一蘭/i,
+          ko: "이치란 라멘 도톤보리본관 (돈코츠 라멘)",
+          local: "一蘭 道頓堀店本館",
+          addr: "大阪市中央区宗右衛門町7-18",
+          lat: 34.6687, lng: 135.5038
+        },
+        {
+          test: /교토\s*eco\s*trip|eco\s*trip|에코트립/i,
+          ko: "교토 에코트립 (교토역 앞 친절한 자전거 렌탈샵)",
+          local: "京都 Eco Trip",
+          addr: "京都市南区西九条東島町54-1",
+          lat: 34.9832, lng: 135.7562
+        },
+        {
+          test: /elyolicho|224\s*elyolicho|기온.*산조.*로컬\s*맛집/i,
+          ko: "교토 기온·시모교 전통 로컬 맛집",
+          local: "京都 下京区",
+          addr: "京都市下京区",
+          lat: 35.0005, lng: 135.7665
+        },
+        {
+          test: /traditional\s*교토-style\s*okono|교토\s*전통\s*스타일.*오코노미야키/i,
+          ko: "교토 산조 오코노미야키 맛집 (교토식 철판요리)",
+          local: "お好み焼き",
+          addr: "京都市中京区三条",
+          lat: 35.0090, lng: 135.7680
+        },
+        { test: /donguri\s*kyowakoku|동구리\s*공화국|지브리/i, ko: "동구리 공화국 (지브리 캐릭터 굿즈샵)", local: "どんぐり共和国" },
+        { test: /mugiwara|무기와라\s*스토어|원피스\s*샵/i, ko: "무기와라 스토어 (원피스 공식 굿즈샵)", local: "麦わらストア" },
+        { test: /human\s*made|휴먼메이드/i, ko: "휴먼메이드 (스트릿 패션 편집샵)", local: "HUMAN MADE" },
+        { test: /stussy|스투시/i, ko: "스투시 (스트릿 의류 매장)", local: "STUSSY" },
+        { test: /supreme|슈프림/i, ko: "슈프림 (스트릿 패션 매장)", local: "Supreme" },
+        { test: /mont-?bell|몽벨/i, ko: "몽벨 (아웃도어·경량패딩 매장)", local: "mont-bell" },
+        { test: /don\s*quijote|돈키호테|ドン・キホーテ/i, ko: "돈키호테 (할인 잡화·기념품 쇼핑몰)", local: "ドン・キホーテ" },
+        { test: /gu\b|지유/i, ko: "GU (가성비 패션 의류 매장)", local: "GU" },
+        { test: /uniqlo|유니클로/i, ko: "유니클로 (패션 의류 매장)", local: "UNIQLO" },
+        { test: /kaldi|칼디/i, ko: "칼디 커피팜 (수입과자·스프레드 쇼핑)", local: "KALDI" }
+      ];
+      window.KNOWN_KR_NAME_PATTERNS = KNOWN_KR_NAME_PATTERNS;
+
+      function needsKoreanRename(name, item) {
+        const raw = String(name || "").trim();
+        if (!raw) return true;
+        if (/#/.test(raw) || /외\s*\d+\s*곳/.test(raw)) return true;
+        const core = raw.replace(/#[^\s]+/g, "").replace(/\s*외\s*\d+\s*곳\s*$/, "").trim();
+        if (!core) return true;
+        if (/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(core)) return true;
+        if (!/[가-힣]/.test(core) || /[A-Za-z]{4,}/.test(core)) return true;
+        if (/\d+\s*-\s*\d+|\(음식점\)|\(카페\)|\(매장\)/.test(core)) return true;
+        if (/^(?:이\s*점|그\s*점|이\s*곳|그\s*곳|여기|맛집|추천|오사카|교토|일본|가게|식당|카페|저장된\s*장소)[!！\s]*$/.test(core)) return true;
+        return false;
+      }
+      window.needsKoreanRename = needsKoreanRename;
+
+      function matchKnownPatternsAndFix(it) {
+        if (!it) return it;
+        const hay = `${it.name || ""} ${it.localName || ""} ${it.address || ""} ${it.info || ""} ${it.note || ""}`;
+        for (const pat of KNOWN_KR_NAME_PATTERNS) {
+          if (pat.test.test(hay)) {
+            if (pat.ko) {
+              it.name = pat.ko;
+            }
+            if (pat.local && !it.localName) it.localName = pat.local;
+            if (pat.addr && (!it.address || it.address.length < 5 || /Ranbirsinghpora|Jammu|undefined/i.test(it.address))) {
+              it.address = pat.addr;
+            }
+            if (pat.lat && pat.lng) {
+              const la = Number(it.lat), lo = Number(it.lng);
+              if (!isValidCoord(la, lo)) {
+                it.lat = pat.lat;
+                it.lng = pat.lng;
+              } else {
+                const d = distKm(la, lo, pat.lat, pat.lng);
+                if (d > 1.2) {
+                  it.lat = pat.lat;
+                  it.lng = pat.lng;
+                }
+              }
+            }
+            break;
+          }
+        }
+        if (it.name) {
+          it.name = it.name.replace(/#[^\s]+/g, "").replace(/\s*외\s*\d+\s*곳\s*$/, "").trim();
+        }
+        return it;
+      }
+      window.matchKnownPatternsAndFix = matchKnownPatternsAndFix;
+
+      function unbundleAllGroupedPlaces(rawList) {
+        if (!Array.isArray(rawList)) return [];
+        const flat = [];
+        for (const raw of rawList) {
+          if (!raw || typeof raw !== "object") continue;
+          const places = Array.isArray(raw.places) ? raw.places.filter(p => p && (p.name || p.address)) : [];
+          if (places.length > 1) {
+            places.forEach((p, idx) => {
+              const sub = { ...raw };
+              sub.id = idx === 0 ? String(raw.id || ("it_" + Date.now())) : `it_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 6)}`;
+              const pClean = String(p.name || raw.name || "").replace(/#[^\s]+/g, "").replace(/\s*외\s*\d+\s*곳\s*$/, "").trim();
+              sub.name = pClean;
+              sub.localName = p.localName || (idx === 0 ? raw.localName : "");
+              sub.address = p.address || (idx === 0 ? raw.address : "");
+              sub.price = p.price || (idx === 0 ? raw.price : "");
+              sub.info = p.info || (idx === 0 ? raw.info : "");
+              sub.note = [p.price, p.info].filter(Boolean).join(" · ") || (idx === 0 ? raw.note : "");
+              sub.places = [];
+              if (isValidCoord(p.lat, p.lng)) {
+                sub.lat = Number(p.lat);
+                sub.lng = Number(p.lng);
+              } else if (idx === 0 && isValidCoord(raw.lat, raw.lng)) {
+                sub.lat = Number(raw.lat);
+                sub.lng = Number(raw.lng);
+              } else {
+                sub.lat = null;
+                sub.lng = null;
+              }
+              matchKnownPatternsAndFix(sub);
+              flat.push(sub);
+            });
+          } else {
+            const sub = { ...raw };
+            if (places.length === 1 && places[0].name) {
+              if (!sub.name || sub.name.includes("외 ")) {
+                sub.name = places[0].name;
+              }
+              if (isValidCoord(places[0].lat, places[0].lng)) {
+                sub.lat = Number(places[0].lat);
+                sub.lng = Number(places[0].lng);
+              }
+            }
+            if (sub.name) {
+              sub.name = sub.name.replace(/#[^\s]+/g, "").replace(/\s*외\s*\d+\s*곳\s*$/, "").trim();
+            }
+            sub.places = [];
+            matchKnownPatternsAndFix(sub);
+            flat.push(sub);
+          }
+        }
+        return flat;
+      }
+      window.unbundleAllGroupedPlaces = unbundleAllGroupedPlaces;
       let listFilter = {
         ALL: "ALL",
         LIST: "ALL",
@@ -3752,8 +4045,9 @@
       function sanitizeSharedItems(rawItems) {
         if (!Array.isArray(rawItems)) return [];
         const codeNoiseRe = /allorigins|fetchTO\(|encodeURIComponent|throw\s+new\s+Error|async\s*\(\)|parseIgEmbedHtml|Async\s*Labs|Lipovečka|Nikola\s*Tesla/i;
-        const sanitized = rawItems
-          .slice(0, 200)
+        const unbundled = typeof unbundleAllGroupedPlaces === "function" ? unbundleAllGroupedPlaces(rawItems) : rawItems;
+        const sanitized = unbundled
+          .slice(0, 300)
           .filter((item) => item && typeof item === "object")
           .map((raw, index) => {
             const item = { ...raw };
@@ -3780,17 +4074,12 @@
                 : raw.mapVisible === false
                   ? false
                   : undefined;
-            item.lat = Number.isFinite(Number(item.lat)) && item.lat !== 0
+            item.lat = isValidCoord(item.lat, item.lng)
               ? Number(item.lat)
               : null;
-            item.lng = Number.isFinite(Number(item.lng)) && item.lng !== 0
+            item.lng = isValidCoord(item.lat, item.lng)
               ? Number(item.lng)
               : null;
-            if (item.lat && item.lng && Math.abs(item.lat - 45.799) < 0.05 && Math.abs(item.lng - 15.948) < 0.05) {
-              item.lat = null;
-              item.lng = null;
-            }
-            // 인도 Jammu/Kashmir 또는 sweet_mr.kang 오염 항목 즉시 정정
             if (/sweet_mr\.kang|Ranbirsinghpora|Jammu and Kashmir/i.test(`${item.name || ""} ${item.address || ""} ${item.note || ""}`)) {
               item.name = "닌텐도 오사카 (오사카역 루쿠아 13층)";
               item.localName = "Nintendo OSAKA";
@@ -3800,18 +4089,11 @@
               item.info = "영업시간 10:00~20:00 · 루쿠아 13층";
               item.price = "컨트롤러 가챠 600엔 · 굿즈 다양";
               item.note = "[1] 닌텐도 오사카: 오사카역 루쿠아 13층 컨트롤러 가챠 600엔";
-              if (Array.isArray(item.places)) {
-                item.places = [{
-                  name: item.name,
-                  localName: item.localName,
-                  address: item.address,
-                  lat: item.lat,
-                  lng: item.lng,
-                  price: item.price,
-                  info: item.info
-                }];
-              }
             }
+            if (typeof matchKnownPatternsAndFix === "function") {
+              matchKnownPatternsAndFix(item);
+            }
+            item.places = [];
             if (
               typeof item.img === "string" &&
               item.img.startsWith("data:image") &&
@@ -3821,29 +4103,6 @@
               item.useCustomImg = false;
             }
             if (!item.img) item.useCustomImg = false;
-            item.places = Array.isArray(raw.places)
-              ? raw.places
-                  .slice(0, 20)
-                  .filter((place) => place && typeof place === "object")
-                  .map((place) => {
-                    const badAddr = codeNoiseRe.test(String(place.address || ""));
-                    const badCoord = place.lat && place.lng && Math.abs(Number(place.lat) - 45.799) < 0.05 && Math.abs(Number(place.lng) - 15.948) < 0.05;
-                    return {
-                      ...place,
-                      name: codeNoiseRe.test(String(place.name || ""))
-                        ? ""
-                        : String(place.name || "").slice(0, 500),
-                      localName: String(place.localName || "").slice(0, 500),
-                      address: badAddr ? "" : String(place.address || "").slice(0, 1000),
-                      lat: !badAddr && !badCoord && Number.isFinite(Number(place.lat)) && Number(place.lat) !== 0
-                        ? Number(place.lat)
-                        : null,
-                      lng: !badAddr && !badCoord && Number.isFinite(Number(place.lng)) && Number(place.lng) !== 0
-                        ? Number(place.lng)
-                        : null,
-                    };
-                  })
-              : undefined;
             return item;
           });
 
@@ -4337,8 +4596,10 @@
         try {
           localStorage.removeItem("TRIP_GEO_CACHE");
           items = sanitizeSharedItems(items);
+          if (typeof applyInstantKoreanNames === "function") {
+            applyInstantKoreanNames();
+          }
         } catch (e) {}
-        let changed = false;
         try {
           localStorage.removeItem("TRIP_PHOTO_CACHE");
         } catch (e) {}
@@ -4353,10 +4614,9 @@
           ) {
             i.img = "";
             i.useCustomImg = false;
-            changed = true;
           }
         });
-        if (changed) ls.set("TRIP_MASTER_ITEMS", JSON.stringify(items));
+        ls.set("TRIP_MASTER_ITEMS", JSON.stringify(items));
       })();
 
       (async function syncIndexedDB() {
@@ -5080,15 +5340,28 @@
 
       function fit() {
         if (gmap) {
-          if (!gposPts.length) return;
-          if (gposPts.length === 1) {
-            gmap.panTo(gposPts[0]);
+          const safePts = gposPts.filter((p) => {
+            const la = p.lat(), lo = p.lng();
+            return isValidCoord(la, lo);
+          });
+          const kansaiPts = safePts.filter((p) => {
+            const la = p.lat(), lo = p.lng();
+            return la >= 33.5 && la <= 36.2 && lo >= 134.0 && lo <= 136.5;
+          });
+          const targetPts = kansaiPts.length ? kansaiPts : safePts;
+          if (!targetPts.length) {
+            gmap.panTo({ lat: 34.6937, lng: 135.5023 }); // Osaka Center
+            gmap.setZoom(12);
+            return;
+          }
+          if (targetPts.length === 1) {
+            gmap.panTo(targetPts[0]);
             gmap.setZoom(15);
             return;
           }
           const bounds = new google.maps.LatLngBounds();
-          gposPts.forEach((p) => bounds.extend(p));
-          gmap.fitBounds(bounds);
+          targetPts.forEach((p) => bounds.extend(p));
+          gmap.fitBounds(bounds, { top: 60, right: 40, bottom: 80, left: 40 });
           return;
         }
         if (nmap) {
@@ -5528,9 +5801,9 @@
       }
       function hasMapCoordinates(item) {
         return Boolean(
-          (Number(item?.lat) && Number(item?.lng)) ||
+          isValidCoord(item?.lat, item?.lng) ||
           (Array.isArray(item?.places) &&
-            item.places.some((p) => Number(p.lat) && Number(p.lng))),
+            item.places.some((p) => isValidCoord(p?.lat, p?.lng))),
         );
       }
       function expandMapPins(validItems) {
@@ -5542,13 +5815,11 @@
             .map((place, placeIndex) => ({ place, placeIndex }))
             .filter(
               ({ place }) =>
-                Number(place.lat) &&
-                Number(place.lng) &&
+                isValidCoord(place.lat, place.lng) &&
                 (explicitlyRegistered || hasMapAddress(place)),
             );
           const parentHasPin =
-            Number(i.lat) &&
-            Number(i.lng) &&
+            isValidCoord(i.lat, i.lng) &&
             (!places.length ||
               (!explicitlyRegistered &&
                 !subPlaces.length &&
@@ -5584,8 +5855,9 @@
           address: c.address || "",
           price: c.price || "",
           info: c.info || "",
-          lat: Number(c.lat) || null,
-          lng: Number(c.lng) || null,
+          category: c.category || "PLACE",
+          lat: isValidCoord(c.lat, c.lng) ? Number(c.lat) : null,
+          lng: isValidCoord(c.lat, c.lng) ? Number(c.lng) : null,
         };
       }
       function ensureEditablePlaces(item) {
@@ -5656,26 +5928,26 @@
         if (!item) return;
         item.updatedAt = Date.now();
         item._localTouch = Date.now();
-        if (!Array.isArray(item.places) || !item.places.length) return;
+        if (!Array.isArray(item.places) || !item.places.length) {
+          if (item.name) item.name = item.name.replace(/#[^\s]+/g, "").replace(/\s*외\s*\d+\s*곳\s*$/, "").trim();
+          return;
+        }
         const first = item.places[0];
-        const cleanFirst = String(first.name || "").trim();
+        const cleanFirst = String(first.name || "").replace(/#[^\s]+/g, "").replace(/\s*외\s*\d+\s*곳\s*$/, "").trim();
         const fallbackName = !isGenericSharedName(item.name) && !/allorigins/i.test(item.name || "")
-          ? String(item.name || "").replace(/\s*외\s*\d+곳$/, "").trim()
+          ? String(item.name || "").replace(/#[^\s]+/g, "").replace(/\s*외\s*\d+\s*곳\s*$/, "").trim()
           : "";
         const baseName = cleanFirst || fallbackName || (first.address || "").split(",")[0].trim() || "저장된 장소";
-        item.name =
-          item.places.length > 1
-            ? `${baseName.replace(/\s*외\s*\d+곳$/, "")} 외 ${item.places.length - 1}곳`
-            : baseName;
+        item.name = baseName.replace(/#[^\s]+/g, "").replace(/\s*외\s*\d+\s*곳\s*$/, "").trim();
         item.localName = first.localName ?? "";
         item.address = first.address ?? "";
         item.price = first.price || item.price || "";
         item.info = first.info || item.info || "";
-        const located = item.places.find((p) => Number(p.lat) && Number(p.lng));
+        const located = item.places.find((p) => isValidCoord(p?.lat, p?.lng));
         if (located) {
           item.lat = Number(located.lat);
           item.lng = Number(located.lng);
-        } else {
+        } else if (!isValidCoord(item.lat, item.lng)) {
           item.lat = null;
           item.lng = null;
         }
@@ -7448,16 +7720,57 @@
         }
 
         if (meta.platform === "yt" && meta.id) {
+          const apiBase = location.hostname.includes("vercel.app")
+            ? ""
+            : "https://trip-app-psi-two.vercel.app";
           const wUrl = `https://www.youtube.com/watch?v=${meta.id}`;
-          const title = await fetchTO(
-            `https://noembed.com/embed?url=${encodeURIComponent(wUrl)}`,
-            {},
-            3500
-          )
-            .then((r) => (r.ok ? r.json() : {}))
-            .then((d) => d.title || "")
-            .catch(() => "");
-          return title.trim();
+          const jobs = [
+            async () => {
+              const r = await fetchTO(`${apiBase}/api/yt?id=${encodeURIComponent(meta.id)}`, {}, 6000);
+              if (!r.ok) throw new Error("api yt status " + r.status);
+              const d = await r.json();
+              const cap = d.caption || [d.title, d.description].filter(Boolean).join("\n\n");
+              if (cap && !isCodeGarbage(cap)) return cap.trim();
+              if (d.title && !isCodeGarbage(d.title)) return d.title.trim();
+              throw new Error("api yt empty");
+            },
+            async () => {
+              if (cfBase && !cfBase.includes(location.host)) {
+                const r = await fetchTO(cfBase + encodeURIComponent(wUrl), {}, 5000);
+                if (r.ok) {
+                  const html = await r.text();
+                  const m = html.match(/var ytInitialPlayerResponse\s*=\s*({.+?});(?:var|<\/script>)/);
+                  if (m) {
+                    const data = JSON.parse(m[1]);
+                    const cap = [data.videoDetails?.title, data.videoDetails?.shortDescription].filter(Boolean).join("\n\n");
+                    if (cap && !isCodeGarbage(cap)) return cap.trim();
+                  }
+                }
+              }
+              throw new Error("cf yt empty");
+            },
+            async () => {
+              const r = await fetchTO(`https://www.youtube.com/oembed?url=${encodeURIComponent(wUrl)}&format=json`, {}, 4000);
+              if (!r.ok) throw new Error("oembed status");
+              const d = await r.json();
+              if (d.title && !isCodeGarbage(d.title)) return d.title.trim();
+              throw new Error("oembed empty");
+            },
+            async () => {
+              const r = await fetchTO(`https://noembed.com/embed?url=${encodeURIComponent(wUrl)}`, {}, 3500);
+              if (!r.ok) throw new Error("noembed status");
+              const d = await r.json();
+              if (d.title && !isCodeGarbage(d.title)) return d.title.trim();
+              throw new Error("noembed empty");
+            }
+          ];
+
+          try {
+            const out = await Promise.any(jobs.map((fn) => fn()));
+            return typeof out === "string" && !isCodeGarbage(out) ? out.trim() : "";
+          } catch (_) {
+            return "";
+          }
         }
         if (meta.platform === "tt") {
           try {
@@ -7476,7 +7789,7 @@
       }
 
       function isLikelyAddressLine(s) {
-        return /(?:\b\d{3}-\d{4}\b|\b\d+\s*-\s*\d+|\bWard\b|\bChuo\b|\bKita\b|\bOsaka\b|\bTokyo\b|\bKyoto\b|\bFukuoka\b|丁目|番地?|千日前|中央区|北区|難波|梅田|[시군구]\s+\S+[동로길]\s*\d+|(?:오사카|우메다|난바|도톤보리|신사이바시|교토|도쿄|신주쿠|시부야|후쿠오카|하카타|삿포로).*(?:역|백화점|프라자|플라자|파르코|루쿠아|한큐|한신|다이마루|타카시마야|난바워크|빌딩|타워|상점가|지하|B\d|\d+층|안|내)|(?:백화점|프라자|플라자|파르코|루쿠아|난바워크|역)\s*(?:B?\d+\s*층|지하\s*\d+층|안에|내))/i.test(
+        return /(?:\b\d{3}-\d{4}\b|\b\d+\s*-\s*\d+|\bWard\b|\bChuo\b|\bKita\b|\bOsaka\b|\bTokyo\b|\bKyoto\b|\bFukuoka\b|\bKyutaromachi\b|\bHonmachi\b|\bShinsaibashi\b|\bFukushima\b|\bUmeda\b|\bNamba\b|\bDotonbori\b|\bIne\b|\bArashiyama\b|\bGion\b|\bHUB\s*KITCHEN\b|丁目|番地?|千日前|中央区|北区|難波|梅田|[시군구]\s+\S+[동로길]\s*\d+|(?:오사카|우메다|난바|도톤보리|신사이바시|교토|도쿄|신주쿠|시부야|후쿠오카|하카타|삿포로).*(?:역|백화점|프라자|플라자|파르코|루쿠아|한큐|한신|다이마루|타카시마야|난바워크|빌딩|타워|상점가|지하|B\d|\d+층|안|내)|(?:백화점|프라자|플라자|파르코|루쿠아|난바워크|역)\s*(?:B?\d+\s*층|지하\s*\d+층|안에|내))/i.test(
           String(s || ""),
         );
       }
@@ -7559,12 +7872,18 @@
             cl.startsWith("📌") ||
             cl.startsWith("☕")
           ) {
-            const v = cl.replace(/^(?:📍|📌|☕)\s*/u, "").trim();
+            let v = cl.replace(/^(?:📍|📌|☕)\s*/u, "").trim();
+            v = v.replace(/^\[|\]$/g, "").trim();
             if (v) {
               if (isLikelyAddressLine(v) && !address) addrParts.push(v);
               else if (!name && !isLikelyAddressLine(v)) name = v;
               else if (isLikelyAddressLine(v)) addrParts.push(v);
             }
+            continue;
+          }
+          if (/^(?:메뉴|대표\s*메뉴|추천\s*메뉴|Menu)\s*[:：]/i.test(cl)) {
+            const v = cl.replace(/^(?:메뉴|대표\s*메뉴|추천\s*메뉴|Menu)\s*[:：]\s*/i, "").trim();
+            if (v && !price) price = v;
             continue;
           }
           if (
@@ -8276,107 +8595,88 @@ ${caption || rawText}
               .slice(0, MAX_MULTI_PLACES)
               .filter((c) => c.name || c.address)
               .map(toPlace);
-            const sameVideoItems = vidUrl
-              ? items.filter(
-                  (x) => normalizeVidUrl(getVidUrlStr(x.vid)) === vidUrl,
-                )
-              : [];
-            let targetItem = sameVideoItems[0] || null;
 
-            if (targetItem) {
-              if (
-                !Array.isArray(targetItem.places) ||
-                !targetItem.places.length
-              ) {
-                targetItem.places =
-                  !isGenericSharedName(targetItem.name) &&
-                  (targetItem.name ||
-                    targetItem.address ||
-                    targetItem.lat ||
-                    targetItem.lng)
-                    ? [toPlace(targetItem)]
-                    : [];
-              } else {
-                targetItem.places = targetItem.places.map(toPlace);
-              }
-            } else {
-              const primary = limited[0];
-              targetItem = {
-                id:
-                  "id_" +
-                  Date.now() +
-                  "_" +
-                  Math.random().toString(36).slice(2, 6),
-                name: primary.name,
-                localName: primary.localName,
-                address: primary.address,
-                price: primary.price,
-                info: primary.info,
-                note: limited
-                  .map(
-                    (p, idx) =>
-                      `[${idx + 1}] ${p.name}: ${p.address || ""} ${p.price || ""}`,
-                  )
-                  .join("\n")
-                  .trim(),
-                category: CATS[cands[0].category] ? cands[0].category : cat,
-                lat: primary.lat,
-                lng: primary.lng,
-                places: [],
-                vid: vidUrl || "",
-                img: "",
-                useCustomImg: false,
-                v: 0,
-                done: false,
-              };
-              items.unshift(targetItem);
-            }
-
-            const savedPlaces = [];
+            const savedItems = [];
             for (const place of limited) {
-              const existing = targetItem.places.find((p) =>
-                samePlace(p, place),
-              );
+              const rawPName = String(place.name || "").replace(/\s*외\s*\d+\s*곳\s*$/, "").trim();
+              const pName = (typeof inferKoreanNameFromCaption === "function"
+                ? inferKoreanNameFromCaption({ ...place, name: rawPName })
+                : rawPName) || rawPName || "저장된 장소";
+              const cleanPName = pName.replace(/\s*외\s*\d+\s*곳\s*$/, "").trim();
+
+              const existing = items.find((x) => samePlace(x, place) || (x.name && x.name === cleanPName));
               if (existing) {
-                if (!existing.localName) existing.localName = place.localName;
-                if (!existing.address) existing.address = place.address;
-                if (!existing.price) existing.price = place.price;
-                if (!existing.info) existing.info = place.info;
-                if (
-                  (!existing.lat || !existing.lng) &&
-                  place.lat &&
-                  place.lng
-                ) {
+                if (!existing.localName && place.localName) existing.localName = place.localName;
+                if (!existing.address && place.address) existing.address = place.address;
+                if (!existing.price && place.price) existing.price = place.price;
+                if (!existing.info && place.info) existing.info = place.info;
+                if ((!existing.lat || !existing.lng) && isValidCoord(place.lat, place.lng)) {
                   existing.lat = place.lat;
                   existing.lng = place.lng;
                 }
-                savedPlaces.push(place);
-              } else if (targetItem.places.length < MAX_MULTI_PLACES) {
-                targetItem.places.push(place);
-                savedPlaces.push(place);
+                if (!existing.vid && vidUrl) existing.vid = vidUrl;
+                existing.updatedAt = Date.now();
+                savedItems.push(existing);
+              } else {
+                const newItem = {
+                  id: "id_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+                  name: cleanPName,
+                  localName: place.localName || "",
+                  address: place.address || "",
+                  price: place.price || "",
+                  info: place.info || "",
+                  note: [place.price, place.info].filter(Boolean).join(" · "),
+                  category: CATS[place.category] ? place.category : cat || "PLACE",
+                  lat: isValidCoord(place.lat, place.lng) ? Number(place.lat) : null,
+                  lng: isValidCoord(place.lat, place.lng) ? Number(place.lng) : null,
+                  places: [],
+                  vid: vidUrl || "",
+                  img: place.img || "",
+                  useCustomImg: Boolean(place.img),
+                  v: 0,
+                  done: false,
+                  star: false,
+                  day: 0,
+                  updatedAt: Date.now()
+                };
+                if (typeof KNOWN_KR_NAME_PATTERNS !== "undefined") {
+                  for (const pat of KNOWN_KR_NAME_PATTERNS) {
+                    const h = `${newItem.name} ${newItem.localName} ${newItem.address}`;
+                    if (pat.test.test(h)) {
+                      if (pat.lat && pat.lng) {
+                        newItem.lat = pat.lat;
+                        newItem.lng = pat.lng;
+                      }
+                      if (pat.addr && !newItem.address) newItem.address = pat.addr;
+                      break;
+                    }
+                  }
+                }
+                items.unshift(newItem);
+                savedItems.push(newItem);
               }
             }
-            targetItem.vid = targetItem.vid || vidUrl || "";
-            syncGroupedItem(targetItem);
+
             save();
-            res = savedPlaces.map((p) => ({
+            res = savedItems.map((p) => ({
               ...p,
               vid: vidUrl,
               _saved: true,
-              _itemId: targetItem.id,
+              _itemId: p.id,
             }));
             renderCandidates(
-              `✅ 릴스 1개에 총 ${targetItem.places.length}곳의 장소가 통합 저장되었습니다!`,
+              `✅ 총 ${savedItems.length}곳의 장소가 개별 저장되었습니다!`,
             );
             $("shareBox").value = "";
             $("reelLinkBox").value = "";
             lastSharedVid = "";
-            if (targetItem.lat && targetItem.lng) {
-              draw(true);
-              fit();
-            }
+            draw(true);
+            fit();
+            const firstName = savedItems[0]?.name || "장소";
             toast(
-              `✅ '${targetItem.name}' (총 ${targetItem.places.length}곳) 저장 완료!`,
+              savedItems.length > 1
+                ? `✅ '${firstName}' 등 총 ${savedItems.length}곳 저장 완료!`
+                : `✅ '${firstName}' 저장 완료!`
             );
             return;
           }
@@ -13099,16 +13399,24 @@ ${caption || rawText}
    * 5. 최근접 역·출구 매칭 & 현실적인 총 이동거리(TSP) 계산 & 스마트 일차 배정
    * ========================================================================= */
   const STATIONS_DB = [
+    // 오사카 주요 역
     { name: "난바역", exit: "14번 출구", lat: 34.6685, lng: 135.5013 },
     { name: "닛폰바시역", exit: "2번 출구", lat: 34.6675, lng: 135.5062 },
     { name: "신사이바시역", exit: "6번 출구", lat: 34.6746, lng: 135.5021 },
+    { name: "혼마치역", exit: "3번 출구", lat: 34.6825, lng: 135.4989 },
+    { name: "다니마치9초메역", exit: "3번 출구", lat: 34.6678, lng: 135.5173 },
+    { name: "츠루하시역", exit: "서출구", lat: 34.6657, lng: 135.5305 },
+    { name: "텐노지역", exit: "5번 출구", lat: 34.6475, lng: 135.5133 },
+    { name: "에비스초역", exit: "1-B번 출구", lat: 34.6548, lng: 135.5057 },
+    { name: "도부츠엔마에역", exit: "1번 출구", lat: 34.6508, lng: 135.5065 },
+    { name: "다이쇼역", exit: "2번 출구", lat: 34.6656, lng: 135.4790 },
     { name: "우메다역", exit: "3번 출구", lat: 34.7015, lng: 135.4983 },
     { name: "오사카역", exit: "중앙북구", lat: 34.7031, lng: 135.4954 },
+    { name: "후쿠시마역", exit: "동출구", lat: 34.6972, lng: 135.4868 },
     { name: "나카자키초역", exit: "2번 출구", lat: 34.7069, lng: 135.5055 },
     { name: "기타하마역", exit: "26번 출구", lat: 34.6915, lng: 135.5067 },
-    { name: "혼마치역", exit: "3번 출구", lat: 34.6825, lng: 135.4989 },
-    { name: "텐노지역", exit: "5번 출구", lat: 34.6475, lng: 135.5133 },
-    { name: "다이쇼역", exit: "2번 출구", lat: 34.6656, lng: 135.4790 },
+    { name: "미노오역", exit: "정면출구", lat: 34.8351, lng: 135.4691 },
+    // 교토 주요 역
     { name: "교토역", exit: "중앙구", lat: 34.9858, lng: 135.7588 },
     { name: "도후쿠지역", exit: "북출구", lat: 34.9815, lng: 135.7700 },
     { name: "후시미이나리역", exit: "동출구", lat: 34.9665, lng: 135.7685 },
@@ -13116,25 +13424,37 @@ ${caption || rawText}
     { name: "가와라마치역", exit: "3번 출구", lat: 35.0038, lng: 135.7695 },
     { name: "기온시조역", exit: "6번 출구", lat: 35.0039, lng: 135.7725 },
     { name: "산조역", exit: "6번 출구", lat: 35.0091, lng: 135.7720 },
+    { name: "가라스마오이케역", exit: "6번 출구", lat: 35.0105, lng: 135.7598 },
     { name: "가라스마역", exit: "16번 출구", lat: 35.0037, lng: 135.7615 },
+    { name: "교토시청앞역", exit: "1번 출구", lat: 35.0114, lng: 135.7694 },
+    { name: "히가시야마역", exit: "1번 출구", lat: 35.0089, lng: 135.7820 },
+    { name: "기타노하쿠바이초역", exit: "정면출구", lat: 35.0278, lng: 135.7303 },
     { name: "아라시야마역", exit: "정면출구", lat: 35.0156, lng: 135.6778 },
+    { name: "사가아라시야마역", exit: "남출구", lat: 35.0177, lng: 135.6813 },
     { name: "우지역", exit: "남구 출구", lat: 34.8904, lng: 135.8008 },
-    { name: "미노오역", exit: "정면출구", lat: 34.8351, lng: 135.4691 },
+    // 이네 / 아마노하시다테 / 고베 / 나라
     { name: "아마노하시다테역", exit: "정면출구", lat: 35.5572, lng: 135.1846 },
+    { name: "이네 후나야 (버스정류장)", exit: "이네 버스정류장", lat: 35.6708, lng: 135.2917 },
+    { name: "산노미야역", exit: "서출구", lat: 34.6936, lng: 135.1955 },
+    { name: "긴테츠나라역", exit: "동출구", lat: 34.6841, lng: 135.8278 },
     { name: "구라시키역", exit: "남구 출구", lat: 34.6019, lng: 133.7658 }
   ];
 
   function getNearestStation(it) {
     const la = Number(it?.lat), lo = Number(it?.lng);
-    if (!la || !lo) return null;
+    if (!la || !lo || !isValidCoord(la, lo)) return null;
     let best = null, minKm = Infinity;
     for (const s of STATIONS_DB) {
       const d = distKm(la, lo, s.lat, s.lng);
       if (d < minKm) { minKm = d; best = s; }
     }
-    if (best && minKm <= 3.0) {
-      const wMin = Math.max(1, Math.round((minKm * 1000 * 1.3) / 80));
-      return `🚇 ${best.name} ${best.exit} (${wMin <= 25 ? `도보 ${wMin}분` : `${minKm.toFixed(1)}km`})`;
+    if (best) {
+      if (minKm <= 1.8) {
+        const wMin = Math.max(1, Math.round((minKm * 1000 * 1.3) / 80));
+        return `🚇 ${best.name} ${best.exit} (도보 ${wMin}분)`;
+      } else if (minKm <= 3.5) {
+        return `🚇 ${best.name} (차량·대중교통 ${minKm.toFixed(1)}km)`;
+      }
     }
     return null;
   }
@@ -19395,36 +19715,18 @@ ${caption || rawText}
   function needsKoreanRename(name, item) {
     const raw = String(name || "").trim();
     if (!raw) return true;
-
-    // '외 6곳', '외 8곳' 같은 접미사를 떼어낸 본래 이름으로 검사
-    const core = raw.replace(/\s*외\s*\d+\s*곳\s*$/, "").trim();
+    if (/#/.test(raw) || /외\s*\d+\s*곳/.test(raw)) return true;
+    const core = raw.replace(/#[^\s]+/g, "").replace(/\s*외\s*\d+\s*곳\s*$/, "").trim();
     if (!core) return true;
-
-    // 1) 일본어 히라가나/가타카나/한자가 1글자라도 섞여 있는 경우 (예: '오사카グルメ', '생탑町', '#とくら京都三条店')
     if (/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(core)) return true;
-
-    // 2) 해시태그(#)가 이름에 그대로 남아 있는 경우
-    if (/#/.test(core)) return true;
-
-    // 3) 한글이 아예 없거나, 영어 알파벳이 5글자 이상 연속으로 들어간 경우 (예: 'Charcoal Grilled Eel ... 외 8곳')
     if (!/[가-힣]/.test(core) || /[A-Za-z]{5,}/.test(core)) return true;
-
-    // 4) 번지수 숫자(예: '카시와야초 173-2', '9-192F')나 '(음식점)' 같은 기계적 주소 번역인 경우
     if (/\d+\s*-\s*\d+|\(음식점\)|\(카페\)|\(매장\)/.test(core)) return true;
-
-    // 5) '이 점', '그곳', '좋아요' 등 2~3글자 불완전 절단 이름인 경우
-    if (/^(?:이\s*점|그\s*점|이\s*곳|그\s*곳|여기|맛집|추천|오사카|교토|일본|가게|식당|카페)[!！\s]*$/.test(core)) return true;
-
+    if (/^(?:이\s*점|그\s*점|이\s*곳|그\s*곳|여기|맛집|추천|오사카|교토|일본|가게|식당|카페|저장된\s*장소)[!！\s]*$/.test(core)) return true;
     return false;
   }
 
   function inferKoreanNameFromCaption(item) {
     const rawName = String(item.name || "").trim();
-    // '외 N곳' 접미사 보존용 추출
-    const groupSuffixMatch = rawName.match(/(\s*외\s*\d+\s*곳)\s*$/);
-    const groupSuffix = groupSuffixMatch ? groupSuffixMatch[1] : "";
-
-    // 해시태그 제거 버전
     const cleanedHash = rawName
       .replace(/#[^\s]+/g, "")
       .replace(/\s*외\s*\d+\s*곳\s*$/, "")
@@ -19433,17 +19735,15 @@ ${caption || rawText}
 
     const hay = `${rawName} ${item.localName || ""} ${item.address || ""} ${item.price || ""} ${item.info || ""} ${item.note || ""}`;
 
-    // 1) 알려진 유명 맛집/매장/주소 패턴 즉시 매칭
     for (const pat of KNOWN_KR_NAME_PATTERNS) {
       if (pat.test.test(hay)) {
         if (!item.localName && pat.local) {
           item.localName = pat.local;
         }
-        return pat.ko + groupSuffix;
+        return pat.ko;
       }
     }
 
-    // 2) 음식/디저트/쇼핑 키워드로 품목 추론
     let itemTag = "";
     if (/장어|우나기|eel|鰻/i.test(hay)) itemTag = "장어 덮밥·숯불구이";
     else if (/함박|햄버그|hamburg|ハンバーグ|도쿠라/i.test(hay)) itemTag = "육즙 함박스테이크";
@@ -19460,7 +19760,6 @@ ${caption || rawText}
     else if (/빈티지|구제|옷가게|편집샵|스트릿|의류|신발|쇼핑/i.test(hay) || item.category === "SHOP") itemTag = "쇼핑·패션 매장";
     else if (/다리|신사|사찰|절|전망대|공원|거리|산책|포토스팟/i.test(hay) || item.category === "PLACE") itemTag = "여행 명소·포토스팟";
 
-    // 3) 이름에서 해시태그나 일본어만 걷어냈을 때 훌륭한 한국어 상호명이 남는 경우 (예: '도쿠라 교토 산조점 #とくら京都三条店 외 6곳')
     const koOnly = cleanedHash
       .replace(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]+/g, "")
       .replace(/\(음식점\)|\(카페\)|\(매장\)/g, "")
@@ -19472,17 +19771,15 @@ ${caption || rawText}
       const withTag = itemTag && !koOnly.includes(itemTag.split("·")[0])
         ? `${koOnly} (${itemTag})`
         : koOnly;
-      return withTag + groupSuffix;
+      return withTag;
     }
 
-    // 4) 캡션/메모 안에 '📍 한국어 상호명' 이 적혀 있는 경우 추출
     const pinMatch = hay.match(/📍\s*([가-힣0-9\s·()]{2,22}?)(?=\s+[一-龯ぁ-んァ-ヶ〒\dA-Za-z]|$|\n)/);
     if (pinMatch && /[가-힣]{2,}/.test(pinMatch[1])) {
       const pinKo = pinMatch[1].trim();
-      return (itemTag ? `${pinKo} (${itemTag})` : pinKo) + groupSuffix;
+      return itemTag ? `${pinKo} (${itemTag})` : pinKo;
     }
 
-    // 5) 주소/지역명 + 음식/품목 조합으로 자연스러운 한국어 제목 생성 (번지수나 영어/일본어 대신!)
     let areaKo = "오사카·교토";
     if (/기온|가와라마치|산조|nakagyo|higashiyama|kashiwayacho|inaricho/i.test(hay)) areaKo = "교토 기온·산조";
     else if (/아라시야마|ukyo|sagayanagida/i.test(hay)) areaKo = "교토 아라시야마";
@@ -19499,7 +19796,7 @@ ${caption || rawText}
        item.category === "SHOP" ? "추천 쇼핑 매장" :
        item.category === "PLACE" ? "추천 여행 스팟" : "로컬 맛집");
 
-    return `${areaKo} ${fallbackCategoryLabel}${groupSuffix}`;
+    return `${areaKo} ${fallbackCategoryLabel}`;
   }
 
   // 다중 묶음 장소(it.places) 내부 서브 장소들의 이름도 깔끔하게 한글 정리
@@ -19585,7 +19882,7 @@ ${caption || rawText}
 
         const prompt = `아래 일본 여행 장소 목록의 이름을 한국인이 한눈에 알아볼 수 있는 **[한국어 상호명 (대표 음식 또는 파는 물건)]** 형태로 변환해주세요.
 - 일본어(グルメ, 町 등), 영어(Charcoal Grilled Eel...), 해시태그(#), 번지수 주소(173-2, 9-192F)가 이름에 남아 있으면 절대 안 됩니다!
-- 원래 이름 끝에 '외 N곳'이 있었다면 변환된 이름 끝에도 '외 N곳'을 유지하세요.
+- '외 N곳' 같은 불필요한 묶음 표기는 절대 붙이지 말고 순수 한글 상호명만 남기세요.
 
 입력 JSON:
 ${JSON.stringify(payload, null, 2)}
@@ -19604,7 +19901,7 @@ ${JSON.stringify(payload, null, 2)}
               if (!target.localName && target.name) {
                 target.localName = target.name;
               }
-              target.name = row.koName.trim();
+              target.name = row.koName.replace(/\s*외\s*\d+\s*곳\s*$/, "").trim();
               if (row.koPrice) target.price = row.koPrice.trim();
             }
           });
@@ -20315,29 +20612,29 @@ ${JSON.stringify(payload, null, 2)}
     const parent = items.find(x => x.id === itemId);
     if (!parent || !Array.isArray(parent.places) || parent.places.length < 2) return;
 
-    if (!confirm(`📍 이 묶음의 ${parent.places.length}개 장소를 각각 목록의 개별 카드로 분리할까요?\n(친구들과의 실시간 공유 방에도 자동 반영됩니다)`)) {
-      return;
-    }
-
-    const newItems = parent.places.map((p, idx) => ({
-      id: idx === 0 ? parent.id : "it_" + Math.random().toString(36).slice(2, 9),
-      name: p.name || parent.name,
-      localName: p.localName || "",
-      category: parent.category || "PLACE",
-      address: p.address || parent.address || "",
-      lat: p.lat || parent.lat || null,
-      lng: p.lng || parent.lng || null,
-      mapVisible: true,
-      day: parent.day || 0,
-      visitTime: parent.visitTime || "",
-      vid: parent.vid || "",
-      price: p.price || "",
-      info: p.info || "",
-      note: parent.note || "",
-      star: parent.star || false,
-      places: [{ name: p.name, address: p.address, lat: p.lat, lng: p.lng, price: p.price, info: p.info }],
-      updatedAt: Date.now()
-    }));
+    const newItems = parent.places.map((p, idx) => {
+      const it = {
+        id: idx === 0 ? parent.id : "it_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+        name: String(p.name || parent.name || "").replace(/#[^\s]+/g, "").replace(/\s*외\s*\d+\s*곳\s*$/, "").trim(),
+        localName: p.localName || "",
+        category: parent.category || "PLACE",
+        address: p.address || (idx === 0 ? parent.address : ""),
+        lat: isValidCoord(p.lat, p.lng) ? Number(p.lat) : (idx === 0 && isValidCoord(parent.lat, parent.lng) ? Number(parent.lat) : null),
+        lng: isValidCoord(p.lat, p.lng) ? Number(p.lng) : (idx === 0 && isValidCoord(parent.lat, parent.lng) ? Number(parent.lng) : null),
+        mapVisible: true,
+        day: parent.day || 0,
+        visitTime: parent.visitTime || "",
+        vid: parent.vid || "",
+        price: p.price || (idx === 0 ? parent.price : ""),
+        info: p.info || (idx === 0 ? parent.info : ""),
+        note: [p.price, p.info].filter(Boolean).join(" · ") || (idx === 0 ? parent.note : ""),
+        star: parent.star || false,
+        places: [],
+        updatedAt: Date.now()
+      };
+      if (typeof matchKnownPatternsAndFix === "function") matchKnownPatternsAndFix(it);
+      return it;
+    });
 
     const pIdx = items.findIndex(x => x.id === itemId);
     if (pIdx !== -1) {

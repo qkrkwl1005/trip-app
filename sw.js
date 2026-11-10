@@ -1,7 +1,7 @@
-// V58 Authentic Glassy Dashboard V5 (Specular Rim & StatsCard 3-Tier Suite)
-const CACHE_CORE = "trip-v58-core";
-const CACHE_ASSETS = "trip-v58-assets";
-const CACHE_TILES = "trip-v58-tiles";
+// V61 Pinpoint Station Matching, Map Boundary Rescue & YouTube Shorts Extractor Suite
+const CACHE_CORE = "trip-v61-core";
+const CACHE_ASSETS = "trip-v61-assets";
+const CACHE_TILES = "trip-v61-tiles";
 
 const CORE_URLS = [
   "./",
