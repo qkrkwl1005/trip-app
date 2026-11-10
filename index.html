@@ -2614,7 +2614,7 @@
       const TRIP_PENDING_CONFLICT_KEY = "TRIP_PENDING_CONFLICT";
       const TRIP_LAST_ROOM_KEY = "TRIP_LAST_ROOM";
       const TRIP_CREATING_ROOM_KEY = "TRIP_CREATING_ROOM";
-      const APP_VERSION = "v61";
+      const APP_VERSION = "v62";
       const TRANSIENT_NET_RE =
         /unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
       let _offlineFlushBusy = false,
@@ -13682,33 +13682,6 @@ ${caption || rawText}
           <b class="v32-card-val">${coords}곳</b>
           <div class="v32-card-badge"><span class="ms">north_east</span>${total ? Math.round(coords / total * 100) : 0}%</div>
         </div>
-        <div class="v32-bento-card b-purple" data-v32-go="ALL">
-          <div class="v32-card-head">
-            <span class="v32-card-title">일차 배정 완료</span>
-            <div class="v32-card-icon"><span class="ms">calendar_month</span></div>
-          </div>
-          <b class="v32-card-val">${scheduled}곳</b>
-          <div class="v32-card-badge"><span class="ms">north_east</span>${total ? Math.round(scheduled / total * 100) : 0}%</div>
-        </div>
-        <div class="v32-bento-card b-amber" id="v32GoRoute">
-          <div class="v32-card-head">
-            <span class="v32-card-title">최단 동선 거리</span>
-            <div class="v32-card-icon"><span class="ms">route</span></div>
-          </div>
-          <b class="v32-card-val">${routeKm.toFixed(1)}km</b>
-          <div class="v32-card-badge"><span class="ms">check_circle</span>최적화됨</div>
-        </div>
-      </div>
-
-      <div class="v32-sec-card">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <b style="font-size:15px">일차별 코스 & 동선 지도</b>
-          <div style="display:flex;gap:6px">
-            <button type="button" class="mb pr" id="v32AutoDay" style="min-height:30px;padding:4px 10px;font-size:11.5px">자동 배정</button>
-            <button type="button" class="mb dg" id="v32ResetDay" style="min-height:30px;padding:4px 10px;font-size:11.5px">초기화</button>
-          </div>
-        </div>
-        ${dayRows}
       </div>
 
       <div class="v32-sec-card">
@@ -13721,11 +13694,14 @@ ${caption || rawText}
       </div>
     `;
 
-    document.getElementById("v32HeroAdd").onclick = () => document.getElementById("v32ImportSheetWrap")?.classList.add("on");
-    document.getElementById("v32HeroList").onclick = () => tab("list");
-    document.getElementById("v32AutoDay").onclick = () => window.autoAssignDaysV32();
-    document.getElementById("v32ResetDay").onclick = () => window.resetDaysV32();
-    document.getElementById("v32GoRoute").onclick = () => { mapRouteOn = true; draw(true); if (innerWidth <= 820) tab("map"); fit(); };
+    document.getElementById("v32HeroAdd")?.addEventListener("click", () => document.getElementById("v32ImportSheetWrap")?.classList.add("on"));
+    document.getElementById("v32HeroList")?.addEventListener("click", () => tab("list"));
+    const autoDayBtn = document.getElementById("v32AutoDay");
+    if (autoDayBtn) autoDayBtn.onclick = () => window.autoAssignDaysV32();
+    const resetDayBtn = document.getElementById("v32ResetDay");
+    if (resetDayBtn) resetDayBtn.onclick = () => window.resetDaysV32();
+    const goRouteBtn = document.getElementById("v32GoRoute");
+    if (goRouteBtn) goRouteBtn.onclick = () => { mapRouteOn = true; draw(true); if (innerWidth <= 820) tab("map"); fit(); };
 
     dash.querySelectorAll("[data-v32-go]").forEach(el => { el.onclick = () => tab("list"); });
     dash.querySelectorAll("[data-v32-hotel]").forEach(el => { el.onclick = () => window.focusHotelV32(el.dataset.v32Hotel); });
@@ -19306,10 +19282,12 @@ ${caption || rawText}
 <!-- === V45_SMART_QUERY_CACHE_AND_RETRY_ENGINE_END === -->
 <!-- === V46_PASS_AND_MYMAPS_TRANSIT_INTELLIGENCE_SUITE_START === -->
 <style id="v46-pass-guide-style">
-  /* 패스 안내 배너 & 전용 모달 스타일 */
+  /* 패스 안내 배너 & 전용 모달 스타일 (리퀴드 글래스 모노크롬 - 무지개빛/틴트 제거) */
   .v46-pass-card {
-    background: linear-gradient(135deg, rgba(37, 99, 235, 0.16) 0%, rgba(16, 185, 129, 0.14) 100%) !important;
-    border: 1px solid rgba(59, 130, 246, 0.32) !important;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%) !important;
+    backdrop-filter: blur(20px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
     border-radius: 20px !important;
     padding: 15px 16px !important;
     margin: 8px 0 12px !important;
@@ -19317,15 +19295,40 @@ ${caption || rawText}
     align-items: center !important;
     justify-content: space-between !important;
     cursor: pointer !important;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22) !important;
-    transition: transform 0.18s ease, box-shadow 0.18s ease !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18), inset 0 1px 1px 0 rgba(255, 255, 255, 0.25) !important;
+    transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.22s ease, border-color 0.22s ease !important;
+  }
+  .v46-pass-card:hover {
+    transform: translateY(-3px) !important;
+    border-color: rgba(255, 255, 255, 0.24) !important;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32), inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.35) !important;
   }
   .v46-pass-card:active {
     transform: scale(0.98) !important;
   }
+  .v46-pass-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--tx);
+    flex: none;
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2);
+  }
   [data-theme="light"] .v46-pass-card {
-    background: linear-gradient(135deg, #eff6ff 0%, #ecfdf5 100%) !important;
-    border-color: #bfdbfe !important;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.78) 0%, rgba(255, 255, 255, 0.52) 100%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.88) !important;
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.95), 0 8px 24px rgba(15, 23, 42, 0.08) !important;
+  }
+  [data-theme="light"] .v46-pass-icon {
+    background: rgba(0, 0, 0, 0.04);
+    border-color: rgba(0, 0, 0, 0.08);
+    color: var(--tx);
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.8);
   }
 
   /* 장소 카드 & 상세창 내 교통패스 판별 배지 */
@@ -19590,9 +19593,9 @@ ${caption || rawText}
     card.id = "v46HomePassCard";
     card.className = "v46-pass-card";
     card.innerHTML = `
-      <div style="display:flex;align-items:center;gap:10px">
-        <div style="width:38px;height:38px;border-radius:12px;background:rgba(59,130,246,0.2);display:flex;align-items:center;justify-content:center;color:#3b82f6;flex:none">
-          <span class="ms" style="font-size:22px">confirmation_number</span>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="v46-pass-icon">
+          <span class="ms" style="font-size:20px;opacity:0.9">confirmation_number</span>
         </div>
         <div>
           <b style="font-size:13.5px;letter-spacing:-0.02em;color:var(--tx)">간사이 와이드 5일 & 이네 2일 패스 가이드</b>
@@ -20959,6 +20962,7 @@ ${JSON.stringify(payload, null, 2)}
   .item,
   .v32-sec-card,
   .v32-bento-card,
+  .v46-pass-card,
   #v49SharedRoomCard,
   .taxi-card,
   #groupedPlacesSummary,
@@ -20968,6 +20972,7 @@ ${JSON.stringify(payload, null, 2)}
   html[data-oled="true"] .item,
   html[data-oled="true"] .v32-sec-card,
   html[data-oled="true"] .v32-bento-card,
+  html[data-oled="true"] .v46-pass-card,
   html[data-oled="true"] #v49SharedRoomCard,
   html[data-oled="true"] .taxi-card,
   html[data-oled="true"] .sh {
@@ -20990,7 +20995,8 @@ ${JSON.stringify(payload, null, 2)}
   /* 영상 framer-motion: whileHover={{ y: -5 }} 인터랙션 */
   .card:hover,
   .item:hover,
-  .v32-bento-card:hover {
+  .v32-bento-card:hover,
+  .v46-pass-card:hover {
     transform: translateY(-5px) !important;
     background: linear-gradient(
       135deg,
@@ -21004,7 +21010,8 @@ ${JSON.stringify(payload, null, 2)}
   }
   .card:active,
   .item:active,
-  .v32-bento-card:active {
+  .v32-bento-card:active,
+  .v46-pass-card:active {
     transform: translateY(-2px) scale(0.99) !important;
   }
 
@@ -21012,6 +21019,7 @@ ${JSON.stringify(payload, null, 2)}
   [data-theme="light"] .item,
   [data-theme="light"] .v32-sec-card,
   [data-theme="light"] .v32-bento-card,
+  [data-theme="light"] .v46-pass-card,
   [data-theme="light"] #v49SharedRoomCard,
   [data-theme="light"] .taxi-card,
   [data-theme="light"] #groupedPlacesSummary,
@@ -21049,7 +21057,7 @@ ${JSON.stringify(payload, null, 2)}
   .v32-bento-card.b-purple,
   .v32-bento-card.b-amber,
   #v32GoRoute {
-    display: flex !important; /* 4개 카드가 균형있게 2x2로 노출 */
+    display: none !important; /* 홈 화면: 일차 배정 및 최단 동선거리 카드 완전 제거 */
   }
 
   .v32-card-head {

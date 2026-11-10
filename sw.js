@@ -1,7 +1,7 @@
-// V61 Pinpoint Station Matching, Map Boundary Rescue & YouTube Shorts Extractor Suite
-const CACHE_CORE = "trip-v61-core";
-const CACHE_ASSETS = "trip-v61-assets";
-const CACHE_TILES = "trip-v61-tiles";
+// V62 Home Dashboard Bento Refinement & Pure Monochrome Liquid Glass Pass Card
+const CACHE_CORE = "trip-v62-core";
+const CACHE_ASSETS = "trip-v62-assets";
+const CACHE_TILES = "trip-v62-tiles";
 
 const CORE_URLS = [
   "./",
