@@ -1,7 +1,7 @@
-// V55 GitHub iOS Liquid Glass & Zero-Jank Instant Skeleton Suite
-const CACHE_CORE = "trip-v55-core";
-const CACHE_ASSETS = "trip-v55-assets";
-const CACHE_TILES = "trip-v55-tiles";
+// V56 Complete Liquid Glass Suite (Glassy Dashboard V5)
+const CACHE_CORE = "trip-v56-core";
+const CACHE_ASSETS = "trip-v56-assets";
+const CACHE_TILES = "trip-v56-tiles";
 
 const CORE_URLS = [
   "./",
