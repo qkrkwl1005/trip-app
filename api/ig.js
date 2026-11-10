@@ -37,10 +37,29 @@ function parseJsonMedia(obj) {
   return thumb;
 }
 
+function extractCaptionFromJson(obj) {
+  if (!obj || typeof obj !== "object") return "";
+  const direct =
+    obj?.data?.caption?.text ||
+    obj?.caption?.text ||
+    obj?.edge_media_to_caption?.edges?.[0]?.node?.text ||
+    obj?.data?.edge_media_to_caption?.edges?.[0]?.node?.text ||
+    obj?.gql_data?.shortcode_media?.edge_media_to_caption?.edges?.[0]?.node?.text ||
+    obj?.context?.media?.caption?.text ||
+    obj?.context?.caption ||
+    (typeof obj?.caption === "string" ? obj.caption : "") ||
+    "";
+  if (typeof direct === "string" && direct.trim().length >= 6) {
+    return direct.trim();
+  }
+  return "";
+}
+
 async function resolveIgData(code, rapidKey) {
   let thumb = "";
+  let caption = "";
 
-  // 1순위: RapidAPI (사용자가 입력한 키가 전달된 경우) - 가장 정확함
+  // 1순위: RapidAPI (사용자가 입력한 키가 전달된 경우)
   if (rapidKey) {
     const reelUrl = `https://www.instagram.com/reel/${code}/`;
     const endpoints = [
@@ -53,8 +72,15 @@ async function resolveIgData(code, rapidKey) {
         const r = await fetch(ep.url, { headers: { "x-rapidapi-key": rapidKey, "x-rapidapi-host": ep.host } });
         if (r.ok) {
           const json = await r.json();
-          const parsed = parseJsonMedia(json);
-          if (parsed && !isAvatarOrBadUrl(parsed)) return parsed;
+          if (!thumb) {
+            const parsed = parseJsonMedia(json);
+            if (parsed && !isAvatarOrBadUrl(parsed)) thumb = parsed;
+          }
+          if (!caption) {
+            const cap = extractCaptionFromJson(json);
+            if (cap) caption = cap;
+          }
+          if (thumb && caption) break;
         }
       } catch(e) {}
     }
@@ -67,10 +93,12 @@ async function resolveIgData(code, rapidKey) {
     });
     if (r.ok) {
       const html = await r.text();
-      const ctxMatch = html.match(/contextJSON"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+      const ctxMatch = html.match(/"contextJSON"\s*:\s*("[^"\\]*(?:\\.[^"\\]*)*")/);
       if (ctxMatch) {
         try {
-          thumb = parseJsonMedia(JSON.parse(JSON.parse('"' + ctxMatch[1] + '"')));
+          const parsedObj = JSON.parse(JSON.parse(ctxMatch[1]));
+          if (!thumb) thumb = parseJsonMedia(parsedObj);
+          if (!caption) caption = extractCaptionFromJson(parsedObj);
         } catch(e) {}
       }
       if (!thumb || isAvatarOrBadUrl(thumb)) {
@@ -80,25 +108,23 @@ async function resolveIgData(code, rapidKey) {
     }
   } catch (e) {}
 
-  return thumb;
+  return { thumb, caption };
 }
 
 async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   const code = String(req.query.code || "").trim();
-  // V6 핵심: 클라이언트가 보낸 RapidAPI 키 수신
   const key = String(req.query.key || req.headers["x-rapidapi-key"] || "").trim();
   
   if (!code) return res.status(400).json({ ok: false });
 
-  const thumb = await resolveIgData(code, key);
+  const { thumb, caption } = await resolveIgData(code, key);
   
-  // V6 핵심: 오염된 캐시를 뚫기 위해 인증 꼬리표를 ig_cover=2로 격상
   const weservUrl = (thumb && !isAvatarOrBadUrl(thumb)) 
     ? `https://images.weserv.nl/?url=${encodeURIComponent(thumb)}&w=640&h=640&fit=cover&output=jpg&ig_cover=2` 
     : "";
     
-  return res.status(200).json({ ok: Boolean(weservUrl), code, thumb, weservThumb: weservUrl });
+  return res.status(200).json({ ok: Boolean(weservUrl || caption), code, thumb, weservThumb: weservUrl, caption: caption || "" });
 }
 
 module.exports = handler;

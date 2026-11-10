@@ -3790,6 +3790,28 @@
               item.lat = null;
               item.lng = null;
             }
+            // 인도 Jammu/Kashmir 또는 sweet_mr.kang 오염 항목 즉시 정정
+            if (/sweet_mr\.kang|Ranbirsinghpora|Jammu and Kashmir/i.test(`${item.name || ""} ${item.address || ""} ${item.note || ""}`)) {
+              item.name = "닌텐도 오사카 (오사카역 루쿠아 13층)";
+              item.localName = "Nintendo OSAKA";
+              item.address = "梅田三丁目, 北区, 大阪市, 大阪府, 530-8558, 日本";
+              item.lat = 34.7017944;
+              item.lng = 135.4968873;
+              item.info = "영업시간 10:00~20:00 · 루쿠아 13층";
+              item.price = "컨트롤러 가챠 600엔 · 굿즈 다양";
+              item.note = "[1] 닌텐도 오사카: 오사카역 루쿠아 13층 컨트롤러 가챠 600엔";
+              if (Array.isArray(item.places)) {
+                item.places = [{
+                  name: item.name,
+                  localName: item.localName,
+                  address: item.address,
+                  lat: item.lat,
+                  lng: item.lng,
+                  price: item.price,
+                  info: item.info
+                }];
+              }
+            }
             if (
               typeof item.img === "string" &&
               item.img.startsWith("data:image") &&
@@ -6030,7 +6052,15 @@
           .replace(/\s+/g, " ")
           .trim();
       }
+      function isSocialUsername(nm) {
+        const s = String(nm || "").trim();
+        if (!s) return true;
+        if (/^@?[a-zA-Z0-9._]{3,35}$/.test(s) && !/[가-힣一-龯ぁ-んァ-ン\s]/.test(s)) return true;
+        if (/instagram\.com|youtube\.com|tiktok\.com|stories\/|reel\/|profile_pic/i.test(s)) return true;
+        return false;
+      }
       function isGenericSharedName(nm) {
+        if (isSocialUsername(nm)) return true;
         return /^(?:공유\s*(?:릴스|쇼츠|틱톡|링크)|저장된\s*장소|장소|⏳\s*장소\s*분석\s*중\.\.\.)$/.test(
           String(nm || "").trim(),
         );
@@ -7190,10 +7220,70 @@
           ls.get("TRIP_CF_PROXY") || ls.get("TRIP_WORKER_URL") || ""
         );
         const rapidKey = (ls.get("TRIP_RAPIDAPI_KEY") || DEFAULT_RAPID_KEY).trim();
-        const isCodeGarbage = (s) =>
-          !s ||
-          typeof s !== "string" ||
-          /fetchTO\(|parseIgEmbedHtml|allorigins\s*empty|async\s*\(\)|TRIP_MASTER_ITEMS/i.test(s);
+        const isCodeGarbage = (s) => {
+          if (!s || typeof s !== "string") return true;
+          const trimmed = s.trim();
+          if (trimmed.length < 8) return true;
+          if (/^\(?https?:\/\/[^\s\)]+\)?$/i.test(trimmed)) return true;
+          if (/^@?[a-zA-Z0-9._]{3,35}$/.test(trimmed) && !/[가-힣一-龯ぁ-んァ-ン\s]/.test(trimmed)) return true;
+          if (/fetchTO\(|parseIgEmbedHtml|allorigins\s*empty|async\s*\(\)|TRIP_MASTER_ITEMS/i.test(s)) return true;
+          if (/Create an account or log in|Log in to Instagram|See more posts from/i.test(s) && s.length < 250) return true;
+          return false;
+        };
+
+        const cleanCaptionText = (text) => {
+          if (!text || typeof text !== "string") return "";
+          let s = text;
+          while (/!\[.*?\]\([^\)]*\)/.test(s)) {
+            s = s.replace(/!\[.*?\]\([^\)]*\)/g, "");
+          }
+          s = s.replace(/\[(#[^\]]+)\]\([^\)]+\)/g, "$1");
+          s = s.replace(/^\s*\[[a-zA-Z0-9._]+\]\([^\)]+\)\s*/g, "");
+          s = s.replace(/^\s*@[a-zA-Z0-9._]+\s*/g, "");
+          s = s.replace(/\[\s*\]\([^\)]+\)/g, "");
+          s = s.replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1");
+          s = s.replace(/\(https?:\/\/[^\s\)]+\)/g, "");
+          s = s.replace(/https?:\/\/[^\s]+/g, "");
+
+          const ignoreLines = new Set([
+            "_Play_", "Play", "Instagram", "_Instagram_", "View profile",
+            "Follow", "Like", "Comment", "Share", "Save", "Reply", "Log In", "Sign Up"
+          ]);
+
+          const lines = s.split(/\r?\n/).map(l => l.trim()).filter(l => {
+            if (!l) return false;
+            if (ignoreLines.has(l)) return false;
+            if (/^\d+\s*(?:posts?|followers?|following)$/i.test(l)) return false;
+            if (/^\d+[smhdw]$/i.test(l)) return false;
+            if (/^[\d,]+\s*likes?$/i.test(l)) return false;
+            return true;
+          });
+
+          let res = lines.join("\n").trim().replace(/\n{3,}/g, "\n\n");
+          if (isCodeGarbage(res)) return "";
+          return res;
+        };
+
+        const parseJinaMarkdown = (txt) => {
+          if (!txt || typeof txt !== "string") return "";
+          // 1순위: Instagram page Title tag에 담긴 원본 전체 캡션
+          const tm = txt.match(/Title:\s*(?:.+?\s+on\s+Instagram|Instagram)\s*:\s*["“]([\s\S]+?)(?:["”]\s*)?(?:\n\s*URL Source:|\n\s*Markdown Content:|\n\s*Title:|$)/i);
+          if (tm && tm[1]) {
+            const cap = cleanCaptionText(tm[1].trim().replace(/["”]$/, "").trim());
+            if (cap && !isCodeGarbage(cap)) return cap;
+          }
+          // 2순위: 본문 Markdown 파싱
+          let content = txt.includes("Markdown Content:") ? (txt.split("Markdown Content:")[1] || "") : txt;
+          content = content.split(/\[Add a comment\.\.\.\]|Add a comment\.\.\.|View all \d+ comments|View more comments|More posts from/i)[0];
+          const embedSplit = content.match(/\[\d+[,\d]*\s*likes?\]\([^\)]+\)|\[(?:Like|_Comment_|_Share_|_Save_|Save)\]\([^\)]+\)|\[View more on Instagram\]\([^\)]+\)/gi);
+          if (embedSplit && embedSplit.length) {
+            const lastToken = embedSplit[embedSplit.length - 1];
+            const idx = content.lastIndexOf(lastToken);
+            if (idx !== -1) content = content.substring(idx + lastToken.length);
+          }
+          const cap = cleanCaptionText(content);
+          return cap && !isCodeGarbage(cap) ? cap : "";
+        };
 
         if (meta.platform === "ig") {
           let igId = meta.id;
@@ -7280,18 +7370,6 @@
             } catch (_) {}
           }
 
-          const parseJinaMarkdown = (txt) => {
-            if (!txt || !txt.includes("Markdown Content:")) return "";
-            let md = txt.split("Markdown Content:")[1] || "";
-            md = md
-              .split(/View all \d+ comments|Watch on Instagram|Log in to Instagram| 더 보기/i)[0]
-              .replace(/!\[.*?\]\(.*?\)/g, "")
-              .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-              .trim();
-            if (/Create an account or log in/i.test(md) || isCodeGarbage(md)) return "";
-            return md.length >= 6 ? md : "";
-          };
-
           // 2단계: 사용자 프록시(cfBase) 시도
           if (cfBase && !cfBase.includes(location.host)) {
             const cfTargets = [embedUrl, reelEmbedUrl, ddUrl];
@@ -7309,8 +7387,36 @@
             } catch (_) {}
           }
 
-          // 3단계: 공용 우회 채널 병렬 실행
+          // 3단계: 공용 우회 채널 및 서버리스 API 병렬 실행
+          const apiBase = location.hostname.includes("vercel.app")
+            ? ""
+            : "https://trip-app-psi-two.vercel.app";
           const jobs = [
+            async () => {
+              const r = await fetchTO(`${apiBase}/api/ig?code=${encodeURIComponent(igId)}`, {}, 4800);
+              if (!r.ok) throw new Error("api status");
+              const d = await r.json();
+              if (d.caption && !isCodeGarbage(d.caption)) return d.caption;
+              throw new Error("api empty");
+            },
+            async () => {
+              const r = await fetchTO(`https://r.jina.ai/${reelUrl}`, {}, 5500);
+              const cap = parseJinaMarkdown(await r.text());
+              if (cap && !isCodeGarbage(cap)) return cap;
+              throw new Error("jina reel empty");
+            },
+            async () => {
+              const r = await fetchTO(`https://r.jina.ai/${embedUrl}`, {}, 5500);
+              const cap = parseJinaMarkdown(await r.text());
+              if (cap && !isCodeGarbage(cap)) return cap;
+              throw new Error("jina embed empty");
+            },
+            async () => {
+              const r = await fetchTO(`https://r.jina.ai/https://www.instagram.com/p/${igId}/`, {}, 5500);
+              const cap = parseJinaMarkdown(await r.text());
+              if (cap && !isCodeGarbage(cap)) return cap;
+              throw new Error("jina post empty");
+            },
             async () => {
               const r = await fetchTO(
                 `https://api.allorigins.win/raw?url=${encodeURIComponent(embedUrl)}`,
@@ -7319,7 +7425,7 @@
               );
               const cap = parseIgEmbedHtml(await r.text());
               if (cap && !isCodeGarbage(cap)) return cap;
-              throw new Error("empty");
+              throw new Error("allorigins empty");
             },
             async () => {
               const r = await fetchTO(
@@ -7329,48 +7435,7 @@
               );
               const cap = parseIgEmbedHtml(await r.text());
               if (cap && !isCodeGarbage(cap)) return cap;
-              throw new Error("empty");
-            },
-            async () => {
-              const r = await fetchTO(
-                `https://corsproxy.io/?url=${encodeURIComponent(embedUrl)}`,
-                {},
-                5000
-              );
-              const cap = parseIgEmbedHtml(await r.text());
-              if (cap && !isCodeGarbage(cap)) return cap;
-              throw new Error("empty");
-            },
-            async () => {
-              const r = await fetchTO(
-                `https://api.allorigins.win/raw?url=${encodeURIComponent(ddUrl)}`,
-                {},
-                5000
-              );
-              const cap = parseIgEmbedHtml(await r.text());
-              if (cap && !isCodeGarbage(cap)) return cap;
-              throw new Error("empty");
-            },
-            async () => {
-              const r = await fetchTO(`https://r.jina.ai/${embedUrl}`, {}, 5500);
-              const cap = parseJinaMarkdown(await r.text());
-              if (cap && !isCodeGarbage(cap)) return cap;
-              throw new Error("empty");
-            },
-            async () => {
-              const r = await fetchTO(
-                `https://api.microlink.io/?url=${encodeURIComponent(reelUrl)}`,
-                {},
-                5500
-              );
-              if (!r.ok) throw new Error("status");
-              const d = await r.json();
-              const rawDesc = d?.data?.description || "";
-              const cap = parseIgEmbedHtml(
-                `<meta property="og:description" content="${esc(rawDesc)}">`
-              );
-              if (cap && !isCodeGarbage(cap)) return cap;
-              throw new Error("empty");
+              throw new Error("codetabs empty");
             },
           ];
 
@@ -7682,13 +7747,42 @@
             ? ""
             : String(cand.name || "").trim();
         const localName = String(cand.localName || "").trim();
+        const cleanName = rawName
+          .replace(/\([^)]*\)/g, " ")
+          .replace(/\[[^\]]*\]/g, " ")
+          .replace(/[【】]/g, " ")
+          .replace(/^[0-9]+[.\-)]\s*/, "")
+          .replace(/\s+/g, " ")
+          .trim();
+        const cleanLocal = localName
+          .replace(/\([^)]*\)/g, " ")
+          .replace(/\[[^\]]*\]/g, " ")
+          .replace(/[【】]/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+
         const aiLat = ignoreCache ? null : Number(cand.lat),
           aiLng = ignoreCache ? null : Number(cand.lng);
-        const context = `${hint || ""} ${rawAddr} ${rawName}`.toLowerCase();
-        const isJapan =
+        const context = `${hint || ""} ${rawAddr} ${rawName} ${localName}`.toLowerCase();
+        let isJapan =
           /日本|北海道|東京|大阪|京都|福岡|札幌|名古屋|沖縄|千日前|難波|梅田|道頓堀|心斎橋|丁目|番地|〒|\b\d{3}-\d{4}\b|japan|osaka|tokyo|kyoto|fukuoka|namba|umeda|shinjuku|shibuya/i.test(
             context
           );
+        if (!isJapan) {
+          const tripName = document.querySelector(".v32-hero")?.innerText || "";
+          if (/일본|오사카|교토|도쿄|후쿠오카|japan|osaka|kyoto/i.test(tripName)) {
+            isJapan = true;
+          } else if (typeof items !== "undefined" && Array.isArray(items) && items.length > 0) {
+            const jpItems = items.filter(
+              (it) =>
+                (Number(it.lat) >= 24 && Number(it.lat) <= 46 && Number(it.lng) >= 122 && Number(it.lng) <= 154) ||
+                /일본|오사카|교토|도쿄|후쿠오카|japan|osaka|kyoto/i.test(`${it.name || ""} ${it.address || ""}`)
+            );
+            if (jpItems.length >= 2 || (jpItems.length / items.length) >= 0.4) {
+              isJapan = true;
+            }
+          }
+        }
 
         const cacheKey = `v2|${localName}|${rawName}|${cleanAddr}|${hint}`.trim();
         if (!ignoreCache && cacheKey.length >= 6 && geoCache[cacheKey])
@@ -7735,11 +7829,15 @@
         if (noZipAddr) queries.push(noZipAddr);
         if (dashChomeAddr && dashChomeAddr !== noZipAddr) queries.push(dashChomeAddr);
         if (cleanAddr && cleanAddr !== noZipAddr) queries.push(cleanAddr);
-        if (localName && noZipAddr) queries.push(`${localName} ${noZipAddr}`);
-        if (rawName && noZipAddr && !/[가-힣]/.test(rawName)) queries.push(`${rawName} ${noZipAddr}`);
+        if (cleanLocal && cleanAddr) queries.push(`${cleanLocal} ${cleanAddr}`);
+        if (cleanName && cleanAddr) queries.push(`${cleanName} ${cleanAddr}`);
+        if (cleanLocal && noZipAddr) queries.push(`${cleanLocal} ${noZipAddr}`);
+        if (cleanName && noZipAddr) queries.push(`${cleanName} ${noZipAddr}`);
+        if (cleanLocal) queries.push(`${cleanLocal} ${jpTown || hint || ""}`.trim());
+        if (cleanName) queries.push(`${cleanName} ${jpTown || hint || ""}`.trim());
+        if (cleanLocal) queries.push(cleanLocal);
+        if (cleanName) queries.push(cleanName);
         if (jpTown) queries.push(jpTown);
-        if (localName) queries.push(`${localName} ${jpTown || hint || ""}`.trim());
-        if (rawName) queries.push(`${rawName} ${hint || ""}`.trim());
 
         const uniq = [
           ...new Set(
@@ -7831,7 +7929,30 @@
           }
         }
 
-        // 3단계: ArcGIS World Geocoding API (구글맵 영문/일문/한글 주소 무키 100% 호환)
+        // 3단계: OpenStreetMap Nominatim (보조 폴백 - 한글·일문 POI 명칭 인식 최고)
+        for (const q of uniq.slice(0, 5)) {
+          try {
+            const nomQ = isJapan && !/Japan|日本/i.test(q) ? `${q}, Japan` : q;
+            const nomUrl = isJapan
+              ? `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(nomQ)}&countrycodes=jp&limit=3`
+              : `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(nomQ)}&limit=3`;
+            const r = await fetchTO(nomUrl, {}, 4000);
+            const d = await r.json();
+            if (Array.isArray(d) && d[0]) {
+              const lat = Number(d[0].lat),
+                lng = Number(d[0].lon);
+              if (isValidCoord(lat, lng)) {
+                return remember({
+                  lat,
+                  lng,
+                  formatted: d[0].display_name,
+                });
+              }
+            }
+          } catch (e) {}
+        }
+
+        // 4단계: ArcGIS World Geocoding API (구글맵 영문/일문/한글 주소 무키 100% 호환)
         for (const q of uniq.slice(0, 5)) {
           try {
             const arcQ = isJapan && !/Japan|日本/i.test(q) ? `${q}, Japan` : q;
@@ -7853,6 +7974,8 @@
                 (c) =>
                   c?.score >= 70 &&
                   c?.location &&
+                  c?.address !== "Japan" &&
+                  c?.attributes?.Addr_type !== "Country" &&
                   isValidCoord(Number(c.location.y), Number(c.location.x))
               );
               if (best) {
@@ -7860,30 +7983,6 @@
                   lat: Number(best.location.y),
                   lng: Number(best.location.x),
                   formatted: best.address || q,
-                });
-              }
-            }
-          } catch (e) {}
-        }
-
-        // 4단계: OpenStreetMap Nominatim (보조 폴백)
-        for (const q of uniq.slice(0, 4)) {
-          try {
-            const nomQ = isJapan && !/Japan|日本/i.test(q) ? `${q}, Japan` : q;
-            const r = await fetchTO(
-              `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(nomQ)}&limit=3`,
-              {},
-              4000
-            );
-            const d = await r.json();
-            if (Array.isArray(d) && d[0]) {
-              const lat = Number(d[0].lat),
-                lng = Number(d[0].lon);
-              if (isValidCoord(lat, lng)) {
-                return remember({
-                  lat,
-                  lng,
-                  formatted: d[0].display_name,
                 });
               }
             }
@@ -7913,7 +8012,7 @@
           }
           toast("릴스/쇼츠 캡션 정보를 불러오는 중...");
           const fetched = await fetchVideoCaption(vidUrl);
-          if (fetched) {
+          if (fetched && !isCodeGarbage(fetched) && fetched.length >= 8) {
             caption = (caption + "\n" + fetched).trim();
             if ($("shareBox") && (!($("shareBox").value || "").replace(/https?:\/\/[^\s]+/g, "").trim())) {
               $("shareBox").value = fetched;
@@ -7955,11 +8054,13 @@ ${caption || rawText}
 사용자 현재 선택 탭: ${cat}
 
 [핵심 작성 규칙 - 매우 중요]
-1. "name" 필드는 반드시 **100% 자연스러운 한국어**로 작성하세요! (절대 일본어 'いいね！', 영어 'CHIYOMATSU', 한자만 적지 마세요)
+1. 인스타그램/유튜브 아이디, 계정명(예: sweet_mr.kang, @xxx), URL, 프로필 링크 등은 장소가 아닙니다! 절대 장소 상호명으로 추출하지 마세요.
+2. "name" 필드는 반드시 **100% 자연스러운 한국어**로 작성하세요! (절대 일본어 'いいね！', 영어 'CHIYOMATSU', 한자만 적지 마세요)
    - 음식점/카페면: **[한국어 상호명 (대표 음식/디저트명)]** 형태로 한눈에 뭘 파는지 알 수 있게 적으세요. (예: "치요마츠 도톤보리 (두꺼운 가츠동·산도)", "야키니쿠 코지마 후쿠시마점", "아오쿠도 이네 (바다뷰 카페)")
-   - 쇼핑/물건 매장이라면: **[한국어 상호명 (파는 물건/품목)]** 형태로 적으세요. (예: "이오시스 난바점 (중고 아이폰·공기계 매장)", "돈키호테 도톤보리점")
-2. "localName" 필드에는 구글맵 검색용 **일본어/영어 공식 상호명**을 적으세요. (예: "イオシス なんば店", "CHIYOMATSU Dotonbori")
-3. "price", "info" 필드도 영어나 일본어가 아닌 **한국어**로 번역·요약해서 적으세요. (예: "가츠산도 ¥1,600 · 타마고산도 ¥800")
+   - 쇼핑/물건 매장이라면: **[한국어 상호명 (파는 물건/품목)]** 형태로 적으세요. (예: "닌텐도 오사카 (피규어·굿즈 매장)", "이오시스 난바점 (중고 아이폰·공기계 매장)", "돈키호테 도톤보리점")
+3. "localName" 필드에는 구글맵 검색용 **현지어(일본어/영어) 공식 상호명**을 적으세요. (예: "Nintendo OSAKA", "イオシス なんば店", "CHIYOMATSU Dotonbori")
+4. "price", "info" 필드도 영어나 일본어가 아닌 **한국어**로 번역·요약해서 적으세요. (예: "가츠산도 ¥1,600 · 타마고산도 ¥800", "컨트롤러 가챠 600엔")
+5. 텍스트에 실제 방문 가능한 관광지/매장/음식점/카페가 없으면 빈 배열 []만 반환하세요.
 
 반드시 아래 JSON 배열 형식으로만 답하세요:
 [
@@ -7982,7 +8083,11 @@ ${caption || rawText}
             if (typeof window.__v8AiSetStep === "function") {
               window.__v8AiSetStep("2단계: AI 장소 추출 완료! 좌표 매핑 중...", 78);
             }
-            return extractJsonArray(txt).slice(0, MAX_MULTI_PLACES);
+            const rawArray = extractJsonArray(txt);
+            return (rawArray || [])
+              .filter((c) => c && (c.name || c.address))
+              .filter((c) => !isSocialUsername(c.name))
+              .slice(0, MAX_MULTI_PLACES);
           } catch (e) {
             aiErr = e.message;
             return [];
@@ -8012,36 +8117,44 @@ ${caption || rawText}
 
         let cands = [];
         if (!aiCands.length && multiLocal.length > 1) {
-          cands = multiLocal.slice(0, MAX_MULTI_PLACES).map((m) => mapLocal(m));
+          cands = multiLocal
+            .filter((m) => !isSocialUsername(m.name))
+            .slice(0, MAX_MULTI_PLACES)
+            .map((m) => mapLocal(m));
         } else if (aiCands.length) {
-          cands = aiCands.slice(0, MAX_MULTI_PLACES).map((c) => ({
-            name: c.name || localParsed.name || "",
-            localName: c.localName || "",
-            address: normalizeOcrAddr(c.address || localParsed.address || ""),
-            price: c.price || localParsed.price || "",
-            info: c.info || localParsed.info || "",
-            note: [c.price || localParsed.price, c.info || localParsed.info]
-              .filter(Boolean)
-              .join(" · "),
-            category:
-              cat !== "PLACE"
-                ? cat
-                : CATS[c.category]
-                  ? c.category
-                  : localParsed.category || "PLACE",
-            lat: Number(c.lat) || null,
-            lng: Number(c.lng) || null,
-            vid: vidUrl || "",
-          }));
-        } else if (localParsed.name || localParsed.address) {
-          cands = [
-            {
-              ...localParsed,
-              lat: preGeo?.lat || null,
-              lng: preGeo?.lng || null,
+          cands = aiCands
+            .filter((c) => !isSocialUsername(c.name))
+            .slice(0, MAX_MULTI_PLACES)
+            .map((c) => ({
+              name: c.name || localParsed.name || "",
+              localName: c.localName || "",
+              address: normalizeOcrAddr(c.address || localParsed.address || ""),
+              price: c.price || localParsed.price || "",
+              info: c.info || localParsed.info || "",
+              note: [c.price || localParsed.price, c.info || localParsed.info]
+                .filter(Boolean)
+                .join(" · "),
+              category:
+                cat !== "PLACE"
+                  ? cat
+                  : CATS[c.category]
+                    ? c.category
+                    : localParsed.category || "PLACE",
+              lat: Number(c.lat) || null,
+              lng: Number(c.lng) || null,
               vid: vidUrl || "",
-            },
-          ];
+            }));
+        } else if (localParsed.name || localParsed.address) {
+          if (!isSocialUsername(localParsed.name)) {
+            cands = [
+              {
+                ...localParsed,
+                lat: preGeo?.lat || null,
+                lng: preGeo?.lng || null,
+                vid: vidUrl || "",
+              },
+            ];
+          }
         }
 
         const totalCands = Math.max(1, cands.length);
