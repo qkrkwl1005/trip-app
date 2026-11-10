@@ -1,7 +1,7 @@
-// V56 Complete Liquid Glass Suite (Glassy Dashboard V5)
-const CACHE_CORE = "trip-v56-core";
-const CACHE_ASSETS = "trip-v56-assets";
-const CACHE_TILES = "trip-v56-tiles";
+// V57 Clean Authentic Liquid Glass Suite (Glassy Dashboard V5)
+const CACHE_CORE = "trip-v57-core";
+const CACHE_ASSETS = "trip-v57-assets";
+const CACHE_TILES = "trip-v57-tiles";
 
 const CORE_URLS = [
   "./",
