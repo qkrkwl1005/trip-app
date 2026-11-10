@@ -1,7 +1,7 @@
-// V66 Zero-API Memory & Permanent Multi-Tier Cache Engine
-const CACHE_CORE = "trip-v66-core";
-const CACHE_ASSETS = "trip-v66-assets";
-const CACHE_TILES = "trip-v66-tiles";
+// V67 Zero-API App Startup & Permanent Local Thumbnail Architecture
+const CACHE_CORE = "trip-v67-core";
+const CACHE_ASSETS = "trip-v67-assets";
+const CACHE_TILES = "trip-v67-tiles";
 
 const CORE_URLS = [
   "./",

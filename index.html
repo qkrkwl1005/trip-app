@@ -2692,7 +2692,7 @@
       const TRIP_PENDING_CONFLICT_KEY = "TRIP_PENDING_CONFLICT";
       const TRIP_LAST_ROOM_KEY = "TRIP_LAST_ROOM";
       const TRIP_CREATING_ROOM_KEY = "TRIP_CREATING_ROOM";
-      const APP_VERSION = "v66";
+      const APP_VERSION = "v67";
       const TRANSIENT_NET_RE =
         /unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
       let _offlineFlushBusy = false,
@@ -4684,9 +4684,7 @@
             applyInstantKoreanNames();
           }
         } catch (e) {}
-        try {
-          localStorage.removeItem("TRIP_PHOTO_CACHE");
-        } catch (e) {}
+        // V67: TRIP_PHOTO_CACHE 영구 보존 (앱 시작 시 캐시 삭제 금지)
         items.forEach((i) => {
           if (i.lat != null) i.lat = Number(i.lat) || null;
           if (i.lng != null) i.lng = Number(i.lng) || null;
@@ -5166,6 +5164,9 @@
       async function hydrateInstagramThumb(item) {
         const meta = parseVideoMeta(item?.vid);
         if (!meta) return false;
+        // 이미 썸네일(img)이 있거나 캐시가 있으면 외부 API 호출 절대 금지 (0회 보장)
+        if (item.img && !item.img.startsWith("data:") && item.img.length > 10) return false;
+        if (meta.id && reelThumbCache[meta.id]) return false;
 
         if (meta.platform === "tt") {
           const key = meta.id || meta.url;
@@ -8861,6 +8862,15 @@ ${caption || rawText}
                 existing.updatedAt = Date.now();
                 savedItems.push(existing);
               } else {
+                let bakedThumb = place.img || "";
+                if (!bakedThumb && vidUrl) {
+                  const vm = parseVideoMeta(vidUrl);
+                  if (vm && vm.platform === "yt" && vm.id) {
+                    bakedThumb = `https://i.ytimg.com/vi/${vm.id}/hqdefault.jpg`;
+                  } else if (vm && vm.platform === "ig" && vm.id) {
+                    bakedThumb = reelThumbCache[vm.id] || "";
+                  }
+                }
                 const newItem = {
                   id: "id_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
                   name: cleanPName,
@@ -8874,8 +8884,8 @@ ${caption || rawText}
                   lng: isValidCoord(place.lat, place.lng) ? Number(place.lng) : null,
                   places: [],
                   vid: vidUrl || "",
-                  img: place.img || "",
-                  useCustomImg: Boolean(place.img),
+                  img: bakedThumb || place.img || "",
+                  useCustomImg: Boolean(bakedThumb || place.img),
                   v: 0,
                   done: false,
                   star: false,
@@ -10674,8 +10684,9 @@ ${caption || rawText}
         completeGoogleRedirectLogin();
       }
       if (getStorageUsedKB() > 3800) slimStorage(false);
-      setTimeout(() => autoFixCoords(), 2000);
-      setTimeout(() => hydrateInstagramThumbs(), 700);
+      // V67: 앱 시작 시 자동 API 소모 완전 차단 (0회) - 저장된 로컬 썸네일과 좌표만으로 0초 렌더링
+      // setTimeout(() => autoFixCoords(), 2000);
+      // setTimeout(() => hydrateInstagramThumbs(), 700);
 
       (function checkShareParam() {
         const p = new URLSearchParams(location.search);
@@ -10692,6 +10703,27 @@ ${caption || rawText}
         }
       })();
     
+      // [V67 영구 썸네일 박제 마이그레이션] 기존 저장된 장소의 썸네일을 item.img에 영구 고정 (앱 켤 때 API 소모 0회)
+      (function bakeExistingPlaceThumbs() {
+        if (!Array.isArray(items)) return;
+        let changed = false;
+        items.forEach((it) => {
+          if (!it.img && it.vid) {
+            const vm = parseVideoMeta(it.vid);
+            if (vm && vm.platform === "yt" && vm.id) {
+              it.img = `https://i.ytimg.com/vi/${vm.id}/hqdefault.jpg`;
+              it.useCustomImg = true;
+              changed = true;
+            } else if (vm && vm.platform === "ig" && vm.id && reelThumbCache[vm.id]) {
+              it.img = reelThumbCache[vm.id];
+              it.useCustomImg = true;
+              changed = true;
+            }
+          }
+        });
+        if (changed) save();
+      })();
+
       // === SMART_CONFLICT_AND_FILTER_ENGINE_START ===
       (function initSmartConflictAndFilterEngine() {
         window.__smartMergeReady = true;
