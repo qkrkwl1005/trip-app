@@ -13346,10 +13346,38 @@ ${caption || rawText}
       </div>
 
       <div class="v32-bento-grid">
-        <div class="v32-bento-card b-blue" data-v32-go="ALL"><span>저장한 장소</span><b>${total}곳</b></div>
-        <div class="v32-bento-card b-green" data-v32-go="ALL"><span>좌표 설정 완료</span><b>${coords}곳</b></div>
-        <div class="v32-bento-card b-purple" data-v32-go="ALL"><span>일차 배정 완료</span><b>${scheduled}곳</b></div>
-        <div class="v32-bento-card b-amber" id="v32GoRoute"><span>최단 동선 총거리</span><b>${routeKm.toFixed(1)}km</b></div>
+        <div class="v32-bento-card b-blue" data-v32-go="ALL">
+          <div class="v32-card-head">
+            <span class="v32-card-title">저장한 장소</span>
+            <div class="v32-card-icon"><span class="ms">bookmark</span></div>
+          </div>
+          <b class="v32-card-val">${total}곳</b>
+          <div class="v32-card-badge"><span class="ms">north_east</span>${total > 0 ? "+100%" : "0%"}</div>
+        </div>
+        <div class="v32-bento-card b-green" data-v32-go="ALL">
+          <div class="v32-card-head">
+            <span class="v32-card-title">좌표 설정 완료</span>
+            <div class="v32-card-icon"><span class="ms">near_me</span></div>
+          </div>
+          <b class="v32-card-val">${coords}곳</b>
+          <div class="v32-card-badge"><span class="ms">north_east</span>${total ? Math.round(coords / total * 100) : 0}%</div>
+        </div>
+        <div class="v32-bento-card b-purple" data-v32-go="ALL">
+          <div class="v32-card-head">
+            <span class="v32-card-title">일차 배정 완료</span>
+            <div class="v32-card-icon"><span class="ms">calendar_month</span></div>
+          </div>
+          <b class="v32-card-val">${scheduled}곳</b>
+          <div class="v32-card-badge"><span class="ms">north_east</span>${total ? Math.round(scheduled / total * 100) : 0}%</div>
+        </div>
+        <div class="v32-bento-card b-amber" id="v32GoRoute">
+          <div class="v32-card-head">
+            <span class="v32-card-title">최단 동선 거리</span>
+            <div class="v32-card-icon"><span class="ms">route</span></div>
+          </div>
+          <b class="v32-card-val">${routeKm.toFixed(1)}km</b>
+          <div class="v32-card-badge"><span class="ms">check_circle</span>최적화됨</div>
+        </div>
       </div>
 
       <div class="v32-sec-card">
@@ -20603,26 +20631,32 @@ ${JSON.stringify(payload, null, 2)}
 <!-- === V56_COMPLETE_LIQUID_GLASS_SUITE_START === -->
 <style id="v56-liquid-glass-style">
   /* =========================================================================
-   * 0. 클린 다크 캔버스 (영상과 1:1 일치 - 무지개빛 라디얼 글로우 전면 제거)
-   *    깊고 깔끔한 프리미엄 슬레이트 블랙 베이스(#090d16)
+   * 0. 클린 다크 캔버스 (영상과 1:1 일치 - 무채색 은은한 상단 달빛/안개 조명)
+   *    어두운 슬레이트(#07090e) 위에 상단에서 부드럽게 퍼지는 무채색 화이트 소프트 글로우
    * ========================================================================= */
   body,
   #side,
   .tab-content,
-  #map-wrap {
-    background-color: #090d16 !important;
-    background-image: none !important;
+  #map-wrap,
+  html[data-oled="true"],
+  html[data-oled="true"] body,
+  html[data-oled="true"] #side,
+  html[data-oled="true"] .tab-content {
+    background-color: #07090e !important;
+    background-image: radial-gradient(ellipse 90% 55% at 50% -10%, rgba(255, 255, 255, 0.08) 0%, transparent 70%) !important;
+    background-attachment: fixed !important;
   }
   [data-theme="light"] body,
   [data-theme="light"] #side,
   [data-theme="light"] .tab-content {
     background-color: #f8fafc !important;
-    background-image: none !important;
+    background-image: radial-gradient(ellipse 90% 55% at 50% -10%, rgba(0, 0, 0, 0.03) 0%, transparent 70%) !important;
   }
 
   /* =========================================================================
    * 1. 영상 속 .glass-card 1:1 완벽 재현: 전역 리퀴드 글래스 카드
-   *    코드: className="glass-card p-6 rounded-2xl" whileHover={{ y: -5 }}
+   *    OLED 모드에서도 검은 칠판으로 죽지 않고 영롱한 유리 효과 유지!
+   *    스펙큘러 상단 하이라이트 림(inset 0 1px 1px) + 다중 굴절 블러(blur 20px)
    * ========================================================================= */
   .card,
   .item,
@@ -20632,13 +20666,27 @@ ${JSON.stringify(payload, null, 2)}
   .taxi-card,
   #groupedPlacesSummary,
   [id^="sub-place-"],
-  .modal-card {
-    background: rgba(255, 255, 255, 0.05) !important;
-    backdrop-filter: blur(16px) !important;
-    -webkit-backdrop-filter: blur(16px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.12) !important;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.25) !important;
+  .modal-card,
+  html[data-oled="true"] .card,
+  html[data-oled="true"] .item,
+  html[data-oled="true"] .v32-sec-card,
+  html[data-oled="true"] .v32-bento-card,
+  html[data-oled="true"] #v49SharedRoomCard,
+  html[data-oled="true"] .taxi-card,
+  html[data-oled="true"] .sh {
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.08) 0%,
+      rgba(255, 255, 255, 0.02) 100%
+    ) !important;
+    backdrop-filter: blur(20px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.13) !important;
     border-radius: 20px !important;
+    box-shadow:
+      inset 0 1px 1px 0 rgba(255, 255, 255, 0.28),
+      inset 0 -1px 0.5px 0 rgba(255, 255, 255, 0.04),
+      0 12px 34px rgba(0, 0, 0, 0.35) !important;
     transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.25s ease, border-color 0.25s ease, background 0.25s ease !important;
   }
 
@@ -20647,9 +20695,15 @@ ${JSON.stringify(payload, null, 2)}
   .item:hover,
   .v32-bento-card:hover {
     transform: translateY(-5px) !important;
-    background: rgba(255, 255, 255, 0.08) !important;
-    border-color: rgba(255, 255, 255, 0.22) !important;
-    box-shadow: 0 14px 40px 0 rgba(0, 0, 0, 0.38) !important;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.12) 0%,
+      rgba(255, 255, 255, 0.04) 100%
+    ) !important;
+    border-color: rgba(255, 255, 255, 0.25) !important;
+    box-shadow:
+      inset 0 1px 1.5px 0 rgba(255, 255, 255, 0.38),
+      0 16px 44px rgba(0, 0, 0, 0.45) !important;
   }
   .card:active,
   .item:active,
@@ -20666,80 +20720,133 @@ ${JSON.stringify(payload, null, 2)}
   [data-theme="light"] #groupedPlacesSummary,
   [data-theme="light"] [id^="sub-place-"],
   [data-theme="light"] .modal-card {
-    background: rgba(255, 255, 255, 0.72) !important;
-    backdrop-filter: blur(16px) !important;
-    -webkit-backdrop-filter: blur(16px) !important;
-    border: 1px solid rgba(0, 0, 0, 0.08) !important;
-    box-shadow: 0 8px 30px rgba(15, 23, 42, 0.05) !important;
-  }
-  [data-theme="light"] .card:hover,
-  [data-theme="light"] .item:hover,
-  [data-theme="light"] .v32-bento-card:hover {
-    background: rgba(255, 255, 255, 0.9) !important;
-    border-color: rgba(0, 0, 0, 0.14) !important;
-    box-shadow: 0 12px 36px rgba(15, 23, 42, 0.09) !important;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.78) 0%,
+      rgba(255, 255, 255, 0.52) 100%
+    ) !important;
+    backdrop-filter: blur(20px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.88) !important;
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.95),
+      0 10px 28px rgba(15, 23, 42, 0.08) !important;
   }
 
   /* =========================================================================
-   * 2. 대시보드 벤토 카드: 영상의 StatsCard와 100% 동일한 통일된 글래스 & 타이포
-   *    기존의 파랑/초록/보라/노랑 알록달록 무지개색 완전히 제거
+   * 2. 대시보드 벤토 카드: 영상의 StatsCard(3단 레이아웃) 1:1 완벽 일치
    * ========================================================================= */
+  .v32-bento-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 12px !important;
+  }
   .v32-bento-card {
-    padding: 18px 20px !important;
     display: flex !important;
     flex-direction: column !important;
     justify-content: space-between !important;
-    gap: 6px !important;
+    min-height: 124px !important;
+    padding: 16px 18px !important;
+    cursor: pointer !important;
   }
-  .v32-bento-card.b-blue,
-  .v32-bento-card.b-green,
   .v32-bento-card.b-purple,
-  .v32-bento-card.b-amber {
-    background: rgba(255, 255, 255, 0.05) !important;
-    border: 1px solid rgba(255, 255, 255, 0.12) !important;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.25) !important;
+  .v32-bento-card.b-amber,
+  #v32GoRoute {
+    display: flex !important; /* 4개 카드가 균형있게 2x2로 노출 */
   }
-  /* 영상의 <p className="text-sm text-white/60">{title}</p> */
-  .v32-bento-card span {
+
+  .v32-card-head {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    margin-bottom: 6px !important;
+  }
+  .v32-card-title {
     font-size: 13px !important;
     font-weight: 500 !important;
-    color: rgba(255, 255, 255, 0.6) !important;
+    color: rgba(255, 255, 255, 0.65) !important;
     letter-spacing: -0.01em !important;
   }
+  /* 영상의 우측 상단 유리 아이콘 컨테이너 (bg-white/10 p-2 rounded-xl) */
+  .v32-card-icon {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 10px !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    box-shadow: inset 0 1px 0.5px rgba(255, 255, 255, 0.2) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: #ffffff !important;
+  }
+  .v32-card-icon .ms {
+    font-size: 17px !important;
+  }
+
   /* 영상의 <h2 className="text-2xl font-bold text-white">{value}</h2> */
-  .v32-bento-card b {
+  .v32-card-val {
     font-size: 26px !important;
     font-weight: 700 !important;
     color: #ffffff !important;
     letter-spacing: -0.02em !important;
-    margin-top: 4px !important;
+    margin: 4px 0 !important;
+    display: block !important;
     text-shadow: none !important;
   }
 
-  [data-theme="light"] .v32-bento-card.b-blue,
-  [data-theme="light"] .v32-bento-card.b-green,
-  [data-theme="light"] .v32-bento-card.b-purple,
-  [data-theme="light"] .v32-bento-card.b-amber {
-    background: rgba(255, 255, 255, 0.72) !important;
+  /* 영상의 에메랄드 상승 뱃지 (<p className="text-emerald-400 ..."> <ArrowUpRight /> {change}%</p>) */
+  .v32-card-badge {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 3px !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    color: #34d399 !important;
+    background: rgba(16, 185, 129, 0.12) !important;
+    border: 1px solid rgba(52, 211, 153, 0.25) !important;
+    padding: 2px 8px !important;
+    border-radius: 999px !important;
+    align-self: flex-start !important;
+    margin-top: 4px !important;
+  }
+  .v32-card-badge .ms {
+    font-size: 12px !important;
+  }
+
+  [data-theme="light"] .v32-card-title {
+    color: rgba(30, 41, 59, 0.65) !important;
+  }
+  [data-theme="light"] .v32-card-icon {
+    background: rgba(0, 0, 0, 0.05) !important;
     border: 1px solid rgba(0, 0, 0, 0.08) !important;
-  }
-  [data-theme="light"] .v32-bento-card span {
-    color: rgba(30, 41, 59, 0.6) !important;
-  }
-  [data-theme="light"] .v32-bento-card b {
     color: #0f172a !important;
+  }
+  [data-theme="light"] .v32-card-val {
+    color: #0f172a !important;
+  }
+  [data-theme="light"] .v32-card-badge {
+    background: #ecfdf5 !important;
+    border-color: #a7f3d0 !important;
+    color: #059669 !important;
   }
 
   /* =========================================================================
-   * 3. 히어로 배너: 깔끔하고 깊이감 있는 모던 글래스
+   * 3. 히어로 배너: 깊이감 넘치는 모던 글래스
    * ========================================================================= */
   .v32-hero {
     border-radius: 24px !important;
-    background: rgba(255, 255, 255, 0.04) !important;
-    backdrop-filter: blur(20px) !important;
-    -webkit-backdrop-filter: blur(20px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.12) !important;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25) !important;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.07) 0%,
+      rgba(255, 255, 255, 0.02) 100%
+    ) !important;
+    backdrop-filter: blur(20px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.13) !important;
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.28),
+      0 12px 34px rgba(0, 0, 0, 0.35) !important;
   }
   #v32HeroAdd,
   #v32HeroList {
@@ -20752,10 +20859,10 @@ ${JSON.stringify(payload, null, 2)}
     transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.2s ease, border-color 0.2s ease !important;
   }
   #v32HeroAdd {
-    background: rgba(255, 255, 255, 0.12) !important;
-    border: 1px solid rgba(255, 255, 255, 0.22) !important;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.06) 100%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.24) !important;
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.35), 0 4px 16px rgba(0, 0, 0, 0.25) !important;
     color: #ffffff !important;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2) !important;
   }
   #v32HeroList {
     background: rgba(255, 255, 255, 0.05) !important;
@@ -20771,18 +20878,24 @@ ${JSON.stringify(payload, null, 2)}
    * 4. 빠른 실행 버튼: 깔끔한 글래스 캡슐
    * ========================================================================= */
   .v32-base-btn {
-    background: rgba(255, 255, 255, 0.05) !important;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.07) 0%,
+      rgba(255, 255, 255, 0.02) 100%
+    ) !important;
     backdrop-filter: blur(14px) !important;
     -webkit-backdrop-filter: blur(14px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    box-shadow:
+      inset 0 1px 0.5px rgba(255, 255, 255, 0.2),
+      0 4px 16px rgba(0, 0, 0, 0.2) !important;
     border-radius: 16px !important;
     color: rgba(255, 255, 255, 0.9) !important;
     transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease !important;
   }
   .v32-base-btn:hover {
-    background: rgba(255, 255, 255, 0.08) !important;
-    border-color: rgba(255, 255, 255, 0.18) !important;
+    background: rgba(255, 255, 255, 0.09) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
     transform: translateY(-2px) !important;
   }
   .v32-base-btn:active {
@@ -20813,10 +20926,16 @@ ${JSON.stringify(payload, null, 2)}
     transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
   }
   .seg div.on {
-    background: rgba(255, 255, 255, 0.12) !important;
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.16) 0%,
+      rgba(255, 255, 255, 0.08) 100%
+    ) !important;
     color: #ffffff !important;
-    border: 1px solid rgba(255, 255, 255, 0.18) !important;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2) !important;
+    border: 1px solid rgba(255, 255, 255, 0.22) !important;
+    box-shadow:
+      inset 0 1px 0.5px rgba(255, 255, 255, 0.35),
+      0 2px 10px rgba(0, 0, 0, 0.2) !important;
   }
   [data-theme="light"] .seg {
     background: rgba(0, 0, 0, 0.04) !important;
@@ -20839,10 +20958,16 @@ ${JSON.stringify(payload, null, 2)}
     transition: all 0.18s ease !important;
   }
   .lchip.on {
-    background: rgba(255, 255, 255, 0.16) !important;
-    border-color: rgba(255, 255, 255, 0.25) !important;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.18) 0%,
+      rgba(255, 255, 255, 0.08) 100%
+    ) !important;
+    border-color: rgba(255, 255, 255, 0.28) !important;
+    box-shadow:
+      inset 0 1px 0.5px rgba(255, 255, 255, 0.35),
+      0 2px 10px rgba(0, 0, 0, 0.2) !important;
     color: #ffffff !important;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2) !important;
   }
   [data-theme="light"] .lchip {
     background: rgba(255, 255, 255, 0.72) !important;
@@ -20857,11 +20982,17 @@ ${JSON.stringify(payload, null, 2)}
 
   #v32ListBudgetBar {
     border-radius: 18px !important;
-    background: rgba(255, 255, 255, 0.05) !important;
-    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.08) 0%,
+      rgba(255, 255, 255, 0.02) 100%
+    ) !important;
+    border: 1px solid rgba(255, 255, 255, 0.13) !important;
     backdrop-filter: blur(16px) !important;
     -webkit-backdrop-filter: blur(16px) !important;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2) !important;
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.25),
+      0 8px 24px rgba(0, 0, 0, 0.25) !important;
   }
   [data-theme="light"] #v32ListBudgetBar {
     background: rgba(255, 255, 255, 0.75) !important;
@@ -20870,7 +21001,21 @@ ${JSON.stringify(payload, null, 2)}
   }
 
   /* =========================================================================
-   * 6. 입력창 & 검색바: 클린 글래스 인셋 필드
+   * 6. 목록 탭(#list-LIST) 리스트 아이템 프리미엄 리퀴드 글래스
+   * ========================================================================= */
+  #list-LIST .item {
+    padding: 16px 18px !important;
+    margin-bottom: 12px !important;
+    gap: 14px !important;
+    border-radius: 22px !important;
+  }
+  #list-LIST .item img {
+    border-radius: 14px !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  }
+
+  /* =========================================================================
+   * 7. 입력창 & 검색바: 클린 글래스 인셋 필드
    * ========================================================================= */
   input[type="text"],
   input[type="number"],
@@ -20907,15 +21052,21 @@ ${JSON.stringify(payload, null, 2)}
   }
 
   /* =========================================================================
-   * 7. 버튼: 깔끔하고 단정한 글래스 버튼
+   * 8. 버튼: 깔끔하고 단정한 글래스 버튼
    * ========================================================================= */
   .mb.pr,
   .v32-import-btn {
-    background: rgba(255, 255, 255, 0.12) !important;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.14) 0%,
+      rgba(255, 255, 255, 0.06) 100%
+    ) !important;
     backdrop-filter: blur(14px) !important;
     -webkit-backdrop-filter: blur(14px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25) !important;
+    border: 1px solid rgba(255, 255, 255, 0.24) !important;
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.35),
+      0 4px 20px rgba(0, 0, 0, 0.25) !important;
     border-radius: 14px !important;
     color: #ffffff !important;
     font-weight: 600 !important;
@@ -20944,7 +21095,7 @@ ${JSON.stringify(payload, null, 2)}
   }
 
   /* =========================================================================
-   * 8. 바텀 시트 & 드로어: 영상의 깊고 단정한 프로스티드 글래스
+   * 9. 바텀 시트 & 드로어: 영상의 깊고 단정한 프로스티드 글래스
    * ========================================================================= */
   #sheet #sbody,
   #v32ImportSheet,
@@ -20952,12 +21103,14 @@ ${JSON.stringify(payload, null, 2)}
     background: rgba(11, 15, 22, 0.88) !important;
     backdrop-filter: blur(28px) !important;
     -webkit-backdrop-filter: blur(28px) !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.14) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.16) !important;
     border-left: 1px solid rgba(255, 255, 255, 0.08) !important;
     border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
     border-top-left-radius: 28px !important;
     border-top-right-radius: 28px !important;
-    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.5) !important;
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.25),
+      0 -12px 40px rgba(0, 0, 0, 0.5) !important;
   }
   [data-theme="light"] #sheet #sbody,
   [data-theme="light"] #v32ImportSheet,
@@ -20968,14 +21121,16 @@ ${JSON.stringify(payload, null, 2)}
   }
 
   /* =========================================================================
-   * 9. 탭 내비게이션(#nav) & 플로팅 액션 버튼(#v32FabBtn)
+   * 10. 탭 내비게이션(#nav) & 플로팅 액션 버튼(#v32FabBtn)
    * ========================================================================= */
   #nav {
     background: rgba(15, 20, 30, 0.65) !important;
     backdrop-filter: blur(24px) !important;
     -webkit-backdrop-filter: blur(24px) !important;
     border: 1px solid rgba(255, 255, 255, 0.14) !important;
-    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.4) !important;
+    box-shadow:
+      inset 0 1px 0.5px rgba(255, 255, 255, 0.28),
+      0 10px 32px rgba(0, 0, 0, 0.4) !important;
     border-radius: 999px !important;
     padding: 4px !important;
   }
@@ -21069,12 +21224,14 @@ ${JSON.stringify(payload, null, 2)}
     border-radius: 999px !important;
     right: 18px !important;
     bottom: calc(84px + env(safe-area-inset-bottom)) !important;
-    background: rgba(255, 255, 255, 0.1) !important;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.06) 100%) !important;
     backdrop-filter: blur(20px) !important;
     -webkit-backdrop-filter: blur(20px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    border: 1px solid rgba(255, 255, 255, 0.22) !important;
     color: #ffffff !important;
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35) !important;
+    box-shadow:
+      inset 0 1px 0.5px rgba(255, 255, 255, 0.35),
+      0 10px 28px rgba(0, 0, 0, 0.35) !important;
     transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.2s ease !important;
   }
   #v32FabBtn:active {
