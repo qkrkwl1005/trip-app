@@ -2729,7 +2729,7 @@
       const TRIP_PENDING_CONFLICT_KEY = "TRIP_PENDING_CONFLICT";
       const TRIP_LAST_ROOM_KEY = "TRIP_LAST_ROOM";
       const TRIP_CREATING_ROOM_KEY = "TRIP_CREATING_ROOM";
-      const APP_VERSION = "v70";
+      const APP_VERSION = "v71";
       const TRANSIENT_NET_RE =
         /unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
       let _offlineFlushBusy = false,
@@ -11261,32 +11261,34 @@ ${caption || rawText}
     el._t = setTimeout(() => { el.style.opacity = "0"; }, 2600);
   }
 
+  function updateCardThumbDom(itemId, url) {
+    if (!itemId || !url) return;
+    const cards = document.querySelectorAll(`.item[data-id="${CSS.escape(String(itemId))}"]`);
+    cards.forEach(card => {
+      const pic = card.querySelector(".pic");
+      if (pic) {
+        let img = pic.querySelector("img");
+        if (!img) {
+          img = document.createElement("img");
+          img.loading = "lazy";
+          img.referrerPolicy = "no-referrer";
+          img.decoding = "async";
+          img.onerror = () => { img.style.display = "none"; };
+          pic.appendChild(img);
+        }
+        img.src = url;
+        img.style.display = "block";
+      }
+    });
+  }
+
   function refreshMapAndDom() {
     try { if (typeof save === "function") save(); } catch (_) {}
     try { if (typeof render === "function") render(); } catch (_) {}
-    
-    // 지도의 마커를 강제로 다시 그리기 (지도 동시 반영의 핵심)
     try {
       if (typeof renderMap === "function") renderMap();
       else if (typeof updateMarkers === "function") updateMarkers();
     } catch (_) {}
-    
-    // DOM 내 렌더링된 사진 강제 교체 (이전 ig_thumb=1 꼬리표 사진은 전부 화면에서 삭제)
-    document.querySelectorAll("img").forEach(img => {
-      const src = img.getAttribute("src") || "";
-      if (src && !src.includes("maps.google") && !src.includes("openstreetmap") && !src.includes("cartocdn")) {
-         const card = img.closest("[data-id], .item, .card, li, div");
-         if (card && extractShortcode(card.innerText)) {
-             // ig_cover=2 꼬리표가 없으면 화면에서 강제 숨김 처리 (프로필 사진, 외부 맨홀 사진 등)
-             if (!src.includes(IG_THUMB_MARKER)) {
-                 img.src = "";
-                 img.style.display = "none";
-             } else {
-                 img.style.display = "block";
-             }
-         }
-      }
-    });
   }
 
   // =========================================================================
@@ -11373,7 +11375,7 @@ ${caption || rawText}
   }
 
   // =========================================================================
-  // 전체 릴스 썸네일 복구 엔진
+  // 전체 릴스 썸네일 복구 엔진 (깜빡임·사라짐 제로 + 부드러운 순차 반영)
   // =========================================================================
   async function restoreAllInstagramThumbs(explicitKey) {
     if (!Array.isArray(items)) return 0;
@@ -11392,23 +11394,33 @@ ${caption || rawText}
     showNotice(`📸 릴스 ${igItems.length}곳의 썸네일을 불러오는 중...`);
     let restored = 0;
 
-    for (const it of igItems) {
-      const code = extractShortcode(it);
-      if (!code) continue;
-      try {
-        const url = await fetchTrueCoverV6(code, key);
-        if (url) {
-          it.img = url;
-          it.useCustomImg = true;
-          if (typeof reelThumbCache === "object") reelThumbCache[code] = url;
-          restored++;
-          refreshMapAndDom();
-        }
-      } catch (_) {}
+    // 4개씩 병렬 처리하여 초고속 복구 + 카드별 DOM만 직접 갱신 (전체 깜빡임·사진 사라짐 제로)
+    const BATCH_SIZE = 4;
+    for (let i = 0; i < igItems.length; i += BATCH_SIZE) {
+      const chunk = igItems.slice(i, i + BATCH_SIZE);
+      await Promise.all(chunk.map(async (it) => {
+        const code = extractShortcode(it);
+        if (!code) return;
+        try {
+          const url = await fetchTrueCoverV6(code, key);
+          if (url) {
+            it.img = url;
+            it.useCustomImg = true;
+            if (typeof reelThumbCache === "object") reelThumbCache[code] = url;
+            restored++;
+            updateCardThumbDom(it.id, url);
+          }
+        } catch (_) {}
+      }));
     }
 
+    // 전체 작업 완료 후 딱 1번만 일괄 저장 및 지도 마커 갱신
+    try { if (typeof save === "function") save(); } catch (_) {}
     if (typeof saveReelThumbCache === "function") saveReelThumbCache();
-    refreshMapAndDom();
+    try {
+      if (typeof renderMap === "function") renderMap();
+      else if (typeof updateMarkers === "function") updateMarkers();
+    } catch (_) {}
 
     if (restored > 0) {
       showNotice(`🎉 총 ${restored}곳의 릴스 썸네일 복구 완료!`);

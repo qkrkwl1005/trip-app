@@ -1,7 +1,7 @@
-// V70 RapidAPI Auto-Restore & Full Instagram Thumbnail Recovery
-const CACHE_CORE = "trip-v70-core";
-const CACHE_ASSETS = "trip-v70-assets";
-const CACHE_TILES = "trip-v70-tiles";
+// V71 Smooth Targeted Thumbnail Loading Without Page Flicker
+const CACHE_CORE = "trip-v71-core";
+const CACHE_ASSETS = "trip-v71-assets";
+const CACHE_TILES = "trip-v71-tiles";
 
 const CORE_URLS = [
   "./",
