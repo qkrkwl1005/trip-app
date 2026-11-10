@@ -1125,35 +1125,113 @@
         box-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
         pointer-events: none;
       }
+      /* Google Maps InfoWindow & Map Pin Popup High-Contrast Liquid Glass */
+      .gm-style .gm-style-iw-c {
+        background: rgba(15, 23, 42, 0.96) !important;
+        backdrop-filter: blur(20px) !important;
+        -webkit-backdrop-filter: blur(20px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.18) !important;
+        border-radius: 18px !important;
+        padding: 14px 16px !important;
+        box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55), inset 0 1px 1px rgba(255, 255, 255, 0.2) !important;
+      }
+      .gm-style .gm-style-iw-tc::after {
+        background: rgba(15, 23, 42, 0.96) !important;
+      }
+      .gm-style .gm-style-iw-d {
+        overflow: visible !important;
+      }
+      .gm-ui-hover-effect {
+        filter: invert(1) !important;
+      }
       .mapPinPopup {
-        min-width: 210px;
-        max-width: 280px;
-        font:
-          500 13.5px/1.45 "Pretendard Variable",
-          system-ui,
-          sans-serif;
-        color: #0f172a;
+        min-width: 220px;
+        max-width: 290px;
+        font: 500 13.5px/1.45 "Pretendard Variable", system-ui, sans-serif;
+        color: #f8fafc !important;
       }
       .mapPinPopup strong {
         display: block;
         font-size: 15px;
         font-weight: 800;
         margin-bottom: 4px;
+        color: #ffffff !important;
       }
       .mapPinPopup .mapPinPlace {
         padding-bottom: 8px;
         margin-bottom: 8px;
-        border-bottom: 1px solid #e2e8f0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
       }
       .mapPinPopup .mapPinAddress {
         margin-bottom: 8px;
-        color: #475569;
+        color: rgba(255, 255, 255, 0.72) !important;
         overflow-wrap: anywhere;
+        font-size: 12px;
       }
       .mapPinPopup .mapPinActions {
-        display: flex;
-        gap: 6px;
-        flex-wrap: wrap;
+        display: flex !important;
+        gap: 6px !important;
+        flex-wrap: wrap !important;
+        margin-top: 6px !important;
+      }
+      .mapPinPopup .mapPinActions .mb {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        min-height: 32px !important;
+        padding: 4px 11px !important;
+        font-size: 12px !important;
+        font-weight: 700 !important;
+        border-radius: 10px !important;
+        background: rgba(255, 255, 255, 0.12) !important;
+        color: #ffffff !important;
+        border: 1px solid rgba(255, 255, 255, 0.22) !important;
+        text-decoration: none !important;
+        cursor: pointer !important;
+        gap: 4px !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+      }
+      .mapPinPopup .mapPinActions .mb.pr {
+        background: #2563eb !important;
+        border-color: #3b82f6 !important;
+        color: #ffffff !important;
+      }
+      .mapPinPopup .mapPinActions .mb.dg {
+        background: rgba(239, 68, 68, 0.2) !important;
+        border-color: rgba(239, 68, 68, 0.35) !important;
+        color: #fca5a5 !important;
+      }
+      [data-theme="light"] .gm-style .gm-style-iw-c {
+        background: rgba(255, 255, 255, 0.98) !important;
+        border: 1px solid rgba(0, 0, 0, 0.12) !important;
+        box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18) !important;
+      }
+      [data-theme="light"] .gm-style .gm-style-iw-tc::after {
+        background: rgba(255, 255, 255, 0.98) !important;
+      }
+      [data-theme="light"] .gm-ui-hover-effect {
+        filter: none !important;
+      }
+      [data-theme="light"] .mapPinPopup,
+      [data-theme="light"] .mapPinPopup strong {
+        color: #0f172a !important;
+      }
+      [data-theme="light"] .mapPinPopup .mapPinPlace {
+        border-bottom: 1px solid #e2e8f0 !important;
+      }
+      [data-theme="light"] .mapPinPopup .mapPinAddress {
+        color: #475569 !important;
+      }
+      [data-theme="light"] .mapPinPopup .mapPinActions .mb {
+        background: #f1f5f9 !important;
+        color: #0f172a !important;
+        border: 1px solid #cbd5e1 !important;
+      }
+      [data-theme="light"] .mapPinPopup .mapPinActions .mb.pr {
+        background: #2563eb !important;
+        border-color: #2563eb !important;
+        color: #ffffff !important;
       }
       #groupedPlacesSummary .selectedMapPlace {
         outline: 3px solid var(--pr);
@@ -2614,7 +2692,7 @@
       const TRIP_PENDING_CONFLICT_KEY = "TRIP_PENDING_CONFLICT";
       const TRIP_LAST_ROOM_KEY = "TRIP_LAST_ROOM";
       const TRIP_CREATING_ROOM_KEY = "TRIP_CREATING_ROOM";
-      const APP_VERSION = "v62";
+      const APP_VERSION = "v63";
       const TRANSIENT_NET_RE =
         /unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
       let _offlineFlushBusy = false,
@@ -6702,12 +6780,12 @@
 
         $("sbody").innerHTML = `
     ${media}
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+    <div class="sheet-title-row" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;width:100%;box-sizing:border-box">
       <div style="flex:1;min-width:0">
-        <div class="nm" style="font-size:20px;line-height:1.25;font-weight:900">${esc(i.name)}</div>
-        ${i.localName && i.localName !== i.name ? `<div style="font-size:13.5px;color:var(--sub);font-weight:600;margin-top:3px">(${esc(i.localName)})</div>` : ""}
+        <div class="nm" style="font-size:20px;line-height:1.28;font-weight:900;word-break:keep-all">${esc(i.name)}</div>
+        ${i.localName && i.localName !== i.name ? `<div style="font-size:13.5px;color:var(--sub);font-weight:600;margin-top:3px;word-break:keep-all">(${esc(i.localName)})</div>` : ""}
       </div>
-      <button type="button" class="mb${i.star ? " pr" : ""}" data-act="toggleStarSheet" style="flex:none;min-height:36px;padding:0 12px;border-radius:12px">
+      <button type="button" class="mb${i.star ? " pr" : ""}" data-act="toggleStarSheet" style="flex:none;min-height:36px;padding:0 12px;border-radius:12px;white-space:nowrap;display:inline-flex;align-items:center;gap:4px">
         <span class="ms${i.star ? " fill" : ""}">star</span>${i.star ? "중요" : "즐겨찾기"}
       </button>
     </div>
@@ -7723,10 +7801,11 @@
           const apiBase = location.hostname.includes("vercel.app")
             ? ""
             : "https://trip-app-psi-two.vercel.app";
+          const sUrl = `https://www.youtube.com/shorts/${meta.id}`;
           const wUrl = `https://www.youtube.com/watch?v=${meta.id}`;
           const jobs = [
             async () => {
-              const r = await fetchTO(`${apiBase}/api/yt?id=${encodeURIComponent(meta.id)}`, {}, 6000);
+              const r = await fetchTO(`${apiBase}/api/yt?url=${encodeURIComponent(sUrl)}`, {}, 7000);
               if (!r.ok) throw new Error("api yt status " + r.status);
               const d = await r.json();
               const cap = d.caption || [d.title, d.description].filter(Boolean).join("\n\n");
@@ -7735,15 +7814,44 @@
               throw new Error("api yt empty");
             },
             async () => {
+              const r = await fetchTO(`https://r.jina.ai/https://www.youtube.com/shorts/${encodeURIComponent(meta.id)}`, {
+                headers: { "Accept": "text/plain" }
+              }, 6000);
+              if (!r.ok) throw new Error("jina status " + r.status);
+              const txt = await r.text();
+              const cap = parseJinaMarkdown(txt);
+              if (cap && !isCodeGarbage(cap)) return cap.trim();
+              throw new Error("jina empty");
+            },
+            async () => {
               if (cfBase && !cfBase.includes(location.host)) {
                 const r = await fetchTO(cfBase + encodeURIComponent(wUrl), {}, 5000);
                 if (r.ok) {
                   const html = await r.text();
-                  const m = html.match(/var ytInitialPlayerResponse\s*=\s*({.+?});(?:var|<\/script>)/);
-                  if (m) {
-                    const data = JSON.parse(m[1]);
-                    const cap = [data.videoDetails?.title, data.videoDetails?.shortDescription].filter(Boolean).join("\n\n");
-                    if (cap && !isCodeGarbage(cap)) return cap.trim();
+                  const pIdx = html.indexOf("ytInitialPlayerResponse");
+                  if (pIdx !== -1) {
+                    const start = html.indexOf("{", pIdx);
+                    let depth = 0, inString = false, escape = false;
+                    for (let i = start; i < Math.min(start + 80000, html.length); i++) {
+                      const c = html[i];
+                      if (escape) { escape = false; continue; }
+                      if (c === "\\") { escape = true; continue; }
+                      if (c === '"') { inString = !inString; continue; }
+                      if (!inString) {
+                        if (c === "{") depth++;
+                        else if (c === "}") {
+                          depth--;
+                          if (depth === 0) {
+                            try {
+                              const data = JSON.parse(html.slice(start, i + 1));
+                              const cap = [data.videoDetails?.title, data.videoDetails?.shortDescription].filter(Boolean).join("\n\n");
+                              if (cap && !isCodeGarbage(cap)) return cap.trim();
+                            } catch (_) {}
+                            break;
+                          }
+                        }
+                      }
+                    }
                   }
                 }
               }
@@ -19653,13 +19761,15 @@ ${caption || rawText}
     const passInfo = judgeTransitPass(it);
     if (!passInfo) return;
 
-    const nm = sbody.querySelector(".nm");
-    const headerRow = nm ? nm.parentElement : null;
-    if (!headerRow) return;
+    const titleRow = sbody.querySelector(".sheet-title-row") ||
+                     sbody.querySelector(".nm")?.closest(".sheet-title-row") ||
+                     sbody.querySelector(".nm")?.parentElement?.parentElement;
+    if (!titleRow) return;
 
     const passBox = document.createElement("div");
     passBox.id = "v46SheetPassTip";
-    passBox.style.cssText = "width:100%;margin:10px 0 6px;padding:10px 14px;border-radius:14px;background:var(--s2);border:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;gap:10px;box-sizing:border-box";
+    passBox.className = "card";
+    passBox.style.cssText = "width:100%;margin:10px 0 6px;padding:10px 14px;border-radius:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;box-sizing:border-box";
     passBox.innerHTML = `
       <div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1">
         <span class="v46-transit-badge ${passInfo.type}" style="flex:none;white-space:nowrap;margin:0"><span class="ms" style="font-size:12px">${passInfo.icon}</span>${passInfo.label}</span>
@@ -19668,7 +19778,7 @@ ${caption || rawText}
       <button type="button" class="mb" id="v46OpenGuideFromSheet" style="flex:none;min-height:28px;padding:3px 10px;font-size:11.5px;border-radius:999px;white-space:nowrap">패스 가이드</button>
     `;
 
-    headerRow.insertAdjacentElement("afterend", passBox);
+    titleRow.insertAdjacentElement("afterend", passBox);
 
     document.getElementById("v46OpenGuideFromSheet")?.addEventListener("click", (e) => {
       e.stopPropagation();

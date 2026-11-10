@@ -1,7 +1,7 @@
-// V62 Home Dashboard Bento Refinement & Pure Monochrome Liquid Glass Pass Card
-const CACHE_CORE = "trip-v62-core";
-const CACHE_ASSETS = "trip-v62-assets";
-const CACHE_TILES = "trip-v62-tiles";
+// V63 Detail Sheet Layout Rescue, High-Contrast Map Pin InfoWindow & Resilient YouTube Caption Scraper
+const CACHE_CORE = "trip-v63-core";
+const CACHE_ASSETS = "trip-v63-assets";
+const CACHE_TILES = "trip-v63-tiles";
 
 const CORE_URLS = [
   "./",
