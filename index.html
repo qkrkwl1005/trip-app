@@ -7322,14 +7322,16 @@
           dynModels = await geminiModels(key);
         } catch (_) {}
         const defaultModels = [
+          "gemma-4-26b-a4b-it",
+          "gemma-4-31b-it",
+          "gemini-flash-latest",
+          "gemini-flash-lite-latest",
           "gemini-2.5-flash",
           "gemini-2.5-flash-lite",
           "gemini-1.5-flash",
-          "gemini-2.0-flash",
-          "gemini-1.5-pro",
         ];
         const baseOrder = [...new Set([userModel, ...(dynModels || []), ...defaultModels].filter(Boolean))];
-        const fixed = baseOrder.slice(0, 5);
+        const fixed = baseOrder.slice(0, 8);
         for (const m of fixed) {
           if (Date.now() - t0 > DEADLINE) break;
           const tries = allowGrounding ? [true, false] : [false];
@@ -7786,44 +7788,20 @@
           const reelUrl = `https://www.instagram.com/reel/${igId}/`;
           const stableHost = "instagram-scraper-stable-api.p.rapidapi.com";
 
-          // 1단계: 구독 완료된 instagram-scraper-stable-api (.php GET & POST Form) 최우선 실행
+          // 1단계: RapidAPI 시도 (1.2초 타임아웃)
           if (rapidKey) {
             const stableCalls = [
               () =>
                 fetchTO(
-                  `https://${stableHost}/get_media_data.php?reel_post_code_or_url=${encodeURIComponent(reelUrl)}&type=reel`,
-                  { headers: { "x-rapidapi-key": rapidKey, "x-rapidapi-host": stableHost } },
-                  2000
-                ),
-              () =>
-                fetchTO(
                   `https://${stableHost}/get_media_data_v2.php?media_code=${encodeURIComponent(igId)}`,
                   { headers: { "x-rapidapi-key": rapidKey, "x-rapidapi-host": stableHost } },
-                  2000
+                  1200
                 ),
               () =>
                 fetchTO(
-                  `https://${stableHost}/get_media_data.php`,
-                  {
-                    method: "POST",
-                    headers: {
-                      "Content-Type": "application/x-www-form-urlencoded",
-                      "x-rapidapi-key": rapidKey,
-                      "x-rapidapi-host": stableHost,
-                    },
-                    body: new URLSearchParams({
-                      reel_post_code_or_url: reelUrl,
-                      media_code: igId,
-                      type: "reel",
-                    }).toString(),
-                  },
-                  2000
-                ),
-              () =>
-                fetchTO(
-                  `https://${stableHost}/get_ig_reel_info.php?reel_post_code_or_url=${encodeURIComponent(reelUrl)}`,
+                  `https://${stableHost}/get_media_data.php?reel_post_code_or_url=${encodeURIComponent(reelUrl)}&type=reel`,
                   { headers: { "x-rapidapi-key": rapidKey, "x-rapidapi-host": stableHost } },
-                  2000
+                  1200
                 ),
             ];
 
@@ -7842,72 +7820,23 @@
             } catch (_) {}
           }
 
-          // 2단계: 사용자 프록시(cfBase) 시도
-          if (cfBase && !cfBase.includes(location.host)) {
-            const cfTargets = [embedUrl, reelEmbedUrl, ddUrl];
-            try {
-              const cfRes = await Promise.any(
-                cfTargets.map(async (u) => {
-                  const r = await fetchTO(cfBase + encodeURIComponent(u), {}, 5500);
-                  if (!r.ok) throw new Error("cf status");
-                  const cap = parseIgEmbedHtml(await r.text());
-                  if (cap && cap.length >= 4 && !isCodeGarbage(cap)) return cap;
-                  throw new Error("cf empty");
-                })
-              );
-              if (cfRes) return cfRes;
-            } catch (_) {}
-          }
-
-          // 3단계: 공용 우회 채널 및 서버리스 API 병렬 실행
+          // 2단계: 서버리스 API 및 프록시 시도 (1.5초 타임아웃)
           const apiBase = location.hostname.includes("vercel.app")
             ? ""
             : "https://trip-app-psi-two.vercel.app";
           const jobs = [
             async () => {
-              const r = await fetchTO(`${apiBase}/api/ig?code=${encodeURIComponent(igId)}`, {}, 4800);
+              const r = await fetchTO(`${apiBase}/api/ig?code=${encodeURIComponent(igId)}`, {}, 1500);
               if (!r.ok) throw new Error("api status");
               const d = await r.json();
               if (d.caption && !isCodeGarbage(d.caption)) return d.caption;
               throw new Error("api empty");
             },
             async () => {
-              const r = await fetchTO(`https://r.jina.ai/${reelUrl}`, {}, 5500);
+              const r = await fetchTO(`https://r.jina.ai/${reelUrl}`, {}, 1800);
               const cap = parseJinaMarkdown(await r.text());
               if (cap && !isCodeGarbage(cap)) return cap;
               throw new Error("jina reel empty");
-            },
-            async () => {
-              const r = await fetchTO(`https://r.jina.ai/${embedUrl}`, {}, 5500);
-              const cap = parseJinaMarkdown(await r.text());
-              if (cap && !isCodeGarbage(cap)) return cap;
-              throw new Error("jina embed empty");
-            },
-            async () => {
-              const r = await fetchTO(`https://r.jina.ai/https://www.instagram.com/p/${igId}/`, {}, 5500);
-              const cap = parseJinaMarkdown(await r.text());
-              if (cap && !isCodeGarbage(cap)) return cap;
-              throw new Error("jina post empty");
-            },
-            async () => {
-              const r = await fetchTO(
-                `https://api.allorigins.win/raw?url=${encodeURIComponent(embedUrl)}`,
-                {},
-                5000
-              );
-              const cap = parseIgEmbedHtml(await r.text());
-              if (cap && !isCodeGarbage(cap)) return cap;
-              throw new Error("allorigins empty");
-            },
-            async () => {
-              const r = await fetchTO(
-                `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(embedUrl)}`,
-                {},
-                5000
-              );
-              const cap = parseIgEmbedHtml(await r.text());
-              if (cap && !isCodeGarbage(cap)) return cap;
-              throw new Error("codetabs empty");
             },
           ];
 
