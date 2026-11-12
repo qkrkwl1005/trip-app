@@ -8925,29 +8925,52 @@ ${caption || rawText}
             return;
           }
 
-          const failNote = [
-            "🔒 자동 인식 실패 — 캡션·댓글을 직접 붙여넣거나 스크린샷을 첨부해 주세요",
-            aiErr ? `AI: ${aiErr}` : "",
-          ]
-            .filter(Boolean)
-            .join(" · ");
-          res = [
-            {
-              name: metaFromBox?.platform === "yt" ? "공유 쇼츠" : "공유 릴스",
-              address: "",
-              info: failNote,
-              note: "",
-              category: cat,
-              lat: null,
-              lng: null,
-              vid: vidUrl || "",
-              v: 0,
-            },
-          ];
-          renderCandidates();
-          toast(
-            "🔒 인스타 차단으로 캡션을 가져오지 못했습니다. 2번 칸에 캡션을 직접 붙여넣어 주세요",
-          );
+          const platformLabel = metaFromBox?.platform === "yt" ? "유튜브 쇼츠 저장 장소" : "인스타그램 릴스 저장 장소";
+          const fallbackItem = {
+            id: "id_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+            name: platformLabel,
+            localName: "",
+            address: hint || (cat === "FOOD" ? "오사카 맛집" : "오사카"),
+            price: "",
+            info: "영상 링크 저장 완료 · 상세 정보는 본문 복사 붙여넣기로 자동 보완 가능",
+            note: "영상 링크 저장 완료",
+            category: cat || "PLACE",
+            lat: null,
+            lng: null,
+            places: [],
+            vid: vidUrl || "",
+            img: (vidUrl && parseVideoMeta(vidUrl)?.id && reelThumbCache[parseVideoMeta(vidUrl).id]) || "",
+            useCustomImg: Boolean(vidUrl && parseVideoMeta(vidUrl)?.id && reelThumbCache[parseVideoMeta(vidUrl).id]),
+            v: 0,
+            done: false,
+            star: false,
+            day: 0,
+            updatedAt: Date.now()
+          };
+
+          items.unshift(fallbackItem);
+          save();
+          draw(true);
+          fit();
+
+          res = [{
+            ...fallbackItem,
+            vid: vidUrl,
+            _saved: true,
+            _itemId: fallbackItem.id,
+          }];
+          renderCandidates("🎬 릴스 영상 링크가 장소 목록에 저장되었습니다!");
+
+          $("shareBox").value = "";
+          $("reelLinkBox").value = "";
+          lastSharedVid = "";
+
+          const v32Wrap = document.getElementById("v32ImportSheetWrap");
+          if (v32Wrap) {
+            setTimeout(() => v32Wrap.classList.remove("on"), 600);
+          }
+
+          toast("🎬 인스타 릴스가 저장되었습니다! (본문 복사 시 자동 보완)");
         } finally {
           btn.disabled = false;
           btn.innerHTML = `<span class="ms fill">bolt</span>분석·저장하기`;
