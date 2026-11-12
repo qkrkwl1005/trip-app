@@ -1866,6 +1866,23 @@
               >
                 <span class="ms" style="font-size: 18px;">sync</span>릴스 썸네일 사진 전체 다시 가져오기
               </button>
+              <button
+                type="button"
+                id="diagApiBtn"
+                class="btn g"
+                style="width: 100%; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 14px; font-weight: 700; background: rgba(33, 150, 243, 0.12); color: #2196f3; border: 1px solid rgba(33, 150, 243, 0.35); margin-bottom: 8px;"
+              >
+                <span class="ms" style="font-size: 18px;">troubleshoot</span>🔍 API 키 & 인스타 연결 실시간 정밀진단
+              </button>
+              <div id="diagResultBox" style="display: none; margin-bottom: 12px; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <span style="font-size: 12.5px; font-weight: 700; color: #a5d6a7;">📋 진단 결과 보고서</span>
+                  <button type="button" id="copyDiagBtn" class="btn g" style="padding: 4px 10px; font-size: 12px; min-height: 28px; margin: 0;">
+                    <span class="ms" style="font-size: 14px;">content_copy</span>진단값 복사
+                  </button>
+                </div>
+                <textarea id="diagLog" readonly style="width: 100%; min-height: 140px; font-family: monospace; font-size: 12px; background: rgba(0,0,0,0.5); color: #e0e0e0; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 8px; resize: vertical; box-sizing: border-box; -webkit-user-select: text !important; user-select: text !important;"></textarea>
+              </div>
               <label style="margin-top: 8px">나만의 CORS 프록시 주소 (선택)</label>
               <input
                 type="text"
@@ -10253,6 +10270,153 @@ ${caption || rawText}
           if (typeof window.restoreAllInstagramThumbs === "function") {
             await window.restoreAllInstagramThumbs(key);
           }
+        };
+      }
+      if ($("copyDiagBtn")) {
+        $("copyDiagBtn").onclick = async () => {
+          const logTxt = $("diagLog")?.value || "";
+          if (!logTxt) return toast("진단 결과가 없습니다");
+          try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              await navigator.clipboard.writeText(logTxt);
+            } else {
+              $("diagLog").select();
+              document.execCommand("copy");
+            }
+            toast("📋 진단값이 복사되었습니다! 채팅에 붙여넣어 주세요.");
+          } catch (_) {
+            $("diagLog").select();
+            toast("진단 로그를 전체 선택했습니다. 복사(Ctrl+C / Cmd+C)해 주세요.");
+          }
+        };
+      }
+      if ($("diagApiBtn")) {
+        $("diagApiBtn").onclick = async () => {
+          const btn = $("diagApiBtn");
+          const box = $("diagResultBox");
+          const logArea = $("diagLog");
+          if (!btn || !box || !logArea) return;
+
+          box.style.display = "block";
+          btn.disabled = true;
+          btn.innerHTML = '<span class="ms spin">sync</span>진단 진행 중... (약 3~5초)';
+          logArea.value = "[진단 시작] API 키 상태 및 인스타그램 통신 검사 중...\n";
+
+          const lines = [];
+          const log = (msg) => {
+            lines.push(msg);
+            logArea.value = lines.join("\n");
+            logArea.scrollTop = logArea.scrollHeight;
+          };
+
+          const rKey = ($("rapidkey")?.value || ls.get("TRIP_RAPIDAPI_KEY") || "").trim();
+          const gKey = (aiCfg?.gemini?.key || ls.get("TRAVEL_GMAP_KEY") || "").trim();
+          const orKey = (aiCfg?.openrouter?.key || "").trim();
+          const testCode = "Dti-Co-ulwL"; // 샘플 릴스 코드
+
+          log(`🕒 진단 시각: ${new Date().toLocaleString()}`);
+          log(`📱 브라우저: ${navigator.userAgent.slice(0, 50)}...`);
+          log(`🔑 RapidAPI 키: ${rKey ? rKey.slice(0, 8) + "..." + rKey.slice(-4) + ` (길이 ${rKey.length})` : "❌ 미입력"}`);
+          log(`🔑 Gemini 키: ${gKey ? gKey.slice(0, 8) + "..." : "❌ 미입력"}`);
+          log(`🔑 OpenRouter 키: ${orKey ? orKey.slice(0, 10) + "..." : "❌ 미입력"}`);
+          log("----------------------------------------");
+
+          // 1. RapidAPI 직접 호출 테스트
+          if (rKey) {
+            log("1️⃣ [RapidAPI Scraper] 엔드포인트 직접 호출 검사...");
+            const stableHost = "instagram-scraper-stable-api.p.rapidapi.com";
+            try {
+              const t0 = Date.now();
+              const r = await fetchTO(
+                `https://${stableHost}/get_media_data_v2.php?media_code=${testCode}`,
+                {
+                  headers: {
+                    "x-rapidapi-key": rKey,
+                    "x-rapidapi-host": stableHost,
+                  },
+                },
+                5000
+              );
+              const elapsed = Date.now() - t0;
+              const status = r.status;
+              const text = await r.text();
+              let preview = text.slice(0, 160).replace(/\s+/g, " ");
+
+              if (status === 200) {
+                if (text.includes('"message"') || text.includes('"error"')) {
+                  log(`   ⚠️ 응답 200이지만 메시지 포함 (${elapsed}ms): ${preview}`);
+                } else {
+                  log(`   ✅ RapidAPI 성공 (200 OK, ${elapsed}ms) - 캡션 수신 가능`);
+                }
+              } else if (status === 429) {
+                log(`   ❌ 429 Too Many Requests (${elapsed}ms): 월간 무료 쿼터 소진! (${preview})`);
+              } else if (status === 403) {
+                log(`   ❌ 403 Forbidden (${elapsed}ms): 구독(Subscribe) 미완료 또는 키 오류 (${preview})`);
+              } else {
+                log(`   ⚠️ HTTP ${status} (${elapsed}ms): ${preview}`);
+              }
+            } catch (e) {
+              log(`   ❌ RapidAPI 연결 실패: ${e.message}`);
+            }
+          } else {
+            log("1️⃣ [RapidAPI Scraper] 키가 없어 검사를 건너뜁니다.");
+          }
+
+          // 2. 서버리스 프록시 검사
+          log("2️⃣ [Vercel API] /api/ig 서버리스 프록시 검사...");
+          try {
+            const apiBase = location.hostname.includes("vercel.app")
+              ? ""
+              : "https://trip-app-psi-two.vercel.app";
+            const t0 = Date.now();
+            const r = await fetchTO(`${apiBase}/api/ig?code=${testCode}`, {}, 5000);
+            const elapsed = Date.now() - t0;
+            const d = await r.json();
+            if (d && d.caption) {
+              log(`   ✅ Vercel 프록시 성공 (${elapsed}ms, 캡션 ${d.caption.length}자)`);
+            } else {
+              log(`   ⚠️ Vercel 프록시 캡션 없음 (${elapsed}ms): ok=${d.ok}, thumb=${Boolean(d.weservThumb || d.thumb)}`);
+            }
+          } catch (e) {
+            log(`   ⚠️ Vercel 프록시 호출 실패: ${e.message}`);
+          }
+
+          // 3. Gemini AI 검사
+          if (gKey) {
+            log("3️⃣ [Google Gemini] 텍스트 생성 API 검사...");
+            try {
+              const t0 = Date.now();
+              const r = await fetchTO(
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(gKey)}`,
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    contents: [{ parts: [{ text: "ping" }] }],
+                  }),
+                },
+                5000
+              );
+              const elapsed = Date.now() - t0;
+              if (r.ok) {
+                log(`   ✅ Gemini 2.0 Flash 통신 성공 (${elapsed}ms)`);
+              } else {
+                const errTxt = await r.text();
+                log(`   ❌ Gemini 오류 (${r.status}, ${elapsed}ms): ${errTxt.slice(0, 120)}`);
+              }
+            } catch (e) {
+              log(`   ❌ Gemini 네트워크 오류: ${e.message}`);
+            }
+          } else {
+            log("3️⃣ [Google Gemini] 키가 설정되어 있지 않습니다.");
+          }
+
+          log("----------------------------------------");
+          log("🏁 [진단 완료] 위의 '진단값 복사' 버튼을 눌러 채팅창에 붙여넣어 주세요.");
+
+          btn.disabled = false;
+          btn.innerHTML = '<span class="ms">troubleshoot</span>🔍 API 키 & 인스타 연결 실시간 정밀진단 다시 실행';
+          toast("진단이 완료되었습니다. '진단값 복사'를 눌러주세요!");
         };
       }
       $("savecfproxy").onclick = () => {
