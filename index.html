@@ -7702,18 +7702,6 @@
           ls.get("TRIP_CF_PROXY") || ls.get("TRIP_WORKER_URL") || ""
         );
         const rapidKey = (ls.get("TRIP_RAPIDAPI_KEY") || DEFAULT_RAPID_KEY).trim();
-        const isCodeGarbage = (s) => {
-          if (!s || typeof s !== "string") return true;
-          const trimmed = s.trim();
-          if (trimmed.length < 5) return true;
-          if (/^(?:YouTube|Shorts|Instagram|404 Not Found|Not Found|Error)$/i.test(trimmed)) return true;
-          if (/^\(?https?:\/\/[^\s\)]+\)?$/i.test(trimmed)) return true;
-          if (/^@?[a-zA-Z0-9._]{3,35}$/.test(trimmed) && !/[가-힣一-龯ぁ-んァ-ン\s]/.test(trimmed)) return true;
-          if (/fetchTO\(|parseIgEmbedHtml|allorigins\s*empty|async\s*\(\)|TRIP_MASTER_ITEMS/i.test(s)) return true;
-          if (/Create an account or log in|Log in to Instagram|See more posts from|Post isn't available|antibot protection/i.test(s) && s.length < 350) return true;
-          if (/Video unavailable|This video is unavailable|동영상을 재생할 수 없음|이 동영상은 볼 수 없습니다|Sign in to confirm|Tap to unmute|Skip navigation|You're signed out|404 Not Found/i.test(s)) return true;
-          return false;
-        };
 
         const cleanCaptionText = (text) => {
           if (!text || typeof text !== "string") return "";
@@ -7744,7 +7732,7 @@
           });
 
           let res = lines.join("\n").trim().replace(/\n{3,}/g, "\n\n");
-          if (isCodeGarbage(res)) return "";
+          if (!res || res.trim().length < 3 || res.includes("<html")) return "";
           return res;
         };
 
@@ -7754,7 +7742,7 @@
           const tm = txt.match(/Title:\s*(?:.+?\s+on\s+Instagram|Instagram)\s*:\s*["“]([\s\S]+?)(?:["”]\s*)?(?:\n\s*URL Source:|\n\s*Markdown Content:|\n\s*Title:|$)/i);
           if (tm && tm[1]) {
             const cap = cleanCaptionText(tm[1].trim().replace(/["”]$/, "").trim());
-            if (cap && !isCodeGarbage(cap)) return cap;
+            if (cap && cap.trim().length >= 3 && !cap.includes("<html")) return cap;
           }
           // 2순위: 본문 Markdown 파싱
           let content = txt.includes("Markdown Content:") ? (txt.split("Markdown Content:")[1] || "") : txt;
@@ -7766,7 +7754,7 @@
             if (idx !== -1) content = content.substring(idx + lastToken.length);
           }
           const cap = cleanCaptionText(content);
-          return cap && !isCodeGarbage(cap) ? cap : "";
+          return cap && cap.trim().length >= 3 && !cap.includes("<html") ? cap : "";
         };
 
         if (meta.platform === "ig") {
@@ -7822,7 +7810,7 @@
                   if (!rr || !rr.ok) throw new Error("status error");
                   const rd = await rr.json();
                   const capTxt = extractCaptionFromRapidJson(rd);
-                  if (capTxt && !isCodeGarbage(capTxt)) return capTxt;
+                  if (capTxt && capTxt.trim().length >= 3 && !capTxt.includes("<html")) return capTxt;
                   throw new Error("empty caption");
                 })
               );
@@ -7839,26 +7827,26 @@
               const r = await fetchTO(`${apiBase}/api/ig?code=${encodeURIComponent(igId)}`, {}, 1500);
               if (!r.ok) throw new Error("api status");
               const d = await r.json();
-              if (d.caption && !isCodeGarbage(d.caption)) return d.caption;
+              if (d.caption && d.caption.trim().length >= 3 && !d.caption.includes("<html")) return d.caption;
               throw new Error("api empty");
             },
             async () => {
               const r = await fetchTO(`https://r.jina.ai/${reelUrl}`, {}, 1800);
               const cap = parseJinaMarkdown(await r.text());
-              if (cap && !isCodeGarbage(cap)) return cap;
+              if (cap && cap.trim().length >= 3 && !cap.includes("<html")) return cap;
               throw new Error("jina reel empty");
             },
           ];
 
           try {
             const out = await Promise.any(jobs.map((fn) => fn()));
-            if (typeof out === "string" && !isCodeGarbage(out) && out.trim().length >= 8) {
+            if (typeof out === "string" && out.trim().length >= 3 && !out.includes("<html")) {
               const resText = out.trim();
               mediaCaptionCache[cKey] = resText;
               saveMediaCaptionCache();
               return resText;
             }
-            return typeof out === "string" && !isCodeGarbage(out) ? out : "";
+            return typeof out === "string" && out.trim().length >= 3 && !out.includes("<html") ? out : "";
           } catch (e) {
             return "";
           }
@@ -7876,8 +7864,8 @@
               if (!r.ok) throw new Error("api yt status " + r.status);
               const d = await r.json();
               const cap = d.caption || [d.title, d.description].filter(Boolean).join("\n\n");
-              if (cap && !isCodeGarbage(cap)) return cap.trim();
-              if (d.title && !isCodeGarbage(d.title)) return d.title.trim();
+              if (cap && cap.trim().length >= 3 && !cap.includes("<html")) return cap.trim();
+              if (d.title && d.title.trim().length >= 3 && !d.title.includes("<html")) return d.title.trim();
               throw new Error("api yt empty");
             },
             async () => {
@@ -7887,7 +7875,7 @@
               if (!r.ok) throw new Error("jina status " + r.status);
               const txt = await r.text();
               const cap = parseJinaMarkdown(txt);
-              if (cap && !isCodeGarbage(cap)) return cap.trim();
+              if (cap && cap.trim().length >= 3 && !cap.includes("<html")) return cap.trim();
               throw new Error("jina empty");
             },
             async () => {
@@ -7912,7 +7900,7 @@
                             try {
                               const data = JSON.parse(html.slice(start, i + 1));
                               const cap = [data.videoDetails?.title, data.videoDetails?.shortDescription].filter(Boolean).join("\n\n");
-                              if (cap && !isCodeGarbage(cap)) return cap.trim();
+                              if (cap && cap.trim().length >= 3 && !cap.includes("<html")) return cap.trim();
                             } catch (_) {}
                             break;
                           }
@@ -7928,27 +7916,27 @@
               const r = await fetchTO(`https://www.youtube.com/oembed?url=${encodeURIComponent(wUrl)}&format=json`, {}, 4000);
               if (!r.ok) throw new Error("oembed status");
               const d = await r.json();
-              if (d.title && !isCodeGarbage(d.title)) return d.title.trim();
+              if (d.title && d.title.trim().length >= 3 && !d.title.includes("<html")) return d.title.trim();
               throw new Error("oembed empty");
             },
             async () => {
               const r = await fetchTO(`https://noembed.com/embed?url=${encodeURIComponent(wUrl)}`, {}, 3500);
               if (!r.ok) throw new Error("noembed status");
               const d = await r.json();
-              if (d.title && !isCodeGarbage(d.title)) return d.title.trim();
+              if (d.title && d.title.trim().length >= 3 && !d.title.includes("<html")) return d.title.trim();
               throw new Error("noembed empty");
             }
           ];
 
           try {
             const out = await Promise.any(jobs.map((fn) => fn()));
-            if (typeof out === "string" && !isCodeGarbage(out) && out.trim().length >= 8) {
+            if (typeof out === "string" && out.trim().length >= 3 && !out.includes("<html")) {
               const resText = out.trim();
               mediaCaptionCache[cKey] = resText;
               saveMediaCaptionCache();
               return resText;
             }
-            return typeof out === "string" && !isCodeGarbage(out) ? out.trim() : "";
+            return typeof out === "string" && out.trim().length >= 3 && !out.includes("<html") ? out.trim() : "";
           } catch (_) {
             return "";
           }
@@ -8516,7 +8504,7 @@
           }
           toast("릴스/쇼츠 캡션 정보를 불러오는 중...");
           const fetched = await fetchVideoCaption(vidUrl);
-          if (fetched && !isCodeGarbage(fetched) && fetched.length >= 8) {
+          if (fetched && fetched.trim().length >= 3 && !fetched.includes("<html")) {
             captionText = (captionText + "\n" + fetched).trim();
             caption = captionText;
             if ($("shareBox") && (!($("shareBox").value || "").replace(/https?:\/\/[^\s]+/g, "").trim())) {
@@ -8531,7 +8519,7 @@
           }
         }
 
-        if (!captionText || captionText.trim().length < 3) {
+        if (!captionText || captionText.trim().length < 3 || captionText.includes("<html")) {
           if (!images || images.length === 0) {
             const manualInput = window.prompt("보안 정책으로 본문을 자동 추출하지 못했습니다.\n\n릴스 본문을 붙여넣거나 매장명을 입력해 주세요:");
             if (!manualInput) throw new Error("취소되었습니다.");
