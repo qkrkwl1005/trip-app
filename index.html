@@ -10421,7 +10421,9 @@ ${caption || rawText}
               let successModel = null;
               let lastErrMsg = "";
               const triedModels = [];
-              for (const cm of [...new Set(candidateModels)]) {
+              const uniqueCands = [...new Set(candidateModels)].slice(0, 10);
+              log(`   ⏳ 총 ${uniqueCands.length}개 모델 순차 테스트 중...`);
+              for (const cm of uniqueCands) {
                 triedModels.push(cm);
                 try {
                   const t0 = Date.now();
@@ -10431,10 +10433,10 @@ ${caption || rawText}
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({
-                        contents: [{ parts: [{ text: "ping" }] }],
+                        contents: [{ parts: [{ text: "hi" }] }],
                       }),
                     },
-                    4500
+                    3000
                   );
                   const elapsed = Date.now() - t0;
                   if (r.ok) {
@@ -10443,15 +10445,17 @@ ${caption || rawText}
                     break;
                   } else {
                     const errTxt = await r.text();
-                    lastErrMsg = `[${cm}] HTTP ${r.status}: ${errTxt.slice(0, 100)}`;
+                    log(`   ⚠️ [${cm}] 실패 (${r.status}): ${errTxt.slice(0, 90).replace(/\s+/g, ' ')}`);
+                    lastErrMsg = `[${cm}] HTTP ${r.status}`;
                   }
                 } catch (e) {
+                  log(`   ⚠️ [${cm}] 에러: ${e.message}`);
                   lastErrMsg = `[${cm}] ${e.message}`;
                 }
               }
 
               if (!successModel) {
-                log(`   ❌ Gemini 시도 모델 (${triedModels.join(", ")}) 실패: ${lastErrMsg}`);
+                log(`   ❌ 모든 후보 모델 실패 (${lastErrMsg})`);
               }
             } catch (e) {
               log(`   ❌ Gemini 진단 실패: ${e.message}`);
