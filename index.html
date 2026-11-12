@@ -3206,30 +3206,34 @@
             const d = await r.json();
             const supported = (d.models || [])
               .filter((x) => (x.supportedGenerationMethods || []).includes("generateContent"))
-              .map((x) => String(x.name || "").replace("models/", ""));
+              .map((x) => String(x.name || "").replace("models/", ""))
+              .filter((name) => {
+                if (/tts|preview-tts/i.test(name)) return false; // 음성 전용 400 에러 방지
+                if (/2\.5-flash|2\.5-pro|2\.0-flash/i.test(name)) return false; // 레거시 404 에러 방지
+                if (/pro-latest/i.test(name)) return false; // 무료 쿼터 초과 방지
+                return true;
+              });
             const preferred = [
               "gemini-flash-latest",
               "gemini-flash-lite-latest",
-              "gemini-2.5-flash",
-              "gemini-2.5-flash-lite",
+              "gemma-4-26b-a4b-it",
+              "gemma-4-31b-it",
               "gemini-1.5-flash",
             ];
             const sorted = [
               ...preferred.filter((p) => supported.includes(p)),
-              ...supported.filter((s) => /flash/i.test(s) && !preferred.includes(s)),
-              ...supported,
+              ...supported.filter((s) => !preferred.includes(s)),
             ];
-            if (sorted.length) out = [...new Set(sorted)].slice(0, 8);
+            if (sorted.length) out = [...new Set(sorted)].slice(0, 5);
           }
         } catch (e) {}
         if (!out || !out.length)
           out = [
             "gemini-flash-latest",
             "gemini-flash-lite-latest",
-            "gemini-2.5-flash",
-            "gemini-2.5-flash-lite",
+            "gemma-4-26b-a4b-it",
+            "gemma-4-31b-it",
             "gemini-1.5-flash",
-            "gemini-1.5-pro",
           ];
         _gmodels = out;
         _gmodelsAt = now;
@@ -6529,7 +6533,7 @@
       }
       function isGenericSharedName(nm) {
         if (isSocialUsername(nm)) return true;
-        return /^(?:공유\s*(?:릴스|쇼츠|틱톡|링크)|저장된\s*장소|장소|⏳\s*장소\s*분석\s*중\.\.\.)$/.test(
+        return /^(?:공유\s*(?:릴스|쇼츠|틱톡|링크)|저장된\s*장소|장소|인스타그램\s*릴스\s*저장\s*장소|유튜브\s*쇼츠\s*저장\s*장소|릴스\s*영상\s*저장\s*장소|⏳\s*장소\s*분석\s*중\.\.\.)$/.test(
           String(nm || "").trim(),
         );
       }
@@ -7315,23 +7319,27 @@
             });
         }
         const t0 = Date.now(),
-          DEADLINE = 24000;
+          DEADLINE = 32000;
         let lastErr = "";
         let dynModels = [];
         try {
           dynModels = await geminiModels(key);
         } catch (_) {}
         const defaultModels = [
-          "gemma-4-26b-a4b-it",
-          "gemma-4-31b-it",
           "gemini-flash-latest",
           "gemini-flash-lite-latest",
-          "gemini-2.5-flash",
-          "gemini-2.5-flash-lite",
+          "gemma-4-26b-a4b-it",
+          "gemma-4-31b-it",
           "gemini-1.5-flash",
         ];
-        const baseOrder = [...new Set([userModel, ...(dynModels || []), ...defaultModels].filter(Boolean))];
-        const fixed = baseOrder.slice(0, 8);
+        const baseOrder = [...new Set([userModel, ...(dynModels || []), ...defaultModels].filter(Boolean))]
+          .filter((name) => {
+            if (/tts|preview-tts/i.test(name)) return false; // 음성 전용 400 에러 방지
+            if (/2\.5-flash|2\.5-pro|2\.0-flash/i.test(name)) return false; // 레거시 404 방지
+            if (/pro-latest/i.test(name)) return false; // 쿼터 초과 방지
+            return true;
+          });
+        const fixed = baseOrder.slice(0, 4);
         for (const m of fixed) {
           if (Date.now() - t0 > DEADLINE) break;
           const tries = allowGrounding ? [true, false] : [false];
@@ -7349,7 +7357,7 @@
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify(body),
                 },
-                11000,
+                16000,
               );
               const d = await r.json();
               if (!r.ok) {
@@ -7411,7 +7419,7 @@
                   temperature: 0.1,
                 }),
               },
-              11000,
+              16000,
             );
             const d = await r.json();
             if (!r.ok) {
@@ -7436,18 +7444,19 @@
           try {
             return await callGeminiSmart(prompt, images, allowGrounding);
           } catch (e) {
+            console.warn("Gemini call failed, checking OpenRouter fallback:", e.message);
             errs.push(`Google Gemini: ${e.message}`);
           }
         }
         if (aiCfg.openrouter?.key) {
-          const custom = aiCfg.openrouter.model;
+          const custom = (aiCfg.openrouter.model || "").trim();
           const ms = [
             ...new Set([
-              custom || "openrouter/free",
-              "openrouter/free",
-              "google/gemini-2.0-flash-exp:free",
+              custom,
+              "google/gemma-3-27b-it:free",
               "meta-llama/llama-3.3-70b-instruct:free",
-            ]),
+              "openrouter/free",
+            ].filter(Boolean)),
           ];
           try {
             return await callOpenAICompat(
@@ -7459,6 +7468,7 @@
               "openrouter",
             );
           } catch (e) {
+            console.warn("OpenRouter fallback failed:", e.message);
             errs.push(`OpenRouter: ${e.message}`);
           }
         }
@@ -8526,7 +8536,7 @@
         let aiCands = [],
           aiErr = "";
         const aiTask = (async () => {
-          if (!hasAi || !(caption.length >= 2 || images.length > 0 || vidUrl))
+          if (!hasAi || !(caption.length >= 2 || images.length > 0))
             return [];
           try {
             if (typeof window.__v8AiSetStep === "function") {
@@ -8756,6 +8766,181 @@ ${caption || rawText}
             .join("");
       }
 
+      function openReelFallbackModal({ vidUrl, fallbackItem }) {
+        let modal = document.getElementById("reelFallbackModal");
+        if (!modal) {
+          modal = document.createElement("div");
+          modal.id = "reelFallbackModal";
+          modal.style.cssText = `
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.72); z-index: 10000;
+            display: flex; align-items: center; justify-content: center;
+            padding: 16px; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+          `;
+          document.body.appendChild(modal);
+        }
+
+        modal.innerHTML = `
+          <div style="background: var(--s); border: 1px solid var(--bd2); border-radius: 20px; max-width: 440px; width: 100%; padding: 20px; box-shadow: 0 16px 40px rgba(0,0,0,0.4); display: flex; flex-direction: column; gap: 14px; max-height: 90vh; overflow-y: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 15px; font-weight: 800; color: #ffb74d; display: flex; align-items: center; gap: 6px;">
+                <span class="ms" style="font-size: 20px;">lock</span>본문 추가 입력 안내
+              </span>
+              <button type="button" id="rfCloseBtn" class="mb" style="padding: 4px 8px; font-size: 13px;">✕</button>
+            </div>
+            <div style="font-size: 12.5px; color: var(--tx2); line-height: 1.5; background: rgba(255,183,77,0.08); border: 1px solid rgba(255,183,77,0.22); border-radius: 10px; padding: 10px;">
+              인스타그램 보안 정책으로 서버에서 릴스 본문을 직접 가져오지 못했습니다.<br>
+              <b>영상 링크와 썸네일은 저장되었습니다.</b> 아래 중 편한 방법으로 장소를 분석해 주세요!
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <label style="font-size: 13px; font-weight: 700; margin: 0; color: var(--tx);">
+                방법 1. 릴스 본문 또는 매장명 붙여넣기
+              </label>
+              <textarea id="rfTextInput" placeholder="인스타 앱에서 복사한 본문·고정댓글이나 매장명을 여기에 붙여넣으세요" style="width: 100%; min-height: 70px; font-size: 13px; padding: 10px; border-radius: 10px; border: 1px solid var(--bd2); background: var(--s2); color: var(--tx); box-sizing: border-box; resize: vertical;"></textarea>
+              <button type="button" id="rfAnalyzeTextBtn" class="btn" style="min-height: 42px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                <span class="ms">auto_fix_high</span>본문으로 100% 장소 추출
+              </button>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 10px; margin: 2px 0;">
+              <div style="flex: 1; height: 1px; background: var(--bd2);"></div>
+              <span style="font-size: 11px; color: var(--tx2);">또는</span>
+              <div style="flex: 1; height: 1px; background: var(--bd2);"></div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <label style="font-size: 13px; font-weight: 700; margin: 0; color: var(--tx);">
+                방법 2. 릴스 화면 캡처(스크린샷) 첨부
+              </label>
+              <input type="file" id="rfFileInput" accept="image/*" multiple style="display: none;">
+              <button type="button" id="rfUploadImgBtn" class="btn g" style="min-height: 42px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px dashed var(--pr); color: var(--pr);">
+                <span class="ms">add_photo_alternate</span>스크린샷 첨부 (Gemini Vision 분석)
+              </button>
+            </div>
+
+            <button type="button" id="rfDoneBtn" class="mb" style="width: 100%; min-height: 38px; font-size: 13px; margin-top: 4px;">
+              영상 링크만 유지하고 닫기
+            </button>
+          </div>
+        `;
+        modal.style.display = "flex";
+
+        const closeModal = () => {
+          modal.style.display = "none";
+        };
+        modal.querySelector("#rfCloseBtn").onclick = closeModal;
+        modal.querySelector("#rfDoneBtn").onclick = closeModal;
+
+        // 방법 1 처리 (본문/텍스트 입력)
+        modal.querySelector("#rfAnalyzeTextBtn").onclick = async () => {
+          const text = modal.querySelector("#rfTextInput").value.trim();
+          if (!text) return toast("본문 텍스트나 매장명을 입력해 주세요");
+          closeModal();
+          toastBusy("🔥 본문 AI 분석 중...");
+          try {
+            const { cands } = await analyzeContent({ rawText: text, vidUrl, images: [] });
+            if (cands.length && (cands[0].name || cands[0].address)) {
+              if (fallbackItem) {
+                const idx = items.findIndex((it) => it.id === fallbackItem.id);
+                if (idx !== -1) items.splice(idx, 1);
+              }
+              for (const place of cands.slice(0, 10)) {
+                const rawPName = String(place.name || "").replace(/\s*외\s*\d+\s*곳\s*$/, "").trim();
+                const pName = (typeof inferKoreanNameFromCaption === "function" ? inferKoreanNameFromCaption({ ...place, name: rawPName }) : rawPName) || rawPName;
+                const newItem = {
+                  id: "id_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+                  name: pName,
+                  localName: place.localName || "",
+                  address: place.address || "",
+                  price: place.price || "",
+                  info: place.info || "",
+                  note: [place.price, place.info].filter(Boolean).join(" · "),
+                  category: CATS[place.category] ? place.category : cat || "PLACE",
+                  lat: isValidCoord(place.lat, place.lng) ? Number(place.lat) : null,
+                  lng: isValidCoord(place.lat, place.lng) ? Number(place.lng) : null,
+                  places: [],
+                  vid: vidUrl || "",
+                  img: (vidUrl && parseVideoMeta(vidUrl)?.id && reelThumbCache[parseVideoMeta(vidUrl).id]) || place.img || "",
+                  useCustomImg: Boolean(vidUrl && parseVideoMeta(vidUrl)?.id && reelThumbCache[parseVideoMeta(vidUrl).id]),
+                  v: 0,
+                  done: false,
+                  star: false,
+                  day: 0,
+                  updatedAt: Date.now()
+                };
+                items.unshift(newItem);
+              }
+              save();
+              draw(true);
+              fit();
+              toast(`✅ '${cands[0].name}' 장소가 등록되었습니다!`);
+            } else {
+              toast("입력하신 텍스트에서 장소를 특정하지 못했습니다. 수동 수정을 이용해 주세요.");
+            }
+          } catch(e) {
+            toast(`분석 실패: ${e.message}`);
+          }
+        };
+
+        // 방법 2 처리 (스크린샷 첨부)
+        const fileInp = modal.querySelector("#rfFileInput");
+        modal.querySelector("#rfUploadImgBtn").onclick = () => fileInp.click();
+        fileInp.onchange = async () => {
+          const files = Array.from(fileInp.files || []);
+          if (!files.length) return;
+          closeModal();
+          toastBusy("📸 스크린샷 Vision AI 분석 중...");
+          try {
+            const images = [];
+            for (const f of files.slice(0, 3)) {
+              images.push(await fileToBase64(f, 860, 0.72));
+            }
+            const { cands } = await analyzeContent({ rawText: "", vidUrl, images });
+            if (cands.length && (cands[0].name || cands[0].address)) {
+              if (fallbackItem) {
+                const idx = items.findIndex((it) => it.id === fallbackItem.id);
+                if (idx !== -1) items.splice(idx, 1);
+              }
+              for (const place of cands.slice(0, 10)) {
+                const rawPName = String(place.name || "").replace(/\s*외\s*\d+\s*곳\s*$/, "").trim();
+                const pName = (typeof inferKoreanNameFromCaption === "function" ? inferKoreanNameFromCaption({ ...place, name: rawPName }) : rawPName) || rawPName;
+                const newItem = {
+                  id: "id_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+                  name: pName,
+                  localName: place.localName || "",
+                  address: place.address || "",
+                  price: place.price || "",
+                  info: place.info || "",
+                  note: [place.price, place.info].filter(Boolean).join(" · "),
+                  category: CATS[place.category] ? place.category : cat || "PLACE",
+                  lat: isValidCoord(place.lat, place.lng) ? Number(place.lat) : null,
+                  lng: isValidCoord(place.lat, place.lng) ? Number(place.lng) : null,
+                  places: [],
+                  vid: vidUrl || "",
+                  img: (vidUrl && parseVideoMeta(vidUrl)?.id && reelThumbCache[parseVideoMeta(vidUrl).id]) || place.img || "",
+                  useCustomImg: Boolean(vidUrl && parseVideoMeta(vidUrl)?.id && reelThumbCache[parseVideoMeta(vidUrl).id]),
+                  v: 0,
+                  done: false,
+                  star: false,
+                  day: 0,
+                  updatedAt: Date.now()
+                };
+                items.unshift(newItem);
+              }
+              save();
+              draw(true);
+              fit();
+              toast(`📸 스크린샷에서 '${cands[0].name}' 장소를 성공적으로 추출했습니다!`);
+            } else {
+              toast("이미지에서 텍스트를 인식하지 못했습니다. 수동으로 상호명을 적어주세요.");
+            }
+          } catch(e) {
+            toast(`스크린샷 분석 실패: ${e.message}`);
+          }
+        };
+      }
+
       async function runAnalyzeShare(files = []) {
         const raw = ($("shareBox").value || "").trim();
         const explicitLink = ($("reelLinkBox").value || "").trim();
@@ -8971,6 +9156,11 @@ ${caption || rawText}
           }
 
           toast("🎬 인스타 릴스가 저장되었습니다! (본문 복사 시 자동 보완)");
+          if (metaFromBox?.platform === "ig" && !raw.replace(/https?:\/\/[^\s]+/g, "").trim() && !files.length) {
+            setTimeout(() => {
+              openReelFallbackModal({ vidUrl, fallbackItem });
+            }, 350);
+          }
         } finally {
           btn.disabled = false;
           btn.innerHTML = `<span class="ms fill">bolt</span>분석·저장하기`;
@@ -10345,27 +10535,53 @@ ${caption || rawText}
           if (gKey) {
             log("3️⃣ [Google Gemini] 텍스트 생성 API 검사...");
             try {
-              // 먼저 사용 가능한 모델 목록 조회
               let candidateModels = [
                 "gemini-flash-latest",
                 "gemini-flash-lite-latest",
-                "gemini-2.5-flash",
-                "gemini-2.5-flash-lite",
-                "gemini-1.5-flash"
+                "gemma-4-26b-a4b-it",
+                "gemma-4-31b-it",
+                "gemini-1.5-flash",
               ];
               try {
-                const lr = await fetchTO(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(gKey)}&pageSize=100`, {}, 4000);
+                const lr = await fetchTO(
+                  `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(gKey)}&pageSize=100`,
+                  {},
+                  5000,
+                );
                 if (lr.ok) {
                   const ld = await lr.json();
                   const genModels = (ld.models || [])
-                    .filter(m => (m.supportedGenerationMethods || []).includes("generateContent"))
-                    .map(m => String(m.name || "").replace("models/", ""));
-                  log(`   ℹ️ 계정 활성 모델 목록 (${genModels.length}개): ${genModels.slice(0, 8).join(", ")}`);
+                    .filter((m) =>
+                      (m.supportedGenerationMethods || []).includes(
+                        "generateContent",
+                      ),
+                    )
+                    .map((m) => String(m.name || "").replace("models/", ""))
+                    .filter((name) => {
+                      if (/tts|preview-tts/i.test(name)) return false; // 음성 전용 400 방지
+                      if (/2\.5-flash|2\.5-pro|2\.0-flash/i.test(name)) return false; // 레거시 404 방지
+                      if (/pro-latest/i.test(name)) return false;
+                      return true;
+                    });
+                  log(`   ℹ️ 유효 텍스트 모델 목록 (${genModels.length}개): ${genModels.slice(0, 6).join(", ")}`);
                   if (genModels.length) {
-                    const topPriority = ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-2.5-flash"];
-                    const matchedTop = topPriority.filter(tp => genModels.includes(tp));
-                    const otherGen = genModels.filter(g => !matchedTop.includes(g));
-                    candidateModels = [...matchedTop, ...otherGen, ...candidateModels];
+                    const topPriority = [
+                      "gemini-flash-latest",
+                      "gemini-flash-lite-latest",
+                      "gemma-4-26b-a4b-it",
+                      "gemma-4-31b-it",
+                    ];
+                    const matchedTop = topPriority.filter((tp) =>
+                      genModels.includes(tp),
+                    );
+                    const otherGen = genModels.filter(
+                      (g) => !matchedTop.includes(g),
+                    );
+                    candidateModels = [
+                      ...matchedTop,
+                      ...otherGen,
+                      ...candidateModels,
+                    ];
                   }
                 }
               } catch (_) {}
@@ -10373,8 +10589,8 @@ ${caption || rawText}
               let successModel = null;
               let lastErrMsg = "";
               const triedModels = [];
-              const uniqueCands = [...new Set(candidateModels)].slice(0, 10);
-              log(`   ⏳ 총 ${uniqueCands.length}개 모델 순차 테스트 중...`);
+              const uniqueCands = [...new Set(candidateModels)].slice(0, 4);
+              log(`   ⏳ 상위 ${uniqueCands.length}개 모델 순차 테스트 중 (타임아웃 12초)...`);
               for (const cm of uniqueCands) {
                 triedModels.push(cm);
                 try {
@@ -10388,7 +10604,7 @@ ${caption || rawText}
                         contents: [{ parts: [{ text: "hi" }] }],
                       }),
                     },
-                    3000
+                    12000,
                   );
                   const elapsed = Date.now() - t0;
                   if (r.ok) {
@@ -10397,7 +10613,7 @@ ${caption || rawText}
                     break;
                   } else {
                     const errTxt = await r.text();
-                    log(`   ⚠️ [${cm}] 실패 (${r.status}): ${errTxt.slice(0, 90).replace(/\s+/g, ' ')}`);
+                    log(`   ⚠️ [${cm}] 실패 (${r.status}): ${errTxt.slice(0, 90).replace(/\s+/g, " ")}`);
                     lastErrMsg = `[${cm}] HTTP ${r.status}`;
                   }
                 } catch (e) {
@@ -10407,13 +10623,50 @@ ${caption || rawText}
               }
 
               if (!successModel) {
-                log(`   ❌ 모든 후보 모델 실패 (${lastErrMsg})`);
+                log(`   ❌ 모든 Gemini 모델 실패 (${lastErrMsg}) -> OpenRouter 폴백으로 전환됩니다`);
               }
             } catch (e) {
               log(`   ❌ Gemini 진단 실패: ${e.message}`);
             }
           } else {
             log("3️⃣ [Google Gemini] 키가 설정되어 있지 않습니다.");
+          }
+
+          // 4. OpenRouter 폴백 검사
+          if (orKey) {
+            log("4️⃣ [OpenRouter] 무료 폴백 모델 검사...");
+            try {
+              const t0 = Date.now();
+              const r = await fetchTO(
+                "https://openrouter.ai/api/v1/chat/completions",
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${orKey}`,
+                  },
+                  body: JSON.stringify({
+                    model: "openrouter/free",
+                    messages: [{ role: "user", content: "hi" }],
+                    temperature: 0.1,
+                  }),
+                },
+                8000,
+              );
+              const elapsed = Date.now() - t0;
+              if (r.ok) {
+                const od = await r.json();
+                const usedM = od?.model || "openrouter/free";
+                log(`   ✅ OpenRouter 폴백 통신 성공! [${usedM}] (${elapsed}ms)`);
+              } else {
+                const errTxt = await r.text();
+                log(`   ⚠️ OpenRouter HTTP ${r.status} (${elapsed}ms): ${errTxt.slice(0, 90).replace(/\s+/g, " ")}`);
+              }
+            } catch (e) {
+              log(`   ⚠️ OpenRouter 호출 실패: ${e.message}`);
+            }
+          } else {
+            log("4️⃣ [OpenRouter] 키가 설정되어 있지 않습니다.");
           }
 
           log("----------------------------------------");
@@ -11969,6 +12222,16 @@ ${caption || rawText}
     if (pcShareBtn) {
       pcShareBtn.classList.add("ux-ocr-hero");
       pcShareBtn.innerHTML = `<span class="ms">add_photo_alternate</span>스샷 여러 장으로 찾기`;
+    }
+
+    if (!document.getElementById("uxReelTipNotice")) {
+      const tipNotice = document.createElement("div");
+      tipNotice.id = "uxReelTipNotice";
+      tipNotice.style.cssText =
+        "margin-top:6px;margin-bottom:8px;font-size:12px;color:var(--pr);background:rgba(33,150,243,0.08);border:1px solid rgba(33,150,243,0.22);border-radius:8px;padding:7px 10px;line-height:1.45;";
+      tipNotice.innerHTML =
+        "💡 <b>팁</b>: 인스타그램 보안 정책으로 릴스 링크 대신 인스타 앱에서 <b>본문 텍스트를 바로 붙여넣으면</b> 1초 만에 100% 정확하게 분석됩니다.";
+      shareBox.insertAdjacentElement("afterend", tipNotice);
     }
   }
 
