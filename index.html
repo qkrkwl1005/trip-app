@@ -3215,9 +3215,10 @@
         } catch (e) {}
         if (!out || !out.length)
           out = [
-            "gemini-2.0-flash",
+            "gemini-2.5-flash",
+            "gemini-2.5-flash-lite",
             "gemini-1.5-flash",
-            "gemini-2.0-flash-lite",
+            "gemini-2.0-flash",
             "gemini-1.5-pro",
           ];
         _gmodels = out;
@@ -7306,22 +7307,19 @@
         const t0 = Date.now(),
           DEADLINE = 24000;
         let lastErr = "";
-        const modelOrder = allowGrounding
-          ? [
-              "gemini-2.0-flash",
-              userModel,
-              "gemini-1.5-flash",
-              "gemini-2.0-flash-lite",
-              "gemini-1.5-pro",
-            ]
-          : [
-              userModel,
-              "gemini-2.0-flash",
-              "gemini-1.5-flash",
-              "gemini-2.0-flash-lite",
-              "gemini-1.5-pro",
-            ];
-        const fixed = [...new Set(modelOrder.filter(Boolean))];
+        let dynModels = [];
+        try {
+          dynModels = await geminiModels(key);
+        } catch (_) {}
+        const defaultModels = [
+          "gemini-2.5-flash",
+          "gemini-2.5-flash-lite",
+          "gemini-1.5-flash",
+          "gemini-2.0-flash",
+          "gemini-1.5-pro",
+        ];
+        const baseOrder = [...new Set([userModel, ...(dynModels || []), ...defaultModels].filter(Boolean))];
+        const fixed = baseOrder.slice(0, 5);
         for (const m of fixed) {
           if (Date.now() - t0 > DEADLINE) break;
           const tries = allowGrounding ? [true, false] : [false];
@@ -10385,9 +10383,33 @@ ${caption || rawText}
           if (gKey) {
             log("3️⃣ [Google Gemini] 텍스트 생성 API 검사...");
             try {
+              // 먼저 사용 가능한 모델 목록 조회
+              let activeModel = "gemini-2.5-flash";
+              let listOk = false;
+              try {
+                const lr = await fetchTO(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(gKey)}&pageSize=50`, {}, 4000);
+                if (lr.ok) {
+                  const ld = await lr.json();
+                  const names = (ld.models || [])
+                    .filter(m => (m.supportedGenerationMethods || []).includes("generateContent"))
+                    .map(m => String(m.name || "").replace("models/", ""));
+                  log(`   ℹ️ 계정 활성 모델 목록 (${names.length}개): ${names.slice(0, 4).join(", ")}`);
+                  const preferred = names.find(n => /gemini-2\.5-flash/i.test(n))
+                    || names.find(n => /gemini-2\./i.test(n) && /flash/i.test(n))
+                    || names.find(n => /flash/i.test(n))
+                    || names[0];
+                  if (preferred) {
+                    activeModel = preferred;
+                    listOk = true;
+                  }
+                } else {
+                  log(`   ⚠️ 모델 목록 조회 HTTP ${lr.status}`);
+                }
+              } catch (_) {}
+
               const t0 = Date.now();
               const r = await fetchTO(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(gKey)}`,
+                `https://generativelanguage.googleapis.com/v1beta/models/${activeModel}:generateContent?key=${encodeURIComponent(gKey)}`,
                 {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
@@ -10399,10 +10421,10 @@ ${caption || rawText}
               );
               const elapsed = Date.now() - t0;
               if (r.ok) {
-                log(`   ✅ Gemini 2.0 Flash 통신 성공 (${elapsed}ms)`);
+                log(`   ✅ Gemini (${activeModel}) 통신 성공 (${elapsed}ms)`);
               } else {
                 const errTxt = await r.text();
-                log(`   ❌ Gemini 오류 (${r.status}, ${elapsed}ms): ${errTxt.slice(0, 120)}`);
+                log(`   ❌ Gemini 오류 (${activeModel}, ${r.status}, ${elapsed}ms): ${errTxt.slice(0, 150)}`);
               }
             } catch (e) {
               log(`   ❌ Gemini 네트워크 오류: ${e.message}`);
