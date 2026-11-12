@@ -3198,27 +3198,37 @@
           const r = await fetchTO(
             "https://generativelanguage.googleapis.com/v1beta/models?key=" +
               encodeURIComponent(key) +
-              "&pageSize=200",
+              "&pageSize=100",
             { method: "GET" },
             6000,
           );
           if (r.ok) {
             const d = await r.json();
-            const ids = (d.models || []).map((x) =>
-              String(x.name || "").replace("models/", ""),
-            );
-            const flash = ids
-              .filter((x) => /^gemini-[\d.]+-flash(-lite)?$/.test(x))
-              .sort((a, b) => b.localeCompare(a, undefined, { numeric: true }));
-            if (flash.length) out = flash.slice(0, 5);
+            const supported = (d.models || [])
+              .filter((x) => (x.supportedGenerationMethods || []).includes("generateContent"))
+              .map((x) => String(x.name || "").replace("models/", ""));
+            const preferred = [
+              "gemini-flash-latest",
+              "gemini-flash-lite-latest",
+              "gemini-2.5-flash",
+              "gemini-2.5-flash-lite",
+              "gemini-1.5-flash",
+            ];
+            const sorted = [
+              ...preferred.filter((p) => supported.includes(p)),
+              ...supported.filter((s) => /flash/i.test(s) && !preferred.includes(s)),
+              ...supported,
+            ];
+            if (sorted.length) out = [...new Set(sorted)].slice(0, 8);
           }
         } catch (e) {}
         if (!out || !out.length)
           out = [
+            "gemini-flash-latest",
+            "gemini-flash-lite-latest",
             "gemini-2.5-flash",
             "gemini-2.5-flash-lite",
             "gemini-1.5-flash",
-            "gemini-2.0-flash",
             "gemini-1.5-pro",
           ];
         _gmodels = out;
@@ -10384,7 +10394,13 @@ ${caption || rawText}
             log("3️⃣ [Google Gemini] 텍스트 생성 API 검사...");
             try {
               // 먼저 사용 가능한 모델 목록 조회
-              let candidateModels = ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.0-flash", "gemini-2.5-flash", "gemini-1.5-flash"];
+              let candidateModels = [
+                "gemini-flash-latest",
+                "gemini-flash-lite-latest",
+                "gemini-2.5-flash",
+                "gemini-2.5-flash-lite",
+                "gemini-1.5-flash"
+              ];
               try {
                 const lr = await fetchTO(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(gKey)}&pageSize=100`, {}, 4000);
                 if (lr.ok) {
@@ -10394,14 +10410,19 @@ ${caption || rawText}
                     .map(m => String(m.name || "").replace("models/", ""));
                   log(`   ℹ️ 계정 활성 모델 목록 (${genModels.length}개): ${genModels.slice(0, 8).join(", ")}`);
                   if (genModels.length) {
-                    candidateModels = [...new Set([...genModels, ...candidateModels])];
+                    const topPriority = ["gemini-flash-latest", "gemini-flash-lite-latest", "gemini-2.5-flash"];
+                    const matchedTop = topPriority.filter(tp => genModels.includes(tp));
+                    const otherGen = genModels.filter(g => !matchedTop.includes(g));
+                    candidateModels = [...matchedTop, ...otherGen, ...candidateModels];
                   }
                 }
               } catch (_) {}
 
               let successModel = null;
               let lastErrMsg = "";
-              for (const cm of candidateModels) {
+              const triedModels = [];
+              for (const cm of [...new Set(candidateModels)]) {
+                triedModels.push(cm);
                 try {
                   const t0 = Date.now();
                   const r = await fetchTO(
@@ -10430,7 +10451,7 @@ ${caption || rawText}
               }
 
               if (!successModel) {
-                log(`   ❌ Gemini 모든 후보 모델 시도 실패: ${lastErrMsg}`);
+                log(`   ❌ Gemini 시도 모델 (${triedModels.join(", ")}) 실패: ${lastErrMsg}`);
               }
             } catch (e) {
               log(`   ❌ Gemini 진단 실패: ${e.message}`);
