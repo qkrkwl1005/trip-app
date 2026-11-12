@@ -8504,21 +8504,23 @@
         images = [],
         hint = "",
       }) {
-        let caption = String(rawText || "")
+        let captionText = String(rawText || "")
           .replace(/https?:\/\/[^\s]+/g, "")
           .trim();
+        let caption = captionText;
         let capStatus = "";
 
-        if (vidUrl && caption.length < 8) {
+        if (vidUrl && captionText.length < 8) {
           if (typeof window.__v8AiSetStep === "function") {
             window.__v8AiSetStep("1단계: 영상 메타데이터 및 캡션 추출 중...", 28);
           }
           toast("릴스/쇼츠 캡션 정보를 불러오는 중...");
           const fetched = await fetchVideoCaption(vidUrl);
           if (fetched && !isCodeGarbage(fetched) && fetched.length >= 8) {
-            caption = (caption + "\n" + fetched).trim();
+            captionText = (captionText + "\n" + fetched).trim();
+            caption = captionText;
             if ($("shareBox") && (!($("shareBox").value || "").replace(/https?:\/\/[^\s]+/g, "").trim())) {
-              $("shareBox").value = fetched;
+              $("shareBox").value = captionText;
             }
             if (typeof window.__v8AiSetStep === "function") {
               window.__v8AiSetStep("1단계: 캡션 추출 완료, AI 분석 준비 중...", 45);
@@ -8526,6 +8528,18 @@
           } else {
             capStatus =
               "🔒 인스타 차단으로 캡션을 가져오지 못했습니다. 캡션·고정댓글을 직접 붙여넣어 주세요";
+          }
+        }
+
+        if (!captionText || captionText.trim().length < 3) {
+          if (!images || images.length === 0) {
+            const manualInput = window.prompt("보안 정책으로 본문을 자동 추출하지 못했습니다.\n\n릴스 본문을 붙여넣거나 매장명을 입력해 주세요:");
+            if (!manualInput) throw new Error("취소되었습니다.");
+            captionText = manualInput;
+            caption = captionText;
+            if ($("shareBox")) {
+              $("shareBox").value = captionText;
+            }
           }
         }
 
@@ -9160,6 +9174,13 @@ ${caption || rawText}
             setTimeout(() => {
               openReelFallbackModal({ vidUrl, fallbackItem });
             }, 350);
+          }
+        } catch (e) {
+          if (e && e.message === "취소되었습니다.") {
+            toast("입력이 취소되었습니다.");
+          } else {
+            console.error("runAnalyzeShare error:", e);
+            toast(`오류: ${e?.message || e}`);
           }
         } finally {
           btn.disabled = false;
