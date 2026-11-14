@@ -2773,7 +2773,7 @@
       const TRIP_PENDING_CONFLICT_KEY = "TRIP_PENDING_CONFLICT";
       const TRIP_LAST_ROOM_KEY = "TRIP_LAST_ROOM";
       const TRIP_CREATING_ROOM_KEY = "TRIP_CREATING_ROOM";
-      const APP_VERSION = "v87";
+      const APP_VERSION = "v88";
       const TRANSIENT_NET_RE =
         /unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
       let _offlineFlushBusy = false,
@@ -8776,6 +8776,62 @@
         }
         return null;
       }
+
+      // ── 좌표 지역 검증: 캡션·주소에 적힌 도시와 20km 넘게 떨어진 결과(예: 교토 가게가 나가노로)는 거부하고
+      //    그 도시 범위 안에서만 다시 찾기. 끝내 못 찾으면 엉뚱한 핀 대신 좌표 없이 저장(나중에 '위치 다시 찾기')
+      const GEO_REGIONS = [
+        { re: /伊根|이네\s*(?:후나야|만|쵸|초|정|숙소)|ine\s*(?:funaya|bay|cho)/i, lat: 35.676, lng: 135.287, r: 15 },
+        { re: /嵐山|아라시야마|arashiyama/i, lat: 35.009, lng: 135.667, r: 8 },
+        { re: /京都|교토|kyoto/i, lat: 35.0116, lng: 135.7681, r: 22 },
+        { re: /大阪|오사카|osaka|難波|난바|namba|梅田|우메다|umeda|道頓堀|도톤보리|dotonbori|心斎橋|신사이바시|shinsaibashi|天王寺|덴노지|新世界|신세카이/i, lat: 34.6937, lng: 135.5023, r: 25 },
+        { re: /奈良|nara\b|나라\s*(?:공원|역|시|현|사슴)/i, lat: 34.685, lng: 135.805, r: 20 },
+        { re: /神戸|고베|kobe/i, lat: 34.69, lng: 135.196, r: 20 },
+      ];
+      function geoExpectedRegion(cand, hint) {
+        const addr = `${(cand && cand.address) || ""}`;
+        const rest = `${(cand && cand.name) || ""} ${(cand && cand.localName) || ""} ${hint || ""}`;
+        return GEO_REGIONS.find((g) => g.re.test(addr)) || GEO_REGIONS.find((g) => g.re.test(rest)) || null;
+      }
+      function geoKm(a, b, c, d) {
+        const R = 6371, toR = Math.PI / 180;
+        const x = Math.sin(((c - a) * toR) / 2) ** 2 + Math.cos(a * toR) * Math.cos(c * toR) * Math.sin(((d - b) * toR) / 2) ** 2;
+        return 2 * R * Math.asin(Math.sqrt(x));
+      }
+      async function geocodeWithinRegion(cand, region) {
+        const dLat = region.r / 111, dLng = region.r / 91;
+        const box = { xmin: region.lng - dLng, ymin: region.lat - dLat, xmax: region.lng + dLng, ymax: region.lat + dLat };
+        const qs = [...new Set([cand.localName, String(cand.name || "").replace(/\([^)]*\)/g, " ").trim(), cand.address].filter((q) => q && String(q).trim().length >= 2))].slice(0, 3);
+        for (const q of qs) {
+          try {
+            const r = await fetchTO(`https://nominatim.openstreetmap.org/search?format=json&limit=3&countrycodes=jp&bounded=1&viewbox=${box.xmin},${box.ymax},${box.xmax},${box.ymin}&q=${encodeURIComponent(q)}`, {}, 4000);
+            const d = await r.json();
+            const hit = Array.isArray(d) && d.find((x) => geoKm(region.lat, region.lng, Number(x.lat), Number(x.lon)) <= region.r);
+            if (hit) return { lat: Number(hit.lat), lng: Number(hit.lon), formatted: hit.display_name };
+          } catch (_) {}
+          try {
+            const params = new URLSearchParams({ f: "json", singleLine: q, maxLocations: "3", sourceCountry: "JPN", searchExtent: `${box.xmin},${box.ymin},${box.xmax},${box.ymax}` });
+            const r = await fetchTO(`https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?${params}`, {}, 4000);
+            const d = await r.json();
+            const hit = (d?.candidates || []).find((c) => c?.score >= 75 && c?.location && geoKm(region.lat, region.lng, c.location.y, c.location.x) <= region.r && c?.attributes?.Addr_type !== "Locality");
+            if (hit) return { lat: Number(hit.location.y), lng: Number(hit.location.x), formatted: hit.address || q };
+          } catch (_) {}
+        }
+        return null;
+      }
+      (function guardGeocodeRegion() {
+        const orig = geocodePlace;
+        geocodePlace = async function (cand, hint = "", ignoreCache = false) {
+          const res = await orig.apply(this, arguments);
+          const region = cand ? geoExpectedRegion(cand, hint) : null;
+          if (!region || !res || !Number.isFinite(Number(res.lat))) return res;
+          if (geoKm(region.lat, region.lng, Number(res.lat), Number(res.lng)) <= region.r) return res;
+          const fixed = await geocodeWithinRegion(cand, region);
+          if (fixed) return fixed;
+          const aiLat = Number(cand.lat), aiLng = Number(cand.lng);
+          if (Number.isFinite(aiLat) && Number.isFinite(aiLng) && geoKm(region.lat, region.lng, aiLat, aiLng) <= region.r) return { lat: aiLat, lng: aiLng };
+          return null;
+        };
+      })();
 
       function requestManualCaptionInput() {
         return new Promise((resolve, reject) => {
@@ -23874,7 +23930,7 @@ ${JSON.stringify(payload, null, 2)}
   }
 
   // 8. 서비스 워커 등록 (즉시 갱신)
-  const SW_QUERY = './sw.js?v=v20261115_091000';
+  const SW_QUERY = './sw.js?v=v20261115_100000';
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', async function() {
       try {
