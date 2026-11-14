@@ -5254,9 +5254,9 @@
                 add(raw);
               }
             }
-            // 캐시 없으면 백그라운드에서 바로 고해상도 인트로 커버 조회
-            if (!cached) {
-              setTimeout(() => hydrateInstagramThumb(i), 30);
+            // 캐시 없으면 중복 방지 큐를 통해 백그라운드에서 순차 조회
+            if (!cached && window.__queueIgThumb) {
+              window.__queueIgThumb(i);
             }
           }
           if (meta && meta.platform === "tt") {
@@ -5544,7 +5544,7 @@
               <div data-lcat="SHOP"><span class="ms">shopping_bag</span>쇼핑 <span id="cnt-SHOP">0</span></div>
             </div>
             <div style="display:flex;gap:8px;align-items:center">
-              <div class="search-row"><input type="text" id="q-LIST" placeholder="이름·주소·메뉴 검색..." oninput="renderListTab()"><button type="button" class="mb clear-search" data-act="clearSearch" data-cat="LIST" aria-label="검색어 지우기"><span class="ms">close</span></button></div>
+              <div class="search-row"><input type="text" id="q-LIST" placeholder="이름·주소·메뉴 검색..." oninput="window.__debouncedRenderList ? window.__debouncedRenderList() : renderListTab()"><button type="button" class="mb clear-search" data-act="clearSearch" data-cat="LIST" aria-label="검색어 지우기"><span class="ms">close</span></button></div>
               <button class="mb" data-act="nearSort" style="flex:none"><span class="ms">near_me</span>가까운순</button>
               <button class="mb" data-act="toggleEdit" data-cat="LIST" style="flex:none" title="선택 삭제"><span class="ms">checklist</span>선택</button>
             </div>
@@ -6622,9 +6622,9 @@
         try {
           if (navigator.onLine && hasOfflineQueue())
             flushOfflineQueue().catch(() => {});
-          pollSharedRoomNow();
+          if (!sharedUnsubscribe) pollSharedRoomNow();
         } catch (e) {}
-      }, 8000);
+      }, 20000);
       // === 3/3 시작: 2/3 코드의 setInterval(..., 8000); 바로 아래에 이어 붙이세요 ===
       function normalizeOcrAddr(s) {
         return String(s || "")
@@ -7158,7 +7158,6 @@
                 if (idx === 0 && place.name) i.name = place.name;
                 syncEditedPlace();
                 refreshGroupedPlacesSummary(i);
-                render();
                 persist();
               }
             };
@@ -9602,7 +9601,22 @@ ${caption || rawText}
           const it = items.find((x) => x.id === id);
           if (it) {
             it.star = !it.star;
-            save();
+            it.updatedAt = Date.now();
+            it._localTouch = Date.now();
+            actEl.classList.toggle("on", it.star);
+            const ms = actEl.querySelector(".ms");
+            if (ms) ms.classList.toggle("fill", it.star);
+            const row = actEl.closest(".item");
+            if (row) row.classList.toggle("starred", it.star);
+            const curF = listFilter[listCat] || "ALL";
+            if (curF === "STAR") {
+              save();
+            } else {
+              if (typeof pushLocalHistory === "function") pushLocalHistory();
+              persist();
+              clearTimeout(_drawT);
+              _drawT = setTimeout(() => { persistNow(); draw(); }, 150);
+            }
             toast(
               it.star
                 ? `⭐ '${it.name}' 중요 장소로 지정했어요`
@@ -9849,10 +9863,19 @@ ${caption || rawText}
           if (it) {
             const prevDone = it.done;
             it.done = actEl.checked;
+            it.updatedAt = Date.now();
+            it._localTouch = Date.now();
             const row = actEl.closest(".item");
             if (row) row.classList.toggle("done", it.done);
-            persist();
-            save();
+            const curF = listFilter[listCat] || "ALL";
+            if (curF === "TODO" || curF === "DONE") {
+              save();
+            } else {
+              if (typeof pushLocalHistory === "function") pushLocalHistory();
+              persist();
+              clearTimeout(_drawT);
+              _drawT = setTimeout(() => { persistNow(); draw(); }, 150);
+            }
             if (actEl.checked)
               toast(`✅ '${it.name}' 방문 완료!`, () => {
                 it.done = prevDone;
@@ -9868,7 +9891,7 @@ ${caption || rawText}
         if (act === "open") {
           cur = id;
           const it = items.find((x) => x.id === id);
-          view = it && getVidUrlStr(it.vid) ? "video" : "photo";
+          view = "photo";
           if (it && it.lat && it.lng) focusMapOnItem(it);
           showSheet();
           return;
@@ -23454,5 +23477,252 @@ ${JSON.stringify(payload, null, 2)}
 })();
 </script>
 <!-- [END_TRIP_THUMB_SAFE_FIX] -->
+<!-- === V74_UX_MOTION_PATCH_START === -->
+<style id="v74-ux-motion-style">
+  html, body {
+    overscroll-behavior: none;
+  }
+  .tab-content, .sh, #mapStrip, .lchips, .chip-row {
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* 대량 리스트 렌더링 가속 (화면에 보이는 카드만 레이아웃 계산) */
+  #list-LIST > .item {
+    content-visibility: auto;
+    contain-intrinsic-size: 0 104px;
+  }
+  /* 바텀 시트 열기/닫기 부드러운 모션 및 스와이프 핸들 */
+  #sheet {
+    transition: opacity 0.22s ease;
+    opacity: 0;
+  }
+  #sheet.on {
+    opacity: 1;
+  }
+  #sheet.closing {
+    opacity: 0 !important;
+    pointer-events: none;
+  }
+  #sheet .sh {
+    transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform;
+  }
+  #sheet.closing .sh {
+    transform: translateY(105%) !important;
+  }
+  /* 썸네일 이미지 부드러운 페이드인 */
+  .pic img, .pinCard img {
+    opacity: 0;
+    transition: opacity 0.22s ease;
+  }
+  .pic img.v74-loaded, .pinCard img.v74-loaded {
+    opacity: 1;
+  }
+</style>
+<script id="v74-ux-motion-script">
+(function() {
+  // 1. 누락 위험 함수(isAvatarOrBadUrl) 안전 폴백 정의
+  if (typeof window.isAvatarOrBadUrl !== "function") {
+    window.isAvatarOrBadUrl = function(url) {
+      const s = String(url || "").toLowerCase();
+      if (!s || !/^https?:\/\//.test(s)) return true;
+      return /s150x150|s320x320|profile_pic|avatar|rsrc\.php|static\.cdninstagram\.com/.test(s);
+    };
+  }
+
+  // 2. 이미지 로드 완료 시 부드러운 페이드인 처리 (캐시된 이미지는 즉시 표시)
+  function markImgLoaded(img) {
+    if (!img || img.classList.contains("v74-loaded")) return;
+    if (img.complete && img.naturalWidth > 0) {
+      img.classList.add("v74-loaded");
+    } else {
+      img.addEventListener("load", function() {
+        img.classList.add("v74-loaded");
+      }, { once: true });
+    }
+  }
+  document.addEventListener("load", function(e) {
+    if (e.target && e.target.tagName === "IMG") {
+      e.target.classList.add("v74-loaded");
+    }
+  }, true);
+
+  const imgObserver = new MutationObserver(function(mutations) {
+    for (const m of mutations) {
+      for (const node of m.addedNodes) {
+        if (node.nodeType !== 1) continue;
+        if (node.tagName === "IMG") markImgLoaded(node);
+        else if (node.querySelectorAll) {
+          node.querySelectorAll("img").forEach(markImgLoaded);
+        }
+      }
+    }
+  });
+  imgObserver.observe(document.body, { childList: true, subtree: true });
+  document.querySelectorAll("img").forEach(markImgLoaded);
+
+  // 3. 검색창 디바운스 헬퍼 (한글 자모 분리 및 타이핑 끊김 방지)
+  let _searchDebounceTimer = null;
+  window.__debouncedRenderList = function() {
+    clearTimeout(_searchDebounceTimer);
+    _searchDebounceTimer = setTimeout(function() {
+      if (typeof renderListTab === "function") renderListTab();
+    }, 160);
+  };
+
+  // 4. 인스타/틱톡 썸네일 추출 동시성 제한 큐 (최대 2개 병렬, 중복 요청 원천 차단)
+  const _thumbQueue = [];
+  const _thumbAttempted = new Set();
+  let _thumbActive = 0;
+
+  function pumpThumbQueue() {
+    if (_thumbActive >= 2 || !_thumbQueue.length) return;
+    const nextItem = _thumbQueue.shift();
+    if (!nextItem) return;
+    _thumbActive++;
+    Promise.resolve(
+      typeof hydrateInstagramThumb === "function" ? hydrateInstagramThumb(nextItem) : false
+    ).then(function(changed) {
+      if (changed) {
+        if (typeof renderListTab === "function") renderListTab();
+        if (typeof draw === "function") draw(true);
+      }
+    }).catch(function() {}).finally(function() {
+      _thumbActive--;
+      setTimeout(pumpThumbQueue, 80);
+    });
+  }
+
+  window.__queueIgThumb = function(item) {
+    if (!item || !item.vid) return;
+    const key = String(item.id || item.vid);
+    if (_thumbAttempted.has(key)) return;
+    _thumbAttempted.add(key);
+    _thumbQueue.push(item);
+    setTimeout(pumpThumbQueue, 40);
+  };
+
+  // 5. 탭 전환 및 리스트 재렌더링 시 스크롤 위치 100% 보존
+  const _savedScrolls = { "tab-add": 0, "tab-list": 0, "tab-set": 0 };
+
+  document.querySelectorAll(".tab-content").forEach(function(sec) {
+    sec.addEventListener("scroll", function() {
+      if (sec.classList.contains("active")) {
+        _savedScrolls[sec.id] = sec.scrollTop;
+      }
+    }, { passive: true });
+  });
+
+  if (typeof window.renderListTab === "function" && !window.__v74RenderWrapped) {
+    window.__v74RenderWrapped = true;
+    const _origRenderListTab = window.renderListTab;
+    let _prevCat = typeof listCat !== "undefined" ? listCat : "ALL";
+    let _prevFilter = "ALL";
+    window.renderListTab = function() {
+      const listSec = document.getElementById("tab-list");
+      const isListActive = listSec && listSec.classList.contains("active");
+      const curCatNow = typeof listCat !== "undefined" ? listCat : "ALL";
+      const curFilterNow = (typeof listFilter !== "undefined" && listFilter[curCatNow]) ? listFilter[curCatNow] : "ALL";
+      const filterChanged = (curCatNow !== _prevCat) || (curFilterNow !== _prevFilter);
+      const savedTop = isListActive ? listSec.scrollTop : (_savedScrolls["tab-list"] || 0);
+
+      _origRenderListTab.apply(this, arguments);
+
+      _prevCat = curCatNow;
+      _prevFilter = curFilterNow;
+      if (listSec && isListActive) {
+        requestAnimationFrame(function() {
+          listSec.scrollTop = filterChanged ? 0 : savedTop;
+        });
+      }
+    };
+  }
+
+  if (typeof window.tab === "function" && !window.__v74TabWrapped) {
+    window.__v74TabWrapped = true;
+    const _origTab = window.tab;
+    window.tab = function(k) {
+      document.querySelectorAll(".tab-content.active").forEach(function(sec) {
+        _savedScrolls[sec.id] = sec.scrollTop;
+      });
+      _origTab.apply(this, arguments);
+      const targetSec = document.getElementById("tab-" + k);
+      if (targetSec && _savedScrolls["tab-" + k] != null) {
+        const restoreY = _savedScrolls["tab-" + k];
+        requestAnimationFrame(function() {
+          targetSec.scrollTop = restoreY;
+        });
+      }
+    };
+  }
+
+  // 6. 바텀 시트 부드러운 닫기 애니메이션 + 배경 터치 닫기 + 아래로 스와이프 닫기
+  const sheetEl = document.getElementById("sheet");
+  const sbodyEl = document.getElementById("sbody");
+
+  if (typeof window.closeSheet === "function" && !window.__v74CloseSheetWrapped) {
+    window.__v74CloseSheetWrapped = true;
+    window.closeSheet = function() {
+      if (!sheetEl || !sheetEl.classList.contains("on")) {
+        cur = null;
+        return;
+      }
+      sheetEl.classList.add("closing");
+      setTimeout(function() {
+        sheetEl.classList.remove("on", "closing");
+        if (sbodyEl) sbodyEl.style.transform = "";
+        cur = null;
+      }, 220);
+    };
+  }
+
+  if (sheetEl && sbodyEl) {
+    // 시트 바깥 어두운 배경 클릭 시 닫기
+    sheetEl.addEventListener("click", function(e) {
+      if (e.target === sheetEl) {
+        window.closeSheet();
+      }
+    });
+
+    // 시트 상단에서 아래로 쓸어내려 닫기 (Swipe-to-close)
+    let startY = 0, currentY = 0, dragging = false;
+    sbodyEl.addEventListener("touchstart", function(e) {
+      if (sbodyEl.scrollTop <= 0 && e.touches.length === 1) {
+        startY = e.touches[0].clientY;
+        currentY = startY;
+        dragging = true;
+        sbodyEl.style.transition = "none";
+      } else {
+        dragging = false;
+      }
+    }, { passive: true });
+
+    sbodyEl.addEventListener("touchmove", function(e) {
+      if (!dragging) return;
+      currentY = e.touches[0].clientY;
+      const dy = currentY - startY;
+      if (dy > 0 && sbodyEl.scrollTop <= 0) {
+        sbodyEl.style.transform = "translateY(" + Math.min(dy * 0.85, 360) + "px)";
+      } else if (dy < 0) {
+        sbodyEl.style.transform = "";
+        dragging = false;
+      }
+    }, { passive: true });
+
+    sbodyEl.addEventListener("touchend", function() {
+      if (!dragging) return;
+      dragging = false;
+      sbodyEl.style.transition = "transform 0.22s cubic-bezier(0.22, 1, 0.36, 1)";
+      const dy = currentY - startY;
+      if (dy > 85) {
+        window.closeSheet();
+      } else {
+        sbodyEl.style.transform = "";
+      }
+    }, { passive: true });
+  }
+})();
+</script>
+<!-- === V74_UX_MOTION_PATCH_END === -->
 </body>
 </html>
