@@ -2773,7 +2773,7 @@
       const TRIP_PENDING_CONFLICT_KEY = "TRIP_PENDING_CONFLICT";
       const TRIP_LAST_ROOM_KEY = "TRIP_LAST_ROOM";
       const TRIP_CREATING_ROOM_KEY = "TRIP_CREATING_ROOM";
-      const APP_VERSION = "v85";
+      const APP_VERSION = "v86";
       const TRANSIENT_NET_RE =
         /unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
       let _offlineFlushBusy = false,
@@ -8228,6 +8228,10 @@
           info = "",
           postal = "";
         const addrParts = [];
+        // 한 줄에 '가게 이름 🍜 메뉴 1인 980엔'처럼 이름과 가격이 같이 있을 때 이름 후보
+        let nameFromPriceLine = "";
+        const EMOJI_RE = /[\p{Extended_Pictographic}\uFE0F\u200D]+/gu;
+        const MONEY_RE = /\d{1,3}(?:,\d{3})*\s*(?:엔|원|¥|₩)|[¥₩]\s*\d/;
 
         const zipM = norm.match(/(?:〒|T|\b)(\d{3}-\d{4})\b/);
         if (zipM) postal = zipM[1];
@@ -8293,7 +8297,10 @@
           ) {
             let v = cl.replace(/^(?:📍|📌|☕)\s*/u, "").trim();
             v = v.replace(/^\[|\]$/g, "").trim();
-            if (v) {
+            const looksLikeShopName = !/\d/.test(v) && !/[市区町村都道府県]|丁目|番地|-ku\b|-shi\b|ward|city/i.test(v);
+            if (v && !name && looksLikeShopName) {
+              name = v;
+            } else if (v) {
               if (isLikelyAddressLine(v) && !address) addrParts.push(v);
               else if (!name && !isLikelyAddressLine(v)) name = v;
               else if (isLikelyAddressLine(v)) addrParts.push(v);
@@ -8336,13 +8343,22 @@
             cl.startsWith("🍜") ||
             cl.startsWith("💴") ||
             cl.startsWith("💰") ||
-            /\d{1,3}(?:,\d{3})*\s*(?:엔|원|¥|₩)/.test(cl)
+            MONEY_RE.test(cl)
           ) {
             const v = cl.replace(/^(?:🥣|🍜|💴|💰)\s*/u, "").trim();
-            if (v && !price) price = v;
+            // 이모지·구분자로 나눠서 금액이 있는 부분만 가격으로, 나머지 앞부분은 이름 후보로
+            const segs = v
+              .split(/\s*(?:[\p{Extended_Pictographic}\uFE0F]+|\s[|·/]\s)\s*/u)
+              .map((x) => x.trim())
+              .filter(Boolean);
+            const moneySeg = segs.find((x) => MONEY_RE.test(x)) || v;
+            if (moneySeg && !price) price = moneySeg.replace(EMOJI_RE, "").trim();
+            const rest = segs.filter((x) => x !== moneySeg && !MONEY_RE.test(x));
+            if (!nameFromPriceLine && rest[0] && rest[0].length >= 2 && rest[0].length <= 40 && !isLikelyAddressLine(rest[0]))
+              nameFromPriceLine = rest[0];
             continue;
           }
-          if (isLikelyAddressLine(cl)) {
+          if (isLikelyAddressLine(cl) || (/[市区町村都道府県]/.test(cl) && /\d/.test(cl))) {
             addrParts.push(cl.replace(/^일본\s+/, ""));
             continue;
           }
@@ -8372,11 +8388,15 @@
           }
         }
 
+        if (!name && nameFromPriceLine) name = nameFromPriceLine;
         if (!name) {
           const candLine = lines.find(
             (l) =>
               !l.startsWith("http") &&
               !l.startsWith("#") &&
+              !MONEY_RE.test(l) &&
+              !/^(?:🏠|📮|🗺|🇯🇵)/u.test(l) &&
+              !(/[市区町村都道府県]/.test(l) && /\d/.test(l)) &&
               !/^다른\s*영상|@/i.test(l) &&
               !isLikelyAddressLine(l) &&
               l.length >= 2 &&
@@ -8405,6 +8425,10 @@
             category = "SHOP";
         }
 
+        // 이름 정리: 이모지 제거, '오사카 도톤보리 맛집 ○○' → '○○'
+        name = String(name || "").replace(EMOJI_RE, " ").replace(/\s{2,}/g, " ").trim();
+        const afterMatjip = name.match(/(?:^|\s)맛집\s+(.{2,})$/);
+        if (afterMatjip) name = afterMatjip[1].trim();
         const note = [price, info].filter(Boolean).join(" · ");
         return { name, address, price, info, note, postal, category };
       }
@@ -23834,7 +23858,7 @@ ${JSON.stringify(payload, null, 2)}
   }
 
   // 8. 서비스 워커 등록 (즉시 갱신)
-  const SW_QUERY = './sw.js?v=v20261115_080000';
+  const SW_QUERY = './sw.js?v=v20261115_083000';
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', async function() {
       try {
