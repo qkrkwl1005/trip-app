@@ -27,11 +27,7 @@
       content="black-translucent"
     />
     <meta name="theme-color" content="#080a0f" />
-    <meta
-      http-equiv="Cache-Control"
-      content="no-cache, no-store, must-revalidate"
-    />
-    <link rel="manifest" href="manifest.json" />
+        <link rel="manifest" href="manifest.json" />
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -2513,6 +2509,7 @@
           )
           .join("");
         el.style.display = "flex";
+        el.onclick = () => { tab("set"); };
       }
       function renderRoomSyncInfo() {
         const el = $("roomSyncInfo");
@@ -4369,7 +4366,7 @@
               setSharedRoomStatus(`공유 저장 실패: ${e.message}`, "error");
             }
           }
-        }, 180);
+        }, 1500);
       }
       function syncSharedSettings() {
         const user = window.firebase?.auth?.().currentUser;
@@ -5713,7 +5710,7 @@
 
       /* 지도 핀 팝업: '검색' 버튼을 '목록' 이동 버튼으로 교체 */
       function mapPinPlaceHtml(item, place, index) {
-        return `<div class="mapPinPlace"><strong>${index + 1}. ${esc(place.name || "장소")}</strong><div class="mapPinAddress">${esc(place.address || "주소 미입력")}</div><div class="mapPinActions"><a class="mb pr" href="${esc(getGMapLink(place))}" target="_blank" rel="noopener"><span class="ms">map</span>구글지도</a><button type="button" class="mb" data-act="jumpToList" data-id="${esc(item.id)}"><span class="ms">format_list_bulleted</span>목록</button><a class="mb" href="${esc(getGMapDirLink(place))}" target="_blank" rel="noopener"><span class="ms">directions</span>길찾기</a><button type="button" class="mb" data-act="openGroupedItem" data-id="${esc(item.id)}" data-place-idx="${index}"><span class="ms">movie</span>릴스에서 보기</button></div></div>`;
+        return `<div class="mapPinPlace"><strong>${index + 1}. ${esc(place.name || "장소")}</strong><div class="mapPinAddress">${esc(place.address || "주소 미입력")}</div><div class="mapPinActions"><a class="mb pr" href="${esc(getGMapLink(place))}" target="_top"><span class="ms">map</span>구글지도</a><button type="button" class="mb" data-act="jumpToList" data-id="${esc(item.id)}"><span class="ms">format_list_bulleted</span>목록</button><a class="mb" href="${esc(getGMapDirLink(place))}" target="_top"><span class="ms">directions</span>길찾기</a><button type="button" class="mb" data-act="openGroupedItem" data-id="${esc(item.id)}" data-place-idx="${index}"><span class="ms">movie</span>릴스에서 보기</button></div></div>`;
       }
       function mapPinPopupHtml(item, expanded = false) {
         const places = Array.isArray(item.places) ? item.places : [];
@@ -6409,7 +6406,7 @@
       </div>
       <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
         ${vAction}
-        <a class="mb" href="${esc(dirHref)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="padding:6px 13px;font-size:12px;min-height:36px"><span class="ms">explore</span>길찾기</a>
+        <a class="mb" href="${esc(dirHref)}" target="_top" onclick="event.stopPropagation()" style="padding:6px 13px;font-size:12px;min-height:36px"><span class="ms">explore</span>길찾기</a>
       </div>
     </div>
     <input type="checkbox" data-act="done" data-id="${i.id}"${i.done ? " checked" : ""} style="flex:none" aria-label="방문 완료 체크">
@@ -6775,7 +6772,7 @@
     ${subTitle ? `<div class="t-sub">${esc(subTitle)}</div>` : ""}
     <div class="t-ad">${esc(addr)}</div>
     <div style="display:flex;gap:10px;justify-content:center">
-      <a class="btn" href="${esc(getGMapDirLink(i))}" target="_blank" rel="noopener" style="text-decoration:none;flex:1"><span class="ms">explore</span>구글 길찾기 열기</a>
+      <a class="btn" href="${esc(getGMapDirLink(i))}" target="_top" style="text-decoration:none;flex:1"><span class="ms">explore</span>구글 길찾기 열기</a>
       <button type="button" class="btn g" onclick="$('taxiModal').classList.remove('show')" style="margin:0;flex:1;background:#e2e8f0;color:#0f172a;border:0"><span class="ms">close</span>화면 닫기</button>
     </div>
   `;
@@ -6910,7 +6907,7 @@
             <div class="ds" style="margin-top:3px">${esc(p.address || "주소 미입력")}</div>
             ${p.price || p.info ? `<div class="ds in" style="margin-top:3px">${esc([p.price, p.info].filter(Boolean).join(" · "))}</div>` : ""}
             <div style="display:flex;gap:6px;margin-top:9px;flex-wrap:wrap">
-              <a class="mb pr" href="${esc(getGMapDirLink(p))}" target="_blank" rel="noopener" style="padding:5px 11px;font-size:11.5px;min-height:34px"><span class="ms">explore</span>길찾기</a>
+              <a class="mb pr" href="${esc(getGMapDirLink(p))}" target="_top" style="padding:5px 11px;font-size:11.5px;min-height:34px"><span class="ms">explore</span>길찾기</a>
               ${p.address ? `<button type="button" class="mb" data-act="copySubAddr" data-idx="${idx}" style="padding:5px 11px;font-size:11.5px;min-height:34px"><span class="ms">content_copy</span>주소복사</button>` : ""}
               <button type="button" class="mb" data-act="focusSubPin" data-idx="${idx}" style="padding:5px 11px;font-size:11.5px;min-height:34px"><span class="ms">my_location</span>지도위치</button>
               <button type="button" class="mb" data-act="taxiSub" data-idx="${idx}" style="padding:5px 11px;font-size:11.5px;min-height:34px"><span class="ms">local_taxi</span>택시화면</button>
@@ -7027,10 +7024,10 @@
           <span class="ms fill" style="font-size:18px">play_circle</span>${esc(vLabel)} 보기
         </button>
       ` : ""}
-      <a class="btn" href="${esc(dirHref)}" target="_blank" rel="noopener" style="flex:1 1 100px;margin:0;min-height:42px;background:var(--pr);color:#fff;font-weight:900;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:5px;box-shadow:0 4px 12px rgba(37,99,235,0.25)">
+      <a class="btn" href="${esc(dirHref)}" target="_top" style="flex:1 1 100px;margin:0;min-height:42px;background:var(--pr);color:#fff;font-weight:900;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:5px;box-shadow:0 4px 12px rgba(37,99,235,0.25)">
         <span class="ms" style="font-size:17px">explore</span>길찾기
       </a>
-      <a class="btn g" href="${esc(gmapHref)}" target="_blank" rel="noopener" style="flex:1 1 90px;margin:0;min-height:42px;font-weight:800;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:5px">
+      <a class="btn g" href="${esc(gmapHref)}" target="_top" style="flex:1 1 90px;margin:0;min-height:42px;font-weight:800;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:5px">
         <span class="ms" style="font-size:17px">map</span>구글지도
       </a>
       <button type="button" class="btn g" data-act="openTaxi" style="flex:1 1 90px;margin:0;min-height:42px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:5px">
@@ -7469,7 +7466,7 @@
               const d = await r.json();
               if (!r.ok) {
                 lastErr = d?.error?.message || `HTTP ${r.status}`;
-                if (/api key not valid/i.test(lastErr))
+                if (r.status === 400 || r.status === 403 || r.status === 429 || /api key not valid|quota|exhausted|billing/i.test(lastErr))
                   throw new Error(lastErr);
                 continue;
               }
@@ -8384,7 +8381,7 @@
 
         const cacheKey = `v2|${localName}|${rawName}|${cleanAddr}|${hint}`.trim();
         if (!ignoreCache && cacheKey.length >= 6 && geoCache[cacheKey])
-          return geoCache[cacheKey];
+          return geoCache[cacheKey] === "FAIL" ? null : geoCache[cacheKey];
 
         const zipM = (cleanAddr + " " + (cand.postal || "")).match(
           /(\d{3})-?(\d{4})/
@@ -8589,6 +8586,10 @@
 
         if (aiLat && aiLng && isValidCoord(aiLat, aiLng)) {
           return remember({ lat: aiLat, lng: aiLng });
+        }
+        if (cacheKey.length >= 6) {
+          geoCache[cacheKey] = "FAIL";
+          saveGeoCache();
         }
         return null;
       }
@@ -9686,6 +9687,7 @@ ${caption || rawText}
           const it =
             items.find((x) => x.id === id) || items.find((x) => x.id === cur);
           if (!it) return;
+          if(!confirm("이 장소를 지도에서 숨길까요? (목록에는 남습니다)")) return;
           it.mapVisible = false;
           save();
           if (cur === it.id) showSheet();
@@ -9784,6 +9786,7 @@ ${caption || rawText}
             idx >= 0 &&
             idx < it.places.length
           ) {
+            if(!confirm("정말 이 장소 정보를 삭제할까요?")) return;
             it.places.splice(idx, 1);
             syncGroupedItem(it);
             save();
@@ -20802,28 +20805,28 @@ ${caption || rawText}
           <span class="ms">schedule</span>핵심 이동 구간 실시간 열차·버스 시간표
         </div>
         <div style="display:flex;flex-direction:column;gap:6px">
-          <a class="v46-train-btn" href="https://www.google.com/maps/dir/?api=1&origin=Kansai+Airport&destination=Kyoto+Station&travelmode=transit" target="_blank" rel="noopener">
+          <a class="v46-train-btn" href="https://www.google.com/maps/dir/?api=1&origin=Kansai+Airport&destination=Kyoto+Station&travelmode=transit" target="_top">
             <div>
               <span style="color:#10b981;font-weight:800">[1일차]</span> 간사이공항 ➔ 교토역 (특급 하루카)
               <div style="font-size:11px;color:var(--sub);margin-top:2px">약 75분 소요 · 배차 30분 간격</div>
             </div>
             <span class="ms" style="color:#3b82f6">open_in_new</span>
           </a>
-          <a class="v46-train-btn" href="https://www.google.com/maps/dir/?api=1&origin=Kyoto+Station&destination=Miyazu+Station&travelmode=transit" target="_blank" rel="noopener">
+          <a class="v46-train-btn" href="https://www.google.com/maps/dir/?api=1&origin=Kyoto+Station&destination=Miyazu+Station&travelmode=transit" target="_top">
             <div>
               <span style="color:#10b981;font-weight:800">[4일차]</span> 교토역 ➔ 미야즈역 (특급 하시다테)
               <div style="font-size:11px;color:var(--sub);margin-top:2px">직통 특급열차 · 전석 지정석 예약 필수</div>
             </div>
             <span class="ms" style="color:#3b82f6">open_in_new</span>
           </a>
-          <a class="v46-train-btn" href="https://www.google.com/maps/dir/?api=1&origin=Miyazu+Station&destination=Ine+Cafe&travelmode=transit" target="_blank" rel="noopener">
+          <a class="v46-train-btn" href="https://www.google.com/maps/dir/?api=1&origin=Miyazu+Station&destination=Ine+Cafe&travelmode=transit" target="_top">
             <div>
               <span style="color:#60a5fa;font-weight:800">[4일차]</span> 미야즈/아마노하시다테 ➔ 이네후나야 (단고 버스)
               <div style="font-size:11px;color:var(--sub);margin-top:2px">단고 2일 패스 기사님께 제시 후 무료 탑승</div>
             </div>
             <span class="ms" style="color:#3b82f6">open_in_new</span>
           </a>
-          <a class="v46-train-btn" href="https://www.google.com/maps/dir/?api=1&origin=Miyazu+Station&destination=Osaka+House+701&travelmode=transit" target="_blank" rel="noopener">
+          <a class="v46-train-btn" href="https://www.google.com/maps/dir/?api=1&origin=Miyazu+Station&destination=Osaka+House+701&travelmode=transit" target="_top">
             <div>
               <span style="color:#10b981;font-weight:800">[5일차]</span> 미야즈 숙소 ➔ 오사카 숙소 복귀
               <div style="font-size:11px;color:var(--sub);margin-top:2px">특급 하시다테 + 신쾌속 열차 환승</div>
@@ -23724,5 +23727,122 @@ ${JSON.stringify(payload, null, 2)}
 })();
 </script>
 <!-- === V74_UX_MOTION_PATCH_END === -->
+<!-- === UX_MOTION_AND_SYNC_START === -->
+<style>
+  html, body { overscroll-behavior: none; }
+  .tab-content, .sh, #mapStrip, .lchips, .chip-row { overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; }
+  .chip-row, #mapStrip { padding-right: 24px !important; } 
+  #sheet { transition: opacity 0.22s ease; opacity: 0; }
+  #sheet.on { opacity: 1; }
+  #sheet.closing { opacity: 0 !important; pointer-events: none; }
+  #sheet .sh { transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1); will-change: transform; }
+  #sheet.closing .sh { transform: translateY(105%) !important; }
+  #list-LIST > .item { content-visibility: auto; contain-intrinsic-size: 0 104px; }
+  .pic img, .pinCard img { opacity: 0; transition: opacity 0.22s ease; }
+  .pic img.v-loaded, .pinCard img.v-loaded { opacity: 1; }
+</style>
+<script>
+(function(){
+  function markLoaded(i) {
+    if(!i || i.classList.contains("v-loaded")) return;
+    if(i.complete && i.naturalWidth > 0) i.classList.add("v-loaded");
+    else i.addEventListener("load", () => i.classList.add("v-loaded"), {once:true});
+  }
+  document.addEventListener("load", e => { if(e.target && e.target.tagName === "IMG") e.target.classList.add("v-loaded"); }, true);
+  new MutationObserver(mList => mList.forEach(m => m.addedNodes.forEach(n => {
+    if(n.nodeType === 1) { if(n.tagName==="IMG") markLoaded(n); else n.querySelectorAll("img").forEach(markLoaded); }
+  }))).observe(document.body, {childList:true, subtree:true});
+  document.querySelectorAll("img").forEach(markLoaded);
+
+  let dTimer;
+  window.__debouncedRenderList = () => { clearTimeout(dTimer); dTimer = setTimeout(() => { if(typeof renderListTab==="function") renderListTab(); }, 160); };
+
+  const tQ = [], tAtt = new Set();
+  let tAct = 0;
+  function pumpQ() {
+    if(tAct >= 2 || !tQ.length) return;
+    const i = tQ.shift();
+    if(!i) return;
+    tAct++;
+    Promise.resolve(typeof hydrateInstagramThumb==="function"?hydrateInstagramThumb(i):false)
+    .then(ok => { if(ok) { if(typeof renderListTab==="function") renderListTab(); if(typeof draw==="function") draw(true); } })
+    .catch(()=>{ if(typeof renderListTab==="function") renderListTab(); }).finally(()=>{ tAct--; setTimeout(pumpQ, 80); });
+  }
+  window.__queueIgThumb = (i) => {
+    if(!i||!i.vid) return; const k = String(i.id||i.vid);
+    if(tAtt.has(k)) return; tAtt.add(k); tQ.push(i); setTimeout(pumpQ, 40);
+  };
+
+  const sY = {"tab-add":0, "tab-list":0, "tab-set":0};
+  document.querySelectorAll(".tab-content").forEach(sec => {
+    sec.addEventListener("scroll", () => { if(sec.classList.contains("active")) sY[sec.id] = sec.scrollTop; }, {passive:true});
+  });
+  if(typeof renderListTab==="function" && !window.__rw) {
+    window.__rw = true; const oR = renderListTab; let pC = "ALL", pF = "ALL";
+    window.renderListTab = function() {
+      const l = document.getElementById("tab-list"), a = l && l.classList.contains("active");
+      const c = typeof listCat!=="undefined"?listCat:"ALL", f = typeof listFilter!=="undefined"&&listFilter[c]?listFilter[c]:"ALL";
+      const ch = (c!==pC)||(f!==pF), s = a ? l.scrollTop : (sY["tab-list"]||0);
+      oR.apply(this, arguments); pC=c; pF=f;
+      if(l && a) requestAnimationFrame(() => l.scrollTop = ch ? 0 : s);
+    };
+  }
+  if(typeof tab==="function" && !window.__tw) {
+    window.__tw = true; const oT = tab;
+    window.tab = function(k) {
+      document.querySelectorAll(".tab-content.active").forEach(sec => sY[sec.id] = sec.scrollTop);
+      oT.apply(this, arguments);
+      const t = document.getElementById("tab-"+k);
+      if(t && sY["tab-"+k]!=null) requestAnimationFrame(() => t.scrollTop = sY["tab-"+k]);
+    };
+  }
+
+  const sh = document.getElementById("sheet"), sb = document.getElementById("sbody");
+  if(typeof closeSheet==="function" && !window.__cw) {
+    window.__cw = true;
+    window.closeSheet = function() {
+      if(!sh || !sh.classList.contains("on")) { cur = null; return; }
+      sh.classList.add("closing");
+      setTimeout(() => { sh.classList.remove("on", "closing"); if(sb) sb.style.transform = ""; cur = null; }, 220);
+    };
+  }
+  if(sh && sb) {
+    sh.addEventListener("click", e => { if(e.target===sh) closeSheet(); });
+    let st=0, cy=0, dg=false;
+    sb.addEventListener("touchstart", e => {
+      if(sb.scrollTop<=0 && e.touches.length===1) { st=e.touches[0].clientY; cy=st; dg=true; sb.style.transition="none"; }
+      else dg=false;
+    }, {passive:true});
+    sb.addEventListener("touchmove", e => {
+      if(!dg) return; cy = e.touches[0].clientY; const dy = cy-st;
+      if(dy>0 && sb.scrollTop<=0) sb.style.transform="translateY("+Math.min(dy*0.85, 360)+"px)";
+      else if(dy<0) { sb.style.transform=""; dg=false; }
+    }, {passive:true});
+    sb.addEventListener("touchend", () => {
+      if(!dg) return; dg=false; sb.style.transition="transform 0.22s cubic-bezier(0.22, 1, 0.36, 1)";
+      if((cy-st)>85) closeSheet(); else sb.style.transform="";
+    }, {passive:true});
+    
+    sb.addEventListener("focusin", (e) => {
+      if(e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") {
+        setTimeout(() => { e.target.scrollIntoView({ behavior: "smooth", block: "center" }); }, 300);
+      }
+    });
+  }
+
+  if(typeof openMapPinPopup === "function" && !window.__mw) {
+    window.__mw = true;
+    const oldMapPopup = window.openMapPinPopup;
+    window.openMapPinPopup = function(item, expanded) {
+      oldMapPopup.apply(this, arguments);
+      if (item && item._pinKey) {
+        const stripCard = document.querySelector(`.stripCard[data-pin-key="${item._pinKey}"]`);
+        if (stripCard) stripCard.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      }
+    };
+  }
+})();
+</script>
+<!-- === UX_MOTION_AND_SYNC_END === -->
 </body>
 </html>
