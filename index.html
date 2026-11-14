@@ -71,23 +71,23 @@
         --r-pill: 999px;
       }
       [data-theme="dark"] {
-        --bg: #080a0f;
-        --s: #12151e;
-        --s2: #181c27;
-        --s3: #222836;
-        --bd: rgba(255, 255, 255, 0.08);
-        --bd2: rgba(255, 255, 255, 0.18);
-        --tx: #f8fafc;
-        --sub: #a8b3cf;
-        --pr: #3b82f6;
-        --dg: #f87171;
-        --ok: #34d399;
-        --PLACE: #60a5fa;
-        --CAFE: #f472b6;
-        --FOOD: #fbbf24;
-        --SHOP: #a78bfa;
-        --pr-soft: rgba(59, 130, 246, 0.18);
-        --sh-card: 0 8px 28px rgba(0, 0, 0, 0.45);
+        --bg: #000000; /* True Black */
+        --s: #1C1C1E; /* iOS System Gray 6 */
+        --s2: #2C2C2E; /* iOS System Gray 5 */
+        --s3: #3A3A3C; /* iOS System Gray 4 */
+        --bd: rgba(255, 255, 255, 0.08); /* 초미세 보더 */
+        --bd2: rgba(255, 255, 255, 0.15);
+        --tx: #F2F2F7; /* 편안한 오프화이트 */
+        --sub: #8E8E93; /* iOS System Gray 1 */
+        --pr: #0A84FF; /* iOS System Blue */
+        --dg: #FF453A; /* iOS System Red */
+        --ok: #32D74B; /* iOS System Green */
+        --PLACE: #64D2FF;
+        --CAFE: #FF6482;
+        --FOOD: #FF9F0A;
+        --SHOP: #BF5AF2;
+        --pr-soft: rgba(10, 132, 255, 0.15);
+        --sh-card: 0 8px 32px rgba(0, 0, 0, 0.6);
       }
       * {
         box-sizing: border-box;
@@ -759,7 +759,7 @@
         padding: 10px 16px;
         border: 1px solid var(--bd2);
         border-radius: var(--r-pill);
-        background: rgba(18, 21, 30, 0.9);
+        background: rgba(28, 28, 30, 0.75);
         backdrop-filter: blur(14px);
         -webkit-backdrop-filter: blur(14px);
         color: var(--tx);
@@ -889,9 +889,9 @@
         padding: 7px 14px;
         border-radius: var(--r-pill);
         border: 1px solid var(--bd2);
-        background: rgba(18, 21, 30, 0.9);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
+        background: rgba(28, 28, 30, 0.75);
+        backdrop-filter: blur(16px) saturate(180%);
+        -webkit-backdrop-filter: blur(16px) saturate(180%);
         color: var(--tx);
         font-family: inherit;
         font-size: 12.5px;
@@ -1245,7 +1245,7 @@
         position: fixed;
         inset: 0;
         z-index: 220;
-        background: rgba(5, 6, 9, 0.74);
+        background: rgba(0, 0, 0, 0.65);
         backdrop-filter: blur(8px);
         -webkit-backdrop-filter: blur(8px);
         display: none;
@@ -1420,9 +1420,9 @@
           border: 1px solid var(--bd2);
           border-radius: 24px;
           padding: 6px;
-          background: rgba(18, 21, 30, 0.9);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
+          background: rgba(28, 28, 30, 0.65); /* 투명도 높임 */
+          backdrop-filter: blur(25px) saturate(180%);
+          -webkit-backdrop-filter: blur(25px) saturate(180%);
           box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55);
         }
         [data-theme="light"] #nav {
@@ -1492,6 +1492,12 @@
           bottom: calc(98px + env(safe-area-inset-bottom));
         }
       }
+    
+      [data-theme="dark"] .pic img, 
+      [data-theme="dark"] .pinCard img {
+        filter: brightness(0.85) contrast(1.05); /* 눈부심 방지 틴트 효과 */
+      }
+
     </style>
   
     
@@ -14304,7 +14310,7 @@ ${caption || rawText}
     position: fixed;
     inset: 0;
     z-index: 230;
-    background: rgba(5, 6, 9, 0.74);
+    background: rgba(0, 0, 0, 0.65);
     backdrop-filter: blur(8px);
     display: none;
     align-items: flex-end;
@@ -18944,8 +18950,8 @@ ${caption || rawText}
     font-size: 12.5px;
     font-weight: 800;
     cursor: pointer;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
   }
   [data-theme="light"] .v41-sd-item {
     background: rgba(255, 255, 255, 0.96);
