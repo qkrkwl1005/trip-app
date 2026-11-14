@@ -2773,7 +2773,7 @@
       const TRIP_PENDING_CONFLICT_KEY = "TRIP_PENDING_CONFLICT";
       const TRIP_LAST_ROOM_KEY = "TRIP_LAST_ROOM";
       const TRIP_CREATING_ROOM_KEY = "TRIP_CREATING_ROOM";
-      const APP_VERSION = "v84";
+      const APP_VERSION = "v85";
       const TRANSIENT_NET_RE =
         /unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
       let _offlineFlushBusy = false,
@@ -4192,7 +4192,7 @@
 
         for (const rem of remoteList) {
           if (!rem || !rem.id) continue;
-          if (deletedMap[rem.id] && now - deletedMap[rem.id] < 120000) continue;
+          if (deletedMap[rem.id] && now - deletedMap[rem.id] < 600000) continue;
           seenIds.add(rem.id);
 
           const loc = localMap.get(rem.id);
@@ -4234,9 +4234,13 @@
         }
 
         // 방금 로컬에서 추가·수정한 항목(30초 이내) 또는 현재 열린 항목이 원격 스냅샷에 아직 없으면 보존
+        // 단, 서버에 있던 항목이 사라진 것은 다른 사람이 삭제한 것 → 되살리지 않음
+        // 직전에 서버에서 실제로 받은 목록 기준 (병합된 목록엔 아직 안 올라간 새 장소가 섞여 있어 쓰면 안 됨)
+        const serverHad = window.__serverIds instanceof Set ? window.__serverIds : new Set();
         for (const loc of localList) {
           if (!loc || !loc.id || seenIds.has(loc.id)) continue;
           if (deletedMap[loc.id]) continue;
+          if (serverHad.has(loc.id) && !(activeEditId && loc.id === activeEditId)) continue;
           const touchAge = now - Number(loc._localTouch || loc.updatedAt || 0);
           if ((activeEditId && loc.id === activeEditId) || touchAge < 30000) {
             merged.unshift(loc);
@@ -15868,7 +15872,10 @@ ${caption || rawText}
     }
 
     const infoPane = sbody.querySelector('.ux-stab-pane[data-pane="info"]') || sbody;
-    const viewerDetails = infoPane.querySelector("details.acc");
+    // 편집 폼(이름·주소·메모·삭제)이 들어 있는 블록은 절대 도구 메뉴로 바꾸지 않음
+    // (예전엔 첫 번째 접이식 블록을 무조건 바꿔서 편집 폼과 삭제 버튼이 사라졌음)
+    const viewerDetails = Array.from(infoPane.querySelectorAll("details.acc"))
+      .find((d) => !d.querySelector('#sh-note, [data-act="del"], #editAddressList'));
     if (!viewerDetails || document.getElementById("v33ToolWrap")) return;
 
     const btns = Array.from(viewerDetails.querySelectorAll("button.mb"));
@@ -23827,7 +23834,7 @@ ${JSON.stringify(payload, null, 2)}
   }
 
   // 8. 서비스 워커 등록 (즉시 갱신)
-  const SW_QUERY = './sw.js?v=v20261115_073000';
+  const SW_QUERY = './sw.js?v=v20261115_080000';
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', async function() {
       try {
@@ -24533,6 +24540,14 @@ ${JSON.stringify(payload, null, 2)}
     const now = Date.now();
     const name = myName();
     const uid = myUid();
+    // 삭제 기억: 저장 직전에 사라진 장소는 동기화 병합이 되살리지 않도록 표시
+    // (기존 삭제 버튼은 이 표시를 안 해서, 서버 반영 전에 들어온 동기화가 삭제한 장소를 되살렸음)
+    const nowIds = new Set(itemsArr().map((it) => String(it && it.id)));
+    window.__deletedItemIds = window.__deletedItemIds || {};
+    seen.forEach((_, id) => {
+      if (!nowIds.has(id)) window.__deletedItemIds[id] = now;
+    });
+    nowIds.forEach((id) => { if (window.__deletedItemIds[id]) delete window.__deletedItemIds[id]; });
     itemsArr().forEach((it) => {
       if (!it || !it.id) return;
       const id = String(it.id);
@@ -24562,8 +24577,11 @@ ${JSON.stringify(payload, null, 2)}
   function hookRemote() {
     const orig = window.applyRemoteRoomSnapshot;
     if (typeof orig !== "function" || orig.__v79) return;
-    window.applyRemoteRoomSnapshot = Object.assign(function () {
+    window.applyRemoteRoomSnapshot = Object.assign(function (data) {
       const r = orig.apply(this, arguments);
+      try {
+        if (data && Array.isArray(data.items)) window.__serverIds = new Set(data.items.map((x) => x && String(x.id)));
+      } catch (_) {}
       try { snapshotSeen(); } catch (_) {}
       scheduleDecorate();
       return r;
@@ -24679,6 +24697,13 @@ ${JSON.stringify(payload, null, 2)}
         let block = chip;
         while (block && block.parentElement && block.parentElement.dataset.pane !== "manage") block = block.parentElement;
         if (block && block.parentElement) plan.appendChild(block);
+      }
+      // 편집 폼(이름·주소·메모·영상 링크·삭제)은 항상 '관리·수정' 탭에 펼쳐서
+      const manage = sbody.querySelector('.ux-stab-pane[data-pane="manage"]');
+      const editForm = sbody.querySelector("#sh-note")?.closest("details.acc");
+      if (manage && editForm && editForm.parentElement !== manage) {
+        manage.appendChild(editForm);
+        editForm.open = true;
       }
       const hasVid = Boolean(plan.querySelector("#sh-vid"));
       const label = hasVid ? "일정·영상" : "일정";
