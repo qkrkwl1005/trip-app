@@ -1,10 +1,8 @@
-const SW_VERSION = 'v20261115_130000';
+const SW_VERSION = 'v20261115_150000';
 const APP_CACHE = 'trip-app-' + SW_VERSION;
 
-// 사진은 서비스워커가 저장하지 않는다.
-// 예전에 사진(교차 출처 opaque 응답)을 여기 저장했는데, 아이폰 Safari에서 주소가
-// https://wsrv.nl/?url=... 처럼 '?' 앞이 같은 사진들이 서로 섞여 목록 전체가 같은 사진으로 보였음.
-// 사진은 브라우저 기본 캐시(wsrv·ytimg가 1년 보관 헤더를 줌)가 대신 보관한다.
+// 서비스워커는 앱 화면(같은 사이트 페이지 이동)만 다룬다. 사진은 건드리지 않고
+// 브라우저 기본 캐시(wsrv·ytimg가 1년 보관 헤더를 줌)가 보관한다.
 
 self.addEventListener('install', () => {
   self.skipWaiting();
@@ -26,18 +24,21 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
 
-  // HTML 문서만 처리: 네트워크가 2.5초 안에 응답하면 최신 버전, 느리면(로밍·지하철) 저장된 버전을
-  // 바로 열고, 받아온 최신 버전은 다음 실행을 위해 저장
-  if (
-    request.mode === 'navigate' ||
-    url.pathname.endsWith('/') ||
-    url.pathname.endsWith('/index.html')
-  ) {
+  // 우리 앱 화면(같은 사이트의 페이지 이동)만 처리.
+  // ⚠️ 예전엔 '경로가 /로 끝나면'도 화면으로 봤는데, 사진 주소 https://wsrv.nl/?url=... 의 경로도 '/'라서
+  //    사진을 index.html로 저장하고 2.5초 넘으면 그 사진을 대신 돌려줘 → 목록 카드들이 같은 사진으로 보였음.
+  const isAppPage =
+    url.origin === self.location.origin &&
+    (request.mode === 'navigate' || request.destination === 'document');
+  if (isAppPage) {
+    // 네트워크가 2.5초 안에 응답하면 최신 버전, 느리면(로밍·지하철) 저장된 버전을 바로 열고
+    // 받아온 최신 버전은 다음 실행을 위해 저장 (실제 HTML일 때만)
     event.respondWith(
       (async () => {
         const cache = await caches.open(APP_CACHE);
         const network = fetch(request, { cache: 'no-store' }).then((resp) => {
-          if (resp && resp.ok) {
+          const isHtml = /text\/html/i.test((resp && resp.headers.get('content-type')) || '');
+          if (resp && resp.ok && isHtml) {
             const copy = resp.clone();
             event.waitUntil(cache.put('./index.html', copy).catch(() => {}));
           }
