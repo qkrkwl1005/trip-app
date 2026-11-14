@@ -2773,7 +2773,7 @@
       const TRIP_PENDING_CONFLICT_KEY = "TRIP_PENDING_CONFLICT";
       const TRIP_LAST_ROOM_KEY = "TRIP_LAST_ROOM";
       const TRIP_CREATING_ROOM_KEY = "TRIP_CREATING_ROOM";
-      const APP_VERSION = "v90";
+      const APP_VERSION = "v91";
       const TRANSIENT_NET_RE =
         /unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
       let _offlineFlushBusy = false,
@@ -5450,8 +5450,10 @@
       async function hydrateInstagramThumb(item) {
         const meta = parseVideoMeta(item?.vid);
         if (!meta) return false;
-        // 이미 썸네일(img)이 있거나 캐시가 있으면 외부 API 호출 절대 금지 (0회 보장)
-        if (item.img && !item.img.startsWith("data:") && item.img.length > 10) return false;
+        // 이미 썸네일(img)이 있거나 캐시가 있으면 외부 API 호출 금지
+        // 단, 저장된 인스타 주소가 만료됐으면 새로 받아옴 (전엔 만료 주소 때문에 영원히 아이콘으로 남았음)
+        const imgExpired = typeof isExpiredIgUrl === "function" && isExpiredIgUrl(item.img);
+        if (item.img && !item.img.startsWith("data:") && item.img.length > 10 && !imgExpired) return false;
         if (meta.id && reelThumbCache[meta.id]) return false;
 
         if (meta.platform === "tt") {
@@ -23962,7 +23964,7 @@ ${JSON.stringify(payload, null, 2)}
   }
 
   // 8. 서비스 워커 등록 (즉시 갱신)
-  const SW_QUERY = './sw.js?v=v20261115_112000';
+  const SW_QUERY = './sw.js?v=v20261115_130000';
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', async function() {
       try {
@@ -25082,6 +25084,10 @@ ${JSON.stringify(payload, null, 2)}
       return p;
     }, { __v87: true });
   })();
+  // 예전 서비스워커가 만든 사진 캐시(아이폰에서 사진이 서로 섞이던 원인) 즉시 삭제
+  try {
+    if (window.caches && caches.keys) caches.keys().then((ks) => ks.filter((k) => /^trip-thumbs/.test(k)).forEach((k) => caches.delete(k))).catch(() => {});
+  } catch (_) {}
   const boot = () => {
     hookSave();
     hookRemote();
