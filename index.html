@@ -2109,6 +2109,8 @@
     <link rel="preconnect" href="https://firebasestorage.googleapis.com">
     <link rel="dns-prefetch" href="https://i.ytimg.com">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -2771,7 +2773,7 @@
       const TRIP_PENDING_CONFLICT_KEY = "TRIP_PENDING_CONFLICT";
       const TRIP_LAST_ROOM_KEY = "TRIP_LAST_ROOM";
       const TRIP_CREATING_ROOM_KEY = "TRIP_CREATING_ROOM";
-      const APP_VERSION = "v82";
+      const APP_VERSION = "v83";
       const TRANSIENT_NET_RE =
         /unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
       let _offlineFlushBusy = false,
@@ -5601,8 +5603,25 @@
         nmap = null;
         if (window.L) {
           $("map").innerHTML = "";
-          lm = L.map("map").setView([34.668, 135.501], 12);
-          layer = L.featureGroup().addTo(lm);
+          lm = L.map("map", { maxZoom: 19 }).setView([34.668, 135.501], 12);
+          let useCluster = false;
+          try { useCluster = Boolean(L.markerClusterGroup); } catch (_) {}
+          layer = (useCluster
+            ? L.markerClusterGroup({
+                maxClusterRadius: 42,
+                disableClusteringAtZoom: 16,
+                showCoverageOnHover: false,
+                spiderfyOnMaxZoom: true,
+                chunkedLoading: true,
+                iconCreateFunction: (c) =>
+                  L.divIcon({
+                    className: "v83-cluster",
+                    html: `<span>${c.getChildCount()}</span>`,
+                    iconSize: [44, 44],
+                  }),
+              })
+            : L.featureGroup()
+          ).addTo(lm);
           rebuildTiles();
           render();
           draw(true);
@@ -5794,8 +5813,9 @@
       function pinCardHtml(i) {
         const icName = CATS[i.category] ? CATS[i.category].ic : "location_on";
         const thumbs = itemThumbCandidates(i);
-        const thumb = thumbs[0] || "";
-        const alts = thumbs.slice(1).join("|");
+        const rawThumb = thumbs[0] || "";
+        const thumb = rawThumb && window.smallThumb ? window.smallThumb(rawThumb, 112) : rawThumb;
+        const alts = (thumb !== rawThumb ? [rawThumb] : []).concat(thumbs.slice(1)).join("|");
         const altAttr = alts ? ` data-imgalts="${esc(alts)}"` : "";
         const dayBadge = i.day ? `<em>D${i.day}</em>` : "";
         const starBadge = i.star
@@ -5804,7 +5824,7 @@
         const placeNumber = i._pinNumber
           ? `<em class="pinNum">${i._pinNumber}</em>`
           : "";
-        return `<div class="pinCard c-${CATS[i.category] ? i.category : "PLACE"}${i.star ? " starred" : ""}">${dayBadge}${starBadge}${placeNumber}<i><span class="ms" style="font-size:22px;color:#fff">${icName}</span></i>${thumb ? `<img loading="eager" fetchpriority="high" decoding="async" referrerpolicy="no-referrer" src="${esc(thumb)}"${altAttr} onerror="imgErr(this)">` : ""}${getVidUrlStr(i.vid) ? `<b><span class="ms fill" style="font-size:11px;color:#fff">play_circle</span></b>` : ""}</div>`;
+        return `<div class="pinCard c-${CATS[i.category] ? i.category : "PLACE"}${i.star ? " starred" : ""}">${dayBadge}${starBadge}${placeNumber}<i><span class="ms" style="font-size:22px;color:#fff">${icName}</span></i>${thumb ? `<img loading="lazy" decoding="async" referrerpolicy="no-referrer" src="${esc(thumb)}"${altAttr} onerror="imgErr(this)">` : ""}${getVidUrlStr(i.vid) ? `<b><span class="ms fill" style="font-size:11px;color:#fff">play_circle</span></b>` : ""}</div>`;
       }
 
       /* 지도 핀 팝업: '검색' 버튼을 '목록' 이동 버튼으로 교체 */
@@ -5870,7 +5890,9 @@
         if (marker) {
           marker.setPopupContent(mapPinPopupHtml(item, expanded));
           try {
-            marker.openPopup();
+            // 묶여 있는 핀이면 풀릴 때까지 확대한 뒤 열기
+            if (layer && typeof layer.zoomToShowLayer === "function") layer.zoomToShowLayer(marker, () => marker.openPopup());
+            else marker.openPopup();
           } catch (e) {}
         }
       }
@@ -23786,7 +23808,7 @@ ${JSON.stringify(payload, null, 2)}
   }
 
   // 8. 서비스 워커 등록 (즉시 갱신)
-  const SW_QUERY = './sw.js?v=v20261115_063000';
+  const SW_QUERY = './sw.js?v=v20261115_070000';
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', async function() {
       try {
@@ -24277,6 +24299,19 @@ ${JSON.stringify(payload, null, 2)}
 </script>
 <!-- === V78_UX_POLISH_END === -->
 
+<style id="v83-map-cluster-style">
+  .v83-cluster {
+    display: grid !important;
+    place-items: center;
+    border-radius: 50%;
+    background: rgba(37, 99, 235, 0.92);
+    border: 3px solid rgba(255, 255, 255, 0.9);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+    color: #fff;
+    font-weight: 800;
+    font-size: 15px;
+  }
+</style>
 <!-- === V79_FRIENDS_START === -->
 <style id="v79-friends-style">
   /* 닉네임·첫 안내 */
@@ -24457,7 +24492,13 @@ ${JSON.stringify(payload, null, 2)}
   const user = () => { try { return firebase.auth().currentUser; } catch (_) { return null; } };
   const myUid = () => (user() && user().uid) || "local";
   const myName = () => lsGet(NAME_KEY) || (user() && user().displayName) || "나";
-  const roomId = () => (typeof sharedRoomId !== "undefined" ? sharedRoomId : "") || (typeof initialRoom !== "undefined" ? initialRoom : "") || "";
+  const roomId = () => {
+    try {
+      return (typeof sharedRoomId !== "undefined" ? sharedRoomId : "") || (typeof initialRoom !== "undefined" ? initialRoom : "") || "";
+    } catch (_) {
+      return "";
+    }
+  };
   const ownerUid = () => (typeof sharedOwnerUid !== "undefined" ? sharedOwnerUid : "") || "";
   const isOwner = () => Boolean(user() && ownerUid() && user().uid === ownerUid());
   const itemsArr = () => (typeof items !== "undefined" && Array.isArray(items) ? items : []);
