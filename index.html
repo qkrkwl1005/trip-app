@@ -1679,7 +1679,7 @@
           <div style="background:var(--s2);border:1px solid var(--bd2);border-radius:18px;padding:12px 14px;margin-bottom:12px">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
               <span id="sharedRoomStatus" style="font-weight: 700;font-size:13.5px;color:var(--tx)">● 실시간 동기화 중</span>
-              <span id="v49RoomBadge" style="font-size:11px;font-weight: 700;padding:2px 8px;border-radius:999px;background:var(--s);color:var(--tx);/* border removed */">PIN 1124</span>
+              <span id="v49RoomBadge" style="font-size:11px;font-weight: 700;padding:2px 8px;border-radius:999px;background:var(--s);color:var(--tx);/* border removed */">🔒 비공개 링크</span>
             </div>
             <div style="font-size:12px;color:var(--sub);line-height:1.45">
               함께하는 친구와 일정 및 가계부를 실시간으로 같이 봅니다.
@@ -1697,7 +1697,7 @@
             </button>
           </div>
           <button id="v49QuickJoinBtn" type="button" class="btn g" style="width:100%;margin:0 0 8px;min-height:38px;font-size:12px;font-weight:700">
-            <span class="ms">pin</span>방 번호(1124) 직접 입력
+            <span class="ms">link</span>받은 초대 링크로 들어가기
           </button>
 
           <!-- 참여자 목록 -->
@@ -2631,6 +2631,8 @@
           toEmbedMyMapsUrl(raw.myMapsEmbed)
         )
           ls.set(MYMAPS_EMBED_KEY, toEmbedMyMapsUrl(raw.myMapsEmbed));
+        if (typeof raw.rapidKey === "string" && raw.rapidKey.trim() && !(ls.get("TRIP_RAPIDAPI_KEY") || "").trim())
+          ls.set("TRIP_RAPIDAPI_KEY", raw.rapidKey.trim().slice(0, 300));
         buildAiProvUI();
       }
       function downloadAutoBackup(label) {
@@ -2759,6 +2761,9 @@
           cfProxy: ls.get("TRIP_CF_PROXY") || "",
           myMapsUrl: ls.get("TRIP_MYMAPS_URL") || "",
           myMapsEmbed: getMyMapsEmbedUrl() || "",
+          rapidKey: ["TRIP_RAPIDAPI_KEY", "TRIP_RAPID_API_KEY", "RAPID_API_KEY", "rapidApiKey", "rapidapi_key"]
+            .map((k) => (ls.get(k) || "").trim())
+            .find(Boolean) || "",
         };
       }
 
@@ -2766,7 +2771,7 @@
       const TRIP_PENDING_CONFLICT_KEY = "TRIP_PENDING_CONFLICT";
       const TRIP_LAST_ROOM_KEY = "TRIP_LAST_ROOM";
       const TRIP_CREATING_ROOM_KEY = "TRIP_CREATING_ROOM";
-      const APP_VERSION = "v78";
+      const APP_VERSION = "v79";
       const TRANSIENT_NET_RE =
         /unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
       let _offlineFlushBusy = false,
@@ -2815,7 +2820,35 @@
         "useCustomImg",
         "v",
         "places",
+        "likes",
+        "comments",
+        "addedBy",
+        "addedByUid",
+        "addedAt",
+        "editedBy",
+        "editedByUid",
+        "editedAt",
       ];
+      // 좋아요/코멘트: { key: { t: 시각, ... } } 형태 → 키마다 더 최근 값 채택 (동시에 눌러도 서로 안 지워짐)
+      function mergeSocialMap(a, b) {
+        const out = {};
+        [a, b].forEach((m) => {
+          if (!m || typeof m !== "object" || Array.isArray(m)) return;
+          Object.keys(m).forEach((k) => {
+            const v = m[k];
+            if (!v || typeof v !== "object") return;
+            if (!out[k] || Number(v.t || 0) >= Number(out[k].t || 0)) out[k] = v;
+          });
+        });
+        return out;
+      }
+      function mergeSocialFields(target, x, y) {
+        ["likes", "comments"].forEach((f) => {
+          if ((x && x[f]) || (y && y[f])) target[f] = mergeSocialMap(x && x[f], y && y[f]);
+        });
+        return target;
+      }
+      window.mergeSocialMap = mergeSocialMap;
       function diffSharedFields(base, cand) {
         const out = [];
         SHARE_FIELDS.forEach((f) => {
@@ -2864,13 +2897,13 @@
             localChanged.forEach((f) => {
               next[f] = local[f];
             });
-            merged.push(next);
+            merged.push(mergeSocialFields(next, local, remote));
           } else {
             const next = { ...remote };
             localChanged.forEach((f) => {
               next[f] = local[f];
             });
-            merged.push(next);
+            merged.push(mergeSocialFields(next, local, remote));
           }
         });
         (localItems || []).forEach((local) => {
@@ -3678,20 +3711,14 @@
           try {
             text = decodeURIComponent(text);
           } catch (_) {}
-          if (text === "1124" || text === "1124호") return "OSAKA-2026";
-          if (/^[A-Za-z0-9_-]{4,100}$/.test(text)) {
-            if (text === "1124") return "OSAKA-2026";
-            if (text.length >= 8) return text;
-          }
+          if (/^[A-Za-z0-9_-]{8,100}$/.test(text)) return text;
           const match = text.match(/[?&]room=([^&#]+)/);
           if (match) {
             text = match[1];
-            if (text === "1124" || text === "1124호") return "OSAKA-2026";
             continue;
           }
           break;
         }
-        if (text === "1124" || text === "1124호") return "OSAKA-2026";
         return /^[A-Za-z0-9_-]{8,100}$/.test(text) ? text : "";
       }
       function setSharedRoomStatus(message, kind = "") {
@@ -4184,6 +4211,7 @@
           const lTime = Number(loc.updatedAt || loc._localTouch || 0);
           const rTime = Number(rem.updatedAt || 0);
           const winner = lTime > rTime ? { ...rem, ...loc } : { ...loc, ...rem };
+          mergeSocialFields(winner, loc, rem);
 
           // 한쪽에만 유효한 좌표나 사진이 있으면 유실되지 않게 보존
           if ((!winner.lat || !winner.lng) && loc.lat && loc.lng && loc.address === winner.address) {
@@ -10455,8 +10483,8 @@ ${caption || rawText}
       $("v49MakeNewRoomBtn") && ($("v49MakeNewRoomBtn").onclick = $("createRoomBtn").onclick);
       $("joinRoomBtn").onclick = () => {
         const id = prompt(
-          "친구에게 받은 방 번호(예: 1124) 또는 방 링크를 입력하세요:",
-          "1124",
+          "친구에게 받은 초대 링크를 붙여넣으세요:",
+          "",
         );
         if (!id) return;
         const roomId = extractRoomId(id);
@@ -10468,11 +10496,12 @@ ${caption || rawText}
 
       // 원터치 카카오톡 / 친구 초대 공유
       const handleKakaoShare = async () => {
-        const targetRoom = sharedRoomId || "OSAKA-2026";
+        const targetRoom = sharedRoomId;
+        if (!targetRoom) return toast("먼저 공유 방을 만들어 주세요 (설정 → 방 설정 · 새 방 만들기)");
         const inviteUrl = `${location.origin}${location.pathname}?room=${encodeURIComponent(targetRoom)}`;
         const shareData = {
-          title: "오사카·교토 3인 여행 실시간 플래너",
-          text: `✈️ 오사카·교토 여행 일정 같이 보기!\n링크를 누르면 바로 실시간 공유 방(번호: 1124)으로 연결돼요:\n${inviteUrl}`,
+          title: "오사카·교토 여행 실시간 플래너",
+          text: `✈️ 오사카·교토 여행 일정 같이 짜요!\n링크를 누르면 바로 우리 여행 방으로 들어와요. 장소 추가·수정도 같이 할 수 있어요:\n${inviteUrl}`,
           url: inviteUrl
         };
         try {
@@ -11528,7 +11557,7 @@ ${caption || rawText}
         new URLSearchParams(location.search).get("room"),
       );
       if (!initialRoom) {
-        initialRoom = extractRoomId(ls.get(TRIP_LAST_ROOM_KEY) || "") || "OSAKA-2026";
+        initialRoom = extractRoomId(ls.get(TRIP_LAST_ROOM_KEY) || "") || "";
       }
       if (new URLSearchParams(location.search).get("room") && !initialRoom) {
         history.replaceState(null, "", location.pathname);
@@ -23755,7 +23784,7 @@ ${JSON.stringify(payload, null, 2)}
   }
 
   // 8. 서비스 워커 등록 (즉시 갱신)
-  const SW_QUERY = './sw.js?v=v20261115_024000';
+  const SW_QUERY = './sw.js?v=v20261115_041000';
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', async function() {
       try {
@@ -24240,6 +24269,512 @@ ${JSON.stringify(payload, null, 2)}
 })();
 </script>
 <!-- === V78_UX_POLISH_END === -->
+
+<!-- === V79_FRIENDS_START === -->
+<style id="v79-friends-style">
+  /* 닉네임·첫 안내 */
+  #v79Welcome {
+    position: fixed;
+    inset: 0;
+    z-index: 400;
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.55);
+  }
+  #v79Welcome.on { display: flex; }
+  #v79Welcome .v79-box {
+    width: 100%;
+    max-width: 520px;
+    background: var(--s);
+    color: var(--tx);
+    border-radius: 24px 24px 0 0;
+    padding: 22px 20px calc(20px + env(safe-area-inset-bottom));
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.35);
+  }
+  #v79Welcome h3 { margin: 0 0 6px; font-size: 19px; }
+  #v79Welcome p { margin: 0 0 14px; color: var(--sub); font-size: 13.5px; line-height: 1.5; }
+  #v79Welcome input {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 48px;
+    font-size: 16px;
+    border-radius: 14px;
+    padding: 0 14px;
+    border: 1px solid var(--bd2);
+    background: var(--s2);
+    color: var(--tx);
+  }
+  #v79Welcome ul { margin: 14px 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+  #v79Welcome li { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; line-height: 1.45; }
+  #v79Welcome li .ms { font-size: 20px; color: var(--pr); flex: none; }
+  #v79Welcome .v79-go {
+    width: 100%;
+    min-height: 50px;
+    border: 0;
+    border-radius: 14px;
+    background: var(--pr);
+    color: #fff;
+    font-size: 15.5px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  /* 카드 배지 */
+  .v79-new {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: #ef4444;
+    color: #fff;
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    margin-left: 6px;
+    flex: none;
+  }
+  .v79-meta {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--sub);
+  }
+  .v79-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--s2);
+    border: 1px solid var(--bd2);
+    font-weight: 600;
+  }
+  .v79-chip .ms { font-size: 14px; }
+  .v79-chip.like { color: #e11d48; }
+
+  /* 상세창: 같이 정하기 */
+  #v79Social {
+    margin-top: 14px;
+    padding: 14px;
+    border-radius: 18px;
+    background: var(--s2);
+    border: 1px solid var(--bd2);
+  }
+  #v79Social .v79-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  #v79Social .v79-like-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 42px;
+    padding: 0 16px;
+    border-radius: 999px;
+    border: 1px solid var(--bd2);
+    background: var(--s);
+    color: var(--tx);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  #v79Social .v79-like-btn.on { background: #e11d48; border-color: #e11d48; color: #fff; }
+  #v79Social .v79-like-names { font-size: 12.5px; color: var(--sub); margin-top: 8px; }
+  #v79Social .v79-cmts { margin-top: 12px; display: grid; gap: 8px; }
+  #v79Social .v79-cmt { font-size: 13.5px; line-height: 1.45; }
+  #v79Social .v79-cmt b { font-size: 12.5px; margin-right: 6px; }
+  #v79Social .v79-cmt small { color: var(--sub); font-size: 11.5px; margin-left: 4px; }
+  #v79Social .v79-cmt button { border: 0; background: none; color: var(--sub); font-size: 12px; cursor: pointer; padding: 0 4px; }
+  #v79Social form { display: flex; gap: 6px; margin-top: 10px; }
+  #v79Social form input {
+    flex: 1;
+    min-width: 0;
+    min-height: 42px;
+    font-size: 16px;
+    border-radius: 12px;
+    padding: 0 12px;
+    border: 1px solid var(--bd2);
+    background: var(--s);
+    color: var(--tx);
+  }
+  #v79Social form button {
+    min-height: 42px;
+    padding: 0 14px;
+    border: 0;
+    border-radius: 12px;
+    background: var(--pr);
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  #v79Social .v79-by { margin-top: 10px; font-size: 12px; color: var(--sub); }
+
+  /* 옛 방 → 비공개 방 이전 안내 */
+  #v79MoveCard {
+    margin: 0 0 12px;
+    padding: 14px;
+    border-radius: 18px;
+    border: 1px solid #f59e0b;
+    background: rgba(245, 158, 11, 0.12);
+    color: var(--tx);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  #v79MoveCard button {
+    margin-top: 10px;
+    width: 100%;
+    min-height: 44px;
+    border: 0;
+    border-radius: 12px;
+    background: #f59e0b;
+    color: #111;
+    font-weight: 800;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  /* 친구 화면에선 개발자 설정·승인 버튼 숨김 */
+  html.v79-guest #uxAdvSettings,
+  html.v79-guest #requestJoinBtn,
+  html.v79-guest #joinBadge {
+    display: none !important;
+  }
+</style>
+<script id="v79-friends-script">
+(function () {
+  const NAME_KEY = "TRIP_MY_NAME";
+  const SEEN_KEY = "TRIP_V79_LAST_SEEN";
+  const lsGet = (k) => { try { return localStorage.getItem(k) || ""; } catch (_) { return ""; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
+  const escH = (t) => (typeof esc === "function" ? esc(t) : String(t || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])));
+  const user = () => { try { return firebase.auth().currentUser; } catch (_) { return null; } };
+  const myUid = () => (user() && user().uid) || "local";
+  const myName = () => lsGet(NAME_KEY) || (user() && user().displayName) || "나";
+  const roomId = () => (typeof sharedRoomId !== "undefined" ? sharedRoomId : "") || "";
+  const ownerUid = () => (typeof sharedOwnerUid !== "undefined" ? sharedOwnerUid : "") || "";
+  const isOwner = () => Boolean(user() && ownerUid() && user().uid === ownerUid());
+  const itemsArr = () => (typeof items !== "undefined" && Array.isArray(items) ? items : []);
+  const fmtDate = (t) => { const d = new Date(Number(t)); return `${d.getMonth() + 1}/${d.getDate()}`; };
+
+  /* ---------- 1) 누가 추가·수정했는지 자동 기록 ---------- */
+  const SIG_FIELDS = ["name", "address", "note", "info", "price", "category", "day", "vid", "time"];
+  const sigOf = (it) => JSON.stringify(SIG_FIELDS.map((f) => (it[f] == null ? "" : it[f])));
+  let seen = new Map();
+  const snapshotSeen = () => { seen = new Map(itemsArr().map((it) => [String(it.id), sigOf(it)])); };
+  snapshotSeen();
+  function stampChanges() {
+    const now = Date.now();
+    const name = myName();
+    const uid = myUid();
+    itemsArr().forEach((it) => {
+      if (!it || !it.id) return;
+      const id = String(it.id);
+      const sig = sigOf(it);
+      if (!seen.has(id)) {
+        if (!it.addedAt) {
+          it.addedAt = now;
+          it.addedBy = name;
+          it.addedByUid = uid;
+        }
+      } else if (seen.get(id) !== sig) {
+        it.editedAt = now;
+        it.editedBy = name;
+        it.editedByUid = uid;
+      }
+      seen.set(id, sig);
+    });
+  }
+  function hookSave() {
+    const orig = window.save;
+    if (typeof orig !== "function" || orig.__v79) return;
+    window.save = Object.assign(function () {
+      try { stampChanges(); } catch (_) {}
+      return orig.apply(this, arguments);
+    }, { __v79: true });
+  }
+  function hookRemote() {
+    const orig = window.applyRemoteRoomSnapshot;
+    if (typeof orig !== "function" || orig.__v79) return;
+    window.applyRemoteRoomSnapshot = Object.assign(function () {
+      const r = orig.apply(this, arguments);
+      try { snapshotSeen(); } catch (_) {}
+      scheduleDecorate();
+      return r;
+    }, { __v79: true });
+  }
+
+  /* ---------- 2) NEW 표시 (마지막 접속 이후 친구가 추가한 장소) ---------- */
+  const bootSeenAt = Number(lsGet(SEEN_KEY)) || Date.now();
+  if (!lsGet(SEEN_KEY)) lsSet(SEEN_KEY, String(Date.now()));
+  const markSeen = () => lsSet(SEEN_KEY, String(Date.now()));
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") markSeen(); });
+  window.addEventListener("pagehide", markSeen);
+  const isNewForMe = (it) => it && Number(it.addedAt) > bootSeenAt && it.addedByUid && it.addedByUid !== myUid();
+
+  /* ---------- 3) 좋아요·코멘트 ---------- */
+  const likeList = (it) => Object.entries(it.likes || {}).filter(([, v]) => v && v.on).map(([uid, v]) => ({ uid, n: v.n || "친구" }));
+  const cmtList = (it) => Object.entries(it.comments || {}).map(([id, v]) => ({ id, ...v })).filter((c) => c && !c.del && c.text).sort((a, b) => a.t - b.t);
+  function commit(it) {
+    it.updatedAt = Date.now();
+    it._localTouch = Date.now();
+    if (typeof save === "function") save();
+  }
+  function toggleLike(it) {
+    const uid = myUid();
+    const cur0 = it.likes && it.likes[uid] && it.likes[uid].on;
+    it.likes = { ...(it.likes || {}), [uid]: { n: myName(), on: !cur0, t: Date.now() } };
+    commit(it);
+    renderSocial();
+  }
+  function addComment(it, text) {
+    const t = String(text || "").trim().slice(0, 300);
+    if (!t) return;
+    const id = "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    it.comments = { ...(it.comments || {}), [id]: { uid: myUid(), n: myName(), text: t, t: Date.now() } };
+    commit(it);
+    renderSocial();
+  }
+  function delComment(it, id) {
+    const c = it.comments && it.comments[id];
+    if (!c || c.uid !== myUid()) return;
+    it.comments = { ...it.comments, [id]: { ...c, del: true, text: "", t: Date.now() } };
+    commit(it);
+    renderSocial();
+  }
+  function curItem() {
+    const id = typeof cur !== "undefined" ? cur : null;
+    return id == null ? null : itemsArr().find((x) => String(x.id) === String(id));
+  }
+  function renderSocial() {
+    const sbody = document.getElementById("sbody");
+    const sheet = document.getElementById("sheet");
+    if (!sbody || !sheet || !sheet.classList.contains("on")) return;
+    const it = curItem();
+    if (!it) return;
+    const pane = sbody.querySelector('.ux-stab-pane[data-pane="info"]') || sbody;
+    let box = document.getElementById("v79Social");
+    if (box && box.dataset.id !== String(it.id)) { box.remove(); box = null; }
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "v79Social";
+      box.dataset.id = String(it.id);
+      const footer = pane.querySelector(".ux-sheet-footer");
+      if (footer && footer.parentElement === pane) pane.insertBefore(box, footer);
+      else pane.appendChild(box);
+      box.addEventListener("click", (e) => {
+        const x = curItem();
+        if (!x) return;
+        if (e.target.closest(".v79-like-btn")) { e.stopPropagation(); toggleLike(x); }
+        const del = e.target.closest("[data-v79-del]");
+        if (del) { e.stopPropagation(); delComment(x, del.dataset.v79Del); }
+      });
+      box.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const x = curItem();
+        const input = box.querySelector("input");
+        if (x && input) { const v = input.value; input.value = ""; addComment(x, v); }
+      });
+    }
+    const likes = likeList(it);
+    const mine = likes.some((l) => l.uid === myUid());
+    const cmts = cmtList(it);
+    const by = [];
+    if (it.addedBy) by.push(`${escH(it.addedBy)}님이 추가 · ${fmtDate(it.addedAt)}`);
+    if (it.editedBy && it.editedAt && Number(it.editedAt) - Number(it.addedAt || 0) > 60000) by.push(`${escH(it.editedBy)}님이 수정 · ${fmtDate(it.editedAt)}`);
+    const draft = box.querySelector("input")?.value || "";
+    box.innerHTML = `
+      <div class="v79-head">
+        <b style="font-size:14.5px">같이 정하기</b>
+        <button type="button" class="v79-like-btn${mine ? " on" : ""}"><span class="ms${mine ? " fill" : ""}" style="font-size:19px">favorite</span>가고 싶어요${likes.length ? ` ${likes.length}` : ""}</button>
+      </div>
+      ${likes.length ? `<div class="v79-like-names">${likes.map((l) => escH(l.n)).join(", ")}</div>` : ""}
+      <div class="v79-cmts">${cmts.map((c) => `<div class="v79-cmt"><b>${escH(c.n)}</b>${escH(c.text)}<small>${fmtDate(c.t)}</small>${c.uid === myUid() ? `<button type="button" data-v79-del="${escH(c.id)}" aria-label="코멘트 삭제">삭제</button>` : ""}</div>`).join("") || `<div style="font-size:12.5px;color:var(--sub)">"웨이팅 길대" 같은 한 줄 메모를 남겨 보세요</div>`}</div>
+      <form><input type="text" maxlength="300" placeholder="한 줄 코멘트" enterkeyhint="send"><button type="submit">등록</button></form>
+      ${by.length ? `<div class="v79-by">${by.join(" · ")}</div>` : ""}`;
+    const inp = box.querySelector("input");
+    if (inp && draft && !box.__justSent) inp.value = draft;
+  }
+  function watchSheet() {
+    const sbody = document.getElementById("sbody");
+    const sheet = document.getElementById("sheet");
+    if (!sbody || !sheet) return;
+    let t = null;
+    const kick = () => { clearTimeout(t); t = setTimeout(() => { if (!document.getElementById("v79Social") || document.getElementById("v79Social").dataset.id !== String(typeof cur !== "undefined" ? cur : "")) renderSocial(); }, 60); };
+    new MutationObserver(kick).observe(sbody, { childList: true });
+    new MutationObserver(kick).observe(sheet, { attributes: true, attributeFilter: ["class"] });
+  }
+
+  /* ---------- 4) 목록 카드 꾸미기: NEW · 좋아요 수 · 코멘트 수 · 친구가 추가 ---------- */
+  let decoT = 0;
+  function scheduleDecorate() {
+    if (decoT) return;
+    decoT = requestAnimationFrame(() => { decoT = 0; decorate(); });
+  }
+  function decorate() {
+    const list = document.getElementById("list-LIST");
+    if (!list) return;
+    const map = new Map(itemsArr().map((it) => [String(it.id), it]));
+    list.querySelectorAll(".item[data-id]").forEach((card) => {
+      const it = map.get(String(card.dataset.id));
+      if (!it) return;
+      const likes = likeList(it).length;
+      const cmts = cmtList(it).length;
+      const fresh = isNewForMe(it);
+      const friendAdded = it.addedBy && it.addedByUid && it.addedByUid !== myUid();
+      const key = `${likes}|${cmts}|${fresh}|${friendAdded ? it.addedBy : ""}`;
+      if (card.dataset.v79 === key) return;
+      card.dataset.v79 = key;
+      card.querySelectorAll(".v79-new, .v79-meta").forEach((x) => x.remove());
+      const nm = card.querySelector(".mid .nm");
+      if (fresh && nm) nm.insertAdjacentHTML("beforeend", `<span class="v79-new">NEW</span>`);
+      const chips = [];
+      if (likes) chips.push(`<span class="v79-chip like"><span class="ms fill">favorite</span>${likes}</span>`);
+      if (cmts) chips.push(`<span class="v79-chip"><span class="ms">chat_bubble</span>${cmts}</span>`);
+      if (friendAdded) chips.push(`<span class="v79-chip"><span class="ms">person</span>${escH(it.addedBy)}</span>`);
+      if (chips.length && nm) nm.insertAdjacentHTML("afterend", `<div class="v79-meta">${chips.join("")}</div>`);
+    });
+  }
+  function watchList() {
+    const list = document.getElementById("list-LIST");
+    if (!list) return;
+    new MutationObserver(scheduleDecorate).observe(list, { childList: true });
+    scheduleDecorate();
+  }
+
+  /* ---------- 5) 처음 들어온 친구: 닉네임 + 3줄 안내 ---------- */
+  function ensureMember() {
+    const u = user();
+    const rid = roomId();
+    if (!u || !rid || !ownerUid() || typeof updateRoomWithRevision !== "function") return;
+    const members = (typeof sharedMembers !== "undefined" && sharedMembers) || {};
+    const me = members[u.uid];
+    const name = lsGet(NAME_KEY);
+    if (!name) return;
+    if (me && me.name === name) return;
+    const role = me && me.role ? me.role : (u.uid === ownerUid() ? "owner" : "editor");
+    updateRoomWithRevision({ [`members.${u.uid}`]: { role, name: name.slice(0, 40) } })
+      .then(() => { try { if (typeof renderRoomMembers === "function") renderRoomMembers(); } catch (_) {} })
+      .catch(() => {});
+  }
+  function showWelcome() {
+    if (document.getElementById("v79Welcome")) { document.getElementById("v79Welcome").classList.add("on"); return; }
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+    const wrap = document.createElement("div");
+    wrap.id = "v79Welcome";
+    wrap.className = "on";
+    wrap.innerHTML = `
+      <div class="v79-box" role="dialog" aria-modal="true" aria-labelledby="v79WelcomeTitle">
+        <h3 id="v79WelcomeTitle">오사카·교토 여행 방에 오신 걸 환영해요 👋</h3>
+        <p>친구들에게 보일 이름만 정해 주세요. 로그인은 필요 없어요.</p>
+        <input id="v79NameInput" type="text" maxlength="20" placeholder="예: 민수" autocomplete="nickname">
+        <ul>
+          <li><span class="ms">add_location_alt</span><span><b>장소 추가·수정·삭제</b>를 모두 같이 할 수 있어요. 바뀐 내용은 바로 서로에게 보여요.</span></li>
+          <li><span class="ms">favorite</span><span>장소를 열어 <b>가고 싶어요</b>를 누르거나 한 줄 코멘트를 남겨 보세요.</span></li>
+          ${isIOS && !standalone ? `<li><span class="ms">ios_share</span><span>Safari 아래 <b>공유 → 홈 화면에 추가</b>를 하면 앱처럼 바로 열려요.</span></li>` : `<li><span class="ms">fiber_new</span><span>친구가 새로 추가한 장소에는 <b>NEW</b> 표시가 붙어요.</span></li>`}
+        </ul>
+        <button type="button" class="v79-go">시작하기</button>
+      </div>`;
+    document.body.appendChild(wrap);
+    const input = wrap.querySelector("input");
+    input.value = lsGet(NAME_KEY) || (user() && !user().isAnonymous && user().displayName) || "";
+    const done = () => {
+      const v = input.value.trim().slice(0, 20);
+      if (!v) { input.focus(); input.placeholder = "이름을 입력해 주세요"; return; }
+      lsSet(NAME_KEY, v);
+      wrap.classList.remove("on");
+      ensureMember();
+      if (typeof toast === "function") toast(`반가워요, ${v}님!`);
+    };
+    wrap.querySelector(".v79-go").addEventListener("click", done);
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") done(); });
+  }
+  window.v79EditMyName = showWelcome;
+
+  /* ---------- 6) 옛 고정 방(OSAKA-2026)이면 비공개 새 방으로 옮기기 ---------- */
+  function moveToPrivateRoom() {
+    if (!confirm("지금 일정 전체를 새 비공개 방으로 옮길까요?\n옮긴 뒤 친구들에게 새 초대 링크를 한 번 보내 주세요.")) return;
+    try {
+      if (typeof persistNow === "function") persistNow();
+      const id = makeRoomId();
+      lsSet("TRIP_V79_MOVED_FROM", roomId());
+      sessionStorage.setItem("v79JustMoved", "1");
+      ls.set(TRIP_CREATING_ROOM_KEY, id);
+      location.href = roomUrl(id);
+    } catch (e) {
+      if (typeof toast === "function") toast("새 방 만들기에 실패했어요: " + e.message);
+    }
+  }
+  function renderMoveCard() {
+    const rid = roomId();
+    const legacy = rid && rid.length < 20;
+    let card = document.getElementById("v79MoveCard");
+    if (!legacy) { if (card) card.remove(); return; }
+    if (card) return;
+    const anchor = document.getElementById("sharedRoomStatus")?.closest("div[style*='border-radius:18px']");
+    if (!anchor || !anchor.parentElement) return;
+    card = document.createElement("div");
+    card.id = "v79MoveCard";
+    card.innerHTML = `<b>🔒 보안 업데이트가 필요해요</b><br>지금 방 주소(${escH(rid)})는 누구나 추측할 수 있어서, 모르는 사람이 일정을 지울 수 있어요. 아래 버튼으로 <b>추측할 수 없는 비공개 방</b>으로 옮겨 주세요. 장소·설정은 그대로 옮겨져요.<button type="button">새 비공개 방으로 옮기기</button>`;
+    card.querySelector("button").addEventListener("click", moveToPrivateRoom);
+    anchor.parentElement.insertBefore(card, anchor);
+  }
+  function afterMoveNotice() {
+    if (sessionStorage.getItem("v79JustMoved") !== "1") return;
+    const rid = roomId();
+    if (!rid || rid.length < 20 || !isOwner()) return;
+    sessionStorage.removeItem("v79JustMoved");
+    setTimeout(() => {
+      if (confirm("✅ 새 비공개 방으로 옮겼어요!\n지금 친구들에게 새 초대 링크를 보낼까요?")) {
+        document.getElementById("v49KakaoShareBtn")?.click();
+      }
+    }, 600);
+  }
+
+  /* ---------- 7) 주기적 상태 반영 ---------- */
+  let settingsPushed = false;
+  function tick() {
+    const rid = roomId();
+    document.documentElement.classList.toggle("v79-guest", Boolean(rid && ownerUid() && !isOwner()));
+    renderMoveCard();
+    afterMoveNotice();
+    if (rid && ownerUid() && !lsGet(NAME_KEY) && !document.getElementById("v79Welcome")?.classList.contains("on")) {
+      if (isOwner() && user() && user().displayName) { lsSet(NAME_KEY, user().displayName.split(" ")[0]); ensureMember(); }
+      else showWelcome();
+    } else if (rid && lsGet(NAME_KEY)) {
+      ensureMember();
+    }
+    // 방장이면 공유 설정(API 키 포함)을 한 번 최신으로 올려 친구 폰에서도 분석·썸네일 기능이 되게
+    if (!settingsPushed && isOwner() && typeof syncSharedSettings === "function") {
+      settingsPushed = true;
+      try { syncSharedSettings(); } catch (_) {}
+    }
+    const roomCard = document.getElementById("roomMembers");
+    if (roomCard && rid && !document.getElementById("v79NameBtn")) {
+      const b = document.createElement("button");
+      b.id = "v79NameBtn";
+      b.type = "button";
+      b.className = "btn g";
+      b.style.cssText = "width:100%;margin:8px 0 0;min-height:40px;font-size:13px";
+      b.innerHTML = `<span class="ms">badge</span>내 이름 바꾸기`;
+      b.addEventListener("click", showWelcome);
+      roomCard.insertAdjacentElement("afterend", b);
+    }
+  }
+
+  const boot = () => {
+    hookSave();
+    hookRemote();
+    watchList();
+    watchSheet();
+    tick();
+    setInterval(tick, 3000);
+  };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+  else boot();
+})();
+</script>
+<!-- === V79_FRIENDS_END === -->
 
 </body>
 </html>
