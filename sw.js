@@ -1,4 +1,4 @@
-const SW_VERSION = 'v20261115_100000';
+const SW_VERSION = 'v20261115_104500';
 const APP_CACHE = 'trip-app-' + SW_VERSION;
 const THUMB_CACHE = 'trip-thumbs-v3';
 const THUMB_CACHE_MAX = 600;
