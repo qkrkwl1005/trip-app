@@ -2771,7 +2771,7 @@
       const TRIP_PENDING_CONFLICT_KEY = "TRIP_PENDING_CONFLICT";
       const TRIP_LAST_ROOM_KEY = "TRIP_LAST_ROOM";
       const TRIP_CREATING_ROOM_KEY = "TRIP_CREATING_ROOM";
-      const APP_VERSION = "v80";
+      const APP_VERSION = "v81";
       const TRANSIENT_NET_RE =
         /unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
       let _offlineFlushBusy = false,
@@ -12071,19 +12071,8 @@ ${caption || rawText}
 
                   card.style.display = visible ? "" : "none";
 
-                  // 인스타 인트로 사진(item.img) 카드 썸네일 강제 반영
-                  if (matchedItem.img && typeof matchedItem.img === "string") {
-                    const imgEl = card.querySelector("img");
-                    if (imgEl && imgEl.src !== matchedItem.img) {
-                      imgEl.src = matchedItem.img;
-                      imgEl.style.objectFit = "cover";
-                    } else if (!imgEl) {
-                      const thumbBox = card.querySelector(".th, .thumb, .icon, .cat-icon") || card.firstElementChild;
-                      if (thumbBox && thumbBox.tagName !== "IMG" && thumbBox.clientWidth <= 90) {
-                        thumbBox.innerHTML = `<img src="${matchedItem.img}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;" onerror="this.style.display='none'">`;
-                      }
-                    }
-                  }
+                  // (제거) item.img 강제 덮어쓰기: 카드가 이미 item.img를 후보로 쓰고 있고,
+                  // 덮어쓰면 만료된 주소로 되돌아가 사진이 안 뜨는 원인이었음
 
                   // 거리/코스 배지 표시
                   const oldBadge = card.querySelector(".sfb-badge");
@@ -23784,7 +23773,7 @@ ${JSON.stringify(payload, null, 2)}
   }
 
   // 8. 서비스 워커 등록 (즉시 갱신)
-  const SW_QUERY = './sw.js?v=v20261115_050000';
+  const SW_QUERY = './sw.js?v=v20261115_053000';
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', async function() {
       try {
