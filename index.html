@@ -1505,6 +1505,25 @@
         transition: none !important;
       }
 
+    
+      /* 네비게이션 탭 바 텍스트 및 아이콘 밸런스 튜닝 */
+      .tab-btn {
+        font-size: 10.5px !important;
+        font-weight: 600 !important;
+        gap: 1px !important;
+      }
+      .tab-btn .ms {
+        font-size: 24px !important;
+        margin-bottom: 2px;
+      }
+      /* 활성화 시 배경색 없애고 색상만 쨍하게 변경 (Apple Native Style) */
+      .tab-btn.active {
+        background: transparent !important;
+      }
+      .tab-btn.active .ms {
+        font-size: 25px !important;
+      }
+
     </style>
   
     
@@ -1590,7 +1609,7 @@
             <div data-cat="FOOD"><span class="ms">restaurant</span>음식</div>
             <div data-cat="SHOP"><span class="ms">shopping_bag</span>쇼핑</div>
           </div>
-          <label>1. 원본 영상 링크 (선택 · 저장 후 바로가기 지원)</label>
+          <label style="color:var(--tx);font-size:12px;margin-bottom:6px">🔗 영상 링크 (선택)</label>
           <div style="display: flex; gap: 8px; margin-bottom: 16px">
             <input
               type="text"
@@ -1598,22 +1617,11 @@
               placeholder="https://www.instagram.com/reel/..."
               style="flex: 1; margin-bottom: 0"
             />
-            <button
-              class="mb pr"
-              id="pasteReelLink"
-              style="
-                flex: none;
-                white-space: nowrap;
-                border-radius: 16px;
-                padding: 0 16px;
-              "
-            >
+            <button class="mb pr" id="pasteReelLink" style="display:none;">
               <span class="ms">content_paste</span>링크 붙여넣기
             </button>
           </div>
-          <label
-            >2. 캡션·고정댓글 텍스트 (최대 10곳 동시 분석 · 중복 병합)</label
-          >
+          <label style="color:var(--tx);font-size:12px;margin-bottom:6px">📝 캡션 또는 장소명</label>
           <textarea
             id="shareBox"
             placeholder="릴스/쇼츠 캡션이나 고정댓글에서 복사한 맛집·카페 리스트를 붙여넣으세요 (위의 링크만 넣고 분석해도 됩니다)"
@@ -1621,11 +1629,11 @@
           <button class="btn" id="analyzeShare" style="margin-bottom: 10px">
             <span class="ms fill">bolt</span>분석·저장하기
           </button>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
-            <button class="btn g" id="pasteShare" style="margin-bottom: 0">
+          <div style="display: block;">
+            <button class="btn g" id="pasteShare" style="display:none;">
               <span class="ms">content_paste</span>캡션 붙여넣기
             </button>
-            <button class="btn g" id="pcShare" style="margin-bottom: 0">
+            <button class="btn g" id="pcShare" style="width:100%; border: 1px dashed var(--sub); color: var(--sub); background: transparent; margin-bottom: 0;">
               <span class="ms">add_photo_alternate</span>스샷 여러 장 분석
             </button>
           </div>
@@ -1639,8 +1647,7 @@
               font-size: 12.5px;
               line-height: 1.5;
             "
-            >Top 6·Top 10 영상도 고정댓글을 붙여넣거나 스크린샷을 여러 장
-            선택하면 최대 10곳까지 한 번에 등록됩니다.</small
+            >여러 장소도 텍스트나 스크린샷으로 한 번에 등록할 수 있어요.</small
           >
         </div>
         <div id="rs"></div>
@@ -2024,7 +2031,7 @@
                 placeholder="복사된 백업 JSON이 여기에 표시됩니다. 복원하려면 붙여넣으세요."
               ></textarea>
               <div
-                style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px"
+                style="display: block;"
               >
                 <button id="bkOut" class="btn g" style="margin-bottom: 0">
                   텍스트 백업 복사
@@ -5555,7 +5562,7 @@
         s.id = "tab-list";
         s.className = "tab-content";
         s.innerHTML = `
-          <div class="card" style="padding:14px 16px">
+          <div class="card" style="padding:10px 14px; margin-bottom: 4px; border-radius: 20px;">
             <div class="seg seg5" id="listCatSeg" style="margin-bottom:10px">
               <div data-lcat="ALL" class="on">전체 <span id="cnt-ALL">0</span></div>
               <div data-lcat="PLACE"><span class="ms">location_on</span>장소 <span id="cnt-PLACE">0</span></div>
@@ -7089,7 +7096,7 @@
     ` : ""}
 
     <!-- 정보 수정 및 고급 관리 (기본으로 접어두어 실수 방지 & 화면 깔끔) -->
-    <details class="acc" style="margin-top:14px"><summary><span class="ms">tune</span>정보 수정 및 지도 관리 (주소·좌표·메모·삭제)</summary><div class="acc-in">
+    <details class="acc" style="margin-top:14px"><summary><span class="ms">tune</span>상세 정보 수정</summary><div class="acc-in">
       <label style="margin-top:6px">카테고리 변경</label>
       <div class="seg">
         ${Object.keys(CATS)
@@ -7136,7 +7143,7 @@
       </div>
 
       <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--bd2)">
-        <button type="button" class="btn dg" data-act="del" style="width:100%;margin:0"><span class="ms">delete</span>이 장소 목록에서 완전히 삭제</button>
+        <button type="button" class="btn dg" data-act="del" style="width:100%;margin:0;min-height:46px;border-radius:14px;background:rgba(255,59,48,0.1);color:#FF3B30;"><span class="ms">delete</span>장소 삭제</button>
       </div>
     </div></details>
 
@@ -8957,7 +8964,7 @@ ${caption || rawText}
       }
 
       function renderCandidates(
-        headerMsg = "맞는 항목을 눌러 저장하세요 · 사진이 다르면 🔄",
+        headerMsg = "저장할 장소 선택",
       ) {
         if (!res.length) {
           $("rs").innerHTML = "";
