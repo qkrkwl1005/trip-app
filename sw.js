@@ -1,6 +1,7 @@
-const SW_VERSION = 'v20261114_231300';
+const SW_VERSION = 'v20261114_235500';
 const APP_CACHE = 'trip-app-' + SW_VERSION;
-const THUMB_CACHE = 'trip-thumbs-v2';
+const THUMB_CACHE = 'trip-thumbs-v3';
+const THUMB_CACHE_MAX = 600;
 
 const THUMB_HOSTS = [
   'wsrv.nl',
@@ -73,19 +74,31 @@ self.addEventListener('fetch', (event) => {
         const cached = await cache.match(request);
         if (cached) return cached;
 
-        try {
-          const netResp = await fetch(request);
-          if (netResp && netResp.status === 200) {
-            cache.put(request, netResp.clone());
-          }
-          return netResp;
-        } catch (err) {
-          return fetch(request);
+        const netResp = await fetch(request);
+        // <img>의 교차 출처 요청은 opaque 응답(status 0)이라 기존 200 조건으로는 한 장도 캐싱되지 않았음
+        if (netResp && (netResp.status === 200 || netResp.type === 'opaque')) {
+          event.waitUntil(
+            cache.put(request, netResp.clone()).then(() => trimThumbCache(cache)).catch(() => {})
+          );
         }
+        return netResp;
       })()
     );
   }
 });
+
+let _trimming = false;
+async function trimThumbCache(cache) {
+  if (_trimming) return;
+  _trimming = true;
+  try {
+    const keys = await cache.keys();
+    const extra = keys.length - THUMB_CACHE_MAX;
+    for (let i = 0; i < extra; i++) await cache.delete(keys[i]);
+  } finally {
+    _trimming = false;
+  }
+}
 
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {

@@ -4976,6 +4976,25 @@
           );
       }
 
+      // 목록 카드(72px)용 초경량 썸네일: 480~1080px 원본 대신 160px WebP(약 5KB)로 리사이즈해 받는다.
+      window.smallThumb = function (u, size) {
+        if (!u || typeof u !== "string" || !/^https?:/i.test(u)) return u || "";
+        const px = size || 160;
+        let raw = u;
+        const m = u.match(/^https?:\/\/(?:wsrv\.nl|images\.weserv\.nl)\/?\?(.*)$/i);
+        if (m) {
+          const q = new URLSearchParams(m[1]);
+          raw = q.get("url") || "";
+          if (!raw) return u;
+        }
+        let extra = "";
+        const yt = raw.match(/i\.ytimg\.com\/vi\/([A-Za-z0-9_-]{6,})\/oar2\.jpg/);
+        if (yt) {
+          extra = "&default=" + encodeURIComponent(`https://i.ytimg.com/vi/${yt[1]}/hqdefault.jpg`);
+        }
+        return `https://wsrv.nl/?url=${encodeURIComponent(raw)}&w=${px}&h=${px}&fit=cover&a=attention&output=webp&q=72${extra}`;
+      };
+
       window.imgErr = function (el) {
         if (!el) return;
         const s = el.getAttribute("src") || "";
@@ -5313,7 +5332,7 @@
         if (!Array.isArray(items) || !items.length) return;
         const targetList = items.slice(0, limit);
         targetList.forEach((it) => {
-          const thumb = itemThumb(it);
+          const thumb = window.smallThumb(itemThumb(it));
           if (
             thumb &&
             typeof thumb === "string" &&
@@ -6445,13 +6464,20 @@
 
       function ph(icName, src, c = "", fb = "", day = 0, alts = "") {
         const isEager = c.includes("big") || c.includes("eager");
+        if (src && !c.includes("big")) {
+          const small = window.smallThumb(src);
+          if (small && small !== src) {
+            alts = [src].concat(String(alts || "").split("|").filter(Boolean)).join("|");
+            src = small;
+          }
+        }
         const fba = fb && fb !== src ? ` data-fbsrc="${esc(fb)}"` : "";
         const altAttr = alts ? ` data-imgalts="${esc(alts)}"` : "";
         const dTag =
           day && !c.includes("big")
             ? `<span class="dayTag">D${day}</span>`
             : "";
-        const priority = isEager ? ' fetchpriority="high"' : "";
+        const priority = isEager ? ' fetchpriority="high"' : ' fetchpriority="low"';
         const iconHtml = /^[a-z0-9_]+$/.test(String(icName || ""))
           ? `<span class="ms">${icName}</span>`
           : icName;
@@ -12114,7 +12140,7 @@ ${caption || rawText}
           img.onerror = () => { img.style.display = "none"; };
           pic.appendChild(img);
         }
-        img.src = url;
+        img.src = window.smallThumb ? window.smallThumb(url) : url;
         img.style.display = "block";
       }
     });
@@ -23440,7 +23466,8 @@ ${JSON.stringify(payload, null, 2)}
     const urls = [];
     const seen = new Set();
     for (let i = 0; i < items.length && urls.length < PREHEAT_LIMIT; i++) {
-      const u = items[i] && (items[i].img || (typeof itemThumb === 'function' ? itemThumb(items[i]) : ''));
+      const big = items[i] && (typeof itemThumb === 'function' ? itemThumb(items[i]) : items[i].img);
+      const u = window.smallThumb ? window.smallThumb(big) : big;
       if (typeof u === 'string' && u.startsWith('http') && !seen.has(u)) {
         seen.add(u);
         urls.push(u);
@@ -23481,7 +23508,7 @@ ${JSON.stringify(payload, null, 2)}
         // 전체 innerHTML을 갈아엎지 않고, 해당 카드의 썸네일만 즉시 교체하여 다른 카드 로딩 깜빡임 방지
         const cardPic = document.querySelector(`.item[data-id="${nextItem.id}"] .pic`);
         if (cardPic && typeof itemThumb === "function") {
-          const freshThumb = itemThumb(nextItem);
+          const freshThumb = window.smallThumb ? window.smallThumb(itemThumb(nextItem)) : itemThumb(nextItem);
           if (freshThumb) {
             let img = cardPic.querySelector("img");
             if (!img) {
@@ -23685,7 +23712,7 @@ ${JSON.stringify(payload, null, 2)}
   }
 
   // 8. 서비스 워커 등록 (즉시 갱신)
-  const SW_QUERY = './sw.js?v=v20261114_212000';
+  const SW_QUERY = './sw.js?v=v20261114_235500';
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', async function() {
       try {
