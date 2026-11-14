@@ -2773,7 +2773,7 @@
       const TRIP_PENDING_CONFLICT_KEY = "TRIP_PENDING_CONFLICT";
       const TRIP_LAST_ROOM_KEY = "TRIP_LAST_ROOM";
       const TRIP_CREATING_ROOM_KEY = "TRIP_CREATING_ROOM";
-      const APP_VERSION = "v89";
+      const APP_VERSION = "v90";
       const TRANSIENT_NET_RE =
         /unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
       let _offlineFlushBusy = false,
@@ -5014,16 +5014,28 @@
           );
       }
 
+      // 프로필 사진·작은 아바타·영상 파일 주소는 썸네일로 쓰지 않음 (api/ig.js와 같은 규칙)
+      // 이 함수가 앱에 없어서 릴스 썸네일 가져오기(서버·프록시·RapidAPI 복구)가 전부 조용히 실패하고 있었음
+      window.isAvatarOrBadUrl = function (url) {
+        if (!url || typeof url !== "string") return true;
+        let d = url;
+        try { d = decodeURIComponent(url); } catch (_) {}
+        if (/t51\.2885-19/i.test(d)) return true;
+        if (/profile_pic|s150x150|p150x150|150x150|s320x320|p320x320|320x320|static\.cdninstagram|rsrc\.php|\.mp4/i.test(d)) return true;
+        return false;
+      };
+
       // 목록 카드(72px)용 초경량 썸네일: 480~1080px 원본 대신 160px WebP(약 5KB)로 리사이즈해 받는다.
       window.smallThumb = function (u, size) {
         if (!u || typeof u !== "string" || !/^https?:/i.test(u)) return u || "";
         const px = size || 160;
         let raw = u;
-        const m = u.match(/^https?:\/\/(?:wsrv\.nl|images\.weserv\.nl)\/?\?(.*)$/i);
-        if (m) {
-          const q = new URLSearchParams(m[1]);
-          raw = q.get("url") || "";
-          if (!raw) return u;
+        for (let k = 0; k < 4; k++) {
+          const m = raw.match(/^https?:\/\/(?:wsrv\.nl|images\.weserv\.nl)\/?\?(.*)$/i);
+          if (!m) break;
+          const inner = new URLSearchParams(m[1]).get("url") || "";
+          if (!inner) return u;
+          raw = /^https?:/i.test(inner) ? inner : "https://" + inner;
         }
         let extra = "";
         const yt = raw.match(/i\.ytimg\.com\/vi\/([A-Za-z0-9_-]{6,})\/oar2\.jpg/);
@@ -5346,11 +5358,12 @@
               cached = "";
             }
             if (cached) {
-              const raw = cached.startsWith("https://wsrv.nl/?url=")
-                ? decodeURIComponent(
-                    (cached.match(/[?&]url=([^&]+)/) || [])[1] || "",
-                  )
-                : cached;
+              // wsrv.nl / images.weserv.nl 로 몇 겹 감싸져 있어도 원본 주소까지 벗겨냄 (겹겹이 감싸면 느려짐)
+              let raw = cached;
+              for (let k = 0; k < 4 && /^https?:\/\/(?:wsrv\.nl|images\.weserv\.nl)\/?\?/i.test(raw); k++) {
+                raw = new URLSearchParams(raw.split("?").slice(1).join("?")).get("url") || "";
+                if (raw && !/^https?:/i.test(raw)) raw = "https://" + raw;
+              }
               if (raw) {
                 add(`https://images.weserv.nl/?url=${encodeURIComponent(raw)}&w=480&h=640&fit=cover&output=jpg`);
                 add(raw);
@@ -23949,7 +23962,7 @@ ${JSON.stringify(payload, null, 2)}
   }
 
   // 8. 서비스 워커 등록 (즉시 갱신)
-  const SW_QUERY = './sw.js?v=v20261115_104500';
+  const SW_QUERY = './sw.js?v=v20261115_112000';
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', async function() {
       try {
@@ -24420,8 +24433,13 @@ ${JSON.stringify(payload, null, 2)}
     const orig = window.saveReelThumbCache;
     if (typeof orig !== "function" || orig.__v78) return;
     let t = null;
+    let redrawT = null;
     window.saveReelThumbCache = Object.assign(function () {
       const r = orig.apply(this, arguments);
+      clearTimeout(redrawT);
+      redrawT = setTimeout(() => {
+        try { if (typeof window.renderListTab === "function") window.renderListTab(true); } catch (_) {}
+      }, 400);
       clearTimeout(t);
       t = setTimeout(() => window.persistReelThumbs && window.persistReelThumbs(), 2500);
       return r;
