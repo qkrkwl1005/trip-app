@@ -1678,7 +1678,7 @@
           <!-- 연결 상태 및 방 번호 칩 -->
           <div style="background:var(--s2);border:1px solid var(--bd2);border-radius:18px;padding:12px 14px;margin-bottom:12px">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-              <span id="sharedRoomStatus" style="font-weight: 700;font-size:13.5px;color:var(--tx)">● 실시간 동기화 중</span>
+              <span id="sharedRoomStatus" style="font-weight: 700;font-size:13.5px;color:var(--tx)">연결 확인 중…</span>
               <span id="v49RoomBadge" style="font-size:11px;font-weight: 700;padding:2px 8px;border-radius:999px;background:var(--s);color:var(--tx);/* border removed */">🔒 비공개 링크</span>
             </div>
             <div style="font-size:12px;color:var(--sub);line-height:1.45">
@@ -2771,7 +2771,7 @@
       const TRIP_PENDING_CONFLICT_KEY = "TRIP_PENDING_CONFLICT";
       const TRIP_LAST_ROOM_KEY = "TRIP_LAST_ROOM";
       const TRIP_CREATING_ROOM_KEY = "TRIP_CREATING_ROOM";
-      const APP_VERSION = "v81";
+      const APP_VERSION = "v82";
       const TRANSIENT_NET_RE =
         /unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
       let _offlineFlushBusy = false,
@@ -11583,7 +11583,20 @@ ${caption || rawText}
             if (initialRoom) connectSharedRoom(initialRoom);
           } else {
             // 구글 로그인 미완료 시 게스트(익명)로 자동 연결하여 친구가 로그인 없이도 바로 동기화 참여!
-            firebase.auth().signInAnonymously().catch(() => {});
+            firebase.auth().signInAnonymously().catch((e) => {
+              // Firebase 콘솔에서 익명 로그인이 꺼져 있으면(ADMIN_ONLY_OPERATION) 게스트 입장이 불가 → 이유와 해결 버튼 안내
+              const msg = String((e && (e.code || e.message)) || "");
+              window.__guestLoginBlocked = /admin-restricted|ADMIN_ONLY|operation-not-allowed/i.test(msg);
+              if (initialRoom) {
+                setSharedRoomStatus(
+                  window.__guestLoginBlocked
+                    ? "로그인 없이 들어오기가 꺼져 있어요. 아래 'Google로 로그인하고 들어가기'를 눌러 주세요."
+                    : "방에 연결하지 못했어요. 네트워크를 확인해 주세요.",
+                  "error",
+                );
+                if (typeof window.v79ShowLoginNeeded === "function") window.v79ShowLoginNeeded();
+              }
+            });
           }
         });
         completeGoogleRedirectLogin();
@@ -23773,7 +23786,7 @@ ${JSON.stringify(payload, null, 2)}
   }
 
   // 8. 서비스 워커 등록 (즉시 갱신)
-  const SW_QUERY = './sw.js?v=v20261115_053000';
+  const SW_QUERY = './sw.js?v=v20261115_063000';
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', async function() {
       try {
@@ -23876,6 +23889,11 @@ ${JSON.stringify(payload, null, 2)}
   }
   #sbody .ux-stab-pane {
     padding-bottom: 12px !important;
+  }
+  /* 상세창 사진이 화면 대부분을 차지해 탭·버튼이 아래로 밀리던 문제 → 높이 제한 */
+  #sbody .pic.big:has(img) {
+    aspect-ratio: auto !important;
+    height: min(32vh, 230px) !important;
   }
   /* 사진 없는 장소의 빈 큰 아이콘 박스 축소 */
   #sbody .pic.big:not(:has(img)) {
@@ -24591,6 +24609,26 @@ ${JSON.stringify(payload, null, 2)}
     const kick = () => { clearTimeout(t); t = setTimeout(() => { if (!document.getElementById("v79Social") || document.getElementById("v79Social").dataset.id !== String(typeof cur !== "undefined" ? cur : "")) renderSocial(); }, 60); };
     new MutationObserver(kick).observe(sbody, { childList: true });
     new MutationObserver(kick).observe(sheet, { attributes: true, attributeFilter: ["class"] });
+    // '일정·영상' 탭이 비어 있던 문제: 다른 패치가 일차 버튼을 관리 탭으로 옮기고 영상 입력칸을 지워서 비어 있었음
+    const fixPlan = () => {
+      const plan = sbody.querySelector('.ux-stab-pane[data-pane="plan"]');
+      const btn = sbody.querySelector('.ux-stab-btn[data-stab="plan"]');
+      if (!plan || !btn) return;
+      if (!plan.children.length) {
+        const chip = sbody.querySelector('.ux-stab-pane[data-pane="manage"] [data-act="setDay"]');
+        let block = chip;
+        while (block && block.parentElement && block.parentElement.dataset.pane !== "manage") block = block.parentElement;
+        if (block && block.parentElement) plan.appendChild(block);
+      }
+      const hasVid = Boolean(plan.querySelector("#sh-vid"));
+      const label = hasVid ? "일정·영상" : "일정";
+      if (!btn.dataset.v82) {
+        btn.dataset.v82 = "1";
+        btn.innerHTML = `<span class="ms">calendar_month</span>${label}`;
+      }
+      btn.style.display = plan.children.length ? "" : "none";
+    };
+    new MutationObserver(() => requestAnimationFrame(fixPlan)).observe(sbody, { childList: true });
   }
 
   /* ---------- 4) 목록 카드 꾸미기: NEW · 좋아요 수 · 코멘트 수 · 친구가 추가 ---------- */
@@ -24679,6 +24717,25 @@ ${JSON.stringify(payload, null, 2)}
     input.addEventListener("keydown", (e) => { if (e.key === "Enter") done(); });
   }
   window.v79EditMyName = showWelcome;
+  window.v79ShowLoginNeeded = function () {
+    if (document.getElementById("v79LoginNeed")) { document.getElementById("v79LoginNeed").classList.add("on"); return; }
+    const wrap = document.createElement("div");
+    wrap.id = "v79LoginNeed";
+    wrap.className = "on";
+    wrap.style.cssText = "position:fixed;inset:0;z-index:400;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.55)";
+    wrap.innerHTML = `<div class="v79-box" style="width:100%;max-width:520px;background:var(--s);color:var(--tx);border-radius:24px 24px 0 0;padding:22px 20px calc(20px + env(safe-area-inset-bottom))">
+      <h3 style="margin:0 0 6px;font-size:19px">여행 방에 들어가려면 로그인이 필요해요</h3>
+      <p style="margin:0 0 16px;color:var(--sub);font-size:13.5px;line-height:1.5">구글 계정으로 한 번만 로그인하면 바로 친구들과 같은 목록을 보고 같이 수정할 수 있어요.</p>
+      <button type="button" id="v79LoginGo" style="width:100%;min-height:50px;border:0;border-radius:14px;background:var(--pr);color:#fff;font-size:15.5px;font-weight:700">Google로 로그인하고 들어가기</button>
+      <button type="button" id="v79LoginLater" style="width:100%;min-height:44px;margin-top:8px;border:0;background:none;color:var(--sub);font-size:14px">나중에</button></div>`;
+    document.body.appendChild(wrap);
+    wrap.querySelector("#v79LoginGo").addEventListener("click", () => {
+      wrap.classList.remove("on"); wrap.style.display = "none";
+      if (typeof handleGoogleLoginBtn === "function") handleGoogleLoginBtn();
+      else document.getElementById("googleLoginBtn")?.click();
+    });
+    wrap.querySelector("#v79LoginLater").addEventListener("click", () => { wrap.style.display = "none"; });
+  };
 
   /* ---------- 6) 옛 고정 방(OSAKA-2026)이면 비공개 새 방으로 옮기기 ---------- */
   function moveToPrivateRoom() {
