@@ -23334,170 +23334,8 @@ ${JSON.stringify(payload, null, 2)}
 <!-- === V73_EXACT_VIDEO_MOTION_DESIGN_SUITE_END === -->
 
 
-<!-- [START_TRIP_THUMB_SAFE_FIX] -->
-<style>
-#tab-list img {
-  opacity: 0;
-  transition: opacity 0.14s ease-out;
-  background-color: transparent !important;
-}
-#tab-list img.thumb-ready {
-  opacity: 1;
-}
-</style>
-<script>
-(function () {
-  const STORAGE_KEY = 'TRIP_MASTER_ITEMS';
-  const EAGER_LIMIT = 10;
-  const PREHEAT_LIMIT = 24;
-
-  // 1. 이전 패치로 오염된 localStorage 데이터(회색 SVG, 억지 wsrv 래핑) 자동 치료
-  function healCorruptedStorage() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return [];
-      const items = JSON.parse(raw);
-      if (!Array.isArray(items)) return [];
-
-      let healed = false;
-      for (let i = 0; i < items.length; i++) {
-        const it = items[i];
-        if (!it) continue;
-
-        if (it.imgDead || it.imgBaked) {
-          delete it.imgDead;
-          delete it.imgBaked;
-          healed = true;
-        }
-
-        if (typeof it.img === 'string') {
-          // 잘못 박제된 data:image/svg+xml 제거하여 기본 카테고리 아이콘 복원
-          if (it.img.startsWith('data:image/svg+xml')) {
-            it.img = '';
-            healed = true;
-          }
-          // 억지로 감싸진 wsrv.nl 프록시 벗겨내고 원본 URL 복원
-          else if (it.img.includes('wsrv.nl/?url=') && it.img.includes('maxage=31536000')) {
-            try {
-              const u = new URL(it.img);
-              const orig = u.searchParams.get('url');
-              if (orig) {
-                it.img = orig;
-                healed = true;
-              }
-            } catch (e) {}
-          }
-        }
-      }
-
-      if (healed) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-      }
-      return items;
-    } catch (e) {
-      return [];
-    }
-  }
-
-  // 2. 목록 이미지 우선순위 최적화 (상위 10개 eager + high, 로드 완료 시 부드럽게 페이드인)
-  function enhanceListImages(container) {
-    const root = container || document.getElementById('tab-list');
-    if (!root) return;
-
-    const imgs = root.querySelectorAll('img');
-    imgs.forEach((img, index) => {
-      if (img.dataset.safeOpt === '1') return;
-      img.dataset.safeOpt = '1';
-
-      img.decoding = 'async';
-      if (index < EAGER_LIMIT) {
-        img.loading = 'eager';
-        img.setAttribute('fetchpriority', 'high');
-      } else {
-        img.loading = 'lazy';
-      }
-
-      const show = () => img.classList.add('thumb-ready');
-      if (img.complete && img.naturalWidth > 0) {
-        show();
-      } else {
-        img.addEventListener('load', show, { once: true });
-      }
-    });
-  }
-
-  // 3. 유휴 시간에 상위 24개 정상 HTTP 이미지 조용히 Pre-heat (동시 3개 제한)
-  function preheatImages(items) {
-    const urls = [];
-    const seen = new Set();
-    for (let i = 0; i < items.length && urls.length < PREHEAT_LIMIT; i++) {
-      const u = items[i] && items[i].img;
-      if (typeof u === 'string' && u.startsWith('http') && !seen.has(u)) {
-        seen.add(u);
-        urls.push(u);
-      }
-    }
-    if (!urls.length) return;
-
-    const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 400));
-    idle(() => {
-      let idx = 0;
-      const pump = () => {
-        if (idx >= urls.length) return;
-        const targetUrl = urls[idx++];
-        const loader = new Image();
-        loader.decoding = 'async';
-        loader.onload = loader.onerror = pump;
-        loader.src = targetUrl;
-      };
-      for (let c = 0; c < 3; c++) pump();
-    });
-  }
-
-  // 4. 서비스 워커 등록 (무한 새로고침 루프 방지를 위해 최초 1회만 갱신)
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', async () => {
-      try {
-        const reg = await navigator.serviceWorker.register('./sw.js?v=v20261114_180438', {
-          updateViaCache: 'none'
-        });
-        if (reg.waiting) {
-          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-        }
-        reg.addEventListener('updatefound', () => {
-          const nw = reg.installing;
-          if (!nw) return;
-          nw.addEventListener('statechange', () => {
-            if (nw.state === 'installed' && navigator.serviceWorker.controller) {
-              nw.postMessage({ type: 'SKIP_WAITING' });
-            }
-          });
-        });
-      } catch (e) {}
-    });
-  }
-
-  const items = healCorruptedStorage();
-  preheatImages(items);
-
-  const startObserver = () => {
-    const listEl = document.getElementById('tab-list');
-    if (!listEl) return;
-    enhanceListImages(listEl);
-    const mo = new MutationObserver(() => enhanceListImages(listEl));
-    mo.observe(listEl, { childList: true, subtree: true });
-  };
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', startObserver);
-  } else {
-    startObserver();
-  }
-})();
-</script>
-<!-- [END_TRIP_THUMB_SAFE_FIX] -->
-<!-- === V74_UX_MOTION_PATCH_START === -->
-<style id="v74-ux-motion-style">
+<!-- === TRIP_APP_ULTRA_FAST_UX_ENGINE_START === -->
+<style id="trip-app-ultra-ux-style">
   html, body {
     overscroll-behavior: none;
   }
@@ -23505,12 +23343,17 @@ ${JSON.stringify(payload, null, 2)}
     overscroll-behavior-y: contain;
     -webkit-overflow-scrolling: touch;
   }
-  /* 대량 리스트 렌더링 가속 (화면에 보이는 카드만 레이아웃 계산) */
-  #list-LIST > .item {
-    content-visibility: auto;
-    contain-intrinsic-size: 0 104px;
+  .chip-row, #mapStrip {
+    padding-right: 24px !important;
   }
-  /* 바텀 시트 열기/닫기 부드러운 모션 및 스와이프 핸들 */
+
+  /* ⚡ 목록 및 지도 썸네일 이미지: 어떠한 딜레이/페이드/깜빡임 없이 즉시 100% 선명하게 렌더링 */
+  .pic img, #tab-list img, .pinCard img {
+    opacity: 1 !important;
+    transition: none !important;
+  }
+
+  /* 바텀 시트 열기/닫기 부드러운 모션 */
   #sheet {
     transition: opacity 0.22s ease;
     opacity: 0;
@@ -23529,67 +23372,83 @@ ${JSON.stringify(payload, null, 2)}
   #sheet.closing .sh {
     transform: translateY(105%) !important;
   }
-  /* 썸네일 이미지 부드러운 페이드인 */
-  .pic img, .pinCard img {
-    opacity: 0;
-    transition: opacity 0.22s ease;
-  }
-  .pic img.v74-loaded, .pinCard img.v74-loaded {
-    opacity: 1;
-  }
 </style>
-<script id="v74-ux-motion-script">
+<script id="trip-app-ultra-ux-script">
 (function() {
-  // 1. 누락 위험 함수(isAvatarOrBadUrl) 안전 폴백 정의
-  if (typeof window.isAvatarOrBadUrl !== "function") {
-    window.isAvatarOrBadUrl = function(url) {
-      const s = String(url || "").toLowerCase();
-      if (!s || !/^https?:\/\//.test(s)) return true;
-      return /s150x150|s320x320|profile_pic|avatar|rsrc\.php|static\.cdninstagram\.com/.test(s);
-    };
-  }
+  const STORAGE_KEY = 'TRIP_MASTER_ITEMS';
+  const EAGER_LIMIT = 10;
+  const PREHEAT_LIMIT = 30;
 
-  // 2. 이미지 로드 완료 시 부드러운 페이드인 처리 (캐시된 이미지는 즉시 표시)
-  function markImgLoaded(img) {
-    if (!img || img.classList.contains("v74-loaded")) return;
-    if (img.complete && img.naturalWidth > 0) {
-      img.classList.add("v74-loaded");
-    } else {
-      img.addEventListener("load", function() {
-        img.classList.add("v74-loaded");
-      }, { once: true });
-    }
-  }
-  document.addEventListener("load", function(e) {
-    if (e.target && e.target.tagName === "IMG") {
-      e.target.classList.add("v74-loaded");
-    }
-  }, true);
+  // 1. localStorage 데이터 안전 정제 (손상된 SVG 및 억지 프록시 제거)
+  function healCorruptedStorage() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return [];
+      const items = JSON.parse(raw);
+      if (!Array.isArray(items)) return [];
 
-  const imgObserver = new MutationObserver(function(mutations) {
-    for (const m of mutations) {
-      for (const node of m.addedNodes) {
-        if (node.nodeType !== 1) continue;
-        if (node.tagName === "IMG") markImgLoaded(node);
-        else if (node.querySelectorAll) {
-          node.querySelectorAll("img").forEach(markImgLoaded);
+      let healed = false;
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i];
+        if (!it) continue;
+        if (it.imgDead || it.imgBaked) {
+          delete it.imgDead;
+          delete it.imgBaked;
+          healed = true;
+        }
+        if (typeof it.img === 'string') {
+          if (it.img.startsWith('data:image/svg+xml')) {
+            it.img = '';
+            healed = true;
+          } else if (it.img.includes('wsrv.nl/?url=') && it.img.includes('maxage=31536000')) {
+            try {
+              const u = new URL(it.img);
+              const orig = u.searchParams.get('url');
+              if (orig) {
+                it.img = orig;
+                healed = true;
+              }
+            } catch (e) {}
+          }
         }
       }
+      if (healed) localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+      return items;
+    } catch (e) {
+      return [];
     }
-  });
-  imgObserver.observe(document.body, { childList: true, subtree: true });
-  document.querySelectorAll("img").forEach(markImgLoaded);
+  }
 
-  // 3. 검색창 디바운스 헬퍼 (한글 자모 분리 및 타이핑 끊김 방지)
-  let _searchDebounceTimer = null;
-  window.__debouncedRenderList = function() {
-    clearTimeout(_searchDebounceTimer);
-    _searchDebounceTimer = setTimeout(function() {
-      if (typeof renderListTab === "function") renderListTab();
-    }, 160);
-  };
+  // 2. 유휴 시간 조용한 썸네일 프리히트 (네트워크 지연 없는 즉시 표시 보장)
+  function preheatImages(items) {
+    if (!Array.isArray(items) || !items.length) return;
+    const urls = [];
+    const seen = new Set();
+    for (let i = 0; i < items.length && urls.length < PREHEAT_LIMIT; i++) {
+      const u = items[i] && (items[i].img || (typeof itemThumb === 'function' ? itemThumb(items[i]) : ''));
+      if (typeof u === 'string' && u.startsWith('http') && !seen.has(u)) {
+        seen.add(u);
+        urls.push(u);
+      }
+    }
+    if (!urls.length) return;
 
-  // 4. 인스타/틱톡 썸네일 추출 동시성 제한 큐 (최대 2개 병렬, 중복 요청 원천 차단)
+    const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 400));
+    idle(() => {
+      let idx = 0;
+      const pump = () => {
+        if (idx >= urls.length) return;
+        const targetUrl = urls[idx++];
+        const loader = new Image();
+        loader.decoding = 'async';
+        loader.onload = loader.onerror = pump;
+        loader.src = targetUrl;
+      };
+      for (let c = 0; c < 2; c++) pump();
+    });
+  }
+
+  // 3. 인스타/틱톡 썸네일 동시성 제한 큐 (최대 2개 병렬, 전체 리스트 재렌더링 대신 개별 카드 즉시 교체)
   const _thumbQueue = [];
   const _thumbAttempted = new Set();
   let _thumbActive = 0;
@@ -23603,7 +23462,24 @@ ${JSON.stringify(payload, null, 2)}
       typeof hydrateInstagramThumb === "function" ? hydrateInstagramThumb(nextItem) : false
     ).then(function(changed) {
       if (changed) {
-        if (typeof renderListTab === "function") renderListTab();
+        _lastRenderedSig = ""; // 서명 무효화
+        // 전체 innerHTML을 갈아엎지 않고, 해당 카드의 썸네일만 즉시 교체하여 다른 카드 로딩 깜빡임 방지
+        const cardPic = document.querySelector(`.item[data-id="${nextItem.id}"] .pic`);
+        if (cardPic && typeof itemThumb === "function") {
+          const freshThumb = itemThumb(nextItem);
+          if (freshThumb) {
+            let img = cardPic.querySelector("img");
+            if (!img) {
+              img = document.createElement("img");
+              img.loading = "lazy";
+              img.decoding = "async";
+              img.referrerPolicy = "no-referrer";
+              img.onerror = function() { if (typeof imgErr === "function") imgErr(this); };
+              cardPic.appendChild(img);
+            }
+            if (img.src !== freshThumb) img.src = freshThumb;
+          }
+        }
         if (typeof draw === "function") draw(true);
       }
     }).catch(function() {}).finally(function() {
@@ -23621,8 +23497,36 @@ ${JSON.stringify(payload, null, 2)}
     setTimeout(pumpThumbQueue, 40);
   };
 
-  // 5. 탭 전환 및 리스트 재렌더링 시 스크롤 위치 100% 보존
+  // 4. 검색창 디바운스 헬퍼 (타이핑 시 렉 방지)
+  let _searchDebounceTimer = null;
+  window.__debouncedRenderList = function() {
+    clearTimeout(_searchDebounceTimer);
+    _searchDebounceTimer = setTimeout(function() {
+      if (typeof window.renderListTab === "function") window.renderListTab(true);
+    }, 160);
+  };
+
+  // 5. ⚡ 탭 전환 시 0ms 즉시 복원 및 불필요한 DOM 파괴 방지 엔진
   const _savedScrolls = { "tab-add": 0, "tab-list": 0, "tab-set": 0 };
+  let _lastRenderedSig = "";
+
+  function computeListSig() {
+    const q = (document.getElementById("q-LIST")?.value || "").trim().toLowerCase();
+    const c = typeof listCat !== "undefined" ? listCat : "ALL";
+    const f = (typeof listFilter !== "undefined" && listFilter[c]) || "ALL";
+    const edit = (typeof editMode !== "undefined" && editMode.LIST) ? "1" : "0";
+    const selCnt = (typeof selected !== "undefined") ? selected.size : 0;
+    const near = (typeof nearSortOn !== "undefined" && nearSortOn) ? "1" : "0";
+    const count = Array.isArray(items) ? items.length : 0;
+    let sum = 0;
+    if (Array.isArray(items)) {
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i];
+        if (it) sum = (sum + (it.updatedAt || 0) + (it.star ? 1 : 0) + (it.done ? 2 : 0)) % 1000000007;
+      }
+    }
+    return `${c}|${f}|${q}|${edit}|${selCnt}|${near}|${count}|${sum}`;
+  }
 
   document.querySelectorAll(".tab-content").forEach(function(sec) {
     sec.addEventListener("scroll", function() {
@@ -23632,33 +23536,47 @@ ${JSON.stringify(payload, null, 2)}
     }, { passive: true });
   });
 
-  if (typeof window.renderListTab === "function" && !window.__v74RenderWrapped) {
-    window.__v74RenderWrapped = true;
+  if (typeof window.renderListTab === "function") {
     const _origRenderListTab = window.renderListTab;
-    let _prevCat = typeof listCat !== "undefined" ? listCat : "ALL";
-    let _prevFilter = "ALL";
-    window.renderListTab = function() {
+
+    window.renderListTab = function(force) {
       const listSec = document.getElementById("tab-list");
+      const listEl = document.getElementById("list-LIST");
       const isListActive = listSec && listSec.classList.contains("active");
-      const curCatNow = typeof listCat !== "undefined" ? listCat : "ALL";
-      const curFilterNow = (typeof listFilter !== "undefined" && listFilter[curCatNow]) ? listFilter[curCatNow] : "ALL";
-      const filterChanged = (curCatNow !== _prevCat) || (curFilterNow !== _prevFilter);
+      const curSig = computeListSig();
+
+      // 목록 상단 카운트 배지 및 세그먼트 활성화 상태는 항상 동기화
+      const cntAll = document.getElementById("cnt-ALL");
+      if (cntAll && Array.isArray(items)) cntAll.textContent = items.length;
+      if (typeof CATS !== "undefined" && Array.isArray(items)) {
+        for (const k in CATS) {
+          const el = document.getElementById("cnt-" + k);
+          if (el) el.textContent = items.filter((i) => i.category === k).length;
+        }
+      }
+      document.querySelectorAll("#listCatSeg div").forEach((d) => {
+        d.classList.toggle("on", d.dataset.lcat === (typeof listCat !== "undefined" ? listCat : "ALL"));
+      });
+
+      // ⚡ 핵심: 변경 사항이 없고 이미 카드가 렌더링되어 있다면 innerHTML을 절대 파괴하지 않음! (사진 재로딩/깜빡임 0회)
+      if (!force && listEl && listEl.children.length > 0 && curSig === _lastRenderedSig) {
+        if (listSec && isListActive && _savedScrolls["tab-list"] != null) {
+          requestAnimationFrame(() => { listSec.scrollTop = _savedScrolls["tab-list"]; });
+        }
+        return;
+      }
+
       const savedTop = isListActive ? listSec.scrollTop : (_savedScrolls["tab-list"] || 0);
-
       _origRenderListTab.apply(this, arguments);
+      _lastRenderedSig = curSig;
 
-      _prevCat = curCatNow;
-      _prevFilter = curFilterNow;
       if (listSec && isListActive) {
-        requestAnimationFrame(function() {
-          listSec.scrollTop = filterChanged ? 0 : savedTop;
-        });
+        requestAnimationFrame(() => { listSec.scrollTop = savedTop; });
       }
     };
   }
 
-  if (typeof window.tab === "function" && !window.__v74TabWrapped) {
-    window.__v74TabWrapped = true;
+  if (typeof window.tab === "function") {
     const _origTab = window.tab;
     window.tab = function(k) {
       document.querySelectorAll(".tab-content.active").forEach(function(sec) {
@@ -23675,35 +23593,30 @@ ${JSON.stringify(payload, null, 2)}
     };
   }
 
-  // 6. 바텀 시트 부드러운 닫기 애니메이션 + 배경 터치 닫기 + 아래로 스와이프 닫기
+  // 6. 바텀 시트 부드러운 닫기 및 스와이프 인터랙션
   const sheetEl = document.getElementById("sheet");
   const sbodyEl = document.getElementById("sbody");
 
-  if (typeof window.closeSheet === "function" && !window.__v74CloseSheetWrapped) {
-    window.__v74CloseSheetWrapped = true;
+  if (typeof window.closeSheet === "function") {
     window.closeSheet = function() {
       if (!sheetEl || !sheetEl.classList.contains("on")) {
-        cur = null;
+        if (typeof cur !== "undefined") cur = null;
         return;
       }
       sheetEl.classList.add("closing");
       setTimeout(function() {
         sheetEl.classList.remove("on", "closing");
         if (sbodyEl) sbodyEl.style.transform = "";
-        cur = null;
+        if (typeof cur !== "undefined") cur = null;
       }, 220);
     };
   }
 
   if (sheetEl && sbodyEl) {
-    // 시트 바깥 어두운 배경 클릭 시 닫기
     sheetEl.addEventListener("click", function(e) {
-      if (e.target === sheetEl) {
-        window.closeSheet();
-      }
+      if (e.target === sheetEl) window.closeSheet();
     });
 
-    // 시트 상단에서 아래로 쓸어내려 닫기 (Swipe-to-close)
     let startY = 0, currentY = 0, dragging = false;
     sbodyEl.addEventListener("touchstart", function(e) {
       if (sbodyEl.scrollTop <= 0 && e.touches.length === 1) {
@@ -23733,121 +23646,19 @@ ${JSON.stringify(payload, null, 2)}
       dragging = false;
       sbodyEl.style.transition = "transform 0.22s cubic-bezier(0.22, 1, 0.36, 1)";
       const dy = currentY - startY;
-      if (dy > 85) {
-        window.closeSheet();
-      } else {
-        sbodyEl.style.transform = "";
-      }
+      if (dy > 85) window.closeSheet();
+      else sbodyEl.style.transform = "";
     }, { passive: true });
-  }
-})();
-</script>
-<!-- === V74_UX_MOTION_PATCH_END === -->
-<!-- === UX_MOTION_AND_SYNC_START === -->
-<style>
-  html, body { overscroll-behavior: none; }
-  .tab-content, .sh, #mapStrip, .lchips, .chip-row { overscroll-behavior-y: contain; -webkit-overflow-scrolling: touch; }
-  .chip-row, #mapStrip { padding-right: 24px !important; } 
-  #sheet { transition: opacity 0.22s ease; opacity: 0; }
-  #sheet.on { opacity: 1; }
-  #sheet.closing { opacity: 0 !important; pointer-events: none; }
-  #sheet .sh { transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1); will-change: transform; }
-  #sheet.closing .sh { transform: translateY(105%) !important; }
-  #list-LIST > .item { content-visibility: auto; contain-intrinsic-size: 0 104px; }
-  .pic img, .pinCard img { opacity: 0; transition: opacity 0.22s ease; }
-  .pic img.v-loaded, .pinCard img.v-loaded { opacity: 1; }
-</style>
-<script>
-(function(){
-  function markLoaded(i) {
-    if(!i || i.classList.contains("v-loaded")) return;
-    if(i.complete && i.naturalWidth > 0) i.classList.add("v-loaded");
-    else i.addEventListener("load", () => i.classList.add("v-loaded"), {once:true});
-  }
-  document.addEventListener("load", e => { if(e.target && e.target.tagName === "IMG") e.target.classList.add("v-loaded"); }, true);
-  new MutationObserver(mList => mList.forEach(m => m.addedNodes.forEach(n => {
-    if(n.nodeType === 1) { if(n.tagName==="IMG") markLoaded(n); else n.querySelectorAll("img").forEach(markLoaded); }
-  }))).observe(document.body, {childList:true, subtree:true});
-  document.querySelectorAll("img").forEach(markLoaded);
 
-  let dTimer;
-  window.__debouncedRenderList = () => { clearTimeout(dTimer); dTimer = setTimeout(() => { if(typeof renderListTab==="function") renderListTab(); }, 160); };
-
-  const tQ = [], tAtt = new Set();
-  let tAct = 0;
-  function pumpQ() {
-    if(tAct >= 2 || !tQ.length) return;
-    const i = tQ.shift();
-    if(!i) return;
-    tAct++;
-    Promise.resolve(typeof hydrateInstagramThumb==="function"?hydrateInstagramThumb(i):false)
-    .then(ok => { if(ok) { if(typeof renderListTab==="function") renderListTab(); if(typeof draw==="function") draw(true); } })
-    .catch(()=>{ if(typeof renderListTab==="function") renderListTab(); }).finally(()=>{ tAct--; setTimeout(pumpQ, 80); });
-  }
-  window.__queueIgThumb = (i) => {
-    if(!i||!i.vid) return; const k = String(i.id||i.vid);
-    if(tAtt.has(k)) return; tAtt.add(k); tQ.push(i); setTimeout(pumpQ, 40);
-  };
-
-  const sY = {"tab-add":0, "tab-list":0, "tab-set":0};
-  document.querySelectorAll(".tab-content").forEach(sec => {
-    sec.addEventListener("scroll", () => { if(sec.classList.contains("active")) sY[sec.id] = sec.scrollTop; }, {passive:true});
-  });
-  if(typeof renderListTab==="function" && !window.__rw) {
-    window.__rw = true; const oR = renderListTab; let pC = "ALL", pF = "ALL";
-    window.renderListTab = function() {
-      const l = document.getElementById("tab-list"), a = l && l.classList.contains("active");
-      const c = typeof listCat!=="undefined"?listCat:"ALL", f = typeof listFilter!=="undefined"&&listFilter[c]?listFilter[c]:"ALL";
-      const ch = (c!==pC)||(f!==pF), s = a ? l.scrollTop : (sY["tab-list"]||0);
-      oR.apply(this, arguments); pC=c; pF=f;
-      if(l && a) requestAnimationFrame(() => l.scrollTop = ch ? 0 : s);
-    };
-  }
-  if(typeof tab==="function" && !window.__tw) {
-    window.__tw = true; const oT = tab;
-    window.tab = function(k) {
-      document.querySelectorAll(".tab-content.active").forEach(sec => sY[sec.id] = sec.scrollTop);
-      oT.apply(this, arguments);
-      const t = document.getElementById("tab-"+k);
-      if(t && sY["tab-"+k]!=null) requestAnimationFrame(() => t.scrollTop = sY["tab-"+k]);
-    };
-  }
-
-  const sh = document.getElementById("sheet"), sb = document.getElementById("sbody");
-  if(typeof closeSheet==="function" && !window.__cw) {
-    window.__cw = true;
-    window.closeSheet = function() {
-      if(!sh || !sh.classList.contains("on")) { cur = null; return; }
-      sh.classList.add("closing");
-      setTimeout(() => { sh.classList.remove("on", "closing"); if(sb) sb.style.transform = ""; cur = null; }, 220);
-    };
-  }
-  if(sh && sb) {
-    sh.addEventListener("click", e => { if(e.target===sh) closeSheet(); });
-    let st=0, cy=0, dg=false;
-    sb.addEventListener("touchstart", e => {
-      if(sb.scrollTop<=0 && e.touches.length===1) { st=e.touches[0].clientY; cy=st; dg=true; sb.style.transition="none"; }
-      else dg=false;
-    }, {passive:true});
-    sb.addEventListener("touchmove", e => {
-      if(!dg) return; cy = e.touches[0].clientY; const dy = cy-st;
-      if(dy>0 && sb.scrollTop<=0) sb.style.transform="translateY("+Math.min(dy*0.85, 360)+"px)";
-      else if(dy<0) { sb.style.transform=""; dg=false; }
-    }, {passive:true});
-    sb.addEventListener("touchend", () => {
-      if(!dg) return; dg=false; sb.style.transition="transform 0.22s cubic-bezier(0.22, 1, 0.36, 1)";
-      if((cy-st)>85) closeSheet(); else sb.style.transform="";
-    }, {passive:true});
-    
-    sb.addEventListener("focusin", (e) => {
-      if(e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") {
-        setTimeout(() => { e.target.scrollIntoView({ behavior: "smooth", block: "center" }); }, 300);
+    sbodyEl.addEventListener("focusin", function(e) {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") {
+        setTimeout(function() { e.target.scrollIntoView({ behavior: "smooth", block: "center" }); }, 300);
       }
     });
   }
 
-  if(typeof openMapPinPopup === "function" && !window.__mw) {
-    window.__mw = true;
+  // 7. 지도 핀 클릭 시 하단 스트립 카드 부드러운 스크롤 이동
+  if (typeof window.openMapPinPopup === "function") {
     const oldMapPopup = window.openMapPinPopup;
     window.openMapPinPopup = function(item, expanded) {
       oldMapPopup.apply(this, arguments);
@@ -23857,8 +23668,34 @@ ${JSON.stringify(payload, null, 2)}
       }
     };
   }
+
+  // 8. 서비스 워커 등록 (즉시 갱신)
+  const SW_QUERY = './sw.js?v=v20261114_212000';
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', async function() {
+      try {
+        const reg = await navigator.serviceWorker.register(SW_QUERY, {
+          updateViaCache: 'none'
+        });
+        if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        reg.addEventListener('updatefound', function() {
+          const nw = reg.installing;
+          if (!nw) return;
+          nw.addEventListener('statechange', function() {
+            if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+              nw.postMessage({ type: 'SKIP_WAITING' });
+            }
+          });
+        });
+      } catch (e) {}
+    });
+  }
+
+  // 9. 실행
+  const healedItems = healCorruptedStorage();
+  preheatImages(healedItems);
 })();
 </script>
-<!-- === UX_MOTION_AND_SYNC_END === -->
+<!-- === TRIP_APP_ULTRA_FAST_UX_ENGINE_END === -->
 </body>
 </html>
