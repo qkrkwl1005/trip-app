@@ -2773,7 +2773,7 @@
       const TRIP_PENDING_CONFLICT_KEY = "TRIP_PENDING_CONFLICT";
       const TRIP_LAST_ROOM_KEY = "TRIP_LAST_ROOM";
       const TRIP_CREATING_ROOM_KEY = "TRIP_CREATING_ROOM";
-      const APP_VERSION = "v92";
+      const APP_VERSION = "v93";
       const TRANSIENT_NET_RE =
         /unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
       let _offlineFlushBusy = false,
@@ -6693,7 +6693,11 @@
           idle(() => {
             try {
               const el = $("list-LIST");
-              if (el && el.innerHTML && !$("q-LIST")?.value?.trim()) localStorage.setItem("TRIP_DOM_CACHE_LIST", el.innerHTML);
+              if (el && el.innerHTML && !$("q-LIST")?.value?.trim()) {
+                const rev = window.__thumbVault && window.__thumbVault.rev;
+                const html = el.innerHTML.replace(/src="(blob:[^"]+)"/g, (m, b) => `src="${(rev && rev.get(b)) || ""}"`);
+                localStorage.setItem("TRIP_DOM_CACHE_LIST", html);
+              }
             } catch (e) {}
           });
         }, 1500);
@@ -19864,7 +19868,7 @@ ${caption || rawText}
   window.__realJpyRate = Number(localStorage.getItem("TRIP_V42_JPY_RATE")) || 8.58;
   async function fetchRealTimeJpyRate() {
     try {
-      const r = await fetch("https://api.frankfurter.app/latest?from=JPY&to=KRW");
+      const r = await fetch("https://api.frankfurter.dev/v1/latest?from=JPY&to=KRW");
       if (!r.ok) return;
       const d = await r.json();
       const krw = Number(d?.rates?.KRW);
@@ -20881,7 +20885,7 @@ ${caption || rawText}
       return await window.tripQueryClient.fetchQuery({
         queryKey: "JPY_RATE_V45",
         queryFn: async () => {
-          const r = await fetch("https://api.frankfurter.app/latest?from=JPY&to=KRW");
+          const r = await fetch("https://api.frankfurter.dev/v1/latest?from=JPY&to=KRW");
           if (!r.ok) throw new Error("Rate HTTP " + r.status);
           const d = await r.json();
           const krw = Number(d?.rates?.KRW);
@@ -23748,7 +23752,7 @@ ${JSON.stringify(payload, null, 2)}
   let _thumbActive = 0;
 
   function pumpThumbQueue() {
-    if (_thumbActive >= 2 || !_thumbQueue.length) return;
+    if (_thumbActive >= 5 || !_thumbQueue.length) return;
     const nextItem = _thumbQueue.shift();
     if (!nextItem) return;
     _thumbActive++;
@@ -23964,7 +23968,7 @@ ${JSON.stringify(payload, null, 2)}
   }
 
   // 8. 서비스 워커 등록 (즉시 갱신)
-  const SW_QUERY = './sw.js?v=v20261115_150000';
+  const SW_QUERY = './sw.js?v=v20261115_160000';
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', async function() {
       try {
@@ -25101,6 +25105,233 @@ ${JSON.stringify(payload, null, 2)}
 })();
 </script>
 <!-- === V79_FRIENDS_END === -->
+
+<!-- === V92_THUMB_VAULT_START === -->
+<script id="v92-thumb-vault">
+/* 목록·지도 썸네일 금고:
+ * - 한 번 받은 작은 썸네일(160px)을 기기 저장소(IndexedDB)에 사진 파일 그대로 보관
+ * - 다음 실행부터는 네트워크 없이 바로 표시 (오프라인 포함)
+ * - 앱을 켜자마자(목록을 열기 전에) 아직 없는 썸네일을 백그라운드에서 미리 받아 둠
+ * 인스타 CDN 주소는 다시 받을 때마다 서명(쿼리)이 바뀌어 일반 캐시가 못 쓰므로, 파일 경로로 묶어 저장 */
+(function () {
+  if (!window.indexedDB || !window.smallThumb) return;
+  const DB_NAME = "trip-thumb-vault", STORE = "t", MAX = 900;
+  const mem = new Map(); // key -> blob URL
+  const rev = new Map(); // blob URL -> 원래 작은 썸네일 주소
+  const pending = new Set();
+  window.__thumbVault = { mem, rev };
+
+  const unwrap = (u) => {
+    let raw = String(u || "");
+    for (let k = 0; k < 4; k++) {
+      const m = raw.match(/^https?:\/\/(?:wsrv\.nl|images\.weserv\.nl)\/?\?(.*)$/i);
+      if (!m) break;
+      const inner = new URLSearchParams(m[1]).get("url") || "";
+      if (!inner) break;
+      raw = /^https?:/i.test(inner) ? inner : "https://" + inner;
+    }
+    return raw;
+  };
+  // 같은 사진이면 같은 열쇠: 인스타 CDN은 서버 이름·서명이 바뀌어도 파일 경로는 같음
+  const keyOf = (u) => {
+    if (!u || /^(blob|data):/i.test(u)) return "";
+    try {
+      const x = new URL(unwrap(u));
+      if (/cdninstagram\.com$|fbcdn\.net$/i.test(x.hostname)) return "ig" + x.pathname;
+      if (/ytimg\.com$/i.test(x.hostname)) return "yt" + x.pathname.replace(/\/(oar2|hqdefault|maxresdefault|mqdefault)\.jpg$/, "");
+      if (/firebasestorage\.googleapis\.com$/i.test(x.hostname)) return "fb" + x.pathname;
+      return x.hostname + x.pathname + x.search;
+    } catch (_) {
+      return "";
+    }
+  };
+
+  let dbp = null;
+  const db = () =>
+    dbp ||
+    (dbp = new Promise((res, rej) => {
+      const r = indexedDB.open(DB_NAME, 1);
+      r.onupgradeneeded = () => r.result.createObjectStore(STORE, { keyPath: "k" });
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    }));
+  const tx = async (mode, fn) => {
+    const d = await db();
+    return new Promise((res, rej) => {
+      const t = d.transaction(STORE, mode);
+      const out = fn(t.objectStore(STORE));
+      t.oncomplete = () => res(out && out.result !== undefined ? out.result : out);
+      t.onerror = () => rej(t.error);
+    });
+  };
+
+  const remember = (k, blob, src) => {
+    if (mem.has(k)) return mem.get(k);
+    const url = URL.createObjectURL(blob);
+    mem.set(k, url);
+    rev.set(url, src);
+    return url;
+  };
+
+  // 사진 주소가 만료돼 아이콘만 있는 카드도, 보관본이 있으면 바로 표시
+  const fillIconCards = () => {
+    if (typeof items === "undefined" || !Array.isArray(items)) return;
+    document.querySelectorAll("#list-LIST .item[data-id] .pic").forEach((pic) => {
+      if (pic.querySelector("img")) return;
+      const card = pic.closest(".item[data-id]");
+      const it = card && items.find((x) => String(x.id) === card.dataset.id);
+      if (!it) return;
+      let code = "";
+      try { const m = parseVideoMeta(it.vid); if (m && m.platform === "ig") code = m.id; } catch (_) {}
+      const raw = (code && typeof reelThumbCache === "object" && reelThumbCache[code]) || it.img || "";
+      const k = keyOf(raw);
+      if (!k || !mem.has(k)) return;
+      const img = document.createElement("img");
+      img.decoding = "async";
+      img.src = mem.get(k);
+      pic.appendChild(img);
+    });
+  };
+
+  // 화면에 이미 있는 카드 사진을 보관본으로 즉시 교체
+  const swapInPlace = (root) => {
+    (root || document).querySelectorAll("#list-LIST .pic img, #v8MapDrawerList img, .pinCard img").forEach((img) => {
+      const src = img.getAttribute("src") || "";
+      if (src.startsWith("blob:")) return;
+      const k = keyOf(src);
+      if (k && mem.has(k)) {
+        img.removeAttribute("data-imgalts");
+        img.src = mem.get(k);
+      }
+    });
+    fillIconCards();
+  };
+
+  // 작은 썸네일 주소를 만들 때 보관본이 있으면 그걸 씀
+  const origSmall = window.smallThumb;
+  window.smallThumb = function (u, size) {
+    const k = keyOf(u);
+    if (k && mem.has(k)) return mem.get(k);
+    return origSmall.apply(this, arguments);
+  };
+  window.smallThumb.__orig = origSmall;
+
+  async function store(smallUrl) {
+    const k = keyOf(smallUrl);
+    if (!k || mem.has(k) || pending.has(k) || !/^https:\/\/wsrv\.nl\//.test(smallUrl)) return;
+    pending.add(k);
+    try {
+      const ctrl = new AbortController();
+      const to = setTimeout(() => ctrl.abort(), 12000);
+      const r = await fetch(smallUrl, { mode: "cors", signal: ctrl.signal });
+      clearTimeout(to);
+      if (!r.ok) return;
+      const blob = await r.blob();
+      if (!/^image\//.test(blob.type) || blob.size < 300) return;
+      // Blob을 그대로 넣으면 일부 Safari 모드에서 저장이 실패 → 바이트(ArrayBuffer)로 저장
+      const buf = await blob.arrayBuffer();
+      await tx("readwrite", (s) => s.put({ k, buf, type: blob.type, src: smallUrl, t: Date.now() }));
+      remember(k, blob, smallUrl);
+    } catch (e) {
+      window.__thumbVault.lastError = String((e && e.message) || e);
+    } finally {
+      pending.delete(k);
+    }
+  }
+
+  // 화면에서 사진이 다 뜨면 그 사진을 보관
+  document.addEventListener("load", (e) => {
+    const img = e.target;
+    if (!img || img.tagName !== "IMG") return;
+    const src = img.currentSrc || img.src || "";
+    if (/^https:\/\/wsrv\.nl\//.test(src) && img.closest("#list-LIST, #v8MapDrawerList, .pinCard")) store(src);
+  }, true);
+
+  // 앱 켜자마자 미리 받기 (목록 순서대로, 동시에 4장씩)
+  let prefetching = false, prefetchAgain = false;
+  async function prefetchAll() {
+    if (typeof items === "undefined" || !Array.isArray(items) || typeof itemThumb !== "function") return;
+    if (prefetching) { prefetchAgain = true; return; }
+    prefetching = true;
+    try {
+      const queue = [];
+      const seen = new Set();
+      for (const it of items) {
+        let raw = "";
+        try { raw = itemThumb(it); } catch (_) {}
+        if (!raw) continue;
+        const small = origSmall(raw);
+        const k = keyOf(small);
+        if (!k || mem.has(k) || seen.has(k)) continue;
+        seen.add(k);
+        queue.push(small);
+      }
+      let i = 0;
+      const worker = async () => { while (i < queue.length) await store(queue[i++]); };
+      await Promise.all([worker(), worker(), worker(), worker()]);
+      swapInPlace();
+    } finally {
+      prefetching = false;
+      if (prefetchAgain) { prefetchAgain = false; setTimeout(prefetchAll, 50); }
+    }
+  }
+
+  async function prune() {
+    try {
+      const all = await tx("readonly", (s) => s.getAll());
+      if (all.length <= MAX) return;
+      all.sort((a, b) => a.t - b.t);
+      const drop = all.slice(0, all.length - MAX);
+      await tx("readwrite", (s) => drop.forEach((x) => s.delete(x.k)));
+    } catch (_) {}
+  }
+
+  Object.assign(window.__thumbVault, { store: (u) => store(u), prefetch: () => prefetchAll(), keyOf, count: () => tx("readonly", (s) => s.count()) });
+
+  async function boot() {
+    try {
+      const all = await tx("readonly", (s) => s.getAll());
+      (all || []).forEach((x) => {
+        if (!x || !x.k) return;
+        const blob = x.buf ? new Blob([x.buf], { type: x.type || "image/webp" }) : x.blob;
+        if (blob) remember(x.k, blob, x.src);
+      });
+    } catch (_) {}
+    swapInPlace();
+    const list = document.getElementById("list-LIST");
+    if (list) new MutationObserver(() => swapInPlace(list)).observe(list, { childList: true, subtree: true });
+    const drawer = document.getElementById("v8MapDrawerList");
+    if (drawer) new MutationObserver(() => swapInPlace(drawer)).observe(drawer, { childList: true });
+    // 목록을 열기 전에 미리 받기 + 공유 방 데이터가 도착하거나 바뀌면 다시
+    setTimeout(prefetchAll, 400);
+    // 릴스 썸네일 새 주소가 저장되면 곧바로 보관 (만료된 인스타 주소는 서버에서 새로 받아와야 함)
+    let thumbT = null;
+    const origSave = window.saveReelThumbCache;
+    if (typeof origSave === "function") {
+      window.saveReelThumbCache = Object.assign(function () {
+        const r = origSave.apply(this, arguments);
+        clearTimeout(thumbT);
+        thumbT = setTimeout(prefetchAll, 500);
+        return r;
+      }, origSave);
+    }
+    let remoteT = null;
+    const origApply = window.applyRemoteRoomSnapshot;
+    if (typeof origApply === "function") {
+      window.applyRemoteRoomSnapshot = Object.assign(function () {
+        const r = origApply.apply(this, arguments);
+        clearTimeout(remoteT);
+        remoteT = setTimeout(prefetchAll, 600);
+        return r;
+      }, origApply);
+    }
+    setInterval(() => { if (document.visibilityState === "visible") prefetchAll(); }, 20000);
+    setTimeout(prune, 15000);
+  }
+  boot();
+})();
+</script>
+<!-- === V92_THUMB_VAULT_END === -->
 
 </body>
 </html>
