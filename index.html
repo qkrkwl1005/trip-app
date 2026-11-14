@@ -1498,6 +1498,13 @@
         filter: brightness(0.85) contrast(1.05); /* 눈부심 방지 틴트 효과 */
       }
 
+    
+      /* V76: 사진 로딩 체감 속도를 떨어뜨리던 인위적인 페이드인 딜레이 완전 제거 (즉각 로딩) */
+      .pic img, .pinCard img {
+        opacity: 1 !important;
+        transition: none !important;
+      }
+
     </style>
   
     
@@ -23697,5 +23704,43 @@ ${JSON.stringify(payload, null, 2)}
 })();
 </script>
 <!-- === TRIP_APP_ULTRA_FAST_UX_ENGINE_END === -->
+
+<!-- === V76_FAST_RENDER_START === -->
+<script>
+(function() {
+  // 1. 탭 전환 시마다 발생하는 무의미한 전체 DOM 파괴 및 사진 리로딩 원천 차단
+  if (typeof window.renderListTab === "function" && !window.__v76FastRender) {
+    window.__v76FastRender = true;
+    const _originalRender = window.renderListTab;
+    let _lastListSignature = "";
+    
+    window.renderListTab = function() {
+      const listSec = document.getElementById("tab-list");
+      const qVal = document.getElementById("q-LIST") ? document.getElementById("q-LIST").value.trim() : "";
+      const curCat = typeof listCat !== "undefined" ? listCat : "ALL";
+      const curFilter = (typeof listFilter !== "undefined" && listFilter[curCat]) ? listFilter[curCat] : "ALL";
+      
+      // 데이터가 실제로 변했는지 검증하는 해시(Signature)
+      const itemsSig = (typeof items !== "undefined" && Array.isArray(items)) 
+        ? items.map(i => i.id + (i.updatedAt||0) + i.done + i.star).join("") 
+        : "";
+      const currentSig = curCat + "|" + curFilter + "|" + qVal + "|" + itemsSig;
+      
+      const listContainer = document.getElementById("list-LIST");
+      
+      // 데이터가 완전히 똑같고 이미 목록이 그려져 있다면, 렌더링(화면 지우고 다시 그리기)을 취소!
+      if (currentSig === _lastListSignature && listContainer && listContainer.childElementCount > 0) {
+         return; 
+      }
+      
+      // 변경점(새 장소 추가, 별표 클릭, 카테고리 이동 등)이 있을 때만 실제 렌더링 실행
+      _originalRender.apply(this, arguments);
+      _lastListSignature = currentSig;
+    };
+  }
+})();
+</script>
+<!-- === V76_FAST_RENDER_END === -->
+
 </body>
 </html>
