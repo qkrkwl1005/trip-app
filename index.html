@@ -4549,7 +4549,13 @@
         }
         try {
           if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
-          const user = firebase.auth().currentUser;
+          let user = firebase.auth().currentUser;
+          if (!user) {
+            try {
+              const anon = await firebase.auth().signInAnonymously();
+              user = anon?.user || firebase.auth().currentUser;
+            } catch (_) {}
+          }
           if (!user) throw new Error("먼저 Google 계정으로 로그인해 주세요.");
           window.firestoreDb = firebase.firestore();
           try {
@@ -5022,15 +5028,33 @@
       });
 
       const KOR_DAYS = ["일", "월", "화", "수", "목", "금", "토"];
+      const JP_DAYS = ["日", "月", "火", "水", "木", "金", "土"];
       function getBizStatus(i) {
         const txt = ((i.info || "") + " " + (i.note || "")).trim();
         if (!txt) return null;
         const now = new Date();
-        const todayKor = KOR_DAYS[now.getDay()];
-        const closedRe = new RegExp(
-          `(?:^|[\\s,·/(])${todayKor}(?:요일)?(?:\\s*[·,/]\\s*[월화수목금토일](?:요일)?)*\\s*(?:정기\\s*)?휴무`,
-        );
-        if (closedRe.test(txt)) return { lbl: "오늘 휴무 주의", cls: "closed" };
+        const dayIdx = now.getDay();
+        const todayKor = KOR_DAYS[dayIdx];
+        const todayJp = JP_DAYS[dayIdx];
+
+        // 연중무휴(年中無休) 명시 장소는 휴무 검사를 건너뜀
+        if (!/(?:연중\s*무휴|年中無休|定休日\s*なし|쉬는\s*날\s*없음)/i.test(txt)) {
+          // 1) 한국어 정기휴무 검사 (예: "수요일 휴무", "수 정기휴무", "수·목 휴무")
+          const closedReKor = new RegExp(
+            `(?:^|[\\s,·/(])${todayKor}(?:요일)?(?:\\s*[·,/]\\s*[월화수목금토일](?:요일)?)*\\s*(?:정기\\s*)?휴무`,
+          );
+          // 2) 일본어 정기휴무 검사 (예: "水曜定休", "水曜日定休日", "定休日：水曜", "休：月", "水・木休")
+          const jpPatternA = new RegExp(
+            `${todayJp}(?:曜|曜日)?(?:\\s*[・,、/·\\s]*[日月火水木金土](?:曜|曜日)?)*\\s*(?:定休|休み|休業|店休)`,
+          );
+          const jpPatternB = new RegExp(
+            `(?:定休日?|店休日?|休(?:み|日)?)\\s*[:：]?\\s*(?:[日月火水木金土](?:曜|曜日)?[・,、/·\\s]*)*${todayJp}(?:曜|曜日)?`,
+          );
+
+          if (closedReKor.test(txt) || jpPatternA.test(txt) || jpPatternB.test(txt)) {
+            return { lbl: "오늘 휴무 주의", cls: "closed" };
+          }
+        }
 
         const ranges = [
           ...txt.matchAll(/(\d{1,2}):(\d{2})\s*[~∼\-–]\s*(\d{1,2}):(\d{2})/g),
@@ -5121,13 +5145,69 @@
       function openExternalVideo(url) {
         const u = normalizeVidUrl(url) || String(url || "").trim();
         if (!u) return toast("연결된 릴스/쇼츠 링크가 없어요");
-        const a = document.createElement("a");
-        a.href = u;
-        a.target = "_blank";
-        a.rel = "noopener noreferrer";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
+        openInAppVideoModal(u);
+      }
+
+      function openInAppVideoModal(vidUrl) {
+        const embedSrc = vidEmbedUrl(vidUrl, true);
+        if (!embedSrc) {
+          const a = document.createElement("a");
+          a.href = vidUrl;
+          a.target = "_blank";
+          a.rel = "noopener noreferrer";
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          return;
+        }
+
+        let modal = document.getElementById("inAppVideoModal");
+        if (!modal) {
+          modal = document.createElement("div");
+          modal.id = "inAppVideoModal";
+          modal.style.cssText = "position:fixed;inset:0;z-index:10005;background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px;opacity:0;pointer-events:none;transition:opacity 0.25s ease;";
+          modal.innerHTML = `
+            <div style="width:100%;max-width:420px;display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;color:#fff;">
+              <div style="display:flex;align-items:center;gap:6px;font-weight:700;font-size:14px;">
+                <span class="ms fill" style="color:var(--pr, #fa5252);font-size:20px;">play_circle</span>
+                <span>영상 미리보기</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <a id="inAppVidExternalLink" href="#" target="_blank" rel="noopener noreferrer" style="color:#aaa;text-decoration:none;font-size:12px;display:flex;align-items:center;gap:3px;background:rgba(255,255,255,0.12);padding:5px 9px;border-radius:8px;">
+                  <span>앱으로 열기</span><span class="ms" style="font-size:14px;">north_east</span>
+                </a>
+                <button type="button" id="inAppVidCloseBtn" style="background:rgba(255,255,255,0.15);border:none;color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+                  <span class="ms" style="font-size:18px;">close</span>
+                </button>
+              </div>
+            </div>
+            <div style="width:100%;max-width:420px;height:75vh;max-height:640px;background:#000;border-radius:18px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,0.8);position:relative;">
+              <iframe id="inAppVidIframe" src="" style="width:100%;height:100%;border:none;" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share" allowfullscreen></iframe>
+            </div>
+          `;
+          document.body.appendChild(modal);
+        }
+
+        const iframe = modal.querySelector("#inAppVidIframe");
+        const extLink = modal.querySelector("#inAppVidExternalLink");
+        const closeBtn = modal.querySelector("#inAppVidCloseBtn");
+
+        iframe.src = embedSrc;
+        extLink.href = vidUrl;
+
+        modal.style.opacity = "1";
+        modal.style.pointerEvents = "auto";
+
+        const closeModal = () => {
+          modal.style.opacity = "0";
+          modal.style.pointerEvents = "none";
+          setTimeout(() => { iframe.src = ""; }, 200);
+        };
+
+        closeBtn.onclick = closeModal;
+        modal.onclick = (e) => {
+          if (e.target === modal) closeModal();
+        };
       }
       function vidEmbedUrl(v, captioned = false) {
         const meta = parseVideoMeta(v);
@@ -5198,6 +5278,28 @@
         }
 
         return out;
+      }
+
+      // [V68 제로-토큰 백그라운드 썸네일 캐싱] API 토큰 0회 소모, 브라우저 메모리에 목록 사진 사전 다운로드
+      const _preloadedImgUrls = new Set();
+      function preloadListThumbnails(limit = 35) {
+        if (!Array.isArray(items) || !items.length) return;
+        const targetList = items.slice(0, limit);
+        targetList.forEach((it) => {
+          const thumb = itemThumb(it);
+          if (
+            thumb &&
+            typeof thumb === "string" &&
+            !thumb.startsWith("data:") &&
+            !_preloadedImgUrls.has(thumb)
+          ) {
+            _preloadedImgUrls.add(thumb);
+            const img = new Image();
+            img.decoding = "async";
+            img.referrerPolicy = "no-referrer";
+            img.src = thumb;
+          }
+        });
       }
 
       function extractIgThumbFromHtml(html) {
@@ -5481,7 +5583,10 @@
           .querySelectorAll(".tab-content")
           .forEach((c) => c.classList.toggle("active", c.id === "tab-" + k));
         document.body.classList.toggle("show-map", k === "map");
-        if (k === "list") renderListTab();
+        if (k === "list") {
+          renderListTab();
+          preloadListThumbnails(40);
+        }
         if (k === "set") renderUsageBox();
         if (k === "map") {
           renderMapChips();
@@ -6285,16 +6390,18 @@
       }
 
       /* 목록 카드: 주소·설명 없이 오직 '제목 + 릴스 버튼 + 길찾기 버튼'만 표시 */
-      const card = (i) => {
+      const card = (i, idx = -1) => {
         const vUrl = getVidUrlStr(i.vid);
         const dirHref = getGMapDirLink(i);
         const isEdit = Boolean(editMode.LIST || editMode[i.category]);
+        const isEager = typeof idx === "number" && idx >= 0 && idx < 8;
+        const picClass = isEager ? "eager" : "";
         const vAction = vUrl
           ? `<button class="mb reel-jump" data-act="openVid" data-id="${i.id}" style="padding:6px 13px;font-size:12px;min-height:36px"><span class="ms fill">play_circle</span>${esc(getVidBtnLabel(vUrl))} <span class="ms" style="font-size:14px">north_east</span></button>`
           : `<button class="mb" data-act="quickAddVid" data-id="${i.id}" style="padding:6px 12px;font-size:12px;min-height:36px;color:var(--pr);border-color:var(--pr)"><span class="ms">add_link</span>릴스</button>`;
         return `<div class="item${i.done ? " done" : ""}${i.star ? " starred" : ""}${selected.has(i.id) ? " selected" : ""}" data-act="${isEdit ? "toggleSel" : "open"}" data-id="${i.id}" data-cat="LIST" style="${selected.has(i.id) ? "outline:2px solid var(--pr)" : ""}">
     ${isEdit ? `<input type="checkbox" data-act="sel" data-id="${i.id}" data-cat="LIST"${selected.has(i.id) ? " checked" : ""} style="margin-right:4px">` : ""}
-    ${ph(CATS[i.category] ? CATS[i.category].ic : "location_on", itemThumb(i), "", i.img, i.day, itemThumbCandidates(i).slice(1).join("|"))}
+    ${ph(CATS[i.category] ? CATS[i.category].ic : "location_on", itemThumb(i), picClass, i.img, i.day, itemThumbCandidates(i).slice(1).join("|"))}
     <div class="mid">
       <div class="nm">
         <span style="flex:1;min-width:0">${esc(i.name)}</span>
@@ -6310,17 +6417,18 @@
       };
 
       function ph(icName, src, c = "", fb = "", day = 0, alts = "") {
+        const isEager = c.includes("big") || c.includes("eager");
         const fba = fb && fb !== src ? ` data-fbsrc="${esc(fb)}"` : "";
         const altAttr = alts ? ` data-imgalts="${esc(alts)}"` : "";
         const dTag =
           day && !c.includes("big")
             ? `<span class="dayTag">D${day}</span>`
             : "";
-        const priority = c.includes("big") ? ' fetchpriority="high"' : "";
+        const priority = isEager ? ' fetchpriority="high"' : "";
         const iconHtml = /^[a-z0-9_]+$/.test(String(icName || ""))
           ? `<span class="ms">${icName}</span>`
           : icName;
-        return `<div class="pic ${c}">${dTag}${iconHtml}${src ? `<img loading="${c.includes("big") ? "eager" : "lazy"}"${priority} decoding="async" referrerpolicy="no-referrer" src="${esc(src)}"${fba}${altAttr} onerror="imgErr(this)">` : ""}</div>`;
+        return `<div class="pic ${c}">${dTag}${iconHtml}${src ? `<img loading="${isEager ? "eager" : "lazy"}"${priority} decoding="async" referrerpolicy="no-referrer" src="${esc(src)}"${fba}${altAttr} onerror="imgErr(this)">` : ""}</div>`;
       }
 
       /* 통합 목록 탭 렌더링 */
@@ -6427,7 +6535,7 @@
         if (listEl) {
           const emptyIcon = CATS[listCat] ? CATS[listCat].ic : "location_on";
           listEl.innerHTML = l.length
-            ? l.map(card).join("")
+            ? l.map((item, idx) => card(item, idx)).join("")
             : `<div class="empty"><i><span class="ms" style="font-size:40px">${emptyIcon}</span></i>${all.length ? "선택한 필터 조건에 맞는 항목이 없어요" : "홈 탭에서 장소를 추가해 보세요"}</div>`;
         }
         const bulk = $("bulk-LIST");
@@ -8486,6 +8594,100 @@
         return null;
       }
 
+      function requestManualCaptionInput() {
+        return new Promise((resolve, reject) => {
+          let modal = document.getElementById("manualCaptionModal");
+          if (!modal) {
+            modal = document.createElement("div");
+            modal.id = "manualCaptionModal";
+            modal.style.cssText = "position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.65);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;padding:16px;opacity:0;pointer-events:none;transition:opacity 0.2s ease;";
+            modal.innerHTML = `
+              <div style="background:var(--s, #1c1c1e);border:1px solid var(--bd, #333);border-radius:20px;width:100%;max-width:440px;padding:20px;box-shadow:0 16px 40px rgba(0,0,0,0.5);display:flex;flex-direction:column;gap:14px;color:var(--tx, #fff);">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <div style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:16px;">
+                    <span class="ms" style="color:var(--pr, #fa5252);font-size:22px;">edit_note</span>
+                    <span>릴스 본문 직접 입력</span>
+                  </div>
+                  <button type="button" id="mcapCloseBtn" style="background:none;border:none;color:var(--sub, #888);font-size:20px;cursor:pointer;padding:4px;"><span class="ms">close</span></button>
+                </div>
+                <div style="font-size:13px;color:var(--sub, #a1a1a6);line-height:1.45;">
+                  인스타그램 보안 정책으로 본문을 자동 추출하지 못했습니다.<br>
+                  릴스 본문이나 고정 댓글, 또는 매장명을 편하게 붙여넣어 주세요.
+                </div>
+                <div style="position:relative;">
+                  <textarea id="mcapTextarea" rows="6" placeholder="여기에 릴스 캡션/댓글 또는 매장명을 붙여넣으세요..." style="width:100%;box-sizing:border-box;background:var(--bg, #000);border:1px solid var(--bd, #38383a);border-radius:12px;color:var(--tx, #fff);padding:12px;padding-bottom:38px;font-size:13.5px;font-family:inherit;resize:vertical;line-height:1.5;outline:none;"></textarea>
+                  <button type="button" id="mcapPasteBtn" style="position:absolute;right:10px;bottom:10px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:8px;padding:4px 9px;font-size:12px;color:var(--tx, #fff);cursor:pointer;display:flex;align-items:center;gap:4px;backdrop-filter:blur(8px);">
+                    <span class="ms" style="font-size:14px;">content_paste</span>붙여넣기
+                  </button>
+                </div>
+                <div style="display:flex;gap:10px;margin-top:2px;">
+                  <button type="button" id="mcapCancelBtn" class="mb" style="flex:1;min-height:42px;border-radius:10px;font-size:14px;font-weight:600;">취소</button>
+                  <button type="button" id="mcapSubmitBtn" class="mb pr" style="flex:1.5;min-height:42px;border-radius:10px;font-size:14px;font-weight:700;background:var(--pr, #fa5252);color:#fff;border:none;">분석 시작</button>
+                </div>
+              </div>
+            `;
+            document.body.appendChild(modal);
+          }
+
+          const tx = modal.querySelector("#mcapTextarea");
+          const btnSubmit = modal.querySelector("#mcapSubmitBtn");
+          const btnCancel = modal.querySelector("#mcapCancelBtn");
+          const btnClose = modal.querySelector("#mcapCloseBtn");
+          const btnPaste = modal.querySelector("#mcapPasteBtn");
+
+          tx.value = "";
+          modal.style.opacity = "1";
+          modal.style.pointerEvents = "auto";
+          setTimeout(() => tx.focus(), 100);
+
+          const cleanup = () => {
+            modal.style.opacity = "0";
+            modal.style.pointerEvents = "none";
+            btnSubmit.onclick = null;
+            btnCancel.onclick = null;
+            btnClose.onclick = null;
+            btnPaste.onclick = null;
+            modal.onclick = null;
+          };
+
+          btnPaste.onclick = async () => {
+            try {
+              if (navigator.clipboard?.readText) {
+                const clip = await navigator.clipboard.readText();
+                if (clip) {
+                  tx.value = clip;
+                  toast("📋 클립보드 내용을 붙여넣었어요");
+                }
+              }
+            } catch (_) {
+              toast("클립보드 접근 권한이 없습니다. 텍스트를 길게 눌러 붙여넣어 주세요");
+            }
+          };
+
+          btnSubmit.onclick = () => {
+            const val = (tx.value || "").trim();
+            if (!val || val.length < 2) {
+              toast("본문이나 매장명을 입력해 주세요");
+              tx.focus();
+              return;
+            }
+            cleanup();
+            resolve(val);
+          };
+
+          const handleCancel = () => {
+            cleanup();
+            reject(new Error("취소되었습니다."));
+          };
+
+          btnCancel.onclick = handleCancel;
+          btnClose.onclick = handleCancel;
+          modal.onclick = (e) => {
+            if (e.target === modal) handleCancel();
+          };
+        });
+      }
+
       async function analyzeContent({
         rawText = "",
         vidUrl = "",
@@ -8521,7 +8723,7 @@
 
         if (!captionText || captionText.trim().length < 3 || captionText.includes("<html")) {
           if (!images || images.length === 0) {
-            const manualInput = window.prompt("보안 정책으로 본문을 자동 추출하지 못했습니다.\n\n릴스 본문을 붙여넣거나 매장명을 입력해 주세요:");
+            const manualInput = await requestManualCaptionInput();
             if (!manualInput) throw new Error("취소되었습니다.");
             captionText = manualInput;
             caption = captionText;
@@ -10886,15 +11088,37 @@ ${caption || rawText}
         toast(`CSV에서 ${cnt}개 장소를 가져왔어요!`);
       };
 
-      $("dlJsonBtn").onclick = () => {
-        const blob = new Blob([JSON.stringify(items, null, 2)], {
-          type: "application/json",
-        });
-        const a = document.createElement("a");
+      $("dlJsonBtn").onclick = async () => {
         const d = new Date().toISOString().slice(0, 10);
+        const fileName = `tripsync_backup_${d}.json`;
+        const jsonStr = JSON.stringify(items, null, 2);
+        const blob = new Blob([jsonStr], { type: "application/json" });
+
+        // 모바일(iOS/Android)에서 Web Share API로 카톡/파일 앱/메모장에 원터치 공유/저장 지원
+        try {
+          if (typeof File !== "undefined" && navigator.canShare) {
+            const file = new File([blob], fileName, { type: "application/json" });
+            if (navigator.canShare({ files: [file] })) {
+              await navigator.share({
+                files: [file],
+                title: "여행 계획 백업 파일",
+                text: `오사카/교토 여행 계획 데이터 (${items.length}곳) 백업 파일입니다.`,
+              });
+              toast("💾 백업 파일 공유/저장을 완료했어요");
+              return;
+            }
+          }
+        } catch (e) {
+          if (e.name === "AbortError") return;
+        }
+
+        // 일반 브라우저 다운로드
+        const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = `tripsync_backup_${d}.json`;
+        a.download = fileName;
+        document.body.appendChild(a);
         a.click();
+        a.remove();
         toast("💾 백업 파일(.json)을 다운로드했어요");
       };
       $("ulJsonBtn").onclick = () => $("ulJsonFile").click();
@@ -10906,14 +11130,34 @@ ${caption || rawText}
           const txt = await f.text();
           const arr = JSON.parse(txt);
           if (Array.isArray(arr)) {
-            items = arr;
-            items.forEach((i) => {
-              if (!CATS[i.category]) i.category = "PLACE";
-            });
-            save();
-            fit();
-            toast(`📂 파일에서 ${arr.length}개 장소를 복원했어요!`);
-          } else toast("유효한 백업 배열 형식이 아니에요");
+            const isMerge = items.length > 0 && confirm(
+              `백업 파일에 ${arr.length}개의 장소가 있습니다.\n\n[확인]: 기존 데이터에 합치기(추가 병합)\n[취소]: 기존 데이터를 지우고 새로 덮어쓰기`
+            );
+            if (isMerge) {
+              const existingIds = new Set(items.map((x) => String(x.id)));
+              let added = 0;
+              arr.forEach((it) => {
+                if (!existingIds.has(String(it.id))) {
+                  if (!CATS[it.category]) it.category = "PLACE";
+                  items.push(it);
+                  added++;
+                }
+              });
+              save();
+              fit();
+              toast(`📂 기존 일정에 ${added}개 장소를 안전하게 추가 병합했어요!`);
+            } else {
+              items = arr;
+              items.forEach((i) => {
+                if (!CATS[i.category]) i.category = "PLACE";
+              });
+              save();
+              fit();
+              toast(`📂 총 ${arr.length}개 장소로 복원했습니다!`);
+            }
+          } else {
+            toast("유효한 백업 배열 형식이 아니에요");
+          }
         } catch (err) {
           toast("파일 읽기 실패: " + err.message);
         }
@@ -11239,6 +11483,112 @@ ${caption || rawText}
           }
         });
         if (changed) save();
+      })();
+
+      // [V68 제로-토큰 백그라운드 썸네일 프리로드 트리거] API 토큰 0회 소모
+      setTimeout(() => preloadListThumbnails(30), 300);
+      document.addEventListener("pointerdown", (e) => {
+        if (e.target && e.target.closest && e.target.closest('[data-tab="list"]')) {
+          preloadListThumbnails(40);
+        }
+      }, { passive: true });
+
+      // [V69 클립보드 영상 링크 자동 감지 원터치 배너]
+      let _lastDetectedClipVid = "";
+      async function checkClipboardForVideoLink() {
+        if (!navigator.clipboard?.readText || document.visibilityState !== "visible") return;
+        try {
+          const text = (await navigator.clipboard.readText() || "").trim();
+          if (!text || text === _lastDetectedClipVid) return;
+          const meta = parseVideoMeta(text);
+          if (meta && ["ig", "yt", "tt"].includes(meta.platform) && meta.url) {
+            _lastDetectedClipVid = text;
+            showClipboardVideoBanner(meta.url);
+          }
+        } catch (_) {}
+      }
+
+      function showClipboardVideoBanner(vidUrl) {
+        let banner = document.getElementById("clipboardVidBanner");
+        if (!banner) {
+          banner = document.createElement("div");
+          banner.id = "clipboardVidBanner";
+          banner.style.cssText = "position:fixed;top:calc(14px + env(safe-area-inset-top));left:50%;transform:translateX(-50%) translateY(-140%);background:var(--s, #1c1c1e);border:1px solid var(--pr, #fa5252);border-radius:14px;padding:10px 14px;box-shadow:0 12px 32px rgba(0,0,0,0.55);display:flex;align-items:center;gap:10px;z-index:9999;transition:transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);max-width:92%;width:380px;color:var(--tx, #fff);";
+          banner.innerHTML = `
+            <span class="ms fill" style="color:var(--pr, #fa5252);font-size:22px;flex:none;">play_circle</span>
+            <div style="flex:1;min-width:0;font-size:12.5px;line-height:1.35;">
+              <strong style="display:block;font-size:13px;">복사한 영상 링크 감지</strong>
+              <span id="clipBannerUrl" style="color:var(--sub, #aaa);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;">${esc(vidUrl)}</span>
+            </div>
+            <button type="button" id="clipBannerAction" class="mb pr" style="padding:6px 12px;font-size:12px;min-height:32px;border-radius:8px;flex:none;font-weight:700;">추가</button>
+            <button type="button" id="clipBannerClose" style="background:none;border:none;color:var(--sub, #888);font-size:18px;cursor:pointer;padding:2px;"><span class="ms">close</span></button>
+          `;
+          document.body.appendChild(banner);
+        } else {
+          const urlEl = banner.querySelector("#clipBannerUrl");
+          if (urlEl) urlEl.textContent = vidUrl;
+        }
+
+        const hideBanner = () => {
+          banner.style.transform = "translateX(-50%) translateY(-140%)";
+        };
+
+        const actBtn = banner.querySelector("#clipBannerAction");
+        const closeBtn = banner.querySelector("#clipBannerClose");
+
+        actBtn.onclick = () => {
+          hideBanner();
+          tab("add");
+          if ($("reelLinkBox")) $("reelLinkBox").value = vidUrl;
+          if ($("shareBox")) $("shareBox").value = vidUrl;
+          lastSharedVid = vidUrl;
+          runAnalyzeShare();
+        };
+        closeBtn.onclick = hideBanner;
+
+        requestAnimationFrame(() => {
+          banner.style.transform = "translateX(-50%) translateY(0)";
+        });
+
+        clearTimeout(banner._timer);
+        banner._timer = setTimeout(hideBanner, 8000);
+      }
+
+      window.addEventListener("focus", () => setTimeout(checkClipboardForVideoLink, 400));
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") setTimeout(checkClipboardForVideoLink, 400);
+      });
+      setTimeout(checkClipboardForVideoLink, 1200);
+
+      // [V70 카카오톡 인앱 브라우저 감지 및 외부 브라우저(Safari/Chrome) 전환 안내]
+      (function initKakaoTalkInAppNotice() {
+        const ua = navigator.userAgent || "";
+        const isKakao = /KAKAOTALK/i.test(ua);
+        if (!isKakao) return;
+        const isAndroid = /Android/i.test(ua);
+        const curUrl = location.href;
+
+        const banner = document.createElement("div");
+        banner.id = "kakaoInAppBanner";
+        banner.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:10002;background:#fee500;color:#191919;padding:9px 12px;display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:600;box-shadow:0 3px 10px rgba(0,0,0,0.15);";
+        banner.innerHTML = `
+          <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0;">
+            <span style="background:#000;color:#fee500;border-radius:5px;padding:2px 5px;font-size:10.5px;font-weight:900;">카톡</span>
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">카톡에서는 구글 로그인이 차단돼요!</span>
+          </div>
+          <button type="button" id="kakaoEscapeBtn" style="background:#191919;color:#fff;border:none;border-radius:6px;padding:4px 9px;font-size:11.5px;font-weight:700;cursor:pointer;flex:none;margin-left:6px;">
+            ${isAndroid ? "Chrome으로 열기" : "Safari로 열기"}
+          </button>
+        `;
+        document.body.prepend(banner);
+
+        document.getElementById("kakaoEscapeBtn").onclick = () => {
+          if (isAndroid) {
+            location.href = "intent://" + curUrl.replace(/https?:\/\//, "") + "#Intent;scheme=https;package=com.android.chrome;end";
+          } else {
+            alert("카카오톡 우측 하단 [···] 버튼을 누른 뒤 [다른 브라우저로 열기(Safari)]를 눌러주세요!");
+          }
+        };
       })();
 
       // === SMART_CONFLICT_AND_FILTER_ENGINE_START ===
@@ -22942,5 +23292,291 @@ ${JSON.stringify(payload, null, 2)}
 <!-- === V73_EXACT_VIDEO_MOTION_DESIGN_SUITE_END === -->
 
 
+<!-- [START_TRIP_THUMB_OPTIMIZER] -->
+<style>
+.trip-thumb-wrap {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  background-color: #e5e7eb;
+  background-image: linear-gradient(90deg, #e5e7eb 0%, #f3f4f6 50%, #e5e7eb 100%);
+  background-size: 200% 100%;
+  animation: thumbShimmer 1.4s infinite linear;
+  contain: layout paint;
+}
+.trip-thumb-wrap.is-loaded {
+  animation: none;
+  background-image: none;
+  background-color: transparent;
+}
+.trip-thumb-img {
+  opacity: 0;
+  transition: opacity 0.15s ease-out;
+  will-change: opacity;
+}
+.trip-thumb-img.is-loaded {
+  opacity: 1;
+}
+@keyframes thumbShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+</style>
+<script>
+(function () {
+  const STORAGE_KEY = 'TRIP_MASTER_ITEMS';
+  const EAGER_COUNT = 10;
+  const PREHEAT_COUNT = 30;
+  const CONCURRENCY = 4;
+
+  const FALLBACK_SVG_URI =
+    "data:image/svg+xml;utf8," +
+    encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">' +
+      '<rect width="120" height="120" fill="#f1f5f9"/>' +
+      '<path d="M40 78l14-18 10 12 12-16 14 22H40z" fill="#cbd5e1"/>' +
+      '<circle cx="48" cy="46" r="6" fill="#cbd5e1"/></svg>'
+    );
+
+  window.imgErr = function (el) {
+    if (!el) return;
+    el.onerror = null;
+    el.src = FALLBACK_SVG_URI;
+    el.classList.add('is-loaded');
+    if (el.parentElement) el.parentElement.classList.add('is-loaded');
+  };
+
+  const runWhenIdle =
+    window.requestIdleCallback ||
+    function (cb) {
+      const start = Date.now();
+      return setTimeout(function () {
+        cb({
+          didTimeout: false,
+          timeRemaining: function () {
+            return Math.max(0, 50 - (Date.now() - start));
+          }
+        });
+      }, 150);
+    };
+
+  function normalizeThumbUrl(rawUrl) {
+    if (!rawUrl || typeof rawUrl !== 'string') return FALLBACK_SVG_URI;
+    const trimmed = rawUrl.trim();
+    if (trimmed.startsWith('data:image/')) return trimmed;
+
+    if (trimmed.includes('wsrv.nl') || trimmed.includes('images.weserv.nl')) {
+      try {
+        const u = new URL(trimmed);
+        u.hostname = 'wsrv.nl';
+        if (!u.searchParams.has('w')) u.searchParams.set('w', '240');
+        if (!u.searchParams.has('h')) u.searchParams.set('h', '240');
+        if (!u.searchParams.has('fit')) u.searchParams.set('fit', 'cover');
+        if (!u.searchParams.has('output')) u.searchParams.set('output', 'webp');
+        if (!u.searchParams.has('maxage')) u.searchParams.set('maxage', '31536000');
+        return u.toString();
+      } catch (e) {
+        return FALLBACK_SVG_URI;
+      }
+    }
+
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return 'https://wsrv.nl/?url=' + encodeURIComponent(trimmed) + '&w=240&h=240&fit=cover&output=webp&maxage=31536000';
+    }
+    return FALLBACK_SVG_URI;
+  }
+
+  function bakePersistentThumbnails() {
+    let items = [];
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return [];
+      items = JSON.parse(raw);
+      if (!Array.isArray(items)) return [];
+    } catch (e) {
+      return [];
+    }
+
+    let modified = false;
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (!item) continue;
+      if (item.imgDead === true && item.img !== FALLBACK_SVG_URI) {
+        item.img = FALLBACK_SVG_URI;
+        modified = true;
+        continue;
+      }
+      const baked = normalizeThumbUrl(item.img || item.thumb || item.thumbnail);
+      if (item.img !== baked || !item.imgBaked) {
+        item.img = baked;
+        item.imgBaked = true;
+        modified = true;
+      }
+    }
+
+    if (modified) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+      } catch (e) {}
+    }
+    return items;
+  }
+
+  function markUrlAsDeadInStorage(failedSrc) {
+    if (!failedSrc || failedSrc.startsWith('data:image/')) return;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const items = JSON.parse(raw);
+      if (!Array.isArray(items)) return;
+      let changed = false;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i] && items[i].img === failedSrc) {
+          items[i].img = FALLBACK_SVG_URI;
+          items[i].imgDead = true;
+          changed = true;
+        }
+      }
+      if (changed) localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    } catch (e) {}
+  }
+
+  function optimizeListImages(rootEl) {
+    const container = rootEl || document.getElementById('tab-list') || document;
+    const imgs = container.querySelectorAll('img');
+
+    imgs.forEach((img, idx) => {
+      if (img.dataset.optBound === '1') return;
+      img.dataset.optBound = '1';
+
+      img.removeAttribute('onerror');
+      img.onerror = null;
+      img.decoding = 'async';
+
+      if (idx < EAGER_COUNT) {
+        img.loading = 'eager';
+        img.setAttribute('fetchpriority', 'high');
+      } else {
+        img.loading = 'lazy';
+        img.setAttribute('fetchpriority', 'auto');
+      }
+
+      img.classList.add('trip-thumb-img');
+      if (img.parentElement) img.parentElement.classList.add('trip-thumb-wrap');
+
+      const markLoaded = () => {
+        img.classList.add('is-loaded');
+        if (img.parentElement) img.parentElement.classList.add('is-loaded');
+      };
+
+      if (img.complete && img.naturalWidth > 0) {
+        markLoaded();
+      } else {
+        img.addEventListener('load', markLoaded, { once: true });
+      }
+
+      img.addEventListener(
+        'error',
+        function () {
+          const badSrc = img.getAttribute('src');
+          if (badSrc !== FALLBACK_SVG_URI) {
+            markUrlAsDeadInStorage(badSrc);
+            img.src = FALLBACK_SVG_URI;
+          }
+          markLoaded();
+        },
+        { once: true }
+      );
+    });
+  }
+
+  function preheatTopThumbnails(items) {
+    const urls = [];
+    const seen = new Set();
+    for (let i = 0; i < items.length && urls.length < PREHEAT_COUNT; i++) {
+      const u = items[i] && items[i].img;
+      if (u && u.startsWith('http') && !seen.has(u)) {
+        seen.add(u);
+        urls.push(u);
+      }
+    }
+    if (urls.length === 0) return;
+
+    let cursor = 0;
+    function nextBatch() {
+      if (cursor >= urls.length) return;
+      const url = urls[cursor++];
+      const preImg = new Image();
+      preImg.decoding = 'async';
+      preImg.onload = () => {
+        if (preImg.decode) {
+          preImg.decode().catch(() => {}).finally(nextBatch);
+        } else {
+          nextBatch();
+        }
+      };
+      preImg.onerror = () => {
+        markUrlAsDeadInStorage(url);
+        nextBatch();
+      };
+      preImg.src = url;
+    }
+
+    runWhenIdle(() => {
+      for (let k = 0; k < CONCURRENCY; k++) nextBatch();
+    });
+  }
+
+  function initServiceWorkerFlow() {
+    if (!('serviceWorker' in navigator)) return;
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
+
+    window.addEventListener('load', async () => {
+      try {
+        const reg = await navigator.serviceWorker.register('./sw.js?v=v20261114_140721', {
+          updateViaCache: 'none'
+        });
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') reg.update().catch(() => {});
+        });
+        if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          if (!newWorker) return;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              newWorker.postMessage({ type: 'SKIP_WAITING' });
+            }
+          });
+        });
+      } catch (e) {}
+    });
+  }
+
+  initServiceWorkerFlow();
+  const items = bakePersistentThumbnails();
+  preheatTopThumbnails(items);
+
+  const applyAndObserve = () => {
+    optimizeListImages(document);
+    const target = document.getElementById('tab-list') || document.body;
+    if (!target) return;
+    const observer = new MutationObserver(() => optimizeListImages(target));
+    observer.observe(target, { childList: true, subtree: true });
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', applyAndObserve);
+  } else {
+    applyAndObserve();
+  }
+})();
+</script>
+<!-- [END_TRIP_THUMB_OPTIMIZER] -->
 </body>
 </html>
