@@ -2773,7 +2773,7 @@
       const TRIP_PENDING_CONFLICT_KEY = "TRIP_PENDING_CONFLICT";
       const TRIP_LAST_ROOM_KEY = "TRIP_LAST_ROOM";
       const TRIP_CREATING_ROOM_KEY = "TRIP_CREATING_ROOM";
-      const APP_VERSION = "v88";
+      const APP_VERSION = "v89";
       const TRANSIENT_NET_RE =
         /unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
       let _offlineFlushBusy = false,
@@ -8797,36 +8797,55 @@
         const x = Math.sin(((c - a) * toR) / 2) ** 2 + Math.cos(a * toR) * Math.cos(c * toR) * Math.sin(((d - b) * toR) / 2) ** 2;
         return 2 * R * Math.asin(Math.sqrt(x));
       }
+      const _regionGeoCache = new Map();
       async function geocodeWithinRegion(cand, region) {
         const dLat = region.r / 111, dLng = region.r / 91;
         const box = { xmin: region.lng - dLng, ymin: region.lat - dLat, xmax: region.lng + dLng, ymax: region.lat + dLat };
         const qs = [...new Set([cand.localName, String(cand.name || "").replace(/\([^)]*\)/g, " ").trim(), cand.address].filter((q) => q && String(q).trim().length >= 2))].slice(0, 3);
-        for (const q of qs) {
-          try {
-            const r = await fetchTO(`https://nominatim.openstreetmap.org/search?format=json&limit=3&countrycodes=jp&bounded=1&viewbox=${box.xmin},${box.ymax},${box.xmax},${box.ymin}&q=${encodeURIComponent(q)}`, {}, 4000);
-            const d = await r.json();
-            const hit = Array.isArray(d) && d.find((x) => geoKm(region.lat, region.lng, Number(x.lat), Number(x.lon)) <= region.r);
-            if (hit) return { lat: Number(hit.lat), lng: Number(hit.lon), formatted: hit.display_name };
-          } catch (_) {}
-          try {
-            const params = new URLSearchParams({ f: "json", singleLine: q, maxLocations: "3", sourceCountry: "JPN", searchExtent: `${box.xmin},${box.ymin},${box.xmax},${box.ymax}` });
-            const r = await fetchTO(`https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?${params}`, {}, 4000);
-            const d = await r.json();
-            const hit = (d?.candidates || []).find((c) => c?.score >= 75 && c?.location && geoKm(region.lat, region.lng, c.location.y, c.location.x) <= region.r && c?.attributes?.Addr_type !== "Locality");
-            if (hit) return { lat: Number(hit.location.y), lng: Number(hit.location.x), formatted: hit.address || q };
-          } catch (_) {}
-        }
-        return null;
+        if (!qs.length) return null;
+        const ck = qs.join("|") + "@" + region.lat;
+        if (_regionGeoCache.has(ck)) return _regionGeoCache.get(ck);
+        const inRegion = (lat, lng) => geoKm(region.lat, region.lng, lat, lng) <= region.r;
+        const nom = async (q) => {
+          const r = await fetchTO(`https://nominatim.openstreetmap.org/search?format=json&limit=3&countrycodes=jp&bounded=1&viewbox=${box.xmin},${box.ymax},${box.xmax},${box.ymin}&q=${encodeURIComponent(q)}`, {}, 3500);
+          const d = await r.json();
+          const hit = Array.isArray(d) && d.find((x) => inRegion(Number(x.lat), Number(x.lon)));
+          return hit ? { lat: Number(hit.lat), lng: Number(hit.lon), formatted: hit.display_name } : null;
+        };
+        const arc = async (q) => {
+          const params = new URLSearchParams({ f: "json", singleLine: q, maxLocations: "3", sourceCountry: "JPN", searchExtent: `${box.xmin},${box.ymin},${box.xmax},${box.ymax}` });
+          const r = await fetchTO(`https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?${params}`, {}, 3500);
+          const d = await r.json();
+          const cs = (d?.candidates || []).filter((c) => c?.score >= 75 && c?.location && inRegion(c.location.y, c.location.x));
+          const exact = cs.find((c) => c?.attributes?.Addr_type !== "Locality");
+          // 정확한 가게/번지가 없으면 동네(거리) 수준 결과를 최후 수단으로 (느린 순차 검색이 결국 찾던 것과 같은 수준)
+          const area = cs.find((c) => c?.attributes?.Addr_type === "Locality");
+          const hit = exact || area;
+          return hit ? { lat: Number(hit.location.y), lng: Number(hit.location.x), formatted: hit.address || q, coarse: !exact } : null;
+        };
+        // 모든 검색어 × 서비스를 동시에 요청하고, 우선순위(현지 이름 > 이름 > 주소, Nominatim > ArcGIS)대로 첫 결과 채택
+        const tasks = [];
+        qs.forEach((q, qi) => {
+          tasks.push(nom(q).then((x) => x && { ...x, rank: qi * 2 }).catch(() => null));
+          tasks.push(arc(q).then((x) => x && { ...x, rank: x.coarse ? 50 + qi : qi * 2 + 1 }).catch(() => null));
+        });
+        const found = (await Promise.all(tasks)).filter(Boolean).sort((a, b) => a.rank - b.rank)[0] || null;
+        if (found) { delete found.rank; delete found.coarse; }
+        _regionGeoCache.set(ck, found);
+        return found;
       }
       (function guardGeocodeRegion() {
         const orig = geocodePlace;
         geocodePlace = async function (cand, hint = "", ignoreCache = false) {
-          const res = await orig.apply(this, arguments);
           const region = cand ? geoExpectedRegion(cand, hint) : null;
+          // 도시를 알면: 그 도시 안에서 모든 서비스에 동시에 먼저 물어봄 (빠르고 엉뚱한 지역 결과가 없음)
+          if (region) {
+            const quick = await geocodeWithinRegion(cand, region);
+            if (quick) return quick;
+          }
+          const res = await orig.apply(this, arguments);
           if (!region || !res || !Number.isFinite(Number(res.lat))) return res;
           if (geoKm(region.lat, region.lng, Number(res.lat), Number(res.lng)) <= region.r) return res;
-          const fixed = await geocodeWithinRegion(cand, region);
-          if (fixed) return fixed;
           const aiLat = Number(cand.lat), aiLng = Number(cand.lng);
           if (Number.isFinite(aiLat) && Number.isFinite(aiLng) && geoKm(region.lat, region.lng, aiLat, aiLng) <= region.r) return { lat: aiLat, lng: aiLng };
           return null;
@@ -23930,7 +23949,7 @@ ${JSON.stringify(payload, null, 2)}
   }
 
   // 8. 서비스 워커 등록 (즉시 갱신)
-  const SW_QUERY = './sw.js?v=v20261115_100000';
+  const SW_QUERY = './sw.js?v=v20261115_104500';
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', async function() {
       try {
