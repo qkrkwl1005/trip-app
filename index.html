@@ -2105,6 +2105,9 @@
     <div id="toast"></div>
     <div id="ptr">↻ 새로고침</div>
 
+    <link rel="preconnect" href="https://wsrv.nl">
+    <link rel="preconnect" href="https://firebasestorage.googleapis.com">
+    <link rel="dns-prefetch" href="https://i.ytimg.com">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -2763,7 +2766,7 @@
       const TRIP_PENDING_CONFLICT_KEY = "TRIP_PENDING_CONFLICT";
       const TRIP_LAST_ROOM_KEY = "TRIP_LAST_ROOM";
       const TRIP_CREATING_ROOM_KEY = "TRIP_CREATING_ROOM";
-      const APP_VERSION = "v73";
+      const APP_VERSION = "v78";
       const TRANSIENT_NET_RE =
         /unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
       let _offlineFlushBusy = false,
@@ -3536,7 +3539,8 @@
         const hay = `${it.name || ""} ${it.localName || ""} ${it.address || ""} ${it.info || ""} ${it.note || ""}`;
         for (const pat of KNOWN_KR_NAME_PATTERNS) {
           if (pat.test.test(hay)) {
-            if (pat.ko) {
+            // 사용자가 적은 정상적인 한국어 이름은 그대로 유지 (해시태그·일본어·영문 캡션일 때만 교체)
+            if (pat.ko && needsKoreanRename(it.name, it)) {
               it.name = pat.ko;
             }
             if (pat.local && !it.localName) it.localName = pat.local;
@@ -5271,6 +5275,20 @@
       function itemThumb(i) {
         return itemThumbCandidates(i)[0] || "";
       }
+      // 인스타 CDN 주소의 oe=(16진수 유닉스시간)가 지났으면 만료 → 실패할 요청을 미리 건너뜀
+      function isExpiredIgUrl(u) {
+        if (!u || typeof u !== "string") return false;
+        let raw = u;
+        const w = u.match(/^https?:\/\/(?:wsrv\.nl|images\.weserv\.nl)\/?\?(.*)$/i);
+        if (w) raw = new URLSearchParams(w[1]).get("url") || "";
+        if (!/cdninstagram\.com|fbcdn\.net/i.test(raw)) return false;
+        let dec = raw;
+        try { dec = decodeURIComponent(raw); } catch (_) {}
+        const m = dec.match(/[?&]oe=([0-9a-fA-F]{8})/);
+        if (!m) return false;
+        return parseInt(m[1], 16) * 1000 < Date.now() + 60000;
+      }
+      window.isExpiredIgUrl = isExpiredIgUrl;
       function itemThumbCandidates(i) {
         if (!i) return [];
         const out = [];
@@ -5288,7 +5306,11 @@
             add(`https://i.ytimg.com/vi/${meta.id}/maxresdefault.jpg`);
           }
           if (meta && meta.platform === "ig" && meta.id) {
-            const cached = reelThumbCache[meta.id];
+            let cached = reelThumbCache[meta.id];
+            if (cached && isExpiredIgUrl(cached)) {
+              delete reelThumbCache[meta.id];
+              cached = "";
+            }
             if (cached) {
               const raw = cached.startsWith("https://wsrv.nl/?url=")
                 ? decodeURIComponent(
@@ -5312,7 +5334,7 @@
         }
 
         // 2순위: 사용자가 직접 지정했거나 명확한 장소 전용 이미지 (단, Bing 자동검색 이미지나 인물 먹방 제외)
-        if (i.img && !/mm\.bing\.net/i.test(i.img)) {
+        if (i.img && !/mm\.bing\.net/i.test(i.img) && !isExpiredIgUrl(i.img)) {
           add(i.img);
         }
 
@@ -7077,7 +7099,7 @@
     <div class="sheet-title-row" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;width:100%;box-sizing:border-box">
       <div style="flex:1;min-width:0">
         <div class="nm" style="font-size:20px;line-height:1.28;font-weight: 700;word-break:keep-all">${esc(i.name)}</div>
-        ${i.localName && i.localName !== i.name ? `<div style="font-size:13.5px;color:var(--sub);font-weight:600;margin-top:3px;word-break:keep-all">(${esc(i.localName)})</div>` : ""}
+
       </div>
       <button type="button" class="mb${i.star ? " pr" : ""}" data-act="toggleStarSheet" style="flex:none;min-height:36px;padding:0 12px;border-radius:12px;white-space:nowrap;display:inline-flex;align-items:center;gap:4px">
         <span class="ms${i.star ? " fill" : ""}">star</span>${i.star ? "중요" : "즐겨찾기"}
@@ -15003,6 +15025,18 @@ ${caption || rawText}
     const coords = list.filter(i => Number(i.lat) && Number(i.lng)).length;
     const scheduled = list.filter(i => Number(i.day) > 0).length;
     const routeKm = calcRealisticTotalKm(list);
+    const doneCnt = list.filter(i => i.done).length;
+    const tripDday = (() => {
+      const TRIP_START = new Date(2026, 10, 24); // 2026-11-24 출발
+      const TRIP_DAYS = 7;
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const diff = Math.round((TRIP_START - today) / 86400000);
+      if (diff > 0) return { label: "출발까지", value: `D-${diff}` };
+      if (diff === 0) return { label: "오늘 출발!", value: "D-DAY" };
+      const dayN = 1 - diff;
+      if (dayN <= TRIP_DAYS) return { label: "여행 중", value: `${dayN}일차` };
+      return { label: "여행 완료", value: "다녀왔어요" };
+    })();
 
     const activeDays = [...new Set(list.filter(x => Number(x.day) > 0).map(x => Number(x.day)))].sort((a, b) => a - b);
     const dayRows = activeDays.length
@@ -15027,14 +15061,13 @@ ${caption || rawText}
         <img class="v32-hero-bg" src="https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=1000&q=80" alt="" onerror="this.style.display='none'" />
         <div class="v32-hero-grad"></div>
         <div style="position:relative;z-index:2;display:flex;justify-content:space-between;align-items:center">
-          <span class="ux7-badge places" style="background:#2563eb;color:#fff;padding:4px 10px">🗓️ 2026-11-24 출발</span>
-          <span class="ux7-badge">🌤️ 오사카·교토</span>
+          <span class="ux7-badge places v78-date-badge" style="background:#2563eb;color:#fff;padding:4px 10px"><span class="ms" style="font-size:14px">event</span>2026-11-24 출발</span>
+          <span class="ux7-badge"><span class="ms" style="font-size:14px">location_on</span>오사카·교토</span>
         </div>
         <div style="position:relative;z-index:2;margin-top:28px">
           <div style="font-size:23px;font-weight: 700;margin-bottom:10px">오사카·교토 여행 플랜</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <button type="button" class="btn" id="v32HeroAdd" style="min-height:40px;font-size:13px"><span class="ms">add_circle</span>장소 가져오기</button>
-            <button type="button" class="btn g" id="v32HeroList" style="margin:0;min-height:40px;font-size:13px;background:rgba(15,23,42,0.75);color:#fff"><span class="ms">format_list_bulleted</span>전체 목록 보기</button>
+          <div style="display:grid;grid-template-columns:1fr;gap:8px">
+            <button type="button" class="btn" id="v32HeroAdd" style="min-height:44px;font-size:14px"><span class="ms">add_circle</span>장소 가져오기</button>
           </div>
         </div>
       </div>
@@ -15042,17 +15075,17 @@ ${caption || rawText}
       <div class="v32-bento-grid">
         <div class="v32-bento-card b-blue" data-v32-go="ALL">
           <div class="v32-card-head">
-            <span class="v32-card-title">저장한 장소</span>
-            <div class="v32-card-icon"><span class="ms">bookmark</span></div>
+            <span class="v32-card-title">${tripDday.label}</span>
+            <div class="v32-card-icon"><span class="ms">flight_takeoff</span></div>
           </div>
-          <b class="v32-card-val">${total}곳</b>
+          <b class="v32-card-val v78-noticker">${tripDday.value}</b>
         </div>
         <div class="v32-bento-card b-green" data-v32-go="ALL">
           <div class="v32-card-head">
-            <span class="v32-card-title">좌표 설정 완료</span>
-            <div class="v32-card-icon"><span class="ms">near_me</span></div>
+            <span class="v32-card-title">방문 완료</span>
+            <div class="v32-card-icon"><span class="ms">task_alt</span></div>
           </div>
-          <b class="v32-card-val">${coords}곳</b>
+          <b class="v32-card-val v78-noticker">${doneCnt}<small style="font-size:0.55em;opacity:0.7"> / ${total}곳</small></b>
         </div>
       </div>
 
@@ -23722,7 +23755,7 @@ ${JSON.stringify(payload, null, 2)}
   }
 
   // 8. 서비스 워커 등록 (즉시 갱신)
-  const SW_QUERY = './sw.js?v=v20261115_011000';
+  const SW_QUERY = './sw.js?v=v20261115_024000';
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', async function() {
       try {
@@ -23934,10 +23967,10 @@ ${JSON.stringify(payload, null, 2)}
   }
   async function persistOne(it) {
     const code = igCode(it);
-    if (!code || tried.has(code)) return false;
-    tried.add(code);
     const cur = (typeof reelThumbCache === "object" && reelThumbCache[code]) || it.img || "";
-    if (!cur || cur.includes(FB_HOST)) return false;
+    if (!code || !cur || cur.includes(FB_HOST) || tried.has(code + "|" + cur)) return false;
+    if (window.isExpiredIgUrl && window.isExpiredIgUrl(cur)) return false;
+    tried.add(code + "|" + cur);
     // 기존 사진 업로드와 같은 경로 규칙(images/{방}/...)을 사용해 Storage 권한 규칙을 그대로 따름
     const room = (typeof sharedRoomId !== "undefined" && sharedRoomId) || "local";
     const ref = firebase.storage().ref().child(`images/${room}/reel_${code.replace(/[^A-Za-z0-9_-]/g, "")}.webp`);
@@ -23979,9 +24012,8 @@ ${JSON.stringify(payload, null, 2)}
     try {
       const list = (typeof items !== "undefined" ? items : []).filter((it) => {
         const code = igCode(it);
-        if (!code || tried.has(code)) return false;
-        const cur = (typeof reelThumbCache === "object" && reelThumbCache[code]) || it.img || "";
-        return cur && !cur.includes(FB_HOST);
+        const cur = code && ((typeof reelThumbCache === "object" && reelThumbCache[code]) || it.img || "");
+        return cur && !cur.includes(FB_HOST) && !tried.has(code + "|" + cur);
       });
       for (let i = 0; i < list.length; i += 2) {
         const res = await Promise.all(list.slice(i, i + 2).map((it) => persistOne(it).catch(() => false)));
@@ -24015,6 +24047,199 @@ ${JSON.stringify(payload, null, 2)}
 })();
 </script>
 <!-- === V77_PERF_LAYOUT_FIX_END === -->
+
+<!-- === V78_UX_POLISH_START === -->
+<style id="v78-ux-polish-style">
+  /* 1) 라이트 모드 대비 (흰 배경에 흰 글씨였던 곳) */
+  html[data-theme="light"] body #listCatSeg.seg.seg5 > div:not(.on) {
+    color: #475569 !important;
+  }
+  html[data-theme="light"] body #listCatSeg.seg.seg5 > div:not(.on) .ms {
+    color: #64748b !important;
+  }
+  html[data-theme="light"] .ux7-badge.places:not(.v78-date-badge) {
+    color: #1d4ed8 !important;
+    background: rgba(37, 99, 235, 0.1) !important;
+  }
+  .v32-hero .v78-date-badge {
+    background: #2563eb !important;
+    color: #fff !important;
+    border-color: transparent !important;
+  }
+  html[data-theme="light"] .mb.pr:not(.reel-jump) {
+    color: #1d4ed8 !important;
+    background: rgba(37, 99, 235, 0.1) !important;
+    border-color: rgba(37, 99, 235, 0.32) !important;
+  }
+  html[data-theme="light"] .mb.pr:not(.reel-jump) .ms {
+    color: #f59e0b !important;
+  }
+  html[data-theme="light"] #netStatus {
+    color: #047857 !important;
+  }
+  .ux7-badge .ms, .v78-date-badge .ms {
+    vertical-align: -2px;
+    margin-right: 3px;
+  }
+
+  /* 2) 터치 영역 키우기 (29~31px → 38~40px) */
+  html body #ux7TopUtilBar .ux7-actions .mb {
+    min-height: 38px !important;
+    min-width: 38px !important;
+    padding: 0 12px !important;
+    font-size: 12.5px !important;
+  }
+  html body #ux7TopUtilBar .ux7-actions .mb .ms {
+    font-size: 17px !important;
+  }
+  #list-LIST .item .v33-card-ctrl-row .mb,
+  #list-LIST .item .v33-card-ctrl-row a.mb {
+    min-height: 38px !important;
+    font-size: 13px !important;
+    padding: 0 14px !important;
+  }
+
+  /* 3) 너무 작던 글자 (11px → 12px 이상) */
+  html body #nav .tab-btn span:not(.ms) {
+    font-size: 12px !important;
+  }
+  html body #listCatSeg.seg.seg5 > div {
+    font-size: 12.5px !important;
+    min-height: 38px !important;
+  }
+  .ux7-badge {
+    font-size: 12px !important;
+  }
+
+  html body #list-LIST .v32-station-badge {
+    font-size: 12px !important;
+  }
+  /* 4) 목록 카드: 역·도보 정보가 있으면 긴 영어 주소 줄은 숨김 */
+  #list-LIST .ux7-meta-row:has(.v32-station-badge) > span:not([class]) {
+    display: none !important;
+  }
+
+  /* 5) 홈: 숫자 카드 값 */
+  .v32-card-val.v78-noticker {
+    white-space: nowrap;
+  }
+
+  /* 6) 설정: 테마 선택 한 곳으로 */
+  #v78ThemeSeg {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    padding: 4px;
+    border-radius: 14px;
+    background: var(--s2);
+    border: 1px solid var(--bd2);
+  }
+  #v78ThemeSeg button {
+    min-height: 42px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--sub);
+    font: inherit;
+    font-size: 13.5px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    cursor: pointer;
+  }
+  #v78ThemeSeg button.on {
+    background: var(--pr);
+    color: #fff;
+  }
+  #v78ThemeSeg button .ms {
+    font-size: 18px;
+  }
+  #themeBtn.v78-hidden,
+  #v47SetOledBtn.v78-hidden {
+    display: none !important;
+  }
+</style>
+<script id="v78-ux-polish-script">
+(function () {
+  /* 설정: 라이트 / 다크 / OLED 세그먼트 */
+  const isOled = () => document.documentElement.getAttribute("data-oled") === "true";
+  const curMode = () => (isOled() ? "oled" : document.documentElement.dataset.theme === "light" ? "light" : "dark");
+  function setOled(on) {
+    if (isOled() === on) return;
+    const btn = document.getElementById("v47SetOledBtn") || document.getElementById("v47TopOledBtn");
+    if (btn) btn.click();
+  }
+  function applyMode(mode) {
+    if (typeof setTheme !== "function") return;
+    if (mode === "light") { setOled(false); setTheme("light"); }
+    if (mode === "dark") { setOled(false); setTheme("dark"); }
+    if (mode === "oled") { setTheme("dark"); setOled(true); }
+    syncSeg();
+  }
+  function syncSeg() {
+    const seg = document.getElementById("v78ThemeSeg");
+    if (!seg) return;
+    const m = curMode();
+    seg.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.mode === m));
+  }
+  function injectThemeSeg() {
+    const themeBtn = document.getElementById("themeBtn");
+    if (!themeBtn || document.getElementById("v78ThemeSeg")) return;
+    const seg = document.createElement("div");
+    seg.id = "v78ThemeSeg";
+    seg.setAttribute("role", "radiogroup");
+    seg.innerHTML = [
+      ["light", "light_mode", "라이트"],
+      ["dark", "dark_mode", "다크"],
+      ["oled", "battery_saver", "OLED"],
+    ].map(([m, ic, t]) => `<button type="button" data-mode="${m}" role="radio"><span class="ms">${ic}</span>${t}</button>`).join("");
+    seg.addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-mode]");
+      if (b) applyMode(b.dataset.mode);
+    });
+    themeBtn.parentElement.insertBefore(seg, themeBtn);
+    themeBtn.classList.add("v78-hidden");
+    document.getElementById("v47SetOledBtn")?.classList.add("v78-hidden");
+    syncSeg();
+  }
+  new MutationObserver(syncSeg).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "data-oled"] });
+
+  /* 설정: '참여 멤버 확인 중...'이 계속 남지 않도록 */
+  function memberFallback() {
+    const el = document.getElementById("roomMembers");
+    if (el && /확인 중/.test(el.textContent || "")) {
+      el.textContent = navigator.onLine
+        ? "멤버 정보를 아직 불러오지 못했어요. 잠시 후 다시 확인돼요."
+        : "오프라인이라 멤버 정보를 불러올 수 없어요.";
+    }
+  }
+
+  /* 새 릴스 썸네일이 생기면 곧바로 영구 보관 시도 */
+  function hookThumbSave() {
+    const orig = window.saveReelThumbCache;
+    if (typeof orig !== "function" || orig.__v78) return;
+    let t = null;
+    window.saveReelThumbCache = Object.assign(function () {
+      const r = orig.apply(this, arguments);
+      clearTimeout(t);
+      t = setTimeout(() => window.persistReelThumbs && window.persistReelThumbs(), 2500);
+      return r;
+    }, { __v78: true });
+  }
+
+  const boot = () => {
+    injectThemeSeg();
+    setTimeout(injectThemeSeg, 1500);
+    setTimeout(memberFallback, 10000);
+    hookThumbSave();
+  };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+  else boot();
+})();
+</script>
+<!-- === V78_UX_POLISH_END === -->
 
 </body>
 </html>
