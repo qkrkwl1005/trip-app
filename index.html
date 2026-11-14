@@ -6455,7 +6455,7 @@
         const iconHtml = /^[a-z0-9_]+$/.test(String(icName || ""))
           ? `<span class="ms">${icName}</span>`
           : icName;
-        return `<div class="pic ${c}">${dTag}${iconHtml}${src ? `<img loading="${isEager ? "eager" : "lazy"}"${priority} decoding="async" referrerpolicy="no-referrer" src="${esc(src)}"${fba}${altAttr} onerror="imgErr(this)">` : ""}</div>`;
+        return `<div class="pic ${c}">${dTag}${iconHtml}${src ? `<img loading="eager"${priority} decoding="async" referrerpolicy="no-referrer" src="${esc(src)}"${fba}${altAttr} onerror="imgErr(this)">` : ""}</div>`;
       }
 
       /* 통합 목록 탭 렌더링 */
