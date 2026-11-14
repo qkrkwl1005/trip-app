@@ -5584,7 +5584,7 @@
               <button class="mb dg" data-act="bulkDelete" data-cat="LIST"><span class="ms">delete</span>선택 삭제</button>
             </div>
           </div>
-          <div id="list-LIST" style="display:flex;flex-direction:column;gap:12px"></div>
+          <div id="list-LIST" style="display:flex;flex-direction:column;gap:12px">${(typeof localStorage!=="undefined"&&localStorage.getItem("TRIP_DOM_CACHE_LIST"))||""}</div>
         `;
         $("side").insertBefore(s, $("tab-set"));
       })();
@@ -6569,6 +6569,7 @@
         if (bulk) bulk.style.display = editMode.LIST ? "flex" : "none";
         const sc = $("selCount-LIST");
         if (sc) sc.textContent = editMode.LIST ? `선택 ${selected.size}개` : "";
+        try { if (listEl && listEl.innerHTML && !$("q-LIST")?.value?.trim()) localStorage.setItem("TRIP_DOM_CACHE_LIST", listEl.innerHTML); } catch(e){}
       }
 
       function renderCat(c) {
