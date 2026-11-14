@@ -2773,7 +2773,7 @@
       const TRIP_PENDING_CONFLICT_KEY = "TRIP_PENDING_CONFLICT";
       const TRIP_LAST_ROOM_KEY = "TRIP_LAST_ROOM";
       const TRIP_CREATING_ROOM_KEY = "TRIP_CREATING_ROOM";
-      const APP_VERSION = "v86";
+      const APP_VERSION = "v87";
       const TRANSIENT_NET_RE =
         /unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
       let _offlineFlushBusy = false,
@@ -7586,7 +7586,20 @@
             if (/pro-latest/i.test(name)) return false; // 쿼터 초과 방지
             return true;
           });
-        const fixed = baseOrder.slice(0, 4);
+        // 모델 상태 기억: 마지막에 성공한 모델을 먼저, 방금 실패(429·지연·5xx)한 모델은 10분간 뒤로
+        let health = {};
+        try { health = JSON.parse(localStorage.getItem("TRIP_GEMINI_HEALTH") || "{}"); } catch (_) {}
+        const saveHealth = () => { try { localStorage.setItem("TRIP_GEMINI_HEALTH", JSON.stringify(health)); } catch (_) {} };
+        const nowT = Date.now();
+        const score = (m) => {
+          const h = health[m] || {};
+          if (h.badUntil && h.badUntil > nowT) return 3;
+          if (h.good) return 0;
+          if (/flash-lite-latest/.test(m)) return 1; // 무료 키에서 가장 빠르고 안정적
+          return 2;
+        };
+        const ordered = [...baseOrder].sort((a, b) => score(a) - score(b) || (health[b]?.good || 0) - (health[a]?.good || 0));
+        const fixed = ordered.slice(0, 4);
         for (const m of fixed) {
           if (Date.now() - t0 > DEADLINE) break;
           const tries = allowGrounding ? [true, false] : [false];
@@ -7604,11 +7617,12 @@
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify(body),
                 },
-                16000,
+                10000,
               );
               const d = await r.json();
               if (!r.ok) {
                 lastErr = d?.error?.message || `HTTP ${r.status}`;
+                if (r.status === 429 || r.status >= 500) { health[m] = { badUntil: Date.now() + 600000 }; saveHealth(); }
                 if (r.status === 400 || r.status === 403 || r.status === 429 || /api key not valid|quota|exhausted|billing/i.test(lastErr))
                   throw new Error(lastErr);
                 continue;
@@ -7619,10 +7633,12 @@
                   .join("") || "";
               if (txt.trim()) {
                 bumpCnt("gemini");
+                health[m] = { good: Date.now() }; saveHealth();
                 return txt;
               }
             } catch (e) {
               lastErr = e.message || "네트워크 오류";
+              if (/abort|timeout|시간|지연|network/i.test(lastErr) && !(health[m] && health[m].badUntil)) { health[m] = { badUntil: Date.now() + 600000 }; saveHealth(); }
             }
           }
         }
@@ -8778,7 +8794,7 @@
                   <button type="button" id="mcapCloseBtn" style="background:none;border:none;color:var(--sub, #888);font-size:20px;cursor:pointer;padding:4px;"><span class="ms">close</span></button>
                 </div>
                 <div style="font-size:13px;color:var(--sub, #a1a1a6);line-height:1.45;">
-                  인스타그램 보안 정책으로 본문을 자동 추출하지 못했습니다.<br>
+                  ${window.__rapidQuotaOut ? "릴스 자동 분석(RapidAPI) 이번 달 사용량이 다 떨어졌어요. 설정의 RapidAPI 키·요금제를 확인해 주세요." : "인스타그램 보안 정책으로 본문을 자동 추출하지 못했습니다."}<br>
                   릴스 본문이나 고정 댓글, 또는 매장명을 편하게 붙여넣어 주세요.
                 </div>
                 <div style="position:relative;">
@@ -9160,7 +9176,7 @@ ${caption || rawText}
               <button type="button" id="rfCloseBtn" class="mb" style="padding: 4px 8px; font-size: 13px;">✕</button>
             </div>
             <div style="font-size: 12.5px; color: var(--tx2); line-height: 1.5; background: rgba(255,183,77,0.08); border: 1px solid rgba(255,183,77,0.22); border-radius: 10px; padding: 10px;">
-              인스타그램 보안 정책으로 서버에서 릴스 본문을 직접 가져오지 못했습니다.<br>
+              ${window.__rapidQuotaOut ? "릴스 자동 분석(RapidAPI) 이번 달 사용량이 다 떨어졌어요." : "인스타그램 보안 정책으로 서버에서 릴스 본문을 직접 가져오지 못했습니다."}<br>
               <b>영상 링크와 썸네일은 저장되었습니다.</b> 아래 중 편한 방법으로 장소를 분석해 주세요!
             </div>
             
@@ -23858,7 +23874,7 @@ ${JSON.stringify(payload, null, 2)}
   }
 
   // 8. 서비스 워커 등록 (즉시 갱신)
-  const SW_QUERY = './sw.js?v=v20261115_083000';
+  const SW_QUERY = './sw.js?v=v20261115_091000';
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', async function() {
       try {
@@ -24958,6 +24974,21 @@ ${JSON.stringify(payload, null, 2)}
     }
   }
 
+  // RapidAPI가 429(사용량 초과)를 돌려주면 표시 → 안내 문구를 정확하게
+  (function watchRapidQuota() {
+    const of = window.fetch;
+    if (typeof of !== "function" || of.__v87) return;
+    window.fetch = Object.assign(function (input) {
+      const p = of.apply(this, arguments);
+      try {
+        const url = typeof input === "string" ? input : input && input.url;
+        if (url && /rapidapi\.com/.test(url)) {
+          p.then((r) => { if (r && r.status === 429) window.__rapidQuotaOut = true; else if (r && r.ok) window.__rapidQuotaOut = false; }).catch(() => {});
+        }
+      } catch (_) {}
+      return p;
+    }, { __v87: true });
+  })();
   const boot = () => {
     hookSave();
     hookRemote();
