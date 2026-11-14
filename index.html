@@ -2773,7 +2773,7 @@
       const TRIP_PENDING_CONFLICT_KEY = "TRIP_PENDING_CONFLICT";
       const TRIP_LAST_ROOM_KEY = "TRIP_LAST_ROOM";
       const TRIP_CREATING_ROOM_KEY = "TRIP_CREATING_ROOM";
-      const APP_VERSION = "v91";
+      const APP_VERSION = "v92";
       const TRANSIENT_NET_RE =
         /unavailable|network|deadline|failed-precondition|offline|TOO_MANY_RETRIES|aborted/i;
       let _offlineFlushBusy = false,
@@ -23964,7 +23964,7 @@ ${JSON.stringify(payload, null, 2)}
   }
 
   // 8. 서비스 워커 등록 (즉시 갱신)
-  const SW_QUERY = './sw.js?v=v20261115_130000';
+  const SW_QUERY = './sw.js?v=v20261115_150000';
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', async function() {
       try {
