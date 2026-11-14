@@ -23292,265 +23292,142 @@ ${JSON.stringify(payload, null, 2)}
 <!-- === V73_EXACT_VIDEO_MOTION_DESIGN_SUITE_END === -->
 
 
-<!-- [START_TRIP_THUMB_OPTIMIZER] -->
+<!-- [START_TRIP_THUMB_SAFE_FIX] -->
 <style>
-.trip-thumb-wrap {
-  position: relative;
-  aspect-ratio: 1 / 1;
-  overflow: hidden;
-  background-color: #e5e7eb;
-  background-image: linear-gradient(90deg, #e5e7eb 0%, #f3f4f6 50%, #e5e7eb 100%);
-  background-size: 200% 100%;
-  animation: thumbShimmer 1.4s infinite linear;
-  contain: layout paint;
-}
-.trip-thumb-wrap.is-loaded {
-  animation: none;
-  background-image: none;
-  background-color: transparent;
-}
-.trip-thumb-img {
+#tab-list img {
   opacity: 0;
-  transition: opacity 0.15s ease-out;
-  will-change: opacity;
+  transition: opacity 0.14s ease-out;
+  background-color: transparent !important;
 }
-.trip-thumb-img.is-loaded {
+#tab-list img.thumb-ready {
   opacity: 1;
-}
-@keyframes thumbShimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
 }
 </style>
 <script>
 (function () {
   const STORAGE_KEY = 'TRIP_MASTER_ITEMS';
-  const EAGER_COUNT = 10;
-  const PREHEAT_COUNT = 30;
-  const CONCURRENCY = 4;
+  const EAGER_LIMIT = 10;
+  const PREHEAT_LIMIT = 24;
 
-  const FALLBACK_SVG_URI =
-    "data:image/svg+xml;utf8," +
-    encodeURIComponent(
-      '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">' +
-      '<rect width="120" height="120" fill="#f1f5f9"/>' +
-      '<path d="M40 78l14-18 10 12 12-16 14 22H40z" fill="#cbd5e1"/>' +
-      '<circle cx="48" cy="46" r="6" fill="#cbd5e1"/></svg>'
-    );
-
-  window.imgErr = function (el) {
-    if (!el) return;
-    el.onerror = null;
-    el.src = FALLBACK_SVG_URI;
-    el.classList.add('is-loaded');
-    if (el.parentElement) el.parentElement.classList.add('is-loaded');
-  };
-
-  const runWhenIdle =
-    window.requestIdleCallback ||
-    function (cb) {
-      const start = Date.now();
-      return setTimeout(function () {
-        cb({
-          didTimeout: false,
-          timeRemaining: function () {
-            return Math.max(0, 50 - (Date.now() - start));
-          }
-        });
-      }, 150);
-    };
-
-  function normalizeThumbUrl(rawUrl) {
-    if (!rawUrl || typeof rawUrl !== 'string') return FALLBACK_SVG_URI;
-    const trimmed = rawUrl.trim();
-    if (trimmed.startsWith('data:image/')) return trimmed;
-
-    if (trimmed.includes('wsrv.nl') || trimmed.includes('images.weserv.nl')) {
-      try {
-        const u = new URL(trimmed);
-        u.hostname = 'wsrv.nl';
-        if (!u.searchParams.has('w')) u.searchParams.set('w', '240');
-        if (!u.searchParams.has('h')) u.searchParams.set('h', '240');
-        if (!u.searchParams.has('fit')) u.searchParams.set('fit', 'cover');
-        if (!u.searchParams.has('output')) u.searchParams.set('output', 'webp');
-        if (!u.searchParams.has('maxage')) u.searchParams.set('maxage', '31536000');
-        return u.toString();
-      } catch (e) {
-        return FALLBACK_SVG_URI;
-      }
-    }
-
-    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-      return 'https://wsrv.nl/?url=' + encodeURIComponent(trimmed) + '&w=240&h=240&fit=cover&output=webp&maxage=31536000';
-    }
-    return FALLBACK_SVG_URI;
-  }
-
-  function bakePersistentThumbnails() {
-    let items = [];
+  // 1. 이전 패치로 오염된 localStorage 데이터(회색 SVG, 억지 wsrv 래핑) 자동 치료
+  function healCorruptedStorage() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return [];
-      items = JSON.parse(raw);
+      const items = JSON.parse(raw);
       if (!Array.isArray(items)) return [];
+
+      let healed = false;
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i];
+        if (!it) continue;
+
+        if (it.imgDead || it.imgBaked) {
+          delete it.imgDead;
+          delete it.imgBaked;
+          healed = true;
+        }
+
+        if (typeof it.img === 'string') {
+          // 잘못 박제된 data:image/svg+xml 제거하여 기본 카테고리 아이콘 복원
+          if (it.img.startsWith('data:image/svg+xml')) {
+            it.img = '';
+            healed = true;
+          }
+          // 억지로 감싸진 wsrv.nl 프록시 벗겨내고 원본 URL 복원
+          else if (it.img.includes('wsrv.nl/?url=') && it.img.includes('maxage=31536000')) {
+            try {
+              const u = new URL(it.img);
+              const orig = u.searchParams.get('url');
+              if (orig) {
+                it.img = orig;
+                healed = true;
+              }
+            } catch (e) {}
+          }
+        }
+      }
+
+      if (healed) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+      }
+      return items;
     } catch (e) {
       return [];
     }
-
-    let modified = false;
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      if (!item) continue;
-      if (item.imgDead === true && item.img !== FALLBACK_SVG_URI) {
-        item.img = FALLBACK_SVG_URI;
-        modified = true;
-        continue;
-      }
-      const baked = normalizeThumbUrl(item.img || item.thumb || item.thumbnail);
-      if (item.img !== baked || !item.imgBaked) {
-        item.img = baked;
-        item.imgBaked = true;
-        modified = true;
-      }
-    }
-
-    if (modified) {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-      } catch (e) {}
-    }
-    return items;
   }
 
-  function markUrlAsDeadInStorage(failedSrc) {
-    if (!failedSrc || failedSrc.startsWith('data:image/')) return;
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const items = JSON.parse(raw);
-      if (!Array.isArray(items)) return;
-      let changed = false;
-      for (let i = 0; i < items.length; i++) {
-        if (items[i] && items[i].img === failedSrc) {
-          items[i].img = FALLBACK_SVG_URI;
-          items[i].imgDead = true;
-          changed = true;
-        }
-      }
-      if (changed) localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-    } catch (e) {}
-  }
+  // 2. 목록 이미지 우선순위 최적화 (상위 10개 eager + high, 로드 완료 시 부드럽게 페이드인)
+  function enhanceListImages(container) {
+    const root = container || document.getElementById('tab-list');
+    if (!root) return;
 
-  function optimizeListImages(rootEl) {
-    const container = rootEl || document.getElementById('tab-list') || document;
-    const imgs = container.querySelectorAll('img');
+    const imgs = root.querySelectorAll('img');
+    imgs.forEach((img, index) => {
+      if (img.dataset.safeOpt === '1') return;
+      img.dataset.safeOpt = '1';
 
-    imgs.forEach((img, idx) => {
-      if (img.dataset.optBound === '1') return;
-      img.dataset.optBound = '1';
-
-      img.removeAttribute('onerror');
-      img.onerror = null;
       img.decoding = 'async';
-
-      if (idx < EAGER_COUNT) {
+      if (index < EAGER_LIMIT) {
         img.loading = 'eager';
         img.setAttribute('fetchpriority', 'high');
       } else {
         img.loading = 'lazy';
-        img.setAttribute('fetchpriority', 'auto');
       }
 
-      img.classList.add('trip-thumb-img');
-      if (img.parentElement) img.parentElement.classList.add('trip-thumb-wrap');
-
-      const markLoaded = () => {
-        img.classList.add('is-loaded');
-        if (img.parentElement) img.parentElement.classList.add('is-loaded');
-      };
-
+      const show = () => img.classList.add('thumb-ready');
       if (img.complete && img.naturalWidth > 0) {
-        markLoaded();
+        show();
       } else {
-        img.addEventListener('load', markLoaded, { once: true });
+        img.addEventListener('load', show, { once: true });
       }
-
-      img.addEventListener(
-        'error',
-        function () {
-          const badSrc = img.getAttribute('src');
-          if (badSrc !== FALLBACK_SVG_URI) {
-            markUrlAsDeadInStorage(badSrc);
-            img.src = FALLBACK_SVG_URI;
-          }
-          markLoaded();
-        },
-        { once: true }
-      );
     });
   }
 
-  function preheatTopThumbnails(items) {
+  // 3. 유휴 시간에 상위 24개 정상 HTTP 이미지 조용히 Pre-heat (동시 3개 제한)
+  function preheatImages(items) {
     const urls = [];
     const seen = new Set();
-    for (let i = 0; i < items.length && urls.length < PREHEAT_COUNT; i++) {
+    for (let i = 0; i < items.length && urls.length < PREHEAT_LIMIT; i++) {
       const u = items[i] && items[i].img;
-      if (u && u.startsWith('http') && !seen.has(u)) {
+      if (typeof u === 'string' && u.startsWith('http') && !seen.has(u)) {
         seen.add(u);
         urls.push(u);
       }
     }
-    if (urls.length === 0) return;
+    if (!urls.length) return;
 
-    let cursor = 0;
-    function nextBatch() {
-      if (cursor >= urls.length) return;
-      const url = urls[cursor++];
-      const preImg = new Image();
-      preImg.decoding = 'async';
-      preImg.onload = () => {
-        if (preImg.decode) {
-          preImg.decode().catch(() => {}).finally(nextBatch);
-        } else {
-          nextBatch();
-        }
+    const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 400));
+    idle(() => {
+      let idx = 0;
+      const pump = () => {
+        if (idx >= urls.length) return;
+        const targetUrl = urls[idx++];
+        const loader = new Image();
+        loader.decoding = 'async';
+        loader.onload = loader.onerror = pump;
+        loader.src = targetUrl;
       };
-      preImg.onerror = () => {
-        markUrlAsDeadInStorage(url);
-        nextBatch();
-      };
-      preImg.src = url;
-    }
-
-    runWhenIdle(() => {
-      for (let k = 0; k < CONCURRENCY; k++) nextBatch();
+      for (let c = 0; c < 3; c++) pump();
     });
   }
 
-  function initServiceWorkerFlow() {
-    if (!('serviceWorker' in navigator)) return;
-    let refreshing = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (refreshing) return;
-      refreshing = true;
-      window.location.reload();
-    });
-
+  // 4. 서비스 워커 등록 (무한 새로고침 루프 방지를 위해 최초 1회만 갱신)
+  if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
       try {
-        const reg = await navigator.serviceWorker.register('./sw.js?v=v20261114_140721', {
+        const reg = await navigator.serviceWorker.register('./sw.js?v=v20261114_180438', {
           updateViaCache: 'none'
         });
-        document.addEventListener('visibilitychange', () => {
-          if (document.visibilityState === 'visible') reg.update().catch(() => {});
-        });
-        if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        if (reg.waiting) {
+          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
         reg.addEventListener('updatefound', () => {
-          const newWorker = reg.installing;
-          if (!newWorker) return;
-          newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              newWorker.postMessage({ type: 'SKIP_WAITING' });
+          const nw = reg.installing;
+          if (!nw) return;
+          nw.addEventListener('statechange', () => {
+            if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+              nw.postMessage({ type: 'SKIP_WAITING' });
             }
           });
         });
@@ -23558,25 +23435,24 @@ ${JSON.stringify(payload, null, 2)}
     });
   }
 
-  initServiceWorkerFlow();
-  const items = bakePersistentThumbnails();
-  preheatTopThumbnails(items);
+  const items = healCorruptedStorage();
+  preheatImages(items);
 
-  const applyAndObserve = () => {
-    optimizeListImages(document);
-    const target = document.getElementById('tab-list') || document.body;
-    if (!target) return;
-    const observer = new MutationObserver(() => optimizeListImages(target));
-    observer.observe(target, { childList: true, subtree: true });
+  const startObserver = () => {
+    const listEl = document.getElementById('tab-list');
+    if (!listEl) return;
+    enhanceListImages(listEl);
+    const mo = new MutationObserver(() => enhanceListImages(listEl));
+    mo.observe(listEl, { childList: true, subtree: true });
   };
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', applyAndObserve);
+    document.addEventListener('DOMContentLoaded', startObserver);
   } else {
-    applyAndObserve();
+    startObserver();
   }
 })();
 </script>
-<!-- [END_TRIP_THUMB_OPTIMIZER] -->
+<!-- [END_TRIP_THUMB_SAFE_FIX] -->
 </body>
 </html>

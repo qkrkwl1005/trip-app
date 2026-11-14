@@ -1,6 +1,6 @@
-const SW_VERSION = 'v20261114_140721';
+const SW_VERSION = 'v20261114_180438';
 const APP_CACHE = 'trip-app-' + SW_VERSION;
-const THUMB_CACHE = 'trip-thumbs-v1';
+const THUMB_CACHE = 'trip-thumbs-v2';
 
 const THUMB_HOSTS = [
   'wsrv.nl',
@@ -37,6 +37,7 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
 
+  // HTML 문서: 항상 최신 버전 우선 (Network-First)
   if (
     request.mode === 'navigate' ||
     url.pathname.endsWith('/') ||
@@ -46,8 +47,10 @@ self.addEventListener('fetch', (event) => {
       (async () => {
         try {
           const freshResp = await fetch(request, { cache: 'no-store' });
-          const cache = await caches.open(APP_CACHE);
-          cache.put(request, freshResp.clone());
+          if (freshResp && freshResp.ok) {
+            const cache = await caches.open(APP_CACHE);
+            cache.put(request, freshResp.clone());
+          }
           return freshResp;
         } catch (err) {
           const cachedResp = await caches.match(request);
@@ -58,29 +61,29 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  const isThumbRequest =
+  // 외부 이미지: 정상 응답(200)만 캐싱하여 디스크 즉시 반환
+  const isThumb =
     request.destination === 'image' ||
     THUMB_HOSTS.some((host) => url.hostname.includes(host));
 
-  if (isThumbRequest) {
+  if (isThumb) {
     event.respondWith(
       (async () => {
-        const thumbCache = await caches.open(THUMB_CACHE);
-        const cached = await thumbCache.match(request);
+        const cache = await caches.open(THUMB_CACHE);
+        const cached = await cache.match(request);
         if (cached) return cached;
 
         try {
           const netResp = await fetch(request);
-          if (netResp && (netResp.status === 200 || netResp.type === 'opaque')) {
-            thumbCache.put(request, netResp.clone());
+          if (netResp && netResp.status === 200) {
+            cache.put(request, netResp.clone());
           }
           return netResp;
         } catch (err) {
-          return new Response('', { status: 404 });
+          return fetch(request);
         }
       })()
     );
-    return;
   }
 });
 
