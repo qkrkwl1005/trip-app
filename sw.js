@@ -1,4 +1,4 @@
-const SW_VERSION = 'v20261115_053000';
+const SW_VERSION = 'v20261115_063000';
 const APP_CACHE = 'trip-app-' + SW_VERSION;
 const THUMB_CACHE = 'trip-thumbs-v3';
 const THUMB_CACHE_MAX = 600;
@@ -44,19 +44,34 @@ self.addEventListener('fetch', (event) => {
     url.pathname.endsWith('/') ||
     url.pathname.endsWith('/index.html')
   ) {
+    // 네트워크가 2.5초 안에 응답하면 최신 버전, 느리면(로밍·지하철) 저장된 버전을 바로 열고
+    // 받아온 최신 버전은 다음 실행을 위해 캐시에 저장
     event.respondWith(
       (async () => {
-        try {
-          const freshResp = await fetch(request, { cache: 'no-store' });
-          if (freshResp && freshResp.ok) {
-            const cache = await caches.open(APP_CACHE);
-            cache.put(request, freshResp.clone());
+        const cache = await caches.open(APP_CACHE);
+        const network = fetch(request, { cache: 'no-store' })
+          .then((resp) => {
+            if (resp && resp.ok) {
+              const copy = resp.clone();
+              event.waitUntil(cache.put('./index.html', copy).catch(() => {}));
+            }
+            return resp;
+          });
+        const cached = await cache.match('./index.html');
+        if (!cached) {
+          try {
+            return await network;
+          } catch (err) {
+            return new Response('Offline', { status: 503 });
           }
-          return freshResp;
-        } catch (err) {
-          const cachedResp = await caches.match(request);
-          return cachedResp || new Response('Offline', { status: 503 });
         }
+        const timeout = new Promise((resolve) => setTimeout(() => resolve(null), 2500));
+        try {
+          const fast = await Promise.race([network, timeout]);
+          if (fast && fast.ok) return fast;
+        } catch (err) {}
+        event.waitUntil(network.catch(() => {}));
+        return cached;
       })()
     );
     return;
