@@ -6595,7 +6595,17 @@
         if (bulk) bulk.style.display = editMode.LIST ? "flex" : "none";
         const sc = $("selCount-LIST");
         if (sc) sc.textContent = editMode.LIST ? `선택 ${selected.size}개` : "";
-        try { if (listEl && listEl.innerHTML && !$("q-LIST")?.value?.trim()) localStorage.setItem("TRIP_DOM_CACHE_LIST", listEl.innerHTML); } catch(e){}
+        // 목록 스냅샷 저장은 렌더링 직후가 아니라 한가할 때 1회만 (체크/별표 반응 지연 방지)
+        clearTimeout(window.__domCacheT);
+        window.__domCacheT = setTimeout(() => {
+          const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 0));
+          idle(() => {
+            try {
+              const el = $("list-LIST");
+              if (el && el.innerHTML && !$("q-LIST")?.value?.trim()) localStorage.setItem("TRIP_DOM_CACHE_LIST", el.innerHTML);
+            } catch (e) {}
+          });
+        }, 1500);
       }
 
       function renderCat(c) {
@@ -21310,7 +21320,7 @@ ${JSON.stringify(payload, null, 2)}
 
     const bar = document.getElementById("v32ListBudgetBar");
     if (bar) {
-      bar.style.cssText = "flex:1 1 auto !important;min-width:175px !important;min-height:40px !important;display:flex !important;align-items:center !important;justify-content:space-between !important;gap:8px !important;padding:6px 14px !important;border-radius:14px !important;white-space:nowrap !important;";
+      bar.style.cssText = "flex:1 1 100% !important;min-width:0 !important;max-width:100% !important;box-sizing:border-box !important;width:100% !important;min-height:40px !important;display:flex !important;align-items:center !important;justify-content:space-between !important;gap:8px !important;padding:6px 14px !important;border-radius:14px !important;white-space:nowrap !important;";
       bar.querySelectorAll("span").forEach(sp => {
         sp.style.whiteSpace = "nowrap";
       });
@@ -23712,7 +23722,7 @@ ${JSON.stringify(payload, null, 2)}
   }
 
   // 8. 서비스 워커 등록 (즉시 갱신)
-  const SW_QUERY = './sw.js?v=v20261114_235500';
+  const SW_QUERY = './sw.js?v=v20261115_011000';
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', async function() {
       try {
@@ -23776,6 +23786,235 @@ ${JSON.stringify(payload, null, 2)}
 })();
 </script>
 <!-- === V76_FAST_RENDER_END === -->
+
+<!-- === V77_PERF_LAYOUT_FIX_START === -->
+<style id="v77-perf-layout-fix-style">
+  /* 1) 블러(backdrop-filter)는 고정 크롬(상단바·하단탭·시트·지도 버튼)에만. 스크롤되는 카드·버튼의 블러 341개 제거 */
+  .tab-content,
+  .tab-content *,
+  #v8MapDrawerList *,
+  #sbody *,
+  #ux7TopUtilBar * {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+  /* 2) 화면 밖 카드는 레이아웃·페인트 생략 (탭 전환·체크 시 버벅임 감소) */
+  #list-LIST > .item {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 150px;
+  }
+  #v8MapDrawerList > * {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 84px;
+  }
+  /* 3) 목록 상단: 1/N 정산 바가 '가까운순' 버튼을 덮지 않도록 한 줄 전체 사용 */
+  #tab-list div:has(> .search-row) {
+    flex-wrap: wrap !important;
+  }
+  #tab-list div:has(> .search-row) > .search-row {
+    flex: 1 1 100% !important;
+    min-width: 0 !important;
+  }
+  #tab-list div:has(> .search-row) > button.mb {
+    flex: 1 1 0 !important;
+    justify-content: center;
+  }
+  /* 4) 상세창: 닫기 바가 화면 중간에 떠서 탭을 가리던 문제 (하단 여백 96px → 24px) */
+  #sbody.ux-tabbed-sheet {
+    padding-bottom: 24px !important;
+  }
+  #sbody .ux-stab-pane {
+    padding-bottom: 12px !important;
+  }
+  /* 사진 없는 장소의 빈 큰 아이콘 박스 축소 */
+  #sbody .pic.big:not(:has(img)) {
+    aspect-ratio: auto !important;
+    height: 112px !important;
+  }
+  /* 5) 상단바: 'OLED 절전' 두 줄 깨짐 → 상단에선 숨기고 설정 탭에서 사용 */
+  #ux7TopUtilBar #v47TopOledBtn {
+    display: none !important;
+  }
+  #ux7TopUtilBar .mb {
+    white-space: nowrap;
+  }
+  /* 6) + 버튼: 아래로 스크롤 중엔 숨기고, 위로 올리면 다시 표시 / 마지막 카드가 가려지지 않게 여백 */
+  #v32FabBtn {
+    transition: transform 0.22s ease, opacity 0.18s ease !important;
+  }
+  #v32FabBtn.v77-fab-away {
+    transform: translateY(140%) !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+  #list-LIST {
+    padding-bottom: 76px;
+  }
+</style>
+<script id="v77-perf-layout-fix-script">
+(function () {
+  /* A) 지도 서랍 목록은 지도 탭이 보일 때만 렌더링 (체크·별표 때마다 87개 재생성하던 것 제거) */
+  // 모바일: 지도 탭일 때 body.show-map / 데스크톱(821px+): 지도가 항상 옆에 보임
+  const wideMq = window.matchMedia("(min-width: 821px)");
+  const mapVisible = () => document.body.classList.contains("show-map") || wideMq.matches;
+  let drawerFn = window.renderV8MapDrawer;
+  let drawerDirty = false;
+  const wrapDrawer = (fn) =>
+    typeof fn !== "function" || fn.__v77
+      ? fn
+      : Object.assign(function () {
+          if (!mapVisible()) {
+            drawerDirty = true;
+            return;
+          }
+          drawerDirty = false;
+          return fn.apply(this, arguments);
+        }, { __v77: true });
+  drawerFn = wrapDrawer(drawerFn);
+  try {
+    Object.defineProperty(window, "renderV8MapDrawer", {
+      configurable: true,
+      get() { return drawerFn; },
+      set(v) { drawerFn = wrapDrawer(v); },
+    });
+  } catch (_) {}
+  const watchMap = () => {
+    const s = document.body;
+    new MutationObserver(() => {
+      if (drawerDirty && mapVisible() && typeof drawerFn === "function") drawerFn();
+    }).observe(s, { attributes: true, attributeFilter: ["class"] });
+  };
+
+  /* B) + 버튼 스크롤 방향에 따라 숨김/표시 */
+  const watchFab = () => {
+    const sec = document.getElementById("tab-list");
+    if (!sec) return;
+    let lastY = sec.scrollTop;
+    let ticking = false;
+    sec.addEventListener("scroll", () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        ticking = false;
+        const fab = document.getElementById("v32FabBtn");
+        const y = sec.scrollTop;
+        if (fab && Math.abs(y - lastY) > 6) {
+          fab.classList.toggle("v77-fab-away", y > lastY && y > 120);
+          lastY = y;
+        }
+      });
+    }, { passive: true });
+  };
+
+  /* C) 릴스 썸네일 영구 보관: 만료되는 인스타 CDN 주소 → Firebase Storage 고정 주소로 1회 이전 */
+  const FB_HOST = "firebasestorage.googleapis.com";
+  const tried = new Set();
+  let running = false;
+
+  function igCode(it) {
+    try {
+      const m = it && it.vid && typeof parseVideoMeta === "function" ? parseVideoMeta(it.vid) : null;
+      return m && m.platform === "ig" && m.id ? String(m.id) : "";
+    } catch (_) {
+      return "";
+    }
+  }
+  function rawSource(u) {
+    if (!u || typeof u !== "string" || !/^https?:/i.test(u)) return "";
+    const m = u.match(/^https?:\/\/(?:wsrv\.nl|images\.weserv\.nl)\/?\?(.*)$/i);
+    if (m) return new URLSearchParams(m[1]).get("url") || "";
+    return u;
+  }
+  function canUpload() {
+    try {
+      return Boolean(window.firebase && firebase.storage && firebase.auth && firebase.auth().currentUser);
+    } catch (_) {
+      return false;
+    }
+  }
+  async function persistOne(it) {
+    const code = igCode(it);
+    if (!code || tried.has(code)) return false;
+    tried.add(code);
+    const cur = (typeof reelThumbCache === "object" && reelThumbCache[code]) || it.img || "";
+    if (!cur || cur.includes(FB_HOST)) return false;
+    // 기존 사진 업로드와 같은 경로 규칙(images/{방}/...)을 사용해 Storage 권한 규칙을 그대로 따름
+    const room = (typeof sharedRoomId !== "undefined" && sharedRoomId) || "local";
+    const ref = firebase.storage().ref().child(`images/${room}/reel_${code.replace(/[^A-Za-z0-9_-]/g, "")}.webp`);
+    let url = "";
+    try {
+      url = await ref.getDownloadURL(); // 다른 멤버가 이미 올려둔 경우 재사용
+    } catch (_) {
+      const raw = rawSource(cur);
+      if (!raw) return false;
+      const src = `https://wsrv.nl/?url=${encodeURIComponent(raw)}&w=480&h=640&fit=cover&output=webp&q=80`;
+      const ctrl = new AbortController();
+      const to = setTimeout(() => ctrl.abort(), 8000);
+      let blob;
+      try {
+        const r = await fetch(src, { mode: "cors", signal: ctrl.signal });
+        if (!r.ok) return false; // 이미 만료된 주소 → 다음 썸네일 복구 때 다시 시도
+        blob = await r.blob();
+      } finally {
+        clearTimeout(to);
+      }
+      if (!blob || blob.size < 1500 || !/^image\//.test(blob.type)) return false;
+      await ref.put(blob, { contentType: blob.type, cacheControl: "public,max-age=31536000,immutable" });
+      url = await ref.getDownloadURL();
+    }
+    if (!url) return false;
+    it.useCustomImg = true;
+    it.img = url;
+    if (typeof reelThumbCache === "object") reelThumbCache[code] = url;
+    document.querySelectorAll(`.item[data-id="${CSS.escape(String(it.id))}"] .pic img`).forEach((img) => {
+      img.removeAttribute("data-imgalts");
+      img.src = window.smallThumb ? window.smallThumb(url) : url;
+    });
+    return true;
+  }
+  async function persistReelThumbs() {
+    if (running || !canUpload() || typeof items === "undefined" || !Array.isArray(items)) return;
+    running = true;
+    let changed = 0;
+    try {
+      const list = (typeof items !== "undefined" ? items : []).filter((it) => {
+        const code = igCode(it);
+        if (!code || tried.has(code)) return false;
+        const cur = (typeof reelThumbCache === "object" && reelThumbCache[code]) || it.img || "";
+        return cur && !cur.includes(FB_HOST);
+      });
+      for (let i = 0; i < list.length; i += 2) {
+        const res = await Promise.all(list.slice(i, i + 2).map((it) => persistOne(it).catch(() => false)));
+        changed += res.filter(Boolean).length;
+      }
+    } finally {
+      running = false;
+    }
+    if (changed) {
+      try { if (typeof saveReelThumbCache === "function") saveReelThumbCache(); } catch (_) {}
+      try { if (typeof persistNow === "function") persistNow(); } catch (_) {}
+    }
+  }
+  window.persistReelThumbs = persistReelThumbs;
+
+  const boot = () => {
+    watchMap();
+    watchFab();
+    const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1500));
+    // 로그인 완료 후 + 새 썸네일이 생길 때마다(주기적) 조용히 이전
+    setTimeout(() => idle(persistReelThumbs), 6000);
+    setInterval(() => {
+      if (document.visibilityState === "visible") idle(persistReelThumbs);
+    }, 60000);
+    try {
+      firebase.auth().onAuthStateChanged((u) => { if (u) setTimeout(() => idle(persistReelThumbs), 3000); });
+    } catch (_) {}
+  };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+  else boot();
+})();
+</script>
+<!-- === V77_PERF_LAYOUT_FIX_END === -->
 
 </body>
 </html>
