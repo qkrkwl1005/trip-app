@@ -212,6 +212,11 @@ function buildRapidEndpoints(code) {
   ];
 }
 
+function pickRapidThumb(json) {
+  const parsed = parseJsonMedia(json);
+  return parsed && !isAvatarOrBadUrl(parsed) ? parsed : "";
+}
+
 async function fetchFromRapidKey(endpoints, rapidKey, initial) {
   let { thumb, caption } = initial;
   for (const ep of endpoints) {
@@ -224,14 +229,8 @@ async function fetchFromRapidKey(endpoints, rapidKey, initial) {
       return { thumb, caption, blocked: true };
     }
     if (!ok || !json) continue;
-    if (!thumb) {
-      const parsed = parseJsonMedia(json);
-      if (parsed && !isAvatarOrBadUrl(parsed)) thumb = parsed;
-    }
-    if (!caption) {
-      const cap = extractCaptionFromJson(json);
-      if (cap) caption = cap;
-    }
+    thumb = thumb || pickRapidThumb(json);
+    caption = caption || extractCaptionFromJson(json);
     if (thumb && caption) break;
   }
   return { thumb, caption, blocked: false };
@@ -250,34 +249,39 @@ async function resolveViaRapidApi(code, rapidKeys) {
   return result;
 }
 
-function extractFromIgHtml(html, initial) {
-  let { thumb, caption } = initial;
-  const ctx = extractContextJson(html);
-  if (ctx) {
-    if (!thumb) thumb = parseJsonMedia(ctx);
-    if (!caption) caption = extractCaptionFromJson(ctx);
-  }
+function extractCaptionFromPage(docText, current) {
+  if (current) return current;
+  const ctx = extractContextJson(docText);
+  const ctxCap = ctx ? extractCaptionFromJson(ctx) : "";
+  if (ctxCap) return ctxCap;
   for (const prop of ["description", "title"]) {
-    if (caption) break;
-    const cleaned = cleanMetaCaption(extractMeta(html, prop));
-    if (cleaned && cleaned.length >= 6) caption = cleaned;
+    const cleaned = cleanMetaCaption(extractMeta(docText, prop));
+    if (cleaned && cleaned.length >= 6) return cleaned;
   }
-  if (!thumb || isAvatarOrBadUrl(thumb)) {
-    const ogImg = extractMeta(html, "image");
-    if (ogImg && !isAvatarOrBadUrl(ogImg)) {
-      thumb = cleanUrl(decodeHtmlEntities(ogImg));
-    }
-  }
-  if (!thumb || isAvatarOrBadUrl(thumb)) {
-    const emi = html.match(/class="[^"]*EmbeddedMediaImage[^"]*"[^>]*src="([^"]+)"/i);
-    if (emi && emi[1] && !isAvatarOrBadUrl(emi[1])) {
-      thumb = cleanUrl(decodeHtmlEntities(emi[1]));
-    }
-  }
-  return { thumb, caption };
+  return "";
 }
 
-async function resolveViaIgHtml(code, initial) {
+function extractFallbackThumb(docText) {
+  const ogImg = extractMeta(docText, "image");
+  if (ogImg && !isAvatarOrBadUrl(ogImg)) {
+    return cleanUrl(decodeHtmlEntities(ogImg));
+  }
+  const emi = docText.match(/class="[^"]*EmbeddedMediaImage[^"]*"[^>]*src="([^"]+)"/i);
+  if (emi && emi[1] && !isAvatarOrBadUrl(emi[1])) {
+    return cleanUrl(decodeHtmlEntities(emi[1]));
+  }
+  return "";
+}
+
+function extractThumbFromPage(docText, current) {
+  if (current && !isAvatarOrBadUrl(current)) return current;
+  const ctx = extractContextJson(docText);
+  const ctxThumb = ctx ? parseJsonMedia(ctx) : "";
+  if (ctxThumb && !isAvatarOrBadUrl(ctxThumb)) return ctxThumb;
+  return extractFallbackThumb(docText);
+}
+
+async function resolveViaIgPages(code, initial) {
   const [resEmbed, resBot] = await Promise.all([
     fetchTextTO(
       `https://www.instagram.com/reel/${code}/embed/captioned/`,
@@ -304,8 +308,11 @@ async function resolveViaIgHtml(code, initial) {
     ),
   ]);
   let result = { ...initial };
-  for (const html of [resEmbed.text, resBot.text].filter(Boolean)) {
-    result = extractFromIgHtml(html, result);
+  for (const docText of [resEmbed.text, resBot.text].filter(Boolean)) {
+    result = {
+      thumb: extractThumbFromPage(docText, result.thumb),
+      caption: extractCaptionFromPage(docText, result.caption),
+    };
     if (result.thumb && result.caption) break;
   }
   return result;
@@ -321,7 +328,7 @@ async function resolveIgData(code, rapidKeysInput) {
   if (rapidResult.thumb && rapidResult.caption) return rapidResult;
 
   // 2순위: 인스타그램 엔드포인트 병렬 조회 (Embed 및 메신저 봇 헤더)
-  return resolveViaIgHtml(code, rapidResult);
+  return resolveViaIgPages(code, rapidResult);
 }
 
 async function handler(req, res) {
