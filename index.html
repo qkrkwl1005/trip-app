@@ -8098,8 +8098,6 @@
           if (!igId) return "";
 
           const embedUrl = `https://www.instagram.com/p/${igId}/embed/captioned/`;
-          const reelEmbedUrl = `https://www.instagram.com/reel/${igId}/embed/captioned/`;
-          const ddUrl = `https://www.ddinstagram.com/reel/${igId}/`;
           const reelUrl = `https://www.instagram.com/reel/${igId}/`;
 
           // 1단계: RapidAPI 시도 (키 여러 개면 한도 찬 키는 건너뜀 · 3초 타임아웃)
@@ -8146,20 +8144,43 @@
               if (cap && cap.trim().length >= 3 && !cap.includes("<html")) return cap;
               throw new Error("jina reel empty");
             },
+            // 내 프록시(Cloudflare Worker 등)로 인스타 임베드 HTML을 받아 캡션을 직접 파싱
+            ...(cfBase && !cfBase.includes(location.host)
+              ? [
+                  async () => {
+                    const r = await fetchTO(cfBase + encodeURIComponent(embedUrl), {}, 6000);
+                    if (!r.ok) throw new Error("my proxy status");
+                    const cap = parseIgEmbedHtml(await r.text());
+                    if (cap && cap.trim().length >= 3 && !cap.includes("<html")) return cap;
+                    throw new Error("my proxy embed empty");
+                  },
+                ]
+              : []),
           ];
+          // 위가 모두 실패했을 때만 쓰는 공개 프록시 (느리고 자주 막혀서 마지막 수단)
+          const publicJobs = [
+            `https://api.allorigins.win/raw?url=${encodeURIComponent(embedUrl)}`,
+            `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(embedUrl)}`,
+          ].map((src) => async () => {
+            const r = await fetchTO(src, {}, 9000);
+            if (!r.ok) throw new Error("public proxy status");
+            const cap = parseIgEmbedHtml(await r.text());
+            if (cap && cap.trim().length >= 3 && !cap.includes("<html")) return cap;
+            throw new Error("public proxy embed empty");
+          });
+          const firstOk = async (list) => {
+            try { return await Promise.any(list.map((fn) => fn())); } catch (_) { return ""; }
+          };
 
-          try {
-            const out = await Promise.any(jobs.map((fn) => fn()));
-            if (typeof out === "string" && out.trim().length >= 3 && !out.includes("<html")) {
-              const resText = out.trim();
-              mediaCaptionCache[cKey] = resText;
-              saveMediaCaptionCache();
-              return resText;
-            }
-            return typeof out === "string" && out.trim().length >= 3 && !out.includes("<html") ? out : "";
-          } catch (e) {
-            return "";
+          let out = await firstOk(jobs);
+          if (!(typeof out === "string" && out.trim().length >= 3)) out = await firstOk(publicJobs);
+          if (typeof out === "string" && out.trim().length >= 3 && !out.includes("<html")) {
+            const resText = out.trim();
+            mediaCaptionCache[cKey] = resText;
+            saveMediaCaptionCache();
+            return resText;
           }
+          return "";
         }
 
         if (meta.platform === "yt" && meta.id) {
