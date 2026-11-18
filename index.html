@@ -24015,7 +24015,9 @@ ${JSON.stringify(payload, null, 2)}
       const itemsSig = (typeof items !== "undefined" && Array.isArray(items)) 
         ? items.map(i => i.id + (i.updatedAt||0) + i.done + i.star).join("") 
         : "";
-      const currentSig = curCat + "|" + curFilter + "|" + qVal + "|" + itemsSig;
+      // 선택 모드·체크 상태도 서명에 넣는다. 빠져 있어서 '선택' 버튼을 눌러도 같은 서명이라 다시 그리지 않았다.
+      const selSig = ((typeof editMode !== "undefined" && editMode.LIST) ? "1" : "0") + (typeof selected !== "undefined" ? [...selected].join(",") : "");
+      const currentSig = curCat + "|" + curFilter + "|" + qVal + "|" + selSig + "|" + itemsSig;
       
       const listContainer = document.getElementById("list-LIST");
       
