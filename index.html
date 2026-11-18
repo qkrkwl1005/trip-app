@@ -1846,7 +1846,7 @@
                   <span class="ms">delete_sweep</span>모두 지우기
                 </button>
               </div>
-              <label>인스타 캡션 추출용 RapidAPI 키 (선택 · 차단 우회)</label>
+              <label>인스타 캡션 추출용 RapidAPI 키 (선택 · 여러 개는 쉼표로 구분 · 한도가 차면 다음 키로 자동 전환)</label>
               <input
                 type="text"
                 id="rapidkey"
@@ -7930,6 +7930,43 @@
 
       const DEFAULT_RAPID_KEY = "5fd6fbd834msh3820caaabb2d544p1887a1jsn8dfc3415ab40";
 
+      // RapidAPI 키 여러 개 지원: 설정 입력칸에 쉼표·공백·줄바꿈으로 구분해 넣으면,
+      // 한도가 찬 키(429/403)는 12시간 쉬게 하고 다음 키로 자동 전환한다. 내 키가 먼저, 기본 키는 맨 마지막.
+      const RAPID_HOST = "instagram-scraper-stable-api.p.rapidapi.com";
+      function rapidKeyList() {
+        const own = String(ls.get("TRIP_RAPIDAPI_KEY") || "").split(/[\s,;]+/).map((s) => s.trim()).filter(Boolean);
+        return [...new Set([...own, DEFAULT_RAPID_KEY].filter(Boolean))];
+      }
+      function rapidDeadMap() {
+        try { return JSON.parse(localStorage.getItem("TRIP_RAPID_DEAD") || "{}") || {}; } catch (_) { return {}; }
+      }
+      function rapidLiveKeys() {
+        const dead = rapidDeadMap(), now = Date.now();
+        return rapidKeyList().filter((k) => !(dead[k] > now));
+      }
+      function rapidMarkDead(key) {
+        const d = rapidDeadMap();
+        d[key] = Date.now() + 12 * 3600 * 1000;
+        try { localStorage.setItem("TRIP_RAPID_DEAD", JSON.stringify(d)); } catch (_) {}
+        window.__rapidQuotaOut = rapidLiveKeys().length === 0;
+      }
+      // path 를 살아 있는 키로 차례로 호출. 429/403이면 그 키를 쉬게 하고 다음 키로. 키가 하나도 없으면 null.
+      // 네트워크 오류·타임아웃은 키 탓이 아니므로 그대로 던진다.
+      async function rapidFetch(path, ms) {
+        const keys = rapidLiveKeys();
+        if (!keys.length) { window.__rapidQuotaOut = true; return null; }
+        let last = null;
+        for (const key of keys) {
+          const r = await fetchTO(`https://${RAPID_HOST}/${path}`, { headers: { "x-rapidapi-key": key, "x-rapidapi-host": RAPID_HOST } }, ms);
+          if (r.status === 429 || r.status === 403) { rapidMarkDead(key); last = r; continue; }
+          window.__rapidQuotaOut = false;
+          return r;
+        }
+        return last;
+      }
+      window.rapidFetch = rapidFetch;
+      window.rapidLiveKeys = rapidLiveKeys;
+
       function extractCaptionFromRapidJson(obj) {
         if (!obj || typeof obj !== "object") return "";
         const direct =
@@ -7983,8 +8020,6 @@
         const cfBase = normalizeCfProxy(
           ls.get("TRIP_CF_PROXY") || ls.get("TRIP_WORKER_URL") || ""
         );
-        const rapidKey = (ls.get("TRIP_RAPIDAPI_KEY") || DEFAULT_RAPID_KEY).trim();
-
         const cleanCaptionText = (text) => {
           if (!text || typeof text !== "string") return "";
           let s = text;
@@ -8063,26 +8098,13 @@
           if (!igId) return "";
 
           const embedUrl = `https://www.instagram.com/p/${igId}/embed/captioned/`;
-          const reelEmbedUrl = `https://www.instagram.com/reel/${igId}/embed/captioned/`;
-          const ddUrl = `https://www.ddinstagram.com/reel/${igId}/`;
           const reelUrl = `https://www.instagram.com/reel/${igId}/`;
-          const stableHost = "instagram-scraper-stable-api.p.rapidapi.com";
 
-          // 1단계: RapidAPI 시도 (1.2초 타임아웃)
-          if (rapidKey) {
+          // 1단계: RapidAPI 시도 (키 여러 개면 한도 찬 키는 건너뜀 · 3초 타임아웃)
+          if (rapidLiveKeys().length) {
             const stableCalls = [
-              () =>
-                fetchTO(
-                  `https://${stableHost}/get_media_data_v2.php?media_code=${encodeURIComponent(igId)}`,
-                  { headers: { "x-rapidapi-key": rapidKey, "x-rapidapi-host": stableHost } },
-                  1200
-                ),
-              () =>
-                fetchTO(
-                  `https://${stableHost}/get_media_data.php?reel_post_code_or_url=${encodeURIComponent(reelUrl)}&type=reel`,
-                  { headers: { "x-rapidapi-key": rapidKey, "x-rapidapi-host": stableHost } },
-                  1200
-                ),
+              () => rapidFetch(`get_media_data_v2.php?media_code=${encodeURIComponent(igId)}`, 3000),
+              () => rapidFetch(`get_media_data.php?reel_post_code_or_url=${encodeURIComponent(reelUrl)}&type=reel`, 3000),
             ];
 
             try {
@@ -8096,42 +8118,69 @@
                   throw new Error("empty caption");
                 })
               );
-              if (rapidCap) return rapidCap;
+              if (rapidCap) {
+                mediaCaptionCache[cKey] = rapidCap;
+                saveMediaCaptionCache();
+                return rapidCap;
+              }
             } catch (_) {}
           }
 
-          // 2단계: 서버리스 API 및 프록시 시도 (1.5초 타임아웃)
+          // 2단계: 서버리스 API 및 프록시 시도 (6초 타임아웃 · 먼저 오는 쪽을 쓰므로 느려지지 않음)
           const apiBase = location.hostname.includes("vercel.app")
             ? ""
             : "https://trip-app-psi-two.vercel.app";
           const jobs = [
             async () => {
-              const r = await fetchTO(`${apiBase}/api/ig?code=${encodeURIComponent(igId)}`, {}, 1500);
+              const r = await fetchTO(`${apiBase}/api/ig?code=${encodeURIComponent(igId)}`, {}, 6000);
               if (!r.ok) throw new Error("api status");
               const d = await r.json();
               if (d.caption && d.caption.trim().length >= 3 && !d.caption.includes("<html")) return d.caption;
               throw new Error("api empty");
             },
             async () => {
-              const r = await fetchTO(`https://r.jina.ai/${reelUrl}`, {}, 1800);
+              const r = await fetchTO(`https://r.jina.ai/${reelUrl}`, {}, 6000);
               const cap = parseJinaMarkdown(await r.text());
               if (cap && cap.trim().length >= 3 && !cap.includes("<html")) return cap;
               throw new Error("jina reel empty");
             },
+            // 내 프록시(Cloudflare Worker 등)로 인스타 임베드 HTML을 받아 캡션을 직접 파싱
+            ...(cfBase && !cfBase.includes(location.host)
+              ? [
+                  async () => {
+                    const r = await fetchTO(cfBase + encodeURIComponent(embedUrl), {}, 6000);
+                    if (!r.ok) throw new Error("my proxy status");
+                    const cap = parseIgEmbedHtml(await r.text());
+                    if (cap && cap.trim().length >= 3 && !cap.includes("<html")) return cap;
+                    throw new Error("my proxy embed empty");
+                  },
+                ]
+              : []),
           ];
+          // 위가 모두 실패했을 때만 쓰는 공개 프록시 (느리고 자주 막혀서 마지막 수단)
+          const publicJobs = [
+            `https://api.allorigins.win/raw?url=${encodeURIComponent(embedUrl)}`,
+            `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(embedUrl)}`,
+          ].map((src) => async () => {
+            const r = await fetchTO(src, {}, 9000);
+            if (!r.ok) throw new Error("public proxy status");
+            const cap = parseIgEmbedHtml(await r.text());
+            if (cap && cap.trim().length >= 3 && !cap.includes("<html")) return cap;
+            throw new Error("public proxy embed empty");
+          });
+          const firstOk = async (list) => {
+            try { return await Promise.any(list.map((fn) => fn())); } catch (_) { return ""; }
+          };
 
-          try {
-            const out = await Promise.any(jobs.map((fn) => fn()));
-            if (typeof out === "string" && out.trim().length >= 3 && !out.includes("<html")) {
-              const resText = out.trim();
-              mediaCaptionCache[cKey] = resText;
-              saveMediaCaptionCache();
-              return resText;
-            }
-            return typeof out === "string" && out.trim().length >= 3 && !out.includes("<html") ? out : "";
-          } catch (e) {
-            return "";
+          let out = await firstOk(jobs);
+          if (!(typeof out === "string" && out.trim().length >= 3)) out = await firstOk(publicJobs);
+          if (typeof out === "string" && out.trim().length >= 3 && !out.includes("<html")) {
+            const resText = out.trim();
+            mediaCaptionCache[cKey] = resText;
+            saveMediaCaptionCache();
+            return resText;
           }
+          return "";
         }
 
         if (meta.platform === "yt" && meta.id) {
@@ -8831,25 +8880,27 @@
           const hit = Array.isArray(d) && d.find((x) => inRegion(Number(x.lat), Number(x.lon)));
           return hit ? { lat: Number(hit.lat), lng: Number(hit.lon), formatted: hit.display_name } : null;
         };
-        const arc = async (q) => {
+        const arc = async (q, isAddr = false) => {
           const params = new URLSearchParams({ f: "json", singleLine: q, maxLocations: "3", sourceCountry: "JPN", searchExtent: `${box.xmin},${box.ymin},${box.xmax},${box.ymax}` });
           const r = await fetchTO(`https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?${params}`, {}, 3500);
           const d = await r.json();
           const cs = (d?.candidates || []).filter((c) => c?.score >= 75 && c?.location && inRegion(c.location.y, c.location.x));
           const exact = cs.find((c) => c?.attributes?.Addr_type !== "Locality");
+          // 번지까지 맞은 주소 검색(점수 95+)은 이름 검색보다 먼저 쓴다 (체인점 이름만으로는 엉뚱한 지점이 잡힘)
+          const exactAddr = isAddr && exact && exact.score >= 95;
           // 정확한 가게/번지가 없으면 동네(거리) 수준 결과를 최후 수단으로 (느린 순차 검색이 결국 찾던 것과 같은 수준)
           const area = cs.find((c) => c?.attributes?.Addr_type === "Locality");
           const hit = exact || area;
-          return hit ? { lat: Number(hit.location.y), lng: Number(hit.location.x), formatted: hit.address || q, coarse: !exact } : null;
+          return hit ? { lat: Number(hit.location.y), lng: Number(hit.location.x), formatted: hit.address || q, coarse: !exact, exactAddr: Boolean(exactAddr) } : null;
         };
-        // 모든 검색어 × 서비스를 동시에 요청하고, 우선순위(현지 이름 > 이름 > 주소, Nominatim > ArcGIS)대로 첫 결과 채택
+        // 모든 검색어 × 서비스를 동시에 요청. 번지까지 맞은 주소 결과가 있으면 그것을, 없으면 우선순위(현지 이름 > 이름 > 주소, Nominatim > ArcGIS)대로 첫 결과 채택
         const tasks = [];
         qs.forEach((q, qi) => {
           tasks.push(nom(q).then((x) => x && { ...x, rank: qi * 2 }).catch(() => null));
-          tasks.push(arc(q).then((x) => x && { ...x, rank: x.coarse ? 50 + qi : qi * 2 + 1 }).catch(() => null));
+          tasks.push(arc(q, q === cand.address).then((x) => x && { ...x, rank: x.exactAddr ? -1 : x.coarse ? 50 + qi : qi * 2 + 1 }).catch(() => null));
         });
         const found = (await Promise.all(tasks)).filter(Boolean).sort((a, b) => a.rank - b.rank)[0] || null;
-        if (found) { delete found.rank; delete found.coarse; }
+        if (found) { delete found.rank; delete found.coarse; delete found.exactAddr; }
         _regionGeoCache.set(ck, found);
         return found;
       }
@@ -9045,18 +9096,20 @@ ${caption || rawText}
 3. "localName" 필드에는 구글맵 검색용 **현지어(일본어/영어) 공식 상호명**을 적으세요. (예: "Nintendo OSAKA", "イオシス なんば店", "CHIYOMATSU Dotonbori")
 4. "price", "info" 필드도 영어나 일본어가 아닌 **한국어**로 번역·요약해서 적으세요. (예: "가츠산도 ¥1,600 · 타마고산도 ¥800", "컨트롤러 가챠 600엔")
 5. 텍스트에 실제 방문 가능한 관광지/매장/음식점/카페가 없으면 빈 배열 []만 반환하세요.
+6. "address"는 입력에 적혀 있거나 웹 검색으로 실제 확인한 주소만 쓰세요. 번지·우편번호·동네 이름을 추측하거나 지어내지 말고, 확인하지 못했으면 빈 문자열 ""로 두세요(좌표는 앱이 상호명으로 따로 찾습니다).
+7. "lat"/"lng"는 입력에 좌표가 직접 적혀 있을 때만 숫자로, 아니면 null로 두세요.
 
 반드시 아래 JSON 배열 형식으로만 답하세요:
 [
   {
     "name": "한국어 상호명 (대표 음식 또는 판매 물건)",
     "localName": "현지어 공식 상호명",
-    "address": "우편번호·번지를 포함한 주소",
+    "address": "입력에 적혀 있거나 웹 검색으로 확인한 실제 주소(우편번호·번지 포함). 확인하지 못했으면 반드시 빈 문자열 \"\"",
     "price": "한국어로 번역된 가격·대표메뉴 요약",
     "info": "한국어로 요약된 영업시간·휴무일·특징",
     "category": "PLACE 또는 CAFE 또는 FOOD 또는 SHOP",
-    "lat": 34.6653,
-    "lng": 135.5038
+    "lat": null,
+    "lng": null
   }
 ]`;
             const aiKey = (!images || images.length === 0) ? `ai|${prompt.trim()}` : "";
@@ -10907,6 +10960,7 @@ ${caption || rawText}
       if ($("saverapid")) {
         $("saverapid").onclick = async () => {
           const val = ($("rapidkey")?.value || "").trim();
+          try { localStorage.removeItem("TRIP_RAPID_DEAD"); } catch (_) {}
           ls.set("TRIP_RAPIDAPI_KEY", val);
           ls.set("TRIP_RAPID_API_KEY", val);
           try {
@@ -10974,7 +11028,7 @@ ${caption || rawText}
             logArea.scrollTop = logArea.scrollHeight;
           };
 
-          const rKey = ($("rapidkey")?.value || ls.get("TRIP_RAPIDAPI_KEY") || "").trim();
+          const rKey = String($("rapidkey")?.value || ls.get("TRIP_RAPIDAPI_KEY") || "").trim().split(/[\s,;]+/)[0] || "";
           const gKey = (aiCfg?.gemini?.key || ls.get("TRAVEL_GMAP_KEY") || "").trim();
           const orKey = (aiCfg?.openrouter?.key || "").trim();
           const testCode = "Dti-Co-ulwL"; // 샘플 릴스 코드
@@ -12306,6 +12360,9 @@ ${caption || rawText}
   const IG_THUMB_MARKER = "ig_cover=2"; // 이전 꼬리표(ig_thumb=1)를 가진 오염 사진을 모두 박멸하기 위한 새 규격
 
   function getRapidKey() {
+    // 한도가 안 찬 키를 우선 (여러 키 지원)
+    const live = window.rapidLiveKeys && window.rapidLiveKeys()[0];
+    if (live) return live;
     const keys = ["TRIP_RAPIDAPI_KEY", "TRIP_RAPID_API_KEY", "RAPID_API_KEY", "rapidApiKey", "rapidapi_key"];
     for (const k of keys) {
       const v = (localStorage.getItem(k) || "").trim();
@@ -12428,19 +12485,18 @@ ${caption || rawText}
   // =========================================================================
   async function fetchTrueCoverV6(code, explicitKey) {
     if (!code) return "";
-    const key = (explicitKey || getRapidKey()).trim();
+    // 키가 여러 개면 한도 안 찬 첫 키(서버 /api/ig 에도 이 키를 넘김). 직접 호출은 rapidFetch 가 키를 돌려 쓴다.
+    const key = String(getRapidKey() || explicitKey || "").trim().split(/[\s,;]+/)[0] || "";
 
     // 1순위: 클라이언트에서 RapidAPI 직접 호출 (가장 빠르고 프록시 장애 없음)
-    if (key) {
+    if (key && window.rapidFetch) {
       try {
         const reelUrl = `https://www.instagram.com/reel/${code}/`;
-        const stableHost = "instagram-scraper-stable-api.p.rapidapi.com";
-        const r = await fetchTO(
-          `https://${stableHost}/get_media_data.php?reel_post_code_or_url=${encodeURIComponent(reelUrl)}&type=reel`,
-          { headers: { "x-rapidapi-key": key, "x-rapidapi-host": stableHost } },
+        const r = await window.rapidFetch(
+          `get_media_data.php?reel_post_code_or_url=${encodeURIComponent(reelUrl)}&type=reel`,
           4500
         );
-        if (r.ok) {
+        if (r && r.ok) {
           const json = await r.json();
           const raw = extractThumbFromRapidJson(json);
           if (raw && !isAvatarOrBadUrl(raw)) {
@@ -12450,13 +12506,8 @@ ${caption || rawText}
       } catch (_) {}
 
       try {
-        const stableHost = "instagram-scraper-stable-api.p.rapidapi.com";
-        const r = await fetchTO(
-          `https://${stableHost}/get_media_data_v2.php?media_code=${encodeURIComponent(code)}`,
-          { headers: { "x-rapidapi-key": key, "x-rapidapi-host": stableHost } },
-          4500
-        );
-        if (r.ok) {
+        const r = await window.rapidFetch(`get_media_data_v2.php?media_code=${encodeURIComponent(code)}`, 4500);
+        if (r && r.ok) {
           const json = await r.json();
           const raw = extractThumbFromRapidJson(json);
           if (raw && !isAvatarOrBadUrl(raw)) {
