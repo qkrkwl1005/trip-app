@@ -10839,7 +10839,7 @@ ${caption || rawText}
 
           const gKey = (aiCfg?.gemini?.key || ls.get("TRAVEL_GMAP_KEY") || "").trim();
           const orKey = (aiCfg?.openrouter?.key || "").trim();
-          const testCode = "Dti-Co-ulwL"; // 샘플 릴스 코드
+          const testCode = "fA9uwTtkSN"; // 공개 샘플 포스트 코드 (Meta 공식 oEmbed 예제)
 
           log(`🕒 진단 시각: ${new Date().toLocaleString()}`);
           log(`📱 브라우저: ${navigator.userAgent.slice(0, 50)}...`);
@@ -10868,7 +10868,7 @@ ${caption || rawText}
 
           // 2. Gemini AI 검사
           if (gKey) {
-            log("3️⃣ [Google Gemini] 텍스트 생성 API 검사...");
+            log("2️⃣ [Google Gemini] 텍스트 생성 API 검사...");
             try {
               let candidateModels = [
                 "gemini-flash-latest",
@@ -10964,12 +10964,12 @@ ${caption || rawText}
               log(`   ❌ Gemini 진단 실패: ${e.message}`);
             }
           } else {
-            log("3️⃣ [Google Gemini] 키가 설정되어 있지 않습니다.");
+            log("2️⃣ [Google Gemini] 키가 설정되어 있지 않습니다.");
           }
 
           // 3. OpenRouter 폴백 검사
           if (orKey) {
-            log("4️⃣ [OpenRouter] 무료 폴백 모델 검사...");
+            log("3️⃣ [OpenRouter] 무료 폴백 모델 검사...");
             try {
               const t0 = Date.now();
               const r = await fetchTO(
@@ -11001,7 +11001,7 @@ ${caption || rawText}
               log(`   ⚠️ OpenRouter 호출 실패: ${e.message}`);
             }
           } else {
-            log("4️⃣ [OpenRouter] 키가 설정되어 있지 않습니다.");
+            log("3️⃣ [OpenRouter] 키가 설정되어 있지 않습니다.");
           }
 
           log("----------------------------------------");
