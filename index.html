@@ -7928,14 +7928,12 @@
         return "";
       }
 
-      const DEFAULT_RAPID_KEY = "5fd6fbd834msh3820caaabb2d544p1887a1jsn8dfc3415ab40";
-
       // RapidAPI 키 여러 개 지원: 설정 입력칸에 쉼표·공백·줄바꿈으로 구분해 넣으면,
-      // 한도가 찬 키(429/403)는 12시간 쉬게 하고 다음 키로 자동 전환한다. 내 키가 먼저, 기본 키는 맨 마지막.
+      // 한도가 찬 키(429/403)는 12시간 쉬게 하고 다음 키로 자동 전환한다. (공개 저장소에는 기본 키를 하드코딩하지 않음)
       const RAPID_HOST = "instagram-scraper-stable-api.p.rapidapi.com";
       function rapidKeyList() {
         const own = String(ls.get("TRIP_RAPIDAPI_KEY") || "").split(/[\s,;]+/).map((s) => s.trim()).filter(Boolean);
-        return [...new Set([...own, DEFAULT_RAPID_KEY].filter(Boolean))];
+        return [...new Set(own)];
       }
       function rapidDeadMap() {
         try { return JSON.parse(localStorage.getItem("TRIP_RAPID_DEAD") || "{}") || {}; } catch (_) { return {}; }
@@ -10934,7 +10932,7 @@ ${caption || rawText}
         location.reload();
       };
       if ($("rapidkey")) {
-        $("rapidkey").value = ls.get("TRIP_RAPIDAPI_KEY") || DEFAULT_RAPID_KEY;
+        $("rapidkey").value = ls.get("TRIP_RAPIDAPI_KEY") || "";
         $("rapidkey").addEventListener("click", function() { this.focus(); });
       }
       if ($("pasteRapidKey")) {
@@ -12520,7 +12518,8 @@ ${caption || rawText}
     // 2순위: Vercel 서버리스 /api/ig 호출
     const apiBase = location.hostname.includes("vercel.app") ? "" : "https://trip-app-psi-two.vercel.app";
     try {
-      const res = await fetchTO(`${apiBase}/api/ig?code=${encodeURIComponent(code)}&key=${encodeURIComponent(key)}`, {}, 6000);
+      const apiUrl = `${apiBase}/api/ig?code=${encodeURIComponent(code)}${key ? `&key=${encodeURIComponent(key)}` : ""}`;
+      const res = await fetchTO(apiUrl, {}, 6000);
       if (res.ok) {
         const data = await res.json();
         if (data.weservThumb) return data.weservThumb;

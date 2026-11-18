@@ -185,12 +185,27 @@ async function fetchJsonTO(url, opts = {}, ms = 2000) {
   }
 }
 
-async function resolveIgData(code, rapidKey) {
+function parseRapidKeys(...sources) {
+  const keys = [];
+  for (const src of sources) {
+    if (!src) continue;
+    for (const part of String(src).split(/[\s,;]+/)) {
+      const k = part.trim();
+      if (k && !keys.includes(k)) keys.push(k);
+    }
+  }
+  return keys;
+}
+
+async function resolveIgData(code, rapidKeysInput) {
   let thumb = "";
   let caption = "";
+  const rapidKeys = Array.isArray(rapidKeysInput)
+    ? rapidKeysInput.filter(Boolean)
+    : parseRapidKeys(rapidKeysInput);
 
-  // 1순위: RapidAPI (사용자가 입력한 키가 전달된 경우)
-  if (rapidKey) {
+  // 1순위: RapidAPI (클라이언트 키 우선, 없으면 Vercel 환경변수 키 순회 · 429/403은 다음 키로)
+  if (rapidKeys.length) {
     const reelUrl = `https://www.instagram.com/reel/${code}/`;
     const endpoints = [
       {
@@ -202,29 +217,39 @@ async function resolveIgData(code, rapidKey) {
         url: `https://instagram-scraper-stable-api.p.rapidapi.com/get_media_data_v2.php?media_code=${encodeURIComponent(code)}`,
       },
     ];
-    for (const ep of endpoints) {
-      const { ok, json } = await fetchJsonTO(
-        ep.url,
-        {
-          headers: {
-            "x-rapidapi-key": rapidKey,
-            "x-rapidapi-host": ep.host,
+    for (const rapidKey of rapidKeys) {
+      let keyBlocked = false;
+      for (const ep of endpoints) {
+        const { ok, status, json } = await fetchJsonTO(
+          ep.url,
+          {
+            headers: {
+              "x-rapidapi-key": rapidKey,
+              "x-rapidapi-host": ep.host,
+            },
           },
-        },
-        1800
-      );
-      if (ok && json) {
-        if (!thumb) {
-          const parsed = parseJsonMedia(json);
-          if (parsed && !isAvatarOrBadUrl(parsed)) thumb = parsed;
+          1800
+        );
+        if (status === 429 || status === 403) {
+          keyBlocked = true;
+          break;
         }
-        if (!caption) {
-          const cap = extractCaptionFromJson(json);
-          if (cap) caption = cap;
+        if (ok && json) {
+          if (!thumb) {
+            const parsed = parseJsonMedia(json);
+            if (parsed && !isAvatarOrBadUrl(parsed)) thumb = parsed;
+          }
+          if (!caption) {
+            const cap = extractCaptionFromJson(json);
+            if (cap) caption = cap;
+          }
+          if (thumb && caption) break;
         }
-        if (thumb && caption) break;
       }
+      if (thumb && caption) break;
+      if (!keyBlocked && (thumb || caption)) break;
     }
+    if (thumb && caption) return { thumb, caption };
   }
 
   // 2순위: 인스타그램 엔드포인트 병렬 조회 (Embed 및 메신저 봇 헤더)
@@ -305,11 +330,16 @@ async function resolveIgData(code, rapidKey) {
 async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   const code = String(req.query.code || "").trim();
-  const key = String(req.query.key || req.headers["x-rapidapi-key"] || "").trim();
+  const keys = parseRapidKeys(
+    req.query.key,
+    req.headers["x-rapidapi-key"],
+    process.env.RAPIDAPI_KEYS,
+    process.env.RAPIDAPI_KEY
+  );
 
   if (!code) return res.status(400).json({ ok: false });
 
-  const { thumb, caption } = await resolveIgData(code, key);
+  const { thumb, caption } = await resolveIgData(code, keys);
 
   const weservUrl =
     thumb && !isAvatarOrBadUrl(thumb)
