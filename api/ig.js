@@ -171,84 +171,6 @@ async function fetchTextTO(url, opts = {}, ms = 2200) {
   }
 }
 
-async function fetchJsonTO(url, opts = {}, ms = 2000) {
-  const ctrl = new AbortController();
-  const tm = setTimeout(() => ctrl.abort(), ms);
-  try {
-    const res = await fetch(url, { ...opts, signal: ctrl.signal });
-    const json = await res.json();
-    clearTimeout(tm);
-    return { ok: res.ok, status: res.status, json };
-  } catch (_) {
-    clearTimeout(tm);
-    return { ok: false, status: 0, json: null };
-  }
-}
-
-function parseRapidKeys(...sources) {
-  const keys = [];
-  for (const src of sources) {
-    if (!src) continue;
-    for (const part of String(src).split(/[\s,;]+/)) {
-      const k = part.trim();
-      if (k && !keys.includes(k)) keys.push(k);
-    }
-  }
-  return keys;
-}
-
-function buildRapidEndpoints(code) {
-  const reelUrl = `https://www.instagram.com/reel/${code}/`;
-  const host = "instagram-scraper-stable-api.p.rapidapi.com";
-  return [
-    {
-      host,
-      url: `https://${host}/get_media_data.php?reel_post_code_or_url=${encodeURIComponent(reelUrl)}&type=reel`,
-    },
-    {
-      host,
-      url: `https://${host}/get_media_data_v2.php?media_code=${encodeURIComponent(code)}`,
-    },
-  ];
-}
-
-function pickRapidThumb(json) {
-  const parsed = parseJsonMedia(json);
-  return parsed && !isAvatarOrBadUrl(parsed) ? parsed : "";
-}
-
-async function fetchFromRapidKey(endpoints, rapidKey, initial) {
-  let { thumb, caption } = initial;
-  for (const ep of endpoints) {
-    const { ok, status, json } = await fetchJsonTO(
-      ep.url,
-      { headers: { "x-rapidapi-key": rapidKey, "x-rapidapi-host": ep.host } },
-      1800
-    );
-    if (status === 429 || status === 403) {
-      return { thumb, caption, blocked: true };
-    }
-    if (!ok || !json) continue;
-    thumb = thumb || pickRapidThumb(json);
-    caption = caption || extractCaptionFromJson(json);
-    if (thumb && caption) break;
-  }
-  return { thumb, caption, blocked: false };
-}
-
-async function resolveViaRapidApi(code, rapidKeys) {
-  let result = { thumb: "", caption: "" };
-  if (!rapidKeys.length) return result;
-  const endpoints = buildRapidEndpoints(code);
-  for (const rapidKey of rapidKeys) {
-    const next = await fetchFromRapidKey(endpoints, rapidKey, result);
-    result = { thumb: next.thumb, caption: next.caption };
-    if (result.thumb && result.caption) break;
-    if (!next.blocked && (result.thumb || result.caption)) break;
-  }
-  return result;
-}
-
 function extractCaptionFromPage(docText, current) {
   if (current) return current;
   const ctx = extractContextJson(docText);
@@ -318,32 +240,17 @@ async function resolveViaIgPages(code, initial) {
   return result;
 }
 
-async function resolveIgData(code, rapidKeysInput) {
-  const rapidKeys = Array.isArray(rapidKeysInput)
-    ? rapidKeysInput.filter(Boolean)
-    : parseRapidKeys(rapidKeysInput);
-
-  // 1순위: RapidAPI (클라이언트 키 우선, 없으면 Vercel 환경변수 키 순회 · 429/403은 다음 키로)
-  const rapidResult = await resolveViaRapidApi(code, rapidKeys);
-  if (rapidResult.thumb && rapidResult.caption) return rapidResult;
-
-  // 2순위: 인스타그램 엔드포인트 병렬 조회 (Embed 및 메신저 봇 헤더)
-  return resolveViaIgPages(code, rapidResult);
+async function resolveIgData(code) {
+  return resolveViaIgPages(code, { thumb: "", caption: "" });
 }
 
 async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   const code = String(req.query.code || "").trim();
-  const keys = parseRapidKeys(
-    req.query.key,
-    req.headers["x-rapidapi-key"],
-    process.env.RAPIDAPI_KEYS,
-    process.env.RAPIDAPI_KEY
-  );
 
   if (!code) return res.status(400).json({ ok: false });
 
-  const { thumb, caption } = await resolveIgData(code, keys);
+  const { thumb, caption } = await resolveIgData(code);
 
   const weservUrl =
     thumb && !isAvatarOrBadUrl(thumb)

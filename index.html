@@ -1846,34 +1846,6 @@
                   <span class="ms">delete_sweep</span>모두 지우기
                 </button>
               </div>
-              <label>인스타 캡션 추출용 RapidAPI 키 (선택 · 여러 개는 쉼표로 구분 · 한도가 차면 다음 키로 자동 전환)</label>
-              <input
-                type="text"
-                id="rapidkey"
-                placeholder="RapidAPI Application Key 입력"
-                autocomplete="off"
-                autocorrect="off"
-                autocapitalize="off"
-                spellcheck="false"
-                style="width: 100%; min-height: 46px; -webkit-user-select: text !important; user-select: text !important; -webkit-touch-callout: default !important; font-family: monospace; font-size: 13.5px; margin-bottom: 8px;"
-              />
-              <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-                <button
-                  type="button"
-                  id="pasteRapidKey"
-                  class="btn g"
-                  style="flex: 1; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 14px; font-weight: 700; margin: 0;"
-                >
-                  <span class="ms" style="font-size: 18px;">content_paste</span>붙여넣기
-                </button>
-                <button
-                  id="saverapid"
-                  class="btn"
-                  style="flex: 1; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 14px; font-weight: 700; margin: 0;"
-                >
-                  <span class="ms" style="font-size: 18px;">save</span>RapidAPI 키 저장
-                </button>
-              </div>
               <button
                 type="button"
                 id="refreshAllIgThumbsBtn"
@@ -2633,8 +2605,6 @@
           toEmbedMyMapsUrl(raw.myMapsEmbed)
         )
           ls.set(MYMAPS_EMBED_KEY, toEmbedMyMapsUrl(raw.myMapsEmbed));
-        if (typeof raw.rapidKey === "string" && raw.rapidKey.trim() && !(ls.get("TRIP_RAPIDAPI_KEY") || "").trim())
-          ls.set("TRIP_RAPIDAPI_KEY", raw.rapidKey.trim().slice(0, 300));
         buildAiProvUI();
       }
       function downloadAutoBackup(label) {
@@ -2763,9 +2733,6 @@
           cfProxy: ls.get("TRIP_CF_PROXY") || "",
           myMapsUrl: ls.get("TRIP_MYMAPS_URL") || "",
           myMapsEmbed: getMyMapsEmbedUrl() || "",
-          rapidKey: ["TRIP_RAPIDAPI_KEY", "TRIP_RAPID_API_KEY", "RAPID_API_KEY", "rapidApiKey", "rapidapi_key"]
-            .map((k) => (ls.get(k) || "").trim())
-            .find(Boolean) || "",
         };
       }
 
@@ -7928,85 +7895,6 @@
         return "";
       }
 
-      // RapidAPI 키 여러 개 지원: 설정 입력칸에 쉼표·공백·줄바꿈으로 구분해 넣으면,
-      // 한도가 찬 키(429/403)는 12시간 쉬게 하고 다음 키로 자동 전환한다. (공개 저장소에는 기본 키를 하드코딩하지 않음)
-      const RAPID_HOST = "instagram-scraper-stable-api.p.rapidapi.com";
-      function rapidKeyList() {
-        const own = String(ls.get("TRIP_RAPIDAPI_KEY") || "").split(/[\s,;]+/).map((s) => s.trim()).filter(Boolean);
-        return [...new Set(own)];
-      }
-      function rapidDeadMap() {
-        try { return JSON.parse(localStorage.getItem("TRIP_RAPID_DEAD") || "{}") || {}; } catch (_) { return {}; }
-      }
-      function rapidLiveKeys() {
-        const dead = rapidDeadMap(), now = Date.now();
-        return rapidKeyList().filter((k) => !(dead[k] > now));
-      }
-      function rapidMarkDead(key) {
-        const d = rapidDeadMap();
-        d[key] = Date.now() + 12 * 3600 * 1000;
-        try { localStorage.setItem("TRIP_RAPID_DEAD", JSON.stringify(d)); } catch (_) {}
-        window.__rapidQuotaOut = rapidLiveKeys().length === 0;
-      }
-      // path 를 살아 있는 키로 차례로 호출. 429/403이면 그 키를 쉬게 하고 다음 키로. 키가 하나도 없으면 null.
-      // 네트워크 오류·타임아웃은 키 탓이 아니므로 그대로 던진다.
-      async function rapidFetch(path, ms) {
-        const keys = rapidLiveKeys();
-        if (!keys.length) { window.__rapidQuotaOut = true; return null; }
-        let last = null;
-        for (const key of keys) {
-          const r = await fetchTO(`https://${RAPID_HOST}/${path}`, { headers: { "x-rapidapi-key": key, "x-rapidapi-host": RAPID_HOST } }, ms);
-          if (r.status === 429 || r.status === 403) { rapidMarkDead(key); last = r; continue; }
-          window.__rapidQuotaOut = false;
-          return r;
-        }
-        return last;
-      }
-      window.rapidFetch = rapidFetch;
-      window.rapidLiveKeys = rapidLiveKeys;
-
-      function extractCaptionFromRapidJson(obj) {
-        if (!obj || typeof obj !== "object") return "";
-        const direct =
-          obj?.data?.caption?.text ||
-          obj?.caption?.text ||
-          obj?.edge_media_to_caption?.edges?.[0]?.node?.text ||
-          obj?.data?.edge_media_to_caption?.edges?.[0]?.node?.text ||
-          obj?.xdt_shortcode_media?.edge_media_to_caption?.edges?.[0]?.node?.text ||
-          obj?.data?.xdt_shortcode_media?.edge_media_to_caption?.edges?.[0]?.node?.text ||
-          obj?.items?.[0]?.caption?.text ||
-          obj?.data?.items?.[0]?.caption?.text ||
-          (typeof obj?.caption === "string" ? obj.caption : "") ||
-          (typeof obj?.data?.caption === "string" ? obj.data.caption : "") ||
-          "";
-        if (typeof direct === "string" && direct.trim().length >= 4) {
-          return direct.trim();
-        }
-        // 깊은 탐색: edge_media_to_caption 또는 caption.text 재귀 검색
-        const seen = new Set();
-        const stack = [obj];
-        while (stack.length) {
-          const cur = stack.pop();
-          if (!cur || typeof cur !== "object" || seen.has(cur)) continue;
-          seen.add(cur);
-          if (typeof cur.text === "string" && cur.text.trim().length >= 10 && !/^https?:\/\//i.test(cur.text.trim())) {
-            if (cur.pk || cur.user_id || cur.created_at || cur.content_type || cur.did_report_as_spam !== undefined) {
-              return cur.text.trim();
-            }
-          }
-          if (Array.isArray(cur.edges) && cur.edges[0]?.node?.text) {
-            const t = String(cur.edges[0].node.text).trim();
-            if (t.length >= 4) return t;
-          }
-          for (const k of Object.keys(cur)) {
-            if (k === "comments" || k === "edge_media_to_comment" || k === "edge_media_to_parent_comment") continue;
-            const v = cur[k];
-            if (v && typeof v === "object") stack.push(v);
-          }
-        }
-        return "";
-      }
-
       async function fetchVideoCaption(vUrl) {
         const meta = parseVideoMeta(vUrl);
         if (!meta) return "";
@@ -8098,33 +7986,7 @@
           const embedUrl = `https://www.instagram.com/p/${igId}/embed/captioned/`;
           const reelUrl = `https://www.instagram.com/reel/${igId}/`;
 
-          // 1단계: RapidAPI 시도 (키 여러 개면 한도 찬 키는 건너뜀 · 3초 타임아웃)
-          if (rapidLiveKeys().length) {
-            const stableCalls = [
-              () => rapidFetch(`get_media_data_v2.php?media_code=${encodeURIComponent(igId)}`, 3000),
-              () => rapidFetch(`get_media_data.php?reel_post_code_or_url=${encodeURIComponent(reelUrl)}&type=reel`, 3000),
-            ];
-
-            try {
-              const rapidCap = await Promise.any(
-                stableCalls.map(async (callFn) => {
-                  const rr = await callFn();
-                  if (!rr || !rr.ok) throw new Error("status error");
-                  const rd = await rr.json();
-                  const capTxt = extractCaptionFromRapidJson(rd);
-                  if (capTxt && capTxt.trim().length >= 3 && !capTxt.includes("<html")) return capTxt;
-                  throw new Error("empty caption");
-                })
-              );
-              if (rapidCap) {
-                mediaCaptionCache[cKey] = rapidCap;
-                saveMediaCaptionCache();
-                return rapidCap;
-              }
-            } catch (_) {}
-          }
-
-          // 2단계: 서버리스 API 및 프록시 시도 (6초 타임아웃 · 먼저 오는 쪽을 쓰므로 느려지지 않음)
+          // 1단계: 서버리스 API(/api/ig), r.jina.ai, 사용자 프록시 병렬 시도 (6초 타임아웃 · 먼저 오는 쪽을 쓰므로 느려지지 않음)
           const apiBase = location.hostname.includes("vercel.app")
             ? ""
             : "https://trip-app-psi-two.vercel.app";
@@ -8937,7 +8799,7 @@
                   <button type="button" id="mcapCloseBtn" style="background:none;border:none;color:var(--sub, #888);font-size:20px;cursor:pointer;padding:4px;"><span class="ms">close</span></button>
                 </div>
                 <div style="font-size:13px;color:var(--sub, #a1a1a6);line-height:1.45;">
-                  ${window.__rapidQuotaOut ? "릴스 자동 분석(RapidAPI) 이번 달 사용량이 다 떨어졌어요. 설정의 RapidAPI 키·요금제를 확인해 주세요." : "인스타그램 보안 정책으로 본문을 자동 추출하지 못했습니다."}<br>
+                  인스타그램 보안 정책으로 본문을 자동 추출하지 못했습니다.<br>
                   릴스 본문이나 고정 댓글, 또는 매장명을 편하게 붙여넣어 주세요.
                 </div>
                 <div style="position:relative;">
@@ -9321,7 +9183,7 @@ ${caption || rawText}
               <button type="button" id="rfCloseBtn" class="mb" style="padding: 4px 8px; font-size: 13px;">✕</button>
             </div>
             <div style="font-size: 12.5px; color: var(--tx2); line-height: 1.5; background: rgba(255,183,77,0.08); border: 1px solid rgba(255,183,77,0.22); border-radius: 10px; padding: 10px;">
-              ${window.__rapidQuotaOut ? "릴스 자동 분석(RapidAPI) 이번 달 사용량이 다 떨어졌어요." : "인스타그램 보안 정책으로 서버에서 릴스 본문을 직접 가져오지 못했습니다."}<br>
+              인스타그램 보안 정책으로 서버에서 릴스 본문을 직접 가져오지 못했습니다.<br>
               <b>영상 링크와 썸네일은 저장되었습니다.</b> 아래 중 편한 방법으로 장소를 분석해 주세요!
             </div>
             
@@ -10931,61 +10793,10 @@ ${caption || rawText}
         toast("Naver Maps 키 저장됨");
         location.reload();
       };
-      if ($("rapidkey")) {
-        $("rapidkey").value = ls.get("TRIP_RAPIDAPI_KEY") || "";
-        $("rapidkey").addEventListener("click", function() { this.focus(); });
-      }
-      if ($("pasteRapidKey")) {
-        $("pasteRapidKey").onclick = async () => {
-          try {
-            if (navigator.clipboard && navigator.clipboard.readText) {
-              const text = await navigator.clipboard.readText();
-              if (text && text.trim()) {
-                $("rapidkey").value = text.trim();
-                $("rapidkey").focus();
-                toast("📋 클립보드에서 API 키를 붙여넣었습니다!");
-                return;
-              }
-            }
-          } catch (_) {}
-          // Fallback if clipboard read is restricted by browser
-          $("rapidkey").focus();
-          $("rapidkey").select();
-          try { document.execCommand("paste"); } catch (_) {}
-          toast("입력창을 터치하여 붙여넣기를 완료해 주세요");
-        };
-      }
-      if ($("saverapid")) {
-        $("saverapid").onclick = async () => {
-          const val = ($("rapidkey")?.value || "").trim();
-          try { localStorage.removeItem("TRIP_RAPID_DEAD"); } catch (_) {}
-          ls.set("TRIP_RAPIDAPI_KEY", val);
-          ls.set("TRIP_RAPID_API_KEY", val);
-          try {
-            localStorage.setItem("TRIP_RAPIDAPI_KEY", val);
-            localStorage.setItem("TRIP_RAPID_API_KEY", val);
-          } catch (_) {}
-          syncSharedSettings();
-          if (val) {
-            toast("✅ RapidAPI 키 저장 완료! 릴스 썸네일을 복구합니다...");
-            if (typeof window.restoreAllInstagramThumbs === "function") {
-              await window.restoreAllInstagramThumbs(val);
-            }
-          } else {
-            toast("RapidAPI 키가 저장되었습니다");
-          }
-        };
-      }
       if ($("refreshAllIgThumbsBtn")) {
         $("refreshAllIgThumbsBtn").onclick = async () => {
-          const key = (ls.get("TRIP_RAPIDAPI_KEY") || "").trim();
-          if (!key) {
-            toast("⚠️ 먼저 RapidAPI 키를 입력하고 저장해 주세요.");
-            $("rapidkey")?.focus();
-            return;
-          }
           if (typeof window.restoreAllInstagramThumbs === "function") {
-            await window.restoreAllInstagramThumbs(key);
+            await window.restoreAllInstagramThumbs();
           }
         };
       }
@@ -11026,61 +10837,18 @@ ${caption || rawText}
             logArea.scrollTop = logArea.scrollHeight;
           };
 
-          const rKey = String($("rapidkey")?.value || ls.get("TRIP_RAPIDAPI_KEY") || "").trim().split(/[\s,;]+/)[0] || "";
           const gKey = (aiCfg?.gemini?.key || ls.get("TRAVEL_GMAP_KEY") || "").trim();
           const orKey = (aiCfg?.openrouter?.key || "").trim();
           const testCode = "Dti-Co-ulwL"; // 샘플 릴스 코드
 
           log(`🕒 진단 시각: ${new Date().toLocaleString()}`);
           log(`📱 브라우저: ${navigator.userAgent.slice(0, 50)}...`);
-          log(`🔑 RapidAPI 키: ${rKey ? rKey.slice(0, 8) + "..." + rKey.slice(-4) + ` (길이 ${rKey.length})` : "❌ 미입력"}`);
           log(`🔑 Gemini 키: ${gKey ? gKey.slice(0, 8) + "..." : "❌ 미입력"}`);
           log(`🔑 OpenRouter 키: ${orKey ? orKey.slice(0, 10) + "..." : "❌ 미입력"}`);
           log("----------------------------------------");
 
-          // 1. RapidAPI 직접 호출 테스트
-          if (rKey) {
-            log("1️⃣ [RapidAPI Scraper] 엔드포인트 직접 호출 검사...");
-            const stableHost = "instagram-scraper-stable-api.p.rapidapi.com";
-            try {
-              const t0 = Date.now();
-              const r = await fetchTO(
-                `https://${stableHost}/get_media_data_v2.php?media_code=${testCode}`,
-                {
-                  headers: {
-                    "x-rapidapi-key": rKey,
-                    "x-rapidapi-host": stableHost,
-                  },
-                },
-                5000
-              );
-              const elapsed = Date.now() - t0;
-              const status = r.status;
-              const text = await r.text();
-              let preview = text.slice(0, 160).replace(/\s+/g, " ");
-
-              if (status === 200) {
-                if (text.includes('"message"') || text.includes('"error"')) {
-                  log(`   ⚠️ 응답 200이지만 메시지 포함 (${elapsed}ms): ${preview}`);
-                } else {
-                  log(`   ✅ RapidAPI 성공 (200 OK, ${elapsed}ms) - 캡션 수신 가능`);
-                }
-              } else if (status === 429) {
-                log(`   ❌ 429 Too Many Requests (${elapsed}ms): 월간 무료 쿼터 소진! (${preview})`);
-              } else if (status === 403) {
-                log(`   ❌ 403 Forbidden (${elapsed}ms): 구독(Subscribe) 미완료 또는 키 오류 (${preview})`);
-              } else {
-                log(`   ⚠️ HTTP ${status} (${elapsed}ms): ${preview}`);
-              }
-            } catch (e) {
-              log(`   ❌ RapidAPI 연결 실패: ${e.message}`);
-            }
-          } else {
-            log("1️⃣ [RapidAPI Scraper] 키가 없어 검사를 건너뜁니다.");
-          }
-
-          // 2. 서버리스 프록시 검사
-          log("2️⃣ [Vercel API] /api/ig 서버리스 프록시 검사...");
+          // 1. 서버리스 프록시 검사
+          log("1️⃣ [Vercel API] /api/ig 서버리스 프록시 검사...");
           try {
             const apiBase = location.hostname.includes("vercel.app")
               ? ""
@@ -11098,7 +10866,7 @@ ${caption || rawText}
             log(`   ⚠️ Vercel 프록시 호출 실패: ${e.message}`);
           }
 
-          // 3. Gemini AI 검사
+          // 2. Gemini AI 검사
           if (gKey) {
             log("3️⃣ [Google Gemini] 텍스트 생성 API 검사...");
             try {
@@ -11199,7 +10967,7 @@ ${caption || rawText}
             log("3️⃣ [Google Gemini] 키가 설정되어 있지 않습니다.");
           }
 
-          // 4. OpenRouter 폴백 검사
+          // 3. OpenRouter 폴백 검사
           if (orKey) {
             log("4️⃣ [OpenRouter] 무료 폴백 모델 검사...");
             try {
@@ -12357,44 +12125,6 @@ ${caption || rawText}
 (function() {
   const IG_THUMB_MARKER = "ig_cover=2"; // 이전 꼬리표(ig_thumb=1)를 가진 오염 사진을 모두 박멸하기 위한 새 규격
 
-  function getRapidKey() {
-    // 한도가 안 찬 키를 우선 (여러 키 지원)
-    const live = window.rapidLiveKeys && window.rapidLiveKeys()[0];
-    if (live) return live;
-    const keys = ["TRIP_RAPIDAPI_KEY", "TRIP_RAPID_API_KEY", "RAPID_API_KEY", "rapidApiKey", "rapidapi_key"];
-    for (const k of keys) {
-      const v = (localStorage.getItem(k) || "").trim();
-      if (v) return v;
-    }
-    return (window.RAPID_API_KEY || "").trim();
-  }
-
-  function extractThumbFromRapidJson(obj) {
-    if (!obj || typeof obj !== "object") return "";
-    let thumb = "";
-    function walk(node, depth) {
-      if (!node || typeof node !== "object" || depth > 8 || thumb) return;
-      const candidates = [
-        node.cover_media?.cropped_image_version?.url,
-        node.thumbnail_src, node.display_url, node.thumbnail_url, node.cover_url,
-        node.display_src, node.image_url, node.picture,
-        node.media?.display_url, node.media?.thumbnail_url,
-        node.images?.standard_resolution?.url,
-        ...(Array.isArray(node.image_versions2?.candidates) ? node.image_versions2.candidates.map(c => c?.url) : [])
-      ];
-      for (const c of candidates) {
-        if (typeof c === "string" && !isAvatarOrBadUrl(c)) { thumb = c; break; }
-      }
-      if (thumb) return;
-      for (const k of Object.keys(node)) {
-        if (k === "owner" || k === "user" || k === "profile_pic_url") continue;
-        if (node[k] && typeof node[k] === "object") walk(node[k], depth + 1);
-      }
-    }
-    walk(obj, 0);
-    return thumb;
-  }
-
   function extractShortcode(input) {
     if (!input) return "";
     let s = typeof input === "string" ? input : JSON.stringify(input);
@@ -12479,47 +12209,13 @@ ${caption || rawText}
   }
 
   // =========================================================================
-  // Vercel 서버 및 RapidAPI 직접 호출 (릴스 썸네일 복구)
+  // Vercel 서버 호출 (릴스 썸네일 복구)
   // =========================================================================
-  async function fetchTrueCoverV6(code, explicitKey) {
+  async function fetchTrueCoverV6(code) {
     if (!code) return "";
-    // 키가 여러 개면 한도 안 찬 첫 키(서버 /api/ig 에도 이 키를 넘김). 직접 호출은 rapidFetch 가 키를 돌려 쓴다.
-    const key = String(getRapidKey() || explicitKey || "").trim().split(/[\s,;]+/)[0] || "";
-
-    // 1순위: 클라이언트에서 RapidAPI 직접 호출 (가장 빠르고 프록시 장애 없음)
-    if (key && window.rapidFetch) {
-      try {
-        const reelUrl = `https://www.instagram.com/reel/${code}/`;
-        const r = await window.rapidFetch(
-          `get_media_data.php?reel_post_code_or_url=${encodeURIComponent(reelUrl)}&type=reel`,
-          4500
-        );
-        if (r && r.ok) {
-          const json = await r.json();
-          const raw = extractThumbFromRapidJson(json);
-          if (raw && !isAvatarOrBadUrl(raw)) {
-            return `https://images.weserv.nl/?url=${encodeURIComponent(raw)}&w=480&h=640&fit=cover&output=jpg&ig_cover=2`;
-          }
-        }
-      } catch (_) {}
-
-      try {
-        const r = await window.rapidFetch(`get_media_data_v2.php?media_code=${encodeURIComponent(code)}`, 4500);
-        if (r && r.ok) {
-          const json = await r.json();
-          const raw = extractThumbFromRapidJson(json);
-          if (raw && !isAvatarOrBadUrl(raw)) {
-            return `https://images.weserv.nl/?url=${encodeURIComponent(raw)}&w=480&h=640&fit=cover&output=jpg&ig_cover=2`;
-          }
-        }
-      } catch (_) {}
-    }
-
-    // 2순위: Vercel 서버리스 /api/ig 호출
     const apiBase = location.hostname.includes("vercel.app") ? "" : "https://trip-app-psi-two.vercel.app";
     try {
-      const apiUrl = `${apiBase}/api/ig?code=${encodeURIComponent(code)}${key ? `&key=${encodeURIComponent(key)}` : ""}`;
-      const res = await fetchTO(apiUrl, {}, 6000);
+      const res = await fetchTO(`${apiBase}/api/ig?code=${encodeURIComponent(code)}`, {}, 6000);
       if (res.ok) {
         const data = await res.json();
         if (data.weservThumb) return data.weservThumb;
@@ -12531,13 +12227,8 @@ ${caption || rawText}
   // =========================================================================
   // 전체 릴스 썸네일 복구 엔진 (깜빡임·사라짐 제로 + 부드러운 순차 반영)
   // =========================================================================
-  async function restoreAllInstagramThumbs(explicitKey) {
+  async function restoreAllInstagramThumbs() {
     if (!Array.isArray(items)) return 0;
-    const key = (explicitKey || getRapidKey()).trim();
-    if (!key) {
-      showNotice("⚠️ 먼저 RapidAPI 키를 저장해 주세요.");
-      return 0;
-    }
 
     const igItems = items.filter(it => Boolean(extractShortcode(it)));
     if (!igItems.length) {
@@ -12556,7 +12247,7 @@ ${caption || rawText}
         const code = extractShortcode(it);
         if (!code) return;
         try {
-          const url = await fetchTrueCoverV6(code, key);
+          const url = await fetchTrueCoverV6(code);
           if (url) {
             it.img = url;
             it.useCustomImg = true;
@@ -12579,37 +12270,24 @@ ${caption || rawText}
     if (restored > 0) {
       showNotice(`🎉 총 ${restored}곳의 릴스 썸네일 복구 완료!`);
     } else {
-      showNotice("⚠️ 썸네일을 가져오지 못했습니다. RapidAPI 키가 올바른지 확인해 주세요.");
+      showNotice("⚠️ 썸네일을 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.");
     }
     return restored;
   }
   window.restoreAllInstagramThumbs = restoreAllInstagramThumbs;
 
   // =========================================================================
-  // 초기화: 앱 시작 시 오염된 사진 즉시 파괴 및 키가 있으면 재추출
+  // 초기화: 앱 시작 시 오염된 사진 즉시 정리
   // =========================================================================
   function purgeAndRebuildIgImages() {
     if (typeof items === "undefined" || !Array.isArray(items)) return;
 
-    const key = getRapidKey();
     const before = items.map((x) => x && x.img).join("|");
     for (const it of items) {
       const code = extractShortcode(it);
       if (!code) continue;
 
       applyUltimateShield(it);
-      
-      // 사진이 비어있는 릴스 항목이 있고 키가 있으면 자동으로 커버 복원 시도
-      if (!it.img && key) {
-        fetchTrueCoverV6(code, key).then(url => {
-          if (url) {
-            it.img = url;
-            it.useCustomImg = true;
-            if (typeof reelThumbCache === "object") reelThumbCache[code] = url;
-            refreshMapAndDom();
-          }
-        });
-      }
     }
     // 실제로 사진 값이 바뀐 경우에만 다시 그리고 저장 (매 실행마다 전체 렌더 + 공유 방 쓰기 하던 것 제거)
     if (items.map((x) => x && x.img).join("|") !== before) refreshMapAndDom();
@@ -25117,21 +24795,6 @@ ${JSON.stringify(payload, null, 2)}
     }
   }
 
-  // RapidAPI가 429(사용량 초과)를 돌려주면 표시 → 안내 문구를 정확하게
-  (function watchRapidQuota() {
-    const of = window.fetch;
-    if (typeof of !== "function" || of.__v87) return;
-    window.fetch = Object.assign(function (input) {
-      const p = of.apply(this, arguments);
-      try {
-        const url = typeof input === "string" ? input : input && input.url;
-        if (url && /rapidapi\.com/.test(url)) {
-          p.then((r) => { if (r && r.status === 429) window.__rapidQuotaOut = true; else if (r && r.ok) window.__rapidQuotaOut = false; }).catch(() => {});
-        }
-      } catch (_) {}
-      return p;
-    }, { __v87: true });
-  })();
   // 예전 서비스워커가 만든 사진 캐시(아이폰에서 사진이 서로 섞이던 원인) 즉시 삭제
   try {
     if (window.caches && caches.keys) caches.keys().then((ks) => ks.filter((k) => /^trip-thumbs/.test(k)).forEach((k) => caches.delete(k))).catch(() => {});
