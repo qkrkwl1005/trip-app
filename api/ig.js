@@ -171,63 +171,39 @@ async function fetchTextTO(url, opts = {}, ms = 2200) {
   }
 }
 
-async function fetchJsonTO(url, opts = {}, ms = 2000) {
-  const ctrl = new AbortController();
-  const tm = setTimeout(() => ctrl.abort(), ms);
-  try {
-    const res = await fetch(url, { ...opts, signal: ctrl.signal });
-    const json = await res.json();
-    clearTimeout(tm);
-    return { ok: res.ok, status: res.status, json };
-  } catch (_) {
-    clearTimeout(tm);
-    return { ok: false, status: 0, json: null };
+function extractCaptionFromPage(docText, current) {
+  if (current) return current;
+  const ctx = extractContextJson(docText);
+  const ctxCap = ctx ? extractCaptionFromJson(ctx) : "";
+  if (ctxCap) return ctxCap;
+  for (const prop of ["description", "title"]) {
+    const cleaned = cleanMetaCaption(extractMeta(docText, prop));
+    if (cleaned && cleaned.length >= 6) return cleaned;
   }
+  return "";
 }
 
-async function resolveIgData(code, rapidKey) {
-  let thumb = "";
-  let caption = "";
-
-  // 1순위: RapidAPI (사용자가 입력한 키가 전달된 경우)
-  if (rapidKey) {
-    const reelUrl = `https://www.instagram.com/reel/${code}/`;
-    const endpoints = [
-      {
-        host: "instagram-scraper-stable-api.p.rapidapi.com",
-        url: `https://instagram-scraper-stable-api.p.rapidapi.com/get_media_data.php?reel_post_code_or_url=${encodeURIComponent(reelUrl)}&type=reel`,
-      },
-      {
-        host: "instagram-scraper-stable-api.p.rapidapi.com",
-        url: `https://instagram-scraper-stable-api.p.rapidapi.com/get_media_data_v2.php?media_code=${encodeURIComponent(code)}`,
-      },
-    ];
-    for (const ep of endpoints) {
-      const { ok, json } = await fetchJsonTO(
-        ep.url,
-        {
-          headers: {
-            "x-rapidapi-key": rapidKey,
-            "x-rapidapi-host": ep.host,
-          },
-        },
-        1800
-      );
-      if (ok && json) {
-        if (!thumb) {
-          const parsed = parseJsonMedia(json);
-          if (parsed && !isAvatarOrBadUrl(parsed)) thumb = parsed;
-        }
-        if (!caption) {
-          const cap = extractCaptionFromJson(json);
-          if (cap) caption = cap;
-        }
-        if (thumb && caption) break;
-      }
-    }
+function extractFallbackThumb(docText) {
+  const ogImg = extractMeta(docText, "image");
+  if (ogImg && !isAvatarOrBadUrl(ogImg)) {
+    return cleanUrl(decodeHtmlEntities(ogImg));
   }
+  const emi = docText.match(/class="[^"]*EmbeddedMediaImage[^"]*"[^>]*src="([^"]+)"/i);
+  if (emi && emi[1] && !isAvatarOrBadUrl(emi[1])) {
+    return cleanUrl(decodeHtmlEntities(emi[1]));
+  }
+  return "";
+}
 
-  // 2순위: 인스타그램 엔드포인트 병렬 조회 (Embed 및 메신저 봇 헤더)
+function extractThumbFromPage(docText, current) {
+  if (current && !isAvatarOrBadUrl(current)) return current;
+  const ctx = extractContextJson(docText);
+  const ctxThumb = ctx ? parseJsonMedia(ctx) : "";
+  if (ctxThumb && !isAvatarOrBadUrl(ctxThumb)) return ctxThumb;
+  return extractFallbackThumb(docText);
+}
+
+async function resolveViaIgPages(code, initial) {
   const [resEmbed, resBot] = await Promise.all([
     fetchTextTO(
       `https://www.instagram.com/reel/${code}/embed/captioned/`,
@@ -253,63 +229,28 @@ async function resolveIgData(code, rapidKey) {
       2200
     ),
   ]);
-
-  const htmlList = [resEmbed.text, resBot.text].filter(Boolean);
-
-  for (const html of htmlList) {
-    // 1) contextJSON 파싱 (안전한 선형 파서)
-    const ctx = extractContextJson(html);
-    if (ctx) {
-      if (!thumb) thumb = parseJsonMedia(ctx);
-      if (!caption) caption = extractCaptionFromJson(ctx);
-    }
-
-    // 2) OpenGraph 메타 태그 추출 (선형 정규식)
-    if (!caption) {
-      const ogDesc = extractMeta(html, "description");
-      const cleanDesc = cleanMetaCaption(ogDesc);
-      if (cleanDesc && cleanDesc.length >= 6) {
-        caption = cleanDesc;
-      }
-    }
-    if (!caption) {
-      const ogTitle = extractMeta(html, "title");
-      const cleanTitle = cleanMetaCaption(ogTitle);
-      if (cleanTitle && cleanTitle.length >= 6) {
-        caption = cleanTitle;
-      }
-    }
-
-    if (!thumb || isAvatarOrBadUrl(thumb)) {
-      const ogImg = extractMeta(html, "image");
-      if (ogImg && !isAvatarOrBadUrl(ogImg)) {
-        thumb = cleanUrl(decodeHtmlEntities(ogImg));
-      }
-    }
-
-    if (!thumb || isAvatarOrBadUrl(thumb)) {
-      const emi = html.match(
-        /class="[^"]*EmbeddedMediaImage[^"]*"[^>]*src="([^"]+)"/i
-      );
-      if (emi && emi[1] && !isAvatarOrBadUrl(emi[1])) {
-        thumb = cleanUrl(decodeHtmlEntities(emi[1]));
-      }
-    }
-
-    if (thumb && caption) break;
+  let result = { ...initial };
+  for (const docText of [resEmbed.text, resBot.text].filter(Boolean)) {
+    result = {
+      thumb: extractThumbFromPage(docText, result.thumb),
+      caption: extractCaptionFromPage(docText, result.caption),
+    };
+    if (result.thumb && result.caption) break;
   }
+  return result;
+}
 
-  return { thumb, caption };
+async function resolveIgData(code) {
+  return resolveViaIgPages(code, { thumb: "", caption: "" });
 }
 
 async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   const code = String(req.query.code || "").trim();
-  const key = String(req.query.key || req.headers["x-rapidapi-key"] || "").trim();
 
   if (!code) return res.status(400).json({ ok: false });
 
-  const { thumb, caption } = await resolveIgData(code, key);
+  const { thumb, caption } = await resolveIgData(code);
 
   const weservUrl =
     thumb && !isAvatarOrBadUrl(thumb)
