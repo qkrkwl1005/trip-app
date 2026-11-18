@@ -20790,9 +20790,9 @@ ${caption || rawText}
     }
 
     // TanStack Query의 core: fetchWithRetry + SWR 패턴
-    async fetchQuery({ queryKey, queryFn, staleTime = 1000 * 60 * 15, retry = 3, retryDelay = 1000 }) {
+    async fetchQuery({ queryKey, queryFn, staleTime = 1000 * 60 * 15, retry = 3, retryDelay = 1000, force = false }) {
       const cached = this.getQueryData(queryKey);
-      const stale = this.isStale(queryKey, staleTime);
+      const stale = force || this.isStale(queryKey, staleTime);
 
       // 1) 캐시가 있으면 즉시 반환 (화면 지연 0ms)
       if (cached !== null && cached !== undefined && !stale) {
@@ -20827,7 +20827,8 @@ ${caption || rawText}
       };
 
       // 캐시가 이미 존재하면 백그라운드에서 조용히 갱신하고 우선 기존 캐시 반환(SWR)
-      if (cached !== null && cached !== undefined) {
+      // force(당겨서 새로고침)는 새 값이 올 때까지 기다린다
+      if (cached !== null && cached !== undefined && !force) {
         run().catch(() => {});
         return cached;
       }
@@ -20841,7 +20842,7 @@ ${caption || rawText}
         if (typeof toast === "function") {
           toast("🌐 인터넷이 다시 연결되었습니다. 데이터를 동기화합니다.");
         }
-        // 날씨, 환율, 공유 상태 자동 백그라운드 리패치
+        // 날씨, 환율 자동 백그라운드 리패치 (공유 방 동기화는 네트워크 상태 쪽 online 리스너가 처리)
         if (typeof fetchRealTimeOsakaWeather === "function") fetchRealTimeOsakaWeather();
         if (typeof fetchRealTimeJpyRate === "function") fetchRealTimeJpyRate();
         if (typeof draw === "function") draw(true);
@@ -20854,8 +20855,9 @@ ${caption || rawText}
   // 기존 날씨/환율 fetcher에 스마트 쿼리 캐시 레이어 연결
   if (typeof fetchRealTimeOsakaWeather === "function") {
     const _rawWeather = fetchRealTimeOsakaWeather;
-    fetchRealTimeOsakaWeather = async function() {
+    fetchRealTimeOsakaWeather = async function(force = false) {
       return await window.tripQueryClient.fetchQuery({
+        force,
         queryKey: "OSAKA_WEATHER_V45",
         queryFn: async () => {
           const r = await fetch("https://api.open-meteo.com/v1/forecast?latitude=34.6685&longitude=135.5013&current_weather=true");
@@ -20881,8 +20883,9 @@ ${caption || rawText}
 
   if (typeof fetchRealTimeJpyRate === "function") {
     const _rawRate = fetchRealTimeJpyRate;
-    fetchRealTimeJpyRate = async function() {
+    fetchRealTimeJpyRate = async function(force = false) {
       return await window.tripQueryClient.fetchQuery({
+        force,
         queryKey: "JPY_RATE_V45",
         queryFn: async () => {
           const r = await fetch("https://api.frankfurter.dev/v1/latest?from=JPY&to=KRW");
@@ -21994,22 +21997,11 @@ ${JSON.stringify(payload, null, 2)}
         ptr.style.opacity = "1";
 
         try {
-          if (window.SmartQueryClient && typeof window.SmartQueryClient.invalidateAll === "function") {
-            window.SmartQueryClient.invalidateAll();
-          } else {
-            const [wRes, fxRes] = await Promise.allSettled([
-              fetch("https://api.open-meteo.com/v1/forecast?latitude=34.6685&longitude=135.5013&current_weather=true").then(r => r.json()),
-              fetch("https://open.er-api.com/v6/latest/JPY").then(r => r.json())
-            ]);
-            if (wRes.status === "fulfilled" && wRes.value?.current_weather) {
-              const t = Math.round(wRes.value.current_weather.temperature);
-              localStorage.setItem("TRIP_V42_WEATHER_TEXT", `🌤️ 현지 실시간 ${t}°C`);
-            }
-            if (fxRes.status === "fulfilled" && fxRes.value?.rates?.KRW) {
-              const krw100 = Math.round(fxRes.value.rates.KRW * 100);
-              localStorage.setItem("TRIP_V42_FX_RATE_100", String(krw100));
-            }
-          }
+          // 평소와 같은 캐시 계층(open-meteo·frankfurter)을 강제 갱신
+          await Promise.allSettled([
+            typeof fetchRealTimeOsakaWeather === "function" ? fetchRealTimeOsakaWeather(true) : null,
+            typeof fetchRealTimeJpyRate === "function" ? fetchRealTimeJpyRate(true) : null
+          ]);
           if (typeof window.renderV32Dashboard === "function") window.renderV32Dashboard();
           if (typeof renderListTab === "function") renderListTab();
           if (typeof toast === "function") toast("✨ 실시간 현지 날씨·환율 및 지도를 최신화했어요!");
