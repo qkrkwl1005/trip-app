@@ -197,62 +197,87 @@ function parseRapidKeys(...sources) {
   return keys;
 }
 
-async function resolveIgData(code, rapidKeysInput) {
-  let thumb = "";
-  let caption = "";
-  const rapidKeys = Array.isArray(rapidKeysInput)
-    ? rapidKeysInput.filter(Boolean)
-    : parseRapidKeys(rapidKeysInput);
+function buildRapidEndpoints(code) {
+  const reelUrl = `https://www.instagram.com/reel/${code}/`;
+  const host = "instagram-scraper-stable-api.p.rapidapi.com";
+  return [
+    {
+      host,
+      url: `https://${host}/get_media_data.php?reel_post_code_or_url=${encodeURIComponent(reelUrl)}&type=reel`,
+    },
+    {
+      host,
+      url: `https://${host}/get_media_data_v2.php?media_code=${encodeURIComponent(code)}`,
+    },
+  ];
+}
 
-  // 1순위: RapidAPI (클라이언트 키 우선, 없으면 Vercel 환경변수 키 순회 · 429/403은 다음 키로)
-  if (rapidKeys.length) {
-    const reelUrl = `https://www.instagram.com/reel/${code}/`;
-    const endpoints = [
-      {
-        host: "instagram-scraper-stable-api.p.rapidapi.com",
-        url: `https://instagram-scraper-stable-api.p.rapidapi.com/get_media_data.php?reel_post_code_or_url=${encodeURIComponent(reelUrl)}&type=reel`,
-      },
-      {
-        host: "instagram-scraper-stable-api.p.rapidapi.com",
-        url: `https://instagram-scraper-stable-api.p.rapidapi.com/get_media_data_v2.php?media_code=${encodeURIComponent(code)}`,
-      },
-    ];
-    for (const rapidKey of rapidKeys) {
-      let keyBlocked = false;
-      for (const ep of endpoints) {
-        const { ok, status, json } = await fetchJsonTO(
-          ep.url,
-          {
-            headers: {
-              "x-rapidapi-key": rapidKey,
-              "x-rapidapi-host": ep.host,
-            },
-          },
-          1800
-        );
-        if (status === 429 || status === 403) {
-          keyBlocked = true;
-          break;
-        }
-        if (ok && json) {
-          if (!thumb) {
-            const parsed = parseJsonMedia(json);
-            if (parsed && !isAvatarOrBadUrl(parsed)) thumb = parsed;
-          }
-          if (!caption) {
-            const cap = extractCaptionFromJson(json);
-            if (cap) caption = cap;
-          }
-          if (thumb && caption) break;
-        }
-      }
-      if (thumb && caption) break;
-      if (!keyBlocked && (thumb || caption)) break;
+async function fetchFromRapidKey(endpoints, rapidKey, initial) {
+  let { thumb, caption } = initial;
+  for (const ep of endpoints) {
+    const { ok, status, json } = await fetchJsonTO(
+      ep.url,
+      { headers: { "x-rapidapi-key": rapidKey, "x-rapidapi-host": ep.host } },
+      1800
+    );
+    if (status === 429 || status === 403) {
+      return { thumb, caption, blocked: true };
     }
-    if (thumb && caption) return { thumb, caption };
+    if (!ok || !json) continue;
+    if (!thumb) {
+      const parsed = parseJsonMedia(json);
+      if (parsed && !isAvatarOrBadUrl(parsed)) thumb = parsed;
+    }
+    if (!caption) {
+      const cap = extractCaptionFromJson(json);
+      if (cap) caption = cap;
+    }
+    if (thumb && caption) break;
   }
+  return { thumb, caption, blocked: false };
+}
 
-  // 2순위: 인스타그램 엔드포인트 병렬 조회 (Embed 및 메신저 봇 헤더)
+async function resolveViaRapidApi(code, rapidKeys) {
+  let result = { thumb: "", caption: "" };
+  if (!rapidKeys.length) return result;
+  const endpoints = buildRapidEndpoints(code);
+  for (const rapidKey of rapidKeys) {
+    const next = await fetchFromRapidKey(endpoints, rapidKey, result);
+    result = { thumb: next.thumb, caption: next.caption };
+    if (result.thumb && result.caption) break;
+    if (!next.blocked && (result.thumb || result.caption)) break;
+  }
+  return result;
+}
+
+function extractFromIgHtml(html, initial) {
+  let { thumb, caption } = initial;
+  const ctx = extractContextJson(html);
+  if (ctx) {
+    if (!thumb) thumb = parseJsonMedia(ctx);
+    if (!caption) caption = extractCaptionFromJson(ctx);
+  }
+  for (const prop of ["description", "title"]) {
+    if (caption) break;
+    const cleaned = cleanMetaCaption(extractMeta(html, prop));
+    if (cleaned && cleaned.length >= 6) caption = cleaned;
+  }
+  if (!thumb || isAvatarOrBadUrl(thumb)) {
+    const ogImg = extractMeta(html, "image");
+    if (ogImg && !isAvatarOrBadUrl(ogImg)) {
+      thumb = cleanUrl(decodeHtmlEntities(ogImg));
+    }
+  }
+  if (!thumb || isAvatarOrBadUrl(thumb)) {
+    const emi = html.match(/class="[^"]*EmbeddedMediaImage[^"]*"[^>]*src="([^"]+)"/i);
+    if (emi && emi[1] && !isAvatarOrBadUrl(emi[1])) {
+      thumb = cleanUrl(decodeHtmlEntities(emi[1]));
+    }
+  }
+  return { thumb, caption };
+}
+
+async function resolveViaIgHtml(code, initial) {
   const [resEmbed, resBot] = await Promise.all([
     fetchTextTO(
       `https://www.instagram.com/reel/${code}/embed/captioned/`,
@@ -278,53 +303,25 @@ async function resolveIgData(code, rapidKeysInput) {
       2200
     ),
   ]);
-
-  const htmlList = [resEmbed.text, resBot.text].filter(Boolean);
-
-  for (const html of htmlList) {
-    // 1) contextJSON 파싱 (안전한 선형 파서)
-    const ctx = extractContextJson(html);
-    if (ctx) {
-      if (!thumb) thumb = parseJsonMedia(ctx);
-      if (!caption) caption = extractCaptionFromJson(ctx);
-    }
-
-    // 2) OpenGraph 메타 태그 추출 (선형 정규식)
-    if (!caption) {
-      const ogDesc = extractMeta(html, "description");
-      const cleanDesc = cleanMetaCaption(ogDesc);
-      if (cleanDesc && cleanDesc.length >= 6) {
-        caption = cleanDesc;
-      }
-    }
-    if (!caption) {
-      const ogTitle = extractMeta(html, "title");
-      const cleanTitle = cleanMetaCaption(ogTitle);
-      if (cleanTitle && cleanTitle.length >= 6) {
-        caption = cleanTitle;
-      }
-    }
-
-    if (!thumb || isAvatarOrBadUrl(thumb)) {
-      const ogImg = extractMeta(html, "image");
-      if (ogImg && !isAvatarOrBadUrl(ogImg)) {
-        thumb = cleanUrl(decodeHtmlEntities(ogImg));
-      }
-    }
-
-    if (!thumb || isAvatarOrBadUrl(thumb)) {
-      const emi = html.match(
-        /class="[^"]*EmbeddedMediaImage[^"]*"[^>]*src="([^"]+)"/i
-      );
-      if (emi && emi[1] && !isAvatarOrBadUrl(emi[1])) {
-        thumb = cleanUrl(decodeHtmlEntities(emi[1]));
-      }
-    }
-
-    if (thumb && caption) break;
+  let result = { ...initial };
+  for (const html of [resEmbed.text, resBot.text].filter(Boolean)) {
+    result = extractFromIgHtml(html, result);
+    if (result.thumb && result.caption) break;
   }
+  return result;
+}
 
-  return { thumb, caption };
+async function resolveIgData(code, rapidKeysInput) {
+  const rapidKeys = Array.isArray(rapidKeysInput)
+    ? rapidKeysInput.filter(Boolean)
+    : parseRapidKeys(rapidKeysInput);
+
+  // 1순위: RapidAPI (클라이언트 키 우선, 없으면 Vercel 환경변수 키 순회 · 429/403은 다음 키로)
+  const rapidResult = await resolveViaRapidApi(code, rapidKeys);
+  if (rapidResult.thumb && rapidResult.caption) return rapidResult;
+
+  // 2순위: 인스타그램 엔드포인트 병렬 조회 (Embed 및 메신저 봇 헤더)
+  return resolveViaIgHtml(code, rapidResult);
 }
 
 async function handler(req, res) {
