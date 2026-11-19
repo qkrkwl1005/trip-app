@@ -22446,7 +22446,7 @@ ${JSON.stringify(payload, null, 2)}
         try {
           if ("caches" in window) {
             // sw.js의 APP_CACHE('trip-app-' + SW_VERSION)와 동일해야 activate 때 삭제되지 않음
-            const c = await caches.open(window.__SW_APP_CACHE || "trip-app-v20261120_v63");
+            const c = await caches.open(window.__SW_APP_CACHE || "trip-app-v20261120_v64");
             const results = await Promise.allSettled([
               c.add("./index.html"),
               c.add("./manifest.json"),
@@ -25923,8 +25923,7 @@ ${JSON.stringify(payload, null, 2)}
     box-shadow: 0 4px 20px rgba(17, 17, 20, 0.05) !important;
     border-color: transparent !important;
   }
-  html body .v46-pass-card .v46-pass-ic,
-  html body .v46-pass-card > div:first-child {
+  html body .v46-pass-card .v46-pass-ic {
     background: rgba(59, 130, 246, 0.14) !important;
     color: var(--pr) !important;
     border: none !important;
@@ -26094,7 +26093,11 @@ ${JSON.stringify(payload, null, 2)}
     color: #4338ca !important;
   }
 
-  /* 5. 하단 탭바 (#nav): 이전 블루·글래스 스타일 유지 + 목록 스크롤 시 자연스럽게 숨김 */
+  /* 5. 하단 탭바 (#nav): 하단 그라데이션 마스크 제거(탭바 하단 잘림 방지) + 목록 스크롤 시 자연스럽게 숨김 */
+  html body::after {
+    display: none !important;
+    content: none !important;
+  }
   @media (max-width: 639px) {
     html body #nav {
       transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease !important;

@@ -1,4 +1,4 @@
-const SW_VERSION = 'v20261120_v63';
+const SW_VERSION = 'v20261120_v64';
 const APP_CACHE = 'trip-app-' + SW_VERSION;
 
 // 서비스워커는 앱 화면(같은 사이트 페이지 이동)만 다룬다. 사진은 건드리지 않고
