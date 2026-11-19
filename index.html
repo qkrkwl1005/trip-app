@@ -6403,14 +6403,33 @@
         item.places = [toPlace(primary)];
         return item.places;
       }
+      function shareExactPostalAndBanchi(aAddr, bAddr) {
+        const za = (String(aAddr || "").match(/(\d{3}-\d{4})/) || [])[1] || "";
+        const zb = (String(bAddr || "").match(/(\d{3}-\d{4})/) || [])[1] || "";
+        if (!za || !zb || za !== zb) return false;
+        // 우편번호 자체를 제외한 번지(예: 5-14-1, 1-5-14, 69)가 둘 다 있고 일치해야 함
+        const stripZip = (s) => String(s || "").replace(/\d{3}-\d{4}/g, "");
+        const ba = (stripZip(aAddr).match(/(\d+\s*-\s*\d+(?:\s*-\s*\d+)?)/) || [])[1] || "";
+        const bb = (stripZip(bAddr).match(/(\d+\s*-\s*\d+(?:\s*-\s*\d+)?)/) || [])[1] || "";
+        if (!ba || !bb) return false;
+        return ba.replace(/\s+/g, "") === bb.replace(/\s+/g, "");
+      }
+      function normAddrCore(s) {
+        return String(s || "")
+          .replace(/〒/g, "")
+          .replace(/\b(?:japan|일본|日本)\b/gi, "")
+          .replace(/[\s,.\-·()（）]+/g, "")
+          .toLowerCase();
+      }
       function samePlace(a, b) {
         const norm = (s) =>
           String(s || "")
+            .replace(/\s*\([^)]*\)/g, "")
             .replace(/\s+/g, "")
             .toLowerCase();
         const placeName = (s) => {
           const value = norm(s);
-          return /^(?:장소|저장된장소|공유릴스|공유쇼츠|공유틱톡)$/.test(value)
+          return /^(?:장소|저장된장소|공유된장소|공유릴스|공유쇼츠|공유틱톡|장소미확인|이름없음)$/.test(value)
             ? ""
             : value;
         };
@@ -6418,10 +6437,11 @@
           bName = placeName(b.name);
         const aLocal = norm(a.localName),
           bLocal = norm(b.localName);
-        const aAddress = norm(a.address),
-          bAddress = norm(b.address);
+        const aAddress = normAddrCore(a.address),
+          bAddress = normAddrCore(b.address);
         const sameAddress = Boolean(
-          aAddress && bAddress && aAddress === bAddress,
+          (aAddress && bAddress && aAddress.length >= 6 && (aAddress === bAddress || aAddress.includes(bAddress) || bAddress.includes(aAddress))) ||
+          shareExactPostalAndBanchi(a.address, b.address),
         );
         const addressCompatible = !aAddress || !bAddress || sameAddress;
         const namePrefixOverlap =
@@ -6431,6 +6451,7 @@
           (aLocal &&
             bLocal &&
             (aLocal.startsWith(bLocal) || bLocal.startsWith(aLocal)));
+        if (sameAddress) return true;
         if (namePrefixOverlap && sharePostalBanchi(a.address, b.address))
           return true;
         if (
@@ -6452,11 +6473,126 @@
         )
           return true;
         return Boolean(
-          sameAddress ||
           (addressCompatible && aName && bName && aName === bName) ||
           (addressCompatible && aLocal && bLocal && aLocal === bLocal),
         );
       }
+      function collectAllVids(it) {
+        const list = [];
+        if (it?.vid) list.push(String(it.vid).trim());
+        if (Array.isArray(it?.extraVids)) {
+          it.extraVids.forEach((v) => {
+            const s = String(v || "").trim();
+            if (s && !list.includes(s)) list.push(s);
+          });
+        }
+        return list;
+      }
+      function mergePlaceInto(target, src, extraVidUrl = "") {
+        const vidsToAdd = [...collectAllVids(src)];
+        if (extraVidUrl && !vidsToAdd.includes(extraVidUrl)) vidsToAdd.push(extraVidUrl);
+        vidsToAdd.forEach((v) => {
+          if (!v) return;
+          if (!target.vid) target.vid = v;
+          else if (target.vid !== v) {
+            const ev = (target.extraVids = Array.isArray(target.extraVids) ? target.extraVids : []);
+            if (!ev.includes(v)) ev.push(v);
+          }
+        });
+        if ((!target.name || isGenericSharedName(target.name)) && src.name && !isGenericSharedName(src.name)) {
+          target.name = src.name;
+        }
+        if (!target.localName && src.localName) target.localName = src.localName;
+        if (!target.address && src.address) target.address = src.address;
+        if (!target.price && src.price) target.price = src.price;
+        if (!target.info && src.info) target.info = src.info;
+        else if (src.info && target.info && !target.info.includes(src.info)) {
+          target.info = `${target.info} / ${src.info}`.slice(0, 400);
+        }
+        if (!target.note && src.note) target.note = src.note;
+        else if (src.note && target.note && !target.note.includes(src.note)) {
+          target.note = `${target.note}\n${src.note}`.slice(0, 600);
+        }
+        if (!target.img && src.img) {
+          target.img = src.img;
+          target.useCustomImg = Boolean(src.useCustomImg || src.img);
+        }
+        if ((!target.lat || !target.lng) && isValidCoord(src.lat, src.lng)) {
+          target.lat = Number(src.lat);
+          target.lng = Number(src.lng);
+        }
+        if (src.star) target.star = true;
+        if (src.done) target.done = true;
+        if (!target.day && src.day) target.day = src.day;
+        target.updatedAt = Date.now();
+        return collectAllVids(target).length;
+      }
+      window.dedupeExistingPlaces = function () {
+        if (!Array.isArray(items) || items.length < 2) {
+          toast("✨ 중복된 장소가 없습니다");
+          return 0;
+        }
+        const groups = [];
+        const visited = new Set();
+        for (let i = 0; i < items.length; i++) {
+          if (visited.has(i)) continue;
+          const base = items[i];
+          const group = [i];
+          for (let j = i + 1; j < items.length; j++) {
+            if (visited.has(j)) continue;
+            if (samePlace(base, items[j])) {
+              group.push(j);
+              visited.add(j);
+            }
+          }
+          if (group.length > 1) {
+            visited.add(i);
+            groups.push(group);
+          }
+        }
+        if (!groups.length) {
+          toast("✨ 같은 주소·가게로 중복된 장소가 없습니다!");
+          return 0;
+        }
+        const totalRemove = groups.reduce((acc, g) => acc + (g.length - 1), 0);
+        const preview = groups
+          .slice(0, 6)
+          .map((g) => `• ${items[g[0]].name || "장소"} (${g.length}건 → 1건)`)
+          .join("\n");
+        const more = groups.length > 6 ? `\n… 외 ${groups.length - 6}개 그룹` : "";
+        if (
+          !confirm(
+            `같은 주소/가게로 보이는 중복 장소 ${totalRemove}건을 찾았습니다.\n\n${preview}${more}\n\n하나로 합칠까요? (릴스 링크·메모·즐겨찾기·방문 기록은 모두 보존됩니다)`,
+          )
+        ) {
+          return 0;
+        }
+        const backup = items.map((x) => ({
+          ...x,
+          extraVids: Array.isArray(x.extraVids) ? [...x.extraVids] : undefined,
+        }));
+        const removeIds = new Set();
+        groups.forEach((g) => {
+          const keeper = items[g[0]];
+          for (let k = 1; k < g.length; k++) {
+            const dup = items[g[k]];
+            mergePlaceInto(keeper, dup);
+            removeIds.add(dup.id);
+          }
+        });
+        items = items.filter((x) => !removeIds.has(x.id));
+        save();
+        draw(true);
+        if (typeof renderListTab === "function") renderListTab();
+        toast(`✅ 중복 ${totalRemove}건을 하나로 합쳤어요! (릴스·메모 보존)`, () => {
+          items = backup;
+          save();
+          draw(true);
+          if (typeof renderListTab === "function") renderListTab();
+          toast("↩️ 중복 합치기를 되돌렸어요");
+        });
+        return totalRemove;
+      };
       function syncGroupedItem(item) {
         if (!item) return;
         item.updatedAt = Date.now();
@@ -7298,6 +7434,12 @@
         </button>
       ` : ""}
     </div>
+    ${Array.isArray(i.extraVids) && i.extraVids.length ? `
+      <div style="margin-top:10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <span style="font-size:11.5px;color:var(--sub);font-weight:600">📎 함께 합쳐진 영상:</span>
+        ${i.extraVids.map((ev, idx) => `<a class="mb" href="${esc(ev)}" target="_blank" rel="noopener" style="min-height:30px;padding:4px 10px;font-size:11.5px"><span class="ms fill" style="font-size:14px;color:#e1306c">play_circle</span>영상 ${idx + 2}</a>`).join("")}
+      </div>
+    ` : ""}
 
     <!-- 주소 및 장소 기본 정보 -->
     <div style="margin-top:12px;padding:12px 14px;border-radius:16px;background:var(--s2);border:1px solid var(--bd2);font-size:13.5px;line-height:1.45">
@@ -9612,6 +9754,8 @@ ${caption || rawText}
               .map(toPlace);
 
             const savedItems = [];
+            const addedItems = [];
+            const mergedItems = [];
             for (const place of limited) {
               const rawPName = String(place.name || "").replace(/\s*외\s*\d+\s*곳\s*$/, "").trim();
               const pName = (typeof inferKoreanNameFromCaption === "function"
@@ -9625,24 +9769,9 @@ ${caption || rawText}
               // 일반 이름은 이름만으로 병합하지 않는다 (서로 다른 장소가 한 카드로 합쳐지는 것 방지)
               const existing = items.find((x) => samePlace(x, place) || (!isGenericName && x.name && x.name === cleanPName));
               if (existing) {
-                if (vidUrl) {
-                  if (!existing.vid) existing.vid = vidUrl;
-                  else if (existing.vid !== vidUrl) {
-                    const ev = (existing.extraVids = Array.isArray(existing.extraVids) ? existing.extraVids : []);
-                    if (!ev.includes(vidUrl)) ev.push(vidUrl);
-                  }
-                }
-                if (!existing.localName && place.localName) existing.localName = place.localName;
-                if (!existing.address && place.address) existing.address = place.address;
-                if (!existing.price && place.price) existing.price = place.price;
-                if (!existing.info && place.info) existing.info = place.info;
-                if ((!existing.lat || !existing.lng) && isValidCoord(place.lat, place.lng)) {
-                  existing.lat = place.lat;
-                  existing.lng = place.lng;
-                }
-                if (!existing.vid && vidUrl) existing.vid = vidUrl;
-                existing.updatedAt = Date.now();
+                mergePlaceInto(existing, { ...place, name: cleanPName }, vidUrl);
                 savedItems.push(existing);
+                mergedItems.push(existing);
               } else {
                 let bakedThumb = place.img || "";
                 if (!bakedThumb && vidUrl) {
@@ -9689,6 +9818,7 @@ ${caption || rawText}
                 }
                 items.unshift(newItem);
                 savedItems.push(newItem);
+                addedItems.push(newItem);
               }
             }
 
@@ -9699,20 +9829,31 @@ ${caption || rawText}
               _saved: true,
               _itemId: p.id,
             }));
-            renderCandidates(
-              `✅ 총 ${savedItems.length}곳의 장소가 개별 저장되었습니다!`,
-            );
+            const firstName = savedItems[0]?.name || "장소";
+            let statusMsg = "";
+            if (mergedItems.length && !addedItems.length) {
+              if (mergedItems.length === 1) {
+                const vc = collectAllVids(mergedItems[0]).length;
+                statusMsg = vc > 1
+                  ? `ℹ️ 이미 저장된 '${firstName}'와 같은 곳이라 하나로 합쳤어요! (영상 ${vc}개 연결)`
+                  : `ℹ️ 이미 저장된 '${firstName}'와 같은 곳이에요! (기존 정보에 반영)`;
+              } else {
+                statusMsg = `ℹ️ 이미 저장된 장소 ${mergedItems.length}곳이라 기존 카드에 하나로 합쳤어요!`;
+              }
+            } else if (mergedItems.length && addedItems.length) {
+              statusMsg = `✅ ${addedItems.length}곳 새로 저장 · ℹ️ ${mergedItems.length}곳은 이미 있는 곳이라 합쳤어요!`;
+            } else {
+              statusMsg = savedItems.length > 1
+                ? `✅ '${firstName}' 등 총 ${savedItems.length}곳 저장 완료!`
+                : `✅ '${firstName}' 저장 완료!`;
+            }
+            renderCandidates(statusMsg);
             $("shareBox").value = "";
             $("reelLinkBox").value = "";
             lastSharedVid = "";
             draw(true);
             fit();
-            const firstName = savedItems[0]?.name || "장소";
-            toast(
-              savedItems.length > 1
-                ? `✅ '${firstName}' 등 총 ${savedItems.length}곳 저장 완료!`
-                : `✅ '${firstName}' 저장 완료!`
-            );
+            toast(statusMsg);
             return;
           }
 
@@ -22445,10 +22586,17 @@ ${JSON.stringify(payload, null, 2)}
         <button type="button" class="btn g" style="flex:1;min-height:42px;justify-content:center;font-size:12.5px" id="v47OfflineWarmBtn">
           <span class="ms" style="font-size:16px;color:#38bdf8">offline_pin</span>오프라인 데이터 즉시 보관
         </button>
+        <button type="button" class="btn g" style="flex:1 1 100%;min-height:42px;justify-content:center;font-size:12.5px" id="v47DedupeBtn">
+          <span class="ms" style="font-size:16px;color:#a78bfa">merge</span>같은 주소·가게 중복 자동 합치기
+        </button>
       `;
       themeBtn.parentElement.appendChild(wrap);
 
       document.getElementById("v47SetOledBtn")?.addEventListener("click", toggleOledMode);
+      document.getElementById("v47DedupeBtn")?.addEventListener("click", () => {
+        haptic(14);
+        if (typeof window.dedupeExistingPlaces === "function") window.dedupeExistingPlaces();
+      });
       document.getElementById("v47OfflineWarmBtn")?.addEventListener("click", async () => {
         haptic(18);
         let failed = 0;
