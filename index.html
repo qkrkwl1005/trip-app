@@ -43,8 +43,16 @@
     />
     <link
       rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/wanteddev/wanted-sans@v1.0.3/packages/wanted-sans/fonts/webfonts/variable/split/WantedSansVariable.min.css"
+    />
+    <link
+      rel="stylesheet"
       href="https://cdn.jsdelivr.net/gh/toss/tossface/dist/tossface.css"
     />
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/lucide@0.469.0/dist/umd/lucide.min.js"
+    ></script>
     <link
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
@@ -22614,7 +22622,7 @@ ${JSON.stringify(payload, null, 2)}
         try {
           if ("caches" in window) {
             // sw.js의 APP_CACHE('trip-app-' + SW_VERSION)와 동일해야 activate 때 삭제되지 않음
-            const c = await caches.open(window.__SW_APP_CACHE || "trip-app-v20261115_160000");
+            const c = await caches.open(window.__SW_APP_CACHE || "trip-app-v20261120_v60");
             const results = await Promise.allSettled([
               c.add("./index.html"),
               c.add("./manifest.json"),
@@ -25891,290 +25899,610 @@ ${JSON.stringify(payload, null, 2)}
 </script>
 <!-- === V92_THUMB_VAULT_END === -->
 
-<!-- === V50_ULTRA_CLEAN_DESIGN_START === -->
-<style id="v50UltraCleanDesign">
-  /* 0. 통합 컬러 팔레트 (Midnight Slate 다크 / Porcelain 라이트 / Pitch Black OLED) */
+<!-- === V60_EDITORIAL_OVERHAUL_START === -->
+<style id="v60EditorialDesign">
+  /* =========================================================================
+   * V60 EDITORIAL OVERHAUL — Warm Obsidian × Sunset Coral / Crisp Apple Light
+   * GitHub Open-Source Stack: Pretendard JP + Wanted Sans + Tossface + Lucide SVG
+   * ========================================================================= */
+
   :root {
-    --bg: #f4f6fa;
+    --bg: #f5f5f7;
     --s: #ffffff;
-    --s2: #eef2f7;
-    --s3: #e2e8f0;
-    --bd: rgba(15, 23, 42, 0.075);
-    --bd2: rgba(15, 23, 42, 0.13);
-    --tx: #0f172a;
-    --sub: #64748b;
-    --pr: #2563eb;
+    --s2: #ededf0;
+    --s3: #e2e2e7;
+    --bd: rgba(17, 17, 20, 0.065);
+    --bd2: rgba(17, 17, 20, 0.12);
+    --tx: #111114;
+    --sub: #6b6b76;
+    --pr: #ff4d4f;
+    --pr-dark: #e03131;
+    --pr-soft: rgba(255, 77, 79, 0.11);
     --ok: #10b981;
     --dg: #ef4444;
-    --PLACE: #0284c7;
-    --CAFE: #e11d48;
-    --FOOD: #d97706;
-    --SHOP: #7c3aed;
-    --pr-soft: rgba(37, 99, 235, 0.11);
+    --PLACE: #0ea5e9;
+    --CAFE: #f43f5e;
+    --FOOD: #f59e0b;
+    --SHOP: #8b5cf6;
   }
-  [data-theme="dark"] {
-    --bg: #080a0f;
-    --s: #121620;
-    --s2: #1a2030;
-    --s3: #242c40;
-    --bd: rgba(255, 255, 255, 0.075);
-    --bd2: rgba(255, 255, 255, 0.14);
-    --tx: #f3f5fa;
-    --sub: #94a3b8;
-    --pr: #3b82f6;
-    --ok: #34d399;
-    --dg: #f87171;
+
+  html[data-theme="dark"] {
+    --bg: #09090b;
+    --s: #131316;
+    --s2: #1c1c21;
+    --s3: #27272e;
+    --bd: rgba(255, 255, 255, 0.07);
+    --bd2: rgba(255, 255, 255, 0.13);
+    --tx: #fafafa;
+    --sub: #9a9aa6;
+    --pr: #ff5a36;
+    --pr-dark: #ff3b5c;
+    --pr-soft: rgba(255, 90, 54, 0.15);
+    --ok: #2dd4bf;
+    --dg: #ff4d4f;
     --PLACE: #38bdf8;
     --CAFE: #fb7185;
     --FOOD: #fbbf24;
-    --SHOP: #a78bfa;
-    --pr-soft: rgba(59, 130, 246, 0.16);
-  }
-  body.oled-mode {
-    --bg: #000000;
-    --s: #0b0d12;
-    --s2: #141822;
-    --s3: #1e2433;
+    --SHOP: #c084fc;
   }
 
-  /* 1. 전역 타이포그래피 & 한·일·이모지(Tossface) + 숫자 정렬 통일 */
-  body, button, input, select, textarea {
-    font-family: "Pretendard JP Variable", "Pretendard JP", "Pretendard Variable", Pretendard, "Tossface", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  html[data-oled="true"] {
+    --bg: #000000 !important;
+    --s: #0d0d10 !important;
+    --s2: #16161b !important;
+    --s3: #222229 !important;
+  }
+
+  /* 1. 타이포그래피: Pretendard JP (본문) + Wanted Sans (제목·숫자) + Tossface (이모지) */
+  html body,
+  html body button,
+  html body input,
+  html body select,
+  html body textarea {
+    font-family: "Pretendard JP Variable", "Pretendard JP", "Pretendard Variable", Pretendard, "Tossface", -apple-system, BlinkMacSystemFont, system-ui, sans-serif !important;
     font-variant-numeric: tabular-nums;
+    background-color: transparent;
   }
-
-  /* Primary / Secondary 버튼 컬러·모양 통일 */
-  .btn.pr, button.pr, .mb.pr {
-    background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%) !important;
-    color: #ffffff !important;
-    border: 1px solid rgba(255, 255, 255, 0.14) !important;
-    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.28) !important;
+  html body {
+    background: var(--bg) !important;
+    color: var(--tx) !important;
   }
-  #list-LIST .item .mb.reel-jump {
-    background: rgba(99, 102, 241, 0.16) !important;
-    border-color: rgba(129, 140, 248, 0.34) !important;
-    color: #c7d2fe !important;
+  html body #side {
+    background: var(--bg) !important;
   }
-  [data-theme="light"] #list-LIST .item .mb.reel-jump {
-    background: rgba(79, 70, 229, 0.09) !important;
-    border-color: rgba(79, 70, 229, 0.25) !important;
-    color: #4338ca !important;
-  }
-  #v32FabBtn {
-    background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
-    color: #ffffff !important;
-    border: 1px solid rgba(255, 255, 255, 0.22) !important;
-    box-shadow: 0 8px 24px rgba(37, 99, 235, 0.42) !important;
-  }
-
-  /* 2. 상단 유틸바: iOS 네이티브 반투명 프로스티드 글래스 */
-  #ux7TopUtilBar {
-    background: rgba(11, 14, 21, 0.78) !important;
-    backdrop-filter: blur(22px) saturate(180%) !important;
-    -webkit-backdrop-filter: blur(22px) saturate(180%) !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
-  }
-  [data-theme="light"] #ux7TopUtilBar {
-    background: rgba(248, 250, 252, 0.86) !important;
-    border-bottom: 1px solid rgba(15, 23, 42, 0.07) !important;
-  }
-  #ux7TopUtilBar .ux7-actions .mb {
-    border-radius: 999px !important;
-    border-color: rgba(255, 255, 255, 0.1) !important;
-    background: rgba(255, 255, 255, 0.05) !important;
-    transition: transform 0.14s ease, background 0.18s ease !important;
-  }
-  [data-theme="light"] #ux7TopUtilBar .ux7-actions .mb {
-    border-color: rgba(15, 23, 42, 0.1) !important;
-    background: rgba(15, 23, 42, 0.04) !important;
-  }
-  #ux7TopUtilBar .ux7-actions .mb:active {
-    transform: scale(0.95) !important;
-  }
-
-  /* 3. 카드 표면 질감 통일 (과한 이중 테두리 제거 + 상단 미세 하이라이트) */
-  [data-theme="dark"] .card,
-  [data-theme="dark"] .v32-bento-card,
-  [data-theme="dark"] #list-LIST .item {
-    background: #141720 !important;
-    border: 1px solid rgba(255, 255, 255, 0.075) !important;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 6px 20px rgba(0, 0, 0, 0.28) !important;
-  }
-  [data-theme="dark"] .card,
-  [data-theme="dark"] .v32-bento-card {
-    border-radius: 22px !important;
-  }
-  [data-theme="light"] .card,
-  [data-theme="light"] .v32-bento-card,
-  [data-theme="light"] #list-LIST .item {
-    background: #ffffff !important;
-    border: 1px solid rgba(15, 23, 42, 0.07) !important;
-    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.045) !important;
-  }
-  body.oled-mode .card,
-  body.oled-mode .v32-bento-card,
-  body.oled-mode #list-LIST .item {
-    background: #0b0d12 !important;
-    border-color: rgba(255, 255, 255, 0.09) !important;
-    box-shadow: none !important;
-  }
-
-  /* 4. 홈 화면 히어로 & 벤토 카드 폴리시 */
-  .v32-hero {
-    border-radius: 26px !important;
-    border: 1px solid rgba(255, 255, 255, 0.12) !important;
-    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.42) !important;
-  }
-  .v32-bento-card b {
+  html body .v32-hero h1,
+  html body .v32-hero h2,
+  html body .v32-bento-card b,
+  html body .sec-title,
+  html body #ux7TopUtilBar .ux7-title,
+  html body #sheet .sh .nm {
+    font-family: "Wanted Sans Variable", "Pretendard JP Variable", "Tossface", sans-serif !important;
     letter-spacing: -0.03em !important;
   }
-  .v32-base-btn {
-    border-radius: 16px !important;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    transition: transform 0.14s ease, border-color 0.2s ease !important;
-  }
-  .v32-base-btn:active {
-    transform: scale(0.96) !important;
-  }
 
-  /* 5. 목록 탭 상단 필터 영역: 이중·삼중 박스 소음 축소 + 컴팩트 간격 */
-  #tab-list > .card:first-child {
-    padding: 12px !important;
-    gap: 8px !important;
-    border-radius: 20px !important;
-  }
-  #listCatSeg.seg {
-    padding: 3px !important;
-    border-radius: 14px !important;
-    background: rgba(255, 255, 255, 0.04) !important;
-    border: 1px solid rgba(255, 255, 255, 0.06) !important;
-  }
-  [data-theme="light"] #listCatSeg.seg {
-    background: rgba(15, 23, 42, 0.045) !important;
-    border-color: rgba(15, 23, 42, 0.06) !important;
-  }
-  #v35SearchInput,
-  #tab-list input[type="search"],
-  #tab-list input[type="text"] {
-    border-radius: 13px !important;
-    border-color: rgba(255, 255, 255, 0.08) !important;
-    background: rgba(255, 255, 255, 0.045) !important;
-  }
-  [data-theme="light"] #v35SearchInput,
-  [data-theme="light"] #tab-list input[type="search"],
-  [data-theme="light"] #tab-list input[type="text"] {
-    border-color: rgba(15, 23, 42, 0.1) !important;
-    background: #f8fafc !important;
-  }
-
-  /* 6. 목록 장소 카드: 애플 리스트 스타일 정돈 */
-  #list-LIST {
-    gap: 10px !important;
-  }
-  #list-LIST .item {
-    border-radius: 20px !important;
-    padding: 13px 14px !important;
-    transition: transform 0.14s ease, border-color 0.18s ease !important;
-  }
-  #list-LIST .item:active {
-    transform: scale(0.985) !important;
-  }
-  #list-LIST .item .pic {
-    border-radius: 14px !important;
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25) !important;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  }
-  #list-LIST .item .nm {
-    font-size: 15px !important;
-    font-weight: 700 !important;
-    letter-spacing: -0.02em !important;
-    line-height: 1.32 !important;
-  }
-  #list-LIST .item .v46-transit-badge {
-    font-size: 11.5px !important;
-    padding: 4px 9px !important;
-    border-radius: 999px !important;
-    border-color: rgba(255, 255, 255, 0.08) !important;
-    max-width: 100% !important;
+  /* Lucide SVG 래퍼 스타일 (Material Symbols 대체) */
+  html body .ms.v60-lucide-ready {
+    font-family: inherit !important;
     display: inline-flex !important;
     align-items: center !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    white-space: nowrap !important;
+    justify-content: center !important;
+    line-height: 1 !important;
+    vertical-align: middle !important;
   }
-  #list-LIST .item .mb {
+  html body .ms.v60-lucide-ready svg.v60-svg {
+    width: 1em;
+    height: 1em;
+    display: block;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.85;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  html body .ms.fill.v60-lucide-ready svg.v60-svg {
+    fill: currentColor;
+  }
+
+  /* 2. 상단 유틸바 (#ux7TopUtilBar): 미니멀 에디토리얼 글래스 */
+  html body #ux7TopUtilBar {
+    background: rgba(9, 9, 11, 0.78) !important;
+    backdrop-filter: blur(24px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+  }
+  html[data-theme="light"] body #ux7TopUtilBar {
+    background: rgba(245, 245, 247, 0.85) !important;
+    border-bottom: 1px solid rgba(17, 17, 20, 0.07) !important;
+  }
+  html[data-oled="true"] body #ux7TopUtilBar {
+    background: rgba(0, 0, 0, 0.86) !important;
+  }
+  html body #ux7TopUtilBar .ux7-actions .mb {
     border-radius: 999px !important;
+    background: var(--s2) !important;
+    border: 1px solid var(--bd) !important;
+    color: var(--tx) !important;
     font-weight: 600 !important;
-    letter-spacing: -0.015em !important;
-    transition: transform 0.12s ease, opacity 0.15s ease !important;
   }
-  #list-LIST .item .mb:active {
+
+  /* 3. 홈 탭 (#v32Dashboard): 에어비앤비 × 애플 트래블 에디토리얼 */
+  html body .v32-hero,
+  html[data-oled="true"] body .v32-hero {
+    border-radius: 28px !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    box-shadow: 0 20px 44px rgba(0, 0, 0, 0.45) !important;
+    overflow: hidden !important;
+  }
+  html body .v32-hero .v78-date-badge,
+  html body .v32-hero span[style*="background:#2563eb"],
+  html body .v32-hero span[style*="background: #2563eb"] {
+    background: rgba(9, 9, 11, 0.62) !important;
+    backdrop-filter: blur(14px) !important;
+    -webkit-backdrop-filter: blur(14px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.22) !important;
+    color: #ffffff !important;
+    border-radius: 999px !important;
+    padding: 5px 12px !important;
+    font-weight: 700 !important;
+  }
+  html body .v32-hero #v32HeroAdd {
+    background: #ffffff !important;
+    color: #09090b !important;
+    border: none !important;
+    border-radius: 999px !important;
+    min-height: 48px !important;
+    font-size: 15px !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.02em !important;
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.35) !important;
+    transition: transform 0.14s ease !important;
+  }
+  html body .v32-hero #v32HeroAdd:active {
+    transform: scale(0.97) !important;
+  }
+
+  /* 홈 벤토 카드 (D-day & 방문 완료) */
+  html body .v32-bento-card,
+  html[data-oled="true"] body .v32-bento-card {
+    background: var(--s) !important;
+    border: 1px solid var(--bd) !important;
+    border-radius: 24px !important;
+    padding: 18px !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+  }
+  html[data-theme="light"] body .v32-bento-card {
+    box-shadow: 0 4px 20px rgba(17, 17, 20, 0.05) !important;
+    border-color: transparent !important;
+  }
+  html body .v32-bento-card b {
+    font-size: 32px !important;
+    font-weight: 800 !important;
+    color: var(--tx) !important;
+  }
+  html body .v32-card-icon {
+    background: var(--pr-soft) !important;
+    color: var(--pr) !important;
+    border: none !important;
+    border-radius: 12px !important;
+  }
+
+  /* 홈 패스 가이드 & 숙소 섹션 카드 */
+  html body .v46-pass-card,
+  html[data-oled="true"] body .v46-pass-card,
+  html body .v32-sec-card,
+  html[data-oled="true"] body .v32-sec-card {
+    background: var(--s) !important;
+    border: 1px solid var(--bd) !important;
+    border-radius: 24px !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+  }
+  html[data-theme="light"] body .v46-pass-card,
+  html[data-theme="light"] body .v32-sec-card {
+    box-shadow: 0 4px 20px rgba(17, 17, 20, 0.05) !important;
+    border-color: transparent !important;
+  }
+  html body .v46-pass-card .v46-pass-ic,
+  html body .v46-pass-card > div:first-child {
+    background: linear-gradient(135deg, rgba(255, 90, 54, 0.18), rgba(251, 191, 36, 0.18)) !important;
+    color: var(--pr) !important;
+    border: none !important;
+    border-radius: 14px !important;
+  }
+  html body .v32-base-btn {
+    background: var(--s2) !important;
+    border: 1px solid var(--bd) !important;
+    border-radius: 18px !important;
+    color: var(--tx) !important;
+    font-weight: 700 !important;
+    transition: transform 0.14s ease !important;
+  }
+  html body .v32-base-btn:active {
     transform: scale(0.95) !important;
   }
 
-  /* 7. 하단 플로팅 탭바 (#nav): iOS 26/27 Liquid Glass 스타일 */
+  /* 4. 목록 탭 (#tab-list): 프레임리스 토스/에어비앤비 리스트 */
+  html body #tab-list > .card:first-of-type,
+  html[data-oled="true"] body #tab-list > .card:first-of-type {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 2px 6px !important;
+    border-radius: 0 !important;
+  }
+  /* 카테고리 알약 세그먼트 (V78 덮어쓰기) */
+  html body #listCatSeg.seg.seg5 {
+    background: var(--s) !important;
+    border: 1px solid var(--bd) !important;
+    border-radius: 999px !important;
+    padding: 4px !important;
+    gap: 2px !important;
+  }
+  html body #listCatSeg.seg.seg5 > div {
+    border-radius: 999px !important;
+    min-height: 36px !important;
+    font-weight: 700 !important;
+    color: var(--sub) !important;
+    background: transparent !important;
+    border: none !important;
+    transition: background 0.18s ease, color 0.18s ease !important;
+  }
+  html body #listCatSeg.seg.seg5 > div.on,
+  html[data-theme="dark"] body #listCatSeg.seg.seg5 > div.on {
+    background: #ffffff !important;
+    color: #09090b !important;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22) !important;
+  }
+  html[data-theme="light"] body #listCatSeg.seg.seg5 > div.on {
+    background: #111114 !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 10px rgba(17, 17, 20, 0.18) !important;
+  }
+
+  /* 검색창 & 1/N 정산 바 */
+  html body #tab-list .search-row,
+  html body #tab-list div:has(> .search-row) {
+    background: var(--s) !important;
+    border: 1px solid var(--bd) !important;
+    border-radius: 16px !important;
+    box-shadow: none !important;
+  }
+  html body #v32ListBudgetBar {
+    background: var(--s) !important;
+    border: 1px solid var(--bd) !important;
+    border-radius: 16px !important;
+  }
+  html body #v32ListBudgetBar button,
+  html body #v32BudgetToggleBtn {
+    background: var(--pr-soft) !important;
+    color: var(--pr) !important;
+    border: 1px solid rgba(255, 90, 54, 0.28) !important;
+    border-radius: 999px !important;
+    font-weight: 700 !important;
+  }
+
+  /* 장소 카드 (#list-LIST .item) — 전면 재설계 */
+  html body #list-LIST {
+    gap: 12px !important;
+  }
+  html body #list-LIST .item,
+  html[data-oled="true"] body #list-LIST .item {
+    background: var(--s) !important;
+    border: 1px solid var(--bd) !important;
+    border-radius: 22px !important;
+    padding: 14px !important;
+    box-shadow: none !important;
+    transition: transform 0.14s ease !important;
+  }
+  html[data-theme="light"] body #list-LIST .item {
+    border-color: transparent !important;
+    box-shadow: 0 3px 16px rgba(17, 17, 20, 0.05) !important;
+  }
+  html body #list-LIST .item:active {
+    transform: scale(0.985) !important;
+  }
+  html body #list-LIST .item .pic,
+  html body #list-LIST .item .pic img {
+    border-radius: 16px !important;
+  }
+  html body #list-LIST .item .pic {
+    width: 74px !important;
+    height: 74px !important;
+    min-width: 74px !important;
+    border: 1px solid var(--bd) !important;
+  }
+  @media (max-width: 390px) {
+    html body #list-LIST .item .pic {
+      width: 58px !important;
+      height: 58px !important;
+      min-width: 58px !important;
+    }
+  }
+  html body #list-LIST .item .nm {
+    font-family: "Wanted Sans Variable", "Pretendard JP Variable", sans-serif !important;
+    font-size: 15.5px !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.025em !important;
+    color: var(--tx) !important;
+  }
+  /* 커스텀 원형 체크박스 (기본 브라우저 네모 체크박스 제거!) */
+  html body #list-LIST .item input[type="checkbox"][data-act="done"] {
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    width: 24px !important;
+    height: 24px !important;
+    min-width: 24px !important;
+    border-radius: 999px !important;
+    border: 2px solid var(--bd2) !important;
+    background: var(--s2) !important;
+    cursor: pointer !important;
+    position: relative !important;
+    transition: background 0.18s ease, border-color 0.18s ease, transform 0.12s ease !important;
+  }
+  html body #list-LIST .item input[type="checkbox"][data-act="done"]:checked {
+    background: var(--ok) !important;
+    border-color: var(--ok) !important;
+  }
+  html body #list-LIST .item input[type="checkbox"][data-act="done"]:checked::after {
+    content: "";
+    position: absolute;
+    left: 7px;
+    top: 3px;
+    width: 6px;
+    height: 11px;
+    border: solid #09090b;
+    border-width: 0 2.2px 2.2px 0;
+    transform: rotate(45deg);
+  }
+  /* 카드 내 액션 버튼 3종 (릴스 · 가게 · 길찾기) */
+  html body #list-LIST .item .mb {
+    border-radius: 999px !important;
+    background: var(--s2) !important;
+    border: 1px solid var(--bd) !important;
+    color: var(--tx) !important;
+    font-weight: 700 !important;
+  }
+  html body #list-LIST .item .mb.reel-jump {
+    background: var(--pr-soft) !important;
+    border-color: rgba(255, 90, 54, 0.3) !important;
+    color: var(--pr) !important;
+  }
+
+  /* 5. 하단 플로팅 탭바 (#nav): 코랄 포인트 + 미니멀 캡슐 */
   @media (max-width: 639px) {
-    #nav {
-      background: rgba(20, 24, 34, 0.78) !important;
-      backdrop-filter: blur(26px) saturate(190%) !important;
-      -webkit-backdrop-filter: blur(26px) saturate(190%) !important;
-      border: 1px solid rgba(255, 255, 255, 0.12) !important;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 12px 32px rgba(0, 0, 0, 0.5) !important;
-      border-radius: 26px !important;
+    html body #nav {
+      background: rgba(19, 19, 22, 0.84) !important;
+      backdrop-filter: blur(28px) saturate(190%) !important;
+      -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
+      border: 1px solid rgba(255, 255, 255, 0.11) !important;
+      border-radius: 30px !important;
       padding: 5px !important;
+      box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55) !important;
     }
-    [data-theme="light"] #nav {
-      background: rgba(255, 255, 255, 0.86) !important;
-      border: 1px solid rgba(15, 23, 42, 0.09) !important;
-      box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12) !important;
+    html[data-theme="light"] body #nav {
+      background: rgba(255, 255, 255, 0.9) !important;
+      border: 1px solid rgba(17, 17, 20, 0.08) !important;
+      box-shadow: 0 10px 30px rgba(17, 17, 20, 0.12) !important;
     }
-    #nav .tab-btn {
-      border-radius: 20px !important;
-      min-height: 48px !important;
+    html body #nav .tab-btn {
+      border-radius: 24px !important;
+      color: var(--sub) !important;
+      background: transparent !important;
     }
-    #nav .tab-btn.active {
-      background: rgba(255, 255, 255, 0.11) !important;
-      color: #ffffff !important;
-    }
-    [data-theme="light"] #nav .tab-btn.active {
-      background: rgba(37, 99, 235, 0.12) !important;
+    html body #nav .tab-btn.active {
+      background: var(--pr-soft) !important;
       color: var(--pr) !important;
     }
   }
 
-  /* 8. 지도 오버레이 컨트롤: 통일된 다크/라이트 글래스 필 */
-  #mapChips .chip,
-  #locBtn,
-  #myMapsBtn,
-  #mapRegionBar button {
-    backdrop-filter: blur(18px) saturate(170%) !important;
-    -webkit-backdrop-filter: blur(18px) saturate(170%) !important;
-    border-radius: 999px !important;
-    letter-spacing: -0.015em !important;
+  /* 6. 주요 액션 버튼 & FAB (선명한 코랄 그라데이션) */
+  html body .btn.pr,
+  html body button.pr,
+  html body .mb.pr,
+  html body #v32FabBtn {
+    background: linear-gradient(135deg, var(--pr) 0%, var(--pr-dark) 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+    box-shadow: 0 8px 22px rgba(255, 90, 54, 0.32) !important;
+  }
+  html body #mapRegionBar button.active {
+    background: var(--pr) !important;
+    color: #ffffff !important;
   }
 
-  /* 9. 바텀시트 & 모달: 부드러운 iOS 시트 곡률과 그림자 */
-  #sheet .sh {
-    border-radius: 28px 28px 0 0 !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.12) !important;
-    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.55) !important;
+  /* 7. 상세 시트 (#sheet .sh) & 설정 탭 (#tab-set) */
+  html body #sheet .sh,
+  html[data-oled="true"] body #sheet .sh {
+    background: var(--s) !important;
+    border-radius: 30px 30px 0 0 !important;
+    border-top: 1px solid var(--bd2) !important;
   }
-  [data-theme="light"] #sheet .sh {
-    border-top: 1px solid rgba(15, 23, 42, 0.08) !important;
-    box-shadow: 0 -10px 32px rgba(15, 23, 42, 0.14) !important;
+  html body #tab-set .card,
+  html[data-oled="true"] body #tab-set .card {
+    background: var(--s) !important;
+    border: 1px solid var(--bd) !important;
+    border-radius: 24px !important;
+    padding: 18px !important;
   }
-  #sheet .sh .big {
-    border-radius: 18px !important;
+  html[data-theme="light"] body #tab-set .card {
+    border-color: transparent !important;
+    box-shadow: 0 4px 20px rgba(17, 17, 20, 0.05) !important;
   }
-
-  /* 10. 설정 탭 버튼 & 터치 타깃 일관성 */
-  #tab-set .btn {
-    border-radius: 14px !important;
-    min-height: 44px !important;
-    font-weight: 600 !important;
+  html body #tab-set .btn {
+    border-radius: 16px !important;
+    min-height: 46px !important;
+    font-weight: 700 !important;
+  }
+  html body #tab-set .btn.g {
+    background: var(--s2) !important;
+    border: 1px solid var(--bd) !important;
+    color: var(--tx) !important;
   }
 </style>
-<!-- === V50_ULTRA_CLEAN_DESIGN_END === -->
+
+<script id="v60LucideIconEngine">
+(function initV60LucideIcons() {
+  /* Material Symbols 이름 -> Lucide 아이콘 매핑 (앱 전체 107종 완벽 대응) */
+  const MS_TO_LUCIDE = {
+    home: "home",
+    format_list_bulleted: "list",
+    map: "map",
+    settings: "settings",
+    share: "share-2",
+    ios_share: "share",
+    record_voice_over: "volume-2",
+    volume_up: "volume-2",
+    contrast: "contrast",
+    light_mode: "sun",
+    dark_mode: "moon",
+    battery_saver: "battery-charging",
+    event: "calendar",
+    event_available: "calendar-check",
+    calendar_today: "calendar",
+    calendar_month: "calendar-days",
+    add_circle: "plus-circle",
+    add: "plus",
+    flight_takeoff: "plane-takeoff",
+    task_alt: "check-circle-2",
+    check_circle: "check-circle-2",
+    confirmation_number: "ticket",
+    chevron_right: "chevron-right",
+    temple_buddhist: "landmark",
+    waves: "waves",
+    apartment: "building-2",
+    location_on: "map-pin",
+    pin_drop: "map-pin",
+    my_location: "crosshair",
+    local_cafe: "coffee",
+    restaurant: "utensils",
+    shopping_bag: "shopping-bag",
+    play_circle: "play",
+    movie: "clapperboard",
+    storefront: "store",
+    explore: "compass",
+    directions: "navigation",
+    directions_transit: "train-front",
+    navigation: "navigation",
+    local_taxi: "car-taxi-front",
+    content_copy: "copy",
+    content_paste: "clipboard-paste",
+    star: "star",
+    favorite: "heart",
+    close: "x",
+    delete: "trash-2",
+    delete_sweep: "trash-2",
+    open_in_new: "external-link",
+    north_east: "arrow-up-right",
+    arrow_back: "arrow-left",
+    tune: "sliders-horizontal",
+    search: "search",
+    link: "link",
+    add_link: "link-2",
+    imagesmode: "image",
+    add_photo_alternate: "image-plus",
+    currency_yen: "japanese-yen",
+    offline_pin: "cloud-download",
+    merge: "git-merge",
+    group: "users",
+    palette: "palette",
+    lock: "lock",
+    key: "key-round",
+    bolt: "zap",
+    auto_awesome: "sparkles",
+    route: "route",
+    near_me: "navigation-2",
+    center_focus_strong: "maximize-2",
+    visibility: "eye",
+    visibility_off: "eye-off",
+    refresh: "refresh-cw",
+    sync: "refresh-cw",
+    undo: "undo-2",
+    download: "download",
+    save: "save",
+    login: "log-in",
+    logout: "log-out",
+    smartphone: "smartphone",
+    smart_toy: "bot",
+    troubleshoot: "wrench",
+    cleaning_services: "sparkles",
+    edit_location_alt: "map-pin-pen",
+    add_location_alt: "map-pin-plus",
+    store: "store",
+    view_sidebar: "panel-left",
+  };
+
+  function toPascal(kebab) {
+    return kebab
+      .split("-")
+      .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+      .join("");
+  }
+
+  function renderIconSvg(lucideName) {
+    const lib = window.lucide;
+    if (!lib || !lib.icons) return "";
+    const iconData = lib.icons[toPascal(lucideName)] || lib.icons[lucideName];
+    if (!iconData || !Array.isArray(iconData)) return "";
+    // lucide UMD icon format: Array of [tag, attrs]
+    const children = iconData
+      .map(([tag, attrs]) => {
+        const attrStr = Object.entries(attrs || {})
+          .map(([k, v]) => `${k}="${String(v).replace(/"/g, "&quot;")}"`)
+          .join(" ");
+        return `<${tag} ${attrStr}></${tag}>`;
+      })
+      .join("");
+    return `<svg class="v60-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${children}</svg>`;
+  }
+
+  function convertMsElements(root) {
+    if (!window.lucide || !window.lucide.icons) return;
+    const nodes = (root || document).querySelectorAll("span.ms:not(.v60-lucide-ready)");
+    for (let i = 0; i < nodes.length; i++) {
+      const el = nodes[i];
+      if (el.querySelector("svg")) {
+        el.classList.add("v60-lucide-ready");
+        continue;
+      }
+      const raw = (el.textContent || "").trim();
+      const mapped = MS_TO_LUCIDE[raw];
+      if (!mapped) continue;
+      const svg = renderIconSvg(mapped);
+      if (!svg) continue;
+      el.setAttribute("data-ms-orig", raw);
+      el.setAttribute("aria-hidden", "true");
+      el.innerHTML = svg;
+      el.classList.add("v60-lucide-ready");
+    }
+  }
+
+  let rafPending = false;
+  function scheduleConvert() {
+    if (rafPending) return;
+    rafPending = true;
+    requestAnimationFrame(() => {
+      rafPending = false;
+      convertMsElements(document);
+    });
+  }
+
+  function start() {
+    if (!window.lucide) {
+      setTimeout(start, 120);
+      return;
+    }
+    convertMsElements(document);
+    const mo = new MutationObserver(scheduleConvert);
+    mo.observe(document.body, { childList: true, subtree: true });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", start);
+  } else {
+    start();
+  }
+})();
+</script>
+<!-- === V60_EDITORIAL_OVERHAUL_END === -->
 
 </body>
 </html>
