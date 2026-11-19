@@ -7434,22 +7434,22 @@
     <!-- 친구 전용 핵심 원터치 액션 바 -->
     <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
       ${vUrl ? `
-        <button type="button" class="btn reel-jump" data-act="openVid" data-id="${i.id}" style="flex:2 1 170px;margin:0;min-height:42px;font-weight: 700;background:linear-gradient(135deg, #e1306c, #833ab4);color:#fff;border:none;box-shadow:0 4px 12px rgba(225,48,108,0.25)">
-          <span class="ms fill" style="font-size:18px">play_circle</span>${esc(vLabel)} 보기
+        <button type="button" class="btn reel-jump" data-act="openVid" data-id="${i.id}" style="flex:1 1 115px;margin:0;min-height:38px;padding:0 12px;font-size:13px;border-radius:12px;font-weight: 700;background:linear-gradient(135deg, #e1306c, #833ab4);color:#fff;border:none;box-shadow:0 4px 12px rgba(225,48,108,0.25)">
+          <span class="ms fill" style="font-size:17px">play_circle</span>${esc(vLabel)} 보기
         </button>
       ` : ""}
-      <a class="btn" href="${esc(dirHref)}" target="_top" style="flex:1 1 130px;margin:0;min-height:46px;background:var(--pr);color:#fff;border-radius:14px;font-weight:700;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:5px;box-shadow:0 4px 12px rgba(37,99,235,0.25)">
+      <a class="btn" href="${esc(dirHref)}" target="_top" style="flex:1 1 100px;margin:0;min-height:38px;padding:0 12px;font-size:13px;background:var(--pr);color:#fff;border-radius:12px;font-weight:700;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:5px;box-shadow:0 4px 12px rgba(37,99,235,0.25)">
         <span class="ms" style="font-size:17px">directions_transit</span>길찾기
       </a>
-      <a class="btn g" href="${esc(gmapHref)}" target="_top" style="flex:0 0 52px;margin:0;min-height:46px;border-radius:14px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:0;font-size:11px;flex-direction:column;">
-        <span class="ms" style="font-size:22px">map</span><span style="margin-top:2px">지도</span>
+      <a class="btn g" href="${esc(gmapHref)}" target="_top" style="flex:0 0 auto;margin:0;min-height:38px;padding:0 10px;border-radius:12px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:4px;font-size:12px;flex-direction:row;">
+        <span class="ms" style="font-size:17px">map</span><span>지도</span>
       </a>
-      <button type="button" class="btn g" data-act="openTaxi" style="flex:0 0 52px;margin:0;min-height:46px;border-radius:14px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:0;font-size:11px;flex-direction:column;">
-        <span class="ms" style="font-size:22px">local_taxi</span><span style="margin-top:2px">택시</span>
+      <button type="button" class="btn g" data-act="openTaxi" style="flex:0 0 auto;margin:0;min-height:38px;padding:0 10px;border-radius:12px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:4px;font-size:12px;flex-direction:row;">
+        <span class="ms" style="font-size:17px">local_taxi</span><span>택시</span>
       </button>
       ${i.address ? `
-        <button type="button" class="btn g" data-act="copyAddr" style="flex:0 0 52px;margin:0;min-height:46px;border-radius:14px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:0;font-size:11px;flex-direction:column;">
-          <span class="ms" style="font-size:22px">content_copy</span><span style="margin-top:2px">복사</span>
+        <button type="button" class="btn g" data-act="copyAddr" style="flex:0 0 auto;margin:0;min-height:38px;padding:0 10px;border-radius:12px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:4px;font-size:12px;flex-direction:row;">
+          <span class="ms" style="font-size:17px">content_copy</span><span>복사</span>
         </button>
       ` : ""}
     </div>
@@ -11083,11 +11083,6 @@ ${caption || rawText}
       };
       $("analyzeShare").onclick = () => runAnalyzeShare();
       $("pcShare").onclick = () => $("shareFile").click();
-      $("shareFile").onchange = async (e) => {
-        const fs = [...(e.target.files || [])];
-        e.target.value = "";
-        if (fs.length) await runAnalyzeShare(fs);
-      };
 
       $("own").onchange = async (e) => {
         const f = e.target.files?.[0];
@@ -11115,16 +11110,6 @@ ${caption || rawText}
         save();
         showSheet();
         toast("✅ 내 사진을 적용했어요");
-      };
-      $("sheetShot").onchange = async (e) => {
-        const fs = [...(e.target.files || [])];
-        e.target.value = "";
-        if (!fs.length || !cur) return;
-        const b64s = [];
-        for (const f of fs.slice(0, MAX_MULTI_PLACES))
-          b64s.push(await fileToBase64(f, 860, 0.72));
-        const i = items.find((x) => x.id === cur);
-        if (i) await applyCaptionToItem(i, "", b64s);
       };
 
       $("aiSaveAll").onclick = () => {
@@ -11692,64 +11677,6 @@ ${caption || rawText}
           toast("유효한 백업 데이터가 아니에요");
         }
       };
-
-      (function initPullToRefresh() {
-        let startY = 0,
-          startX = 0,
-          pulling = false;
-        window.addEventListener(
-          "touchstart",
-          (e) => {
-            if (
-              e.touches.length !== 1 ||
-              document.body.classList.contains("show-map") ||
-              e.target.closest(
-                "#map-wrap,#sheet,#myMapsOverlay,#taxiModal,input,textarea,select",
-              )
-            ) {
-              pulling = false;
-              return;
-            }
-            const sc = e.target.closest(".tab-content");
-            if ((sc && sc.scrollTop > 0) || e.touches[0].clientY > 70) {
-              pulling = false;
-              return;
-            }
-            startY = e.touches[0].clientY;
-            startX = e.touches[0].clientX;
-            pulling = true;
-          },
-          { passive: true },
-        );
-
-        window.addEventListener(
-          "touchmove",
-          (e) => {
-            if (!pulling || e.touches.length !== 1) {
-              pulling = false;
-              $("ptr").classList.remove("show");
-              return;
-            }
-            const dy = e.touches[0].clientY - startY;
-            const dx = Math.abs(e.touches[0].clientX - startX);
-            if (dy > 130 && dx < 40) $("ptr").classList.add("show");
-            else $("ptr").classList.remove("show");
-          },
-          { passive: true },
-        );
-
-        window.addEventListener(
-          "touchend",
-          () => {
-            if (pulling && $("ptr").classList.contains("show")) {
-              $("ptr").classList.remove("show");
-              location.reload();
-            }
-            pulling = false;
-          },
-          { passive: true },
-        );
-      })();
 
       function initMap() {
         mapProvider = ls.get("TRIP_MAP_PROVIDER") || "osm";
@@ -13755,7 +13682,6 @@ ${caption || rawText}
     user-select: none;
   }
   .v8-drag-handle:active { cursor: grabbing; color: var(--pr); }
-  .sortable-ghost { opacity: 0.35; background: var(--pr-soft) !important; }
   .item { position: relative; touch-action: pan-y; transition: transform 0.18s ease, background 0.18s ease; }
 
   /* 빠른 일차 배정 바 */
@@ -14173,7 +14099,6 @@ ${caption || rawText}
    * 3. 목록 드래그 앤 드롭 정렬 + 빠른 일차 배정 모드 + 좌우 스와이프 액션
    * ========================================================================= */
   let quickAssignDay = null;
-  let sortableInst = null;
 
   function setupQuickDayAssignBar() {
     const listEl = document.getElementById("list-LIST");
@@ -14250,31 +14175,6 @@ ${caption || rawText}
       }
     });
 
-    // SortableJS 연결
-    if (window.Sortable && !sortableInst) {
-      sortableInst = (function(){return null;})(listEl, {
-        handle: ".v8-drag-handle",
-        animation: 180,
-        ghostClass: "sortable-ghost",
-        onEnd: () => {
-          v8Haptic(20);
-          const orderedIds = Array.from(listEl.querySelectorAll(".item[data-id]")).map(el => String(el.dataset.id));
-          const mapById = new Map(items.map(it => [String(it.id), it]));
-          const reordered = [];
-          orderedIds.forEach(id => {
-            if (mapById.has(id)) {
-              reordered.push(mapById.get(id));
-              mapById.delete(id);
-            }
-          });
-          mapById.forEach(rem => reordered.push(rem));
-          items = reordered;
-          save();
-          draw(true);
-          toast("↕️ 드래그한 순서대로 일정이 저장되었어요");
-        }
-      });
-    }
   }
 
   // 카드 좌우 스와이프 제스처 (우측: 방문완료 토글, 좌측: 삭제)
@@ -14633,7 +14533,7 @@ ${caption || rawText}
     padding: 4px 10px;
     border-radius: 999px;
     font-size: 11.5px !important;
-    font-weight: 700; !important;
+    font-weight: 700 !important;
     background: rgba(16, 185, 129, 0.16);
     color: #34d399 !important;
     border: 1px solid rgba(16, 185, 129, 0.38);
@@ -14654,10 +14554,16 @@ ${caption || rawText}
       position: sticky !important;
       top: -14px !important;
       z-index: 18 !important;
-      margin: -6px -16px 4px -16px !important;
+      margin: -4px 0 4px 0 !important;
       padding: 10px 16px !important;
       background: var(--bg) !important;
       border-bottom: 1px solid var(--bd) !important;
+    }
+    #tab-list,
+    .tab-content {
+      overflow-x: hidden !important;
+      overscroll-behavior-x: none !important;
+      touch-action: pan-y;
     }
   }
 
@@ -15730,7 +15636,7 @@ ${caption || rawText}
     white-space: nowrap !important;
     flex-shrink: 0 !important;
     font-size: 15px !important;
-    font-weight: 700; !important;
+    font-weight: 700 !important;
   }
   #ux7TopUtilBar .ux7-title > span { white-space: nowrap !important; }
   #v32TopOnlineBadge {
@@ -15922,7 +15828,7 @@ ${caption || rawText}
   }
   #sbody .v33-sheet-title {
     display: block !important;
-    font-weight: 700; !important;
+    font-weight: 700 !important;
     font-size: 19px !important;
     line-height: 1.35 !important;
     flex: 1 !important;
@@ -20692,7 +20598,7 @@ ${caption || rawText}
   }
   #ux7TopUtilBar .ux7-title > span:first-of-type {
     font-size: 15px !important;
-    font-weight: 700; !important;
+    font-weight: 700 !important;
     letter-spacing: -0.03em !important;
   }
   #ux7TopUtilBar .ux7-actions {
@@ -20759,7 +20665,7 @@ ${caption || rawText}
   }
   .v32-hero .v43-hero-title {
     font-size: 24px !important;
-    font-weight: 700; !important;
+    font-weight: 700 !important;
     letter-spacing: -0.025em !important;
     color: #ffffff !important;
     margin-bottom: 12px !important;
@@ -20783,7 +20689,7 @@ ${caption || rawText}
     box-shadow: 0 6px 18px rgba(37, 99, 235, 0.3) !important;
     border-radius: 14px !important;
     min-height: 42px !important;
-    font-weight: 700; !important;
+    font-weight: 700 !important;
   }
   #v32HeroList {
     background: rgba(15, 23, 42, 0.78) !important;
@@ -20793,7 +20699,7 @@ ${caption || rawText}
     border: 1px solid rgba(255, 255, 255, 0.16) !important;
     border-radius: 14px !important;
     min-height: 42px !important;
-    font-weight: 700; !important;
+    font-weight: 700 !important;
   }
   .v32-bento-grid {
     gap: 10px !important;
@@ -20842,7 +20748,7 @@ ${caption || rawText}
     color: #ffffff !important;
     border: 1px solid rgba(255, 255, 255, 0.14) !important;
     box-shadow: 0 8px 20px rgba(79, 70, 229, 0.28) !important;
-    font-weight: 700; !important;
+    font-weight: 700 !important;
   }
   #sbody .reel-jump .ms {
     color: #ffffff !important;
@@ -20914,7 +20820,7 @@ ${caption || rawText}
     min-height: 44px !important;
     border-radius: 14px !important;
     font-size: 14px !important;
-    font-weight: 700; !important;
+    font-weight: 700 !important;
   }
 
   /* =========================================================================
@@ -21483,7 +21389,7 @@ ${caption || rawText}
     padding: 3px 8px !important;
     border-radius: 999px !important;
     font-size: 11px !important;
-    font-weight: 700; !important;
+    font-weight: 700 !important;
     letter-spacing: -0.01em !important;
     margin-right: 5px !important;
   }
@@ -22168,8 +22074,8 @@ ${JSON.stringify(payload, null, 2)}
     position: relative !important;
     overflow: hidden !important;
     touch-action: pan-y !important;
-    transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.2s ease !important;
-    will-change: transform;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
   }
   .v47-swipe-hint {
     position: absolute;
@@ -22374,97 +22280,6 @@ ${JSON.stringify(payload, null, 2)}
   }
 
   /* =========================================================
-   * [1-3] 목록 카드 좌우 스와이프 액션 (Swipe to Check / Star)
-   * - 오른쪽으로 밀면: 방문 완료(체크) 토글
-   * - 왼쪽으로 밀면: 중요(★ 별표) 토글
-   * (1-1 화면 탭 전환 스와이프는 요청에 따라 제외하여 충돌 제로!)
-   * ========================================================= */
-  function initListCardSwipe() {
-    const listWrap = document.getElementById("list-LIST");
-    if (!listWrap || listWrap.dataset.v47SwipeBound === "1") return;
-    listWrap.dataset.v47SwipeBound = "1";
-
-    let startX = 0, startY = 0, dx = 0;
-    let targetCard = null;
-    let swiping = false;
-
-    listWrap.addEventListener("touchstart", (e) => {
-      const card = e.target.closest(".item");
-      if (!card || e.target.closest("button, a, input")) return;
-      startX = e.touches[0].clientX;
-      startY = e.touches[0].clientY;
-      dx = 0;
-      targetCard = card;
-      swiping = false;
-      targetCard.style.transition = "none";
-    }, { passive: true });
-
-    listWrap.addEventListener("touchmove", (e) => {
-      if (!targetCard) return;
-      const curX = e.touches[0].clientX;
-      const curY = e.touches[0].clientY;
-      dx = curX - startX;
-      const dy = curY - startY;
-
-      // 세로 스크롤이 더 크면 스와이프 취소
-      if (!swiping && Math.abs(dy) > Math.abs(dx)) {
-        targetCard.style.transition = "";
-        targetCard = null;
-        return;
-      }
-      if (Math.abs(dx) > 14) {
-        swiping = true;
-        const limit = Math.max(-88, Math.min(88, dx * 0.75));
-        targetCard.style.transform = `translateX(${limit}px)`;
-      }
-    }, { passive: true });
-
-    const endCardSwipe = () => {
-      if (!targetCard) return;
-      const card = targetCard;
-      const itemId = card.dataset.id;
-      card.style.transition = "transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1)";
-      card.style.transform = "translateX(0)";
-
-      if (swiping && itemId) {
-        const it = (Array.isArray(items) ? items : []).find(x => String(x.id) === String(itemId));
-        if (it) {
-          if (dx > 110) {
-            // 오른쪽 스와이프 -> 방문 완료 토글 (실행취소 가능)
-            const prevDone = !!it.done;
-            it.done = !prevDone;
-            it.updatedAt = Date.now();
-            haptic(20);
-            if (typeof save === "function") save();
-            if (typeof toast === "function") {
-              toast(it.done ? `✅ '${it.name}' 방문 완료!` : `↩️ '${it.name}' 미방문으로 변경`, () => {
-                it.done = prevDone;
-                it.updatedAt = Date.now();
-                if (typeof save === "function") save();
-                if (typeof draw === "function") draw(true);
-                toast("방문 상태를 되돌렸어요");
-              });
-            }
-          } else if (dx < -110) {
-            // 왼쪽 스와이프 -> 중요(★) 토글
-            it.star = !it.star;
-            haptic(20);
-            if (typeof save === "function") save();
-            if (typeof toast === "function") {
-              toast(it.star ? `⭐ '${it.name}' 중요 장소로 등록!` : `☆ '${it.name}' 중요 해제`);
-            }
-          }
-        }
-      }
-      targetCard = null;
-      swiping = false;
-    };
-
-    listWrap.addEventListener("touchend", endCardSwipe, { passive: true });
-    listWrap.addEventListener("touchcancel", endCardSwipe, { passive: true });
-  }
-
-  /* =========================================================
    * [1-4] 당겨서 새로고침 (Pull-to-Refresh)
    * - 홈/목록 최상단에서 아래로 당기면 실시간 날씨 & 환율 즉시 갱신
    * ========================================================= */
@@ -22622,7 +22437,7 @@ ${JSON.stringify(payload, null, 2)}
         try {
           if ("caches" in window) {
             // sw.js의 APP_CACHE('trip-app-' + SW_VERSION)와 동일해야 activate 때 삭제되지 않음
-            const c = await caches.open(window.__SW_APP_CACHE || "trip-app-v20261120_v61");
+            const c = await caches.open(window.__SW_APP_CACHE || "trip-app-v20261120_v62");
             const results = await Promise.allSettled([
               c.add("./index.html"),
               c.add("./manifest.json"),
@@ -22667,9 +22482,6 @@ ${JSON.stringify(payload, null, 2)}
     attachDragToDismiss("v46PassModal", "#v46PassSheet", () => {
       document.getElementById("v46PassModal")?.classList.remove("on");
     });
-
-    // 1-3. 목록 카드 스와이프 연결
-    initListCardSwipe();
 
     // 1-4. 당겨서 새로고침 연결
     initPullToRefresh();
@@ -24627,8 +24439,7 @@ ${JSON.stringify(payload, null, 2)}
   }
   /* 2) 화면 밖 카드는 레이아웃·페인트 생략 (탭 전환·체크 시 버벅임 감소) */
   #list-LIST > .item {
-    content-visibility: auto;
-    contain-intrinsic-size: auto 150px;
+    contain: layout style;
   }
   #v8MapDrawerList > * {
     content-visibility: auto;
@@ -26046,16 +25857,22 @@ ${JSON.stringify(payload, null, 2)}
     font-weight: 700 !important;
   }
   html body .v32-hero #v32HeroAdd {
-    background: #ffffff !important;
-    color: #09090b !important;
-    border: none !important;
+    background: rgba(15, 18, 26, 0.72) !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 255, 255, 0.22) !important;
     border-radius: 999px !important;
-    min-height: 48px !important;
-    font-size: 15px !important;
-    font-weight: 800 !important;
+    min-height: 44px !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
     letter-spacing: -0.02em !important;
-    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.35) !important;
+    -webkit-backdrop-filter: blur(14px) !important;
+    backdrop-filter: blur(14px) !important;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.30) !important;
     transition: transform 0.14s ease !important;
+  }
+  html[data-theme="light"] body .v32-hero #v32HeroAdd {
+    background: rgba(17, 17, 20, 0.78) !important;
+    color: #ffffff !important;
   }
   html body .v32-hero #v32HeroAdd:active {
     transform: scale(0.97) !important;
