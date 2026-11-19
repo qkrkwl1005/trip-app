@@ -868,6 +868,46 @@
       #mapChips.on {
         display: flex;
       }
+      #mapRegionBar {
+        position: absolute;
+        top: calc(env(safe-area-inset-top, 0px) + 54px);
+        left: 12px;
+        z-index: 440;
+        display: flex;
+        gap: 6px;
+        pointer-events: auto;
+        transition: opacity 0.2s ease;
+      }
+      body:not(.show-map) #mapRegionBar {
+        display: none;
+      }
+      #map-wrap.ux-map-interacting #mapRegionBar {
+        opacity: 0.2;
+        pointer-events: none;
+      }
+      #mapRegionBar button {
+        background: rgba(15, 23, 42, 0.84);
+        color: #f8fafc;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 999px;
+        padding: 5px 11px;
+        font-size: 11.5px;
+        font-weight: 700;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.28);
+        cursor: pointer;
+      }
+      [data-theme="light"] #mapRegionBar button {
+        background: rgba(255, 255, 255, 0.92);
+        color: #0f172a;
+        border-color: rgba(15, 23, 42, 0.12);
+      }
+      #mapRegionBar button.active {
+        background: var(--pr);
+        color: #fff;
+        border-color: transparent;
+      }
       .chip-row {
         display: flex;
         gap: 6px;
@@ -2026,6 +2066,12 @@
       <button id="locBtn"><span class="ms">my_location</span>내 위치</button>
       <button id="myMapsBtn"><span class="ms">map</span>내지도</button>
       <div id="mapChips"></div>
+      <div id="mapRegionBar" aria-label="지역 빠른 이동">
+        <button type="button" onclick="window.jumpMapRegion('osaka')">오사카</button>
+        <button type="button" onclick="window.jumpMapRegion('kyoto')">교토</button>
+        <button type="button" onclick="window.jumpMapRegion('ine')">이네</button>
+        <button type="button" onclick="window.jumpMapRegion('all')">전체</button>
+      </div>
       <div id="mapStrip"></div>
     </main>
 
@@ -5889,62 +5935,9 @@
         return `<div class="pinCard c-${CATS[i.category] ? i.category : "PLACE"}${i.star ? " starred" : ""}">${dayBadge}${starBadge}${placeNumber}<i><span class="ms" style="font-size:22px;color:#fff">${icName}</span></i>${thumb ? `<img loading="lazy" decoding="async" referrerpolicy="no-referrer" src="${esc(thumb)}"${altAttr} onerror="imgErr(this)">` : ""}${getVidUrlStr(i.vid) ? `<b><span class="ms fill" style="font-size:11px;color:#fff">play_circle</span></b>` : ""}</div>`;
       }
 
-      /* 네이버 지도 앱(nmap://) + 웹 폴백 공용 열기 헬퍼 (일본 좌표·검색 모두 지원) */
-      window.openNaverMap = function (target, mode = "route") {
-        if (!target) return;
-        const name = String(target.localName || target.hotelName || target.name || target.title || "장소").trim();
-        const addr = String(target.address || target.addr || "").trim();
-        const query = [name, addr].filter(Boolean).join(" ").trim() || name;
-        const lat = Number(target.lat);
-        const lng = Number(target.lng);
-        const hasCoord = Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0);
-        const appName = "trip-app-psi-two.vercel.app";
-        const webUrl = `https://map.naver.com/p/search/${encodeURIComponent(query)}`;
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || "");
-
-        if (!isMobile) {
-          window.open(webUrl, "_blank", "noopener");
-          return;
-        }
-
-        let schemeUrl = "";
-        if (hasCoord) {
-          if (mode === "route") {
-            schemeUrl = `nmap://route/public?dlat=${lat}&dlng=${lng}&dname=${encodeURIComponent(name)}&appname=${appName}`;
-          } else {
-            schemeUrl = `nmap://place?lat=${lat}&lng=${lng}&name=${encodeURIComponent(name)}&appname=${appName}`;
-          }
-        } else {
-          schemeUrl = `nmap://search?query=${encodeURIComponent(query)}&appname=${appName}`;
-        }
-
-        let switched = false;
-        const onVis = () => {
-          if (document.hidden) switched = true;
-        };
-        document.addEventListener("visibilitychange", onVis, { once: true });
-        location.href = schemeUrl;
-        setTimeout(() => {
-          document.removeEventListener("visibilitychange", onVis);
-          if (!switched && !document.hidden) {
-            window.open(webUrl, "_blank", "noopener") || (location.href = webUrl);
-          }
-        }, 1200);
-      };
-
-      window.openNaverMapById = function (id, mode = "route", placeIdx = -1) {
-        const it = Array.isArray(items) ? items.find((x) => x.id === id) : null;
-        if (!it) return;
-        const target =
-          placeIdx >= 0 && Array.isArray(it.places) && it.places[placeIdx]
-            ? it.places[placeIdx]
-            : it;
-        window.openNaverMap(target, mode);
-      };
-
-      /* 지도 핀 팝업: '검색' 버튼을 '목록' 이동 버튼으로 교체 + 네이버지도 버튼 추가 */
+      /* 지도 핀 팝업: 구글지도(가게정보) · 길찾기(대중교통) · 목록 · 릴스에서 보기 */
       function mapPinPlaceHtml(item, place, index) {
-        return `<div class="mapPinPlace"><strong>${index + 1}. ${esc(place.name || "장소")}</strong><div class="mapPinAddress">${esc(place.address || "주소 미입력")}</div><div class="mapPinActions"><a class="mb pr" href="${esc(getGMapLink(place))}" target="_top"><span class="ms">map</span>구글지도</a><button type="button" class="mb" onclick="window.openNaverMapById('${esc(item.id)}','route',${index})" style="color:#03c75a;border-color:rgba(3,199,90,.35)"><span class="ms">navigation</span>네이버지도</button><button type="button" class="mb" data-act="jumpToList" data-id="${esc(item.id)}"><span class="ms">format_list_bulleted</span>목록</button><a class="mb" href="${esc(getGMapDirLink(place))}" target="_top"><span class="ms">directions</span>길찾기</a><button type="button" class="mb" data-act="openGroupedItem" data-id="${esc(item.id)}" data-place-idx="${index}"><span class="ms">movie</span>릴스에서 보기</button></div></div>`;
+        return `<div class="mapPinPlace"><strong>${index + 1}. ${esc(place.name || "장소")}</strong><div class="mapPinAddress">${esc(place.address || "주소 미입력")}</div><div class="mapPinActions"><a class="mb pr" href="${esc(getGMapLink(place))}" target="_top"><span class="ms">storefront</span>가게정보</a><a class="mb" href="${esc(getGMapDirLink(place))}" target="_top"><span class="ms">directions_transit</span>길찾기</a><button type="button" class="mb" data-act="jumpToList" data-id="${esc(item.id)}"><span class="ms">format_list_bulleted</span>목록</button><button type="button" class="mb" data-act="openGroupedItem" data-id="${esc(item.id)}" data-place-idx="${index}"><span class="ms">movie</span>릴스</button></div></div>`;
       }
       function mapPinPopupHtml(item, expanded = false) {
         const places = Array.isArray(item.places) ? item.places : [];
@@ -5977,11 +5970,13 @@
         if (gmap && window.google?.maps) {
           if (nMapInfoWindow) nMapInfoWindow.close();
           if (!mapInfoWindow) mapInfoWindow = new google.maps.InfoWindow();
+          const pos = { lat: Number(item.lat), lng: Number(item.lng) };
+          if (Number.isFinite(pos.lat) && Number.isFinite(pos.lng)) {
+            gmap.panTo(pos);
+            if ((gmap.getZoom() || 0) < 14) gmap.setZoom(15);
+          }
           mapInfoWindow.setContent(mapPinPopupHtml(item, expanded));
-          mapInfoWindow.setPosition({
-            lat: Number(item.lat),
-            lng: Number(item.lng),
-          });
+          mapInfoWindow.setPosition(pos);
           mapInfoWindow.open({ map: gmap });
           return;
         }
@@ -6642,8 +6637,8 @@
       </div>
       <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
         ${vAction}
-        <a class="mb" href="${esc(dirHref)}" target="_top" onclick="event.stopPropagation()" style="padding:6px 11px;font-size:12px;min-height:36px"><span class="ms">explore</span>구글맵</a>
-        <button type="button" class="mb" onclick="event.stopPropagation();window.openNaverMapById('${esc(i.id)}','route')" style="padding:6px 11px;font-size:12px;min-height:36px;color:#03c75a;border-color:rgba(3,199,90,.35)"><span class="ms">navigation</span>네이버</button>
+        <a class="mb" href="${esc(getGMapLink(i))}" target="_top" onclick="event.stopPropagation()" style="padding:6px 10px;font-size:12px;min-height:36px"><span class="ms">storefront</span>가게</a>
+        <a class="mb" href="${esc(dirHref)}" target="_top" onclick="event.stopPropagation()" style="padding:6px 11px;font-size:12px;min-height:36px"><span class="ms">explore</span>길찾기</a>
       </div>
     </div>
     <input type="checkbox" data-act="done" data-id="${i.id}"${i.done ? " checked" : ""} style="flex:none" aria-label="방문 완료 체크">
@@ -6902,14 +6897,19 @@
         );
       }
       function getValidSearchQuery(i) {
-        const nm = isGenericSharedName(i.name)
+        const rawNm = isGenericSharedName(i.name)
           ? ""
           : String(i.name || "").trim();
+        // 괄호 안 한국어 수식어('(바다뷰 감성 카페)' 등)는 구글맵 장소 매칭을 방해하므로 제거
+        const cleanNm = rawNm.replace(/\s*\([^)]*\)/g, "").trim() || rawNm;
         const lnm = String(i.localName || "").trim();
         const ad = normalizeOcrAddr(i.address || "");
-        if (nm && ad && nm === ad) return ad;
-        const mainName = lnm && nm && lnm !== nm ? `${nm} ${lnm}` : lnm || nm;
-        return [mainName, ad].filter(Boolean).join(" ").trim();
+        if (lnm) {
+          // 현지 상호명(일본어) + 주소 조합이 구글맵 비즈니스 카드 적중률이 가장 높음
+          return [lnm, ad].filter(Boolean).join(" ").trim();
+        }
+        if (cleanNm && ad && cleanNm === ad) return ad;
+        return [cleanNm, ad].filter(Boolean).join(" ").trim();
       }
       function getGMapLink(i) {
         if (!i) return "https://www.google.com/maps";
@@ -6926,11 +6926,11 @@
         if (!i) return "https://www.google.com/maps";
         const qStr = getValidSearchQuery(i);
         if (qStr)
-          return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(qStr)}`;
+          return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(qStr)}&travelmode=transit`;
         const lat = Number(i.lat) || 0,
           lng = Number(i.lng) || 0;
         if (lat && lng)
-          return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+          return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=transit`;
         return "https://www.google.com/maps";
       }
 
@@ -7283,12 +7283,9 @@
           <span class="ms fill" style="font-size:18px">play_circle</span>${esc(vLabel)} 보기
         </button>
       ` : ""}
-      <a class="btn" href="${esc(dirHref)}" target="_top" style="flex:1 1 110px;margin:0;min-height:46px;background:var(--pr);color:#fff;border-radius:14px;font-weight:700;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:5px;box-shadow:0 4px 12px rgba(37,99,235,0.25)">
-        <span class="ms" style="font-size:17px">explore</span>구글 길찾기
+      <a class="btn" href="${esc(dirHref)}" target="_top" style="flex:1 1 130px;margin:0;min-height:46px;background:var(--pr);color:#fff;border-radius:14px;font-weight:700;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:5px;box-shadow:0 4px 12px rgba(37,99,235,0.25)">
+        <span class="ms" style="font-size:17px">directions_transit</span>길찾기
       </a>
-      <button type="button" class="btn" onclick="window.openNaverMapById('${esc(i.id)}','route')" style="flex:1 1 110px;margin:0;min-height:46px;background:#03c75a;color:#fff;border:none;border-radius:14px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:5px;box-shadow:0 4px 12px rgba(3,199,90,0.25)">
-        <span class="ms" style="font-size:17px">navigation</span>네이버지도
-      </button>
       <a class="btn g" href="${esc(gmapHref)}" target="_top" style="flex:0 0 52px;margin:0;min-height:46px;border-radius:14px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:0;font-size:11px;flex-direction:column;">
         <span class="ms" style="font-size:22px">map</span><span style="margin-top:2px">지도</span>
       </a>
@@ -14889,27 +14886,21 @@ ${caption || rawText}
   function hotelPopupHtml(h) {
     const queryStr = h.gmapQuery || `${h.lat},${h.lng}`;
     const gmapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(queryStr)}`;
+    const gmapDirUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(queryStr)}&travelmode=transit`;
     return `
       <div class="mapPinPopup" style="min-width:235px;color:#0f172a;padding:2px">
         <strong style="font-size:15px;color:#059669">${h.emoji} ${esc(h.title)}</strong>
         <div style="font-size:12px;font-weight: 700;color:#2563eb;margin:3px 0">${esc(h.sub)}</div>
         <div style="font-size:11.5px;color:#475569;margin-bottom:8px;word-break:break-all">${esc(h.address)}</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <button type="button" class="mb pr" onclick="window.openExternalCleanNoBlank('${gmapUrl}')" style="min-height:32px;padding:4px 10px;font-size:11.5px"><span class="ms">map</span>구글맵 열기</button>
-          <button type="button" class="mb" onclick="window.openHotelNaverV32('${h.key}')" style="min-height:32px;padding:4px 10px;font-size:11.5px;color:#03c75a;border-color:rgba(3,199,90,.4)"><span class="ms">navigation</span>네이버지도</button>
+          <button type="button" class="mb pr" onclick="window.openExternalCleanNoBlank('${gmapDirUrl}')" style="min-height:32px;padding:4px 10px;font-size:11.5px"><span class="ms">directions_transit</span>숙소 길찾기</button>
+          <button type="button" class="mb" onclick="window.openExternalCleanNoBlank('${gmapUrl}')" style="min-height:32px;padding:4px 10px;font-size:11.5px"><span class="ms">map</span>구글맵</button>
           <button type="button" class="mb" onclick="navigator.clipboard?.writeText('${esc(h.address)}');toast('📋 숙소 주소를 복사했습니다')" style="min-height:32px;padding:4px 10px;font-size:11.5px"><span class="ms">content_copy</span>주소복사</button>
           <button type="button" class="mb" onclick="window.openHotelTaxiV32('${h.key}')" style="min-height:32px;padding:4px 10px;font-size:11.5px"><span class="ms">local_taxi</span>택시화면</button>
         </div>
       </div>
     `;
   }
-
-  window.openHotelNaverV32 = function(key) {
-    const h = HOTELS[key];
-    if (h && typeof window.openNaverMap === "function") {
-      window.openNaverMap({ name: h.hotelName || h.title, address: h.address, lat: h.lat, lng: h.lng }, "place");
-    }
-  };
 
   window.openHotelTaxiV32 = function(key) {
     const h = HOTELS[key];
@@ -15010,6 +15001,36 @@ ${caption || rawText}
       }
     } catch (_) {}
   }
+
+  window.jumpMapRegion = function(key) {
+    const regions = {
+      osaka: { lat: 34.6710, lng: 135.5020, zoom: 14, label: "오사카" },
+      kyoto: { lat: 35.0037, lng: 135.7681, zoom: 13, label: "교토" },
+      ine: { lat: 35.6050, lng: 135.2400, zoom: 11, label: "이네·미야즈" },
+    };
+    const bar = document.getElementById("mapRegionBar");
+    if (bar) {
+      bar.querySelectorAll("button").forEach((b) => {
+        b.classList.toggle("active", b.getAttribute("onclick")?.includes(`'${key}'`));
+      });
+    }
+    if (key === "all") {
+      _skipFitUntil = 0;
+      if (typeof fit === "function") fit();
+      toast("🗺️ 간사이 전체 보기로 이동했습니다");
+      return;
+    }
+    const r = regions[key];
+    if (!r) return;
+    _skipFitUntil = Date.now() + 1400;
+    if (typeof gmap !== "undefined" && gmap && window.google?.maps) {
+      gmap.panTo({ lat: r.lat, lng: r.lng });
+      gmap.setZoom(r.zoom);
+    } else if (typeof lm !== "undefined" && lm) {
+      lm.setView([r.lat, r.lng], r.zoom);
+    }
+    toast(`📍 ${r.label} 지역으로 이동했습니다`);
+  };
 
   window.focusHotelV32 = function(key) {
     const h = HOTELS[key];
