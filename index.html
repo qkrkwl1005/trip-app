@@ -6819,7 +6819,7 @@
         const iconHtml = /^[a-z0-9_]+$/.test(String(icName || ""))
           ? `<span class="ms">${icName}</span>`
           : icName;
-        return `<div class="pic ${c}">${dTag}${iconHtml}${src ? `<img loading="eager"${priority} decoding="async" referrerpolicy="no-referrer" src="${esc(src)}"${fba}${altAttr} onerror="imgErr(this)">` : ""}</div>`;
+        return `<div class="pic ${c}">${dTag}${iconHtml}${src ? `<img loading="${isEager ? "eager" : "lazy"}"${priority} decoding="async" referrerpolicy="no-referrer" src="${esc(src)}"${fba}${altAttr} onerror="imgErr(this)">` : ""}</div>`;
       }
 
       /* 통합 목록 탭 렌더링 */
@@ -15163,10 +15163,15 @@ ${caption || rawText}
     { name: "우지역", exit: "남구 출구", lat: 34.8904, lng: 135.8008 },
     // 이네 / 아마노하시다테 / 고베 / 나라
     { name: "아마노하시다테역", exit: "정면출구", lat: 35.5572, lng: 135.1846 },
-    { name: "이네 후나야 (버스정류장)", exit: "이네 버스정류장", lat: 35.6708, lng: 135.2917 },
+    { name: "이네후나야", bus: true, lat: 35.6708, lng: 135.2917 },
     { name: "산노미야역", exit: "서출구", lat: 34.6936, lng: 135.1955 },
     { name: "긴테츠나라역", exit: "동출구", lat: 34.6841, lng: 135.8278 },
-    { name: "구라시키역", exit: "남구 출구", lat: 34.6019, lng: 133.7658 }
+    { name: "구라시키역", exit: "남구 출구", lat: 34.6019, lng: 133.7658 },
+    // 보강 (출구 번호는 표시하지 않음)
+    { name: "진구마루타마치역", lat: 35.0176, lng: 135.7725 },
+    { name: "시조역", lat: 35.0037, lng: 135.7596 },
+    { name: "신오사카역", lat: 34.7335, lng: 135.5003 },
+    { name: "간사이공항역", lat: 34.4352, lng: 135.2442 }
   ];
 
   function getNearestStation(it) {
@@ -15178,11 +15183,13 @@ ${caption || rawText}
       if (d < minKm) { minKm = d; best = s; }
     }
     if (best) {
-      if (minKm <= 1.8) {
+      const icon = best.bus ? "🚌" : "🚇";
+      const label = best.bus ? best.name : best.name;
+      if (minKm <= 0.9) {
         const wMin = Math.max(1, Math.round((minKm * 1000 * 1.3) / 80));
-        return `🚇 ${best.name} ${best.exit} (도보 ${wMin}분)`;
-      } else if (minKm <= 3.5) {
-        return `🚇 ${best.name} (차량·대중교통 ${minKm.toFixed(1)}km)`;
+        return `${icon} ${label} 부근 (도보 약 ${wMin}분)`;
+      } else if (minKm <= 3.0) {
+        return `${icon} ${label} 부근 (약 ${minKm.toFixed(1)}km)`;
       }
     }
     return null;
@@ -19342,7 +19349,6 @@ ${caption || rawText}
     position: relative;
     overflow: hidden;
   }
-  #list-LIST .item::after,
   .v32-bento-card::after {
     content: "";
     position: absolute;
@@ -19358,7 +19364,6 @@ ${caption || rawText}
     transition: opacity 0.28s ease;
     z-index: 1;
   }
-  [data-theme="light"] #list-LIST .item::after,
   [data-theme="light"] .v32-bento-card::after {
     background: radial-gradient(
       320px circle at var(--v41-spot-x, -999px) var(--v41-spot-y, -999px),
@@ -19677,8 +19682,10 @@ ${caption || rawText}
   /* =========================================================================
    * 1. [Spotlight Card] 카드 위 터치/마우스 좌표 추적 (--v41-spot-x, --v41-spot-y)
    * ========================================================================= */
+  const coarsePtr = window.matchMedia && matchMedia("(pointer: coarse)").matches;
   const handleSpotlightMove = (clientX, clientY, target) => {
-    const card = target?.closest?.("#list-LIST .item, .v32-bento-card");
+    if (coarsePtr) return;
+    const card = target?.closest?.(".v32-bento-card");
     if (!card) return;
     const r = card.getBoundingClientRect();
     card.style.setProperty("--v41-spot-x", `${clientX - r.left}px`);
@@ -19692,7 +19699,8 @@ ${caption || rawText}
     handleSpotlightMove(e.clientX, e.clientY, e.target);
   }, { passive: true });
   document.addEventListener("pointerout", (e) => {
-    const card = e.target?.closest?.("#list-LIST .item, .v32-bento-card");
+    if (coarsePtr) return;
+    const card = e.target?.closest?.(".v32-bento-card");
     if (card && !card.contains(e.relatedTarget)) {
       card.style.setProperty("--v41-spot-op", "0");
     }
@@ -21539,7 +21547,7 @@ ${caption || rawText}
       <!-- 2. 실시간 특급열차 & 버스 시간표 바로보기 -->
       <div class="v46-box">
         <div class="v46-box-title" style="color:#3b82f6">
-          <span class="ms">schedule</span>핵심 이동 구간 실시간 열차·버스 시간표
+          <span class="ms">schedule</span>핵심 이동 구간 구글맵 대중교통 경로·시간 확인
         </div>
         <div style="display:flex;flex-direction:column;gap:6px">
           <a class="v46-train-btn" href="https://www.google.com/maps/dir/?api=1&origin=Kansai+Airport&destination=Kyoto+Station&travelmode=transit" target="_top">
@@ -21552,18 +21560,18 @@ ${caption || rawText}
           <a class="v46-train-btn" href="https://www.google.com/maps/dir/?api=1&origin=Kyoto+Station&destination=Miyazu+Station&travelmode=transit" target="_top">
             <div>
               <span style="color:#10b981;font-weight: 700;">[4일차]</span> 교토역 ➔ 미야즈역 (특급 하시다테)
-              <div style="font-size:11px;color:var(--sub);margin-top:2px">직통 특급열차 · 전석 지정석 예약 필수</div>
+              <div style="font-size:11px;color:var(--sub);margin-top:2px">직통 특급열차 · 전석 지정석(자유석 없음) · 탑승 전 지정석 발권 필수</div>
             </div>
             <span class="ms" style="color:#3b82f6">open_in_new</span>
           </a>
-          <a class="v46-train-btn" href="https://www.google.com/maps/dir/?api=1&origin=Miyazu+Station&destination=Ine+Cafe&travelmode=transit" target="_top">
+          <a class="v46-train-btn" href="https://www.google.com/maps/dir/?api=1&origin=Miyazu+Station&destination=Ine+Funaya&travelmode=transit" target="_top">
             <div>
               <span style="color:#60a5fa;font-weight: 700;">[4일차]</span> 미야즈/아마노하시다테 ➔ 이네후나야 (단고 버스)
               <div style="font-size:11px;color:var(--sub);margin-top:2px">단고 2일 패스 기사님께 제시 후 무료 탑승</div>
             </div>
             <span class="ms" style="color:#3b82f6">open_in_new</span>
           </a>
-          <a class="v46-train-btn" href="https://www.google.com/maps/dir/?api=1&origin=Miyazu+Station&destination=Osaka+House+701&travelmode=transit" target="_top">
+          <a class="v46-train-btn" href="https://www.google.com/maps/dir/?api=1&origin=Miyazu+Station&destination=大阪府大阪市浪速区日本橋東1丁目5-14&travelmode=transit" target="_top">
             <div>
               <span style="color:#10b981;font-weight: 700;">[5일차]</span> 미야즈 숙소 ➔ 오사카 숙소 복귀
               <div style="font-size:11px;color:var(--sub);margin-top:2px">특급 하시다테 + 신쾌속 열차 환승</div>
@@ -21581,9 +21589,10 @@ ${caption || rawText}
         <div style="font-size:12px;line-height:1.6;color:var(--tx)">
           <b>1) JR 간사이 와이드 패스 (5일권)</b><br>
           • <b>간사이공항역 2층 JR 개찰구 앞</b> 초록색 전용 티켓 발권기에서 여권 스캔 후 수령<br>
-          • 무료 지정석 발권: 역 초록색 자동발권기에서 패스 투입 후 '지정석 지정' 클릭 (총 6회 무료)<br><br>
+          • 자동발권기·온라인 무료 지정석 총 6회 (7회 이상은 역 유인 창구 '미도리노마도구치'에서 추가 무료 발권 가능 / 자유석 차량은 횟수 무제한)<br>
+          • ⚠️ 특급 하시다테는 전석 지정석(자유석 없음)이므로 탑승 전 반드시 지정석 발권 필수<br><br>
           <b>2) 단고 아마노하시다테·이네 2일 패스 & 나리아이지</b><br>
-          • <b>교토역 단고철도 창구</b> 또는 <b>아마노하시다테역 안내소</b>에서 바우처 QR 제시 후 실물권 교환
+          • <b>아마노하시다테역 내 관광안내소(터미널 센터, 09:00~16:45)에서만 실물 교환 가능</b> (⚠️ 교토역·미야즈역 직접 교환 불가 — 교토역에서 특급 하시다테 탑승 후 아마노하시다테역 도착 시 교환)
         </div>
       </div>
 
@@ -21649,7 +21658,7 @@ ${caption || rawText}
         </div>
         <div>
           <b style="font-size:13.5px;letter-spacing:-0.02em;color:var(--tx)">간사이 와이드 5일 & 이네 2일 패스 가이드</b>
-          <div style="font-size:11.5px;color:var(--sub);margin-top:2px">개시 일정 · 실시간 열차 시간표 · 패스 교환처 보기</div>
+          <div style="font-size:11.5px;color:var(--sub);margin-top:2px">개시 일정 · 구글맵 대중교통 경로 · 패스 교환처 보기</div>
         </div>
       </div>
       <span class="ms" style="color:var(--sub);font-size:20px">chevron_right</span>
@@ -22437,7 +22446,7 @@ ${JSON.stringify(payload, null, 2)}
         try {
           if ("caches" in window) {
             // sw.js의 APP_CACHE('trip-app-' + SW_VERSION)와 동일해야 activate 때 삭제되지 않음
-            const c = await caches.open(window.__SW_APP_CACHE || "trip-app-v20261120_v62");
+            const c = await caches.open(window.__SW_APP_CACHE || "trip-app-v20261120_v63");
             const results = await Promise.allSettled([
               c.add("./index.html"),
               c.add("./manifest.json"),
@@ -24437,10 +24446,6 @@ ${JSON.stringify(payload, null, 2)}
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
   }
-  /* 2) 화면 밖 카드는 레이아웃·페인트 생략 (탭 전환·체크 시 버벅임 감소) */
-  #list-LIST > .item {
-    contain: layout style;
-  }
   #v8MapDrawerList > * {
     content-visibility: auto;
     contain-intrinsic-size: auto 84px;
@@ -26095,18 +26100,10 @@ ${JSON.stringify(payload, null, 2)}
       transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease !important;
       will-change: transform, opacity;
     }
-    html body.v60-nav-hidden #nav {
+    html body #nav.v60-hidden {
       transform: translateY(120px) !important;
       opacity: 0 !important;
       pointer-events: none !important;
-    }
-    html body.v60-nav-hidden::after {
-      opacity: 0 !important;
-      transition: opacity 0.22s ease !important;
-    }
-    html body.v60-nav-hidden #v32FabBtn {
-      transform: translateY(62px) !important;
-      transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1) !important;
     }
     html body #v32FabBtn {
       transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1) !important;
@@ -26297,13 +26294,29 @@ ${JSON.stringify(payload, null, 2)}
     }
   }
 
+  let pendingRoots = [];
   let rafPending = false;
-  function scheduleConvert() {
-    if (rafPending) return;
+  function scheduleConvert(mutations) {
+    for (const m of mutations) {
+      for (const n of m.addedNodes) {
+        if (n.nodeType === 1) pendingRoots.push(n);
+      }
+    }
+    if (rafPending || !pendingRoots.length) return;
     rafPending = true;
     requestAnimationFrame(() => {
       rafPending = false;
-      convertMsElements(document);
+      const roots = pendingRoots;
+      pendingRoots = [];
+      for (const root of roots) {
+        if (!root.isConnected) continue;
+        if (root.matches("span.ms:not(.v60-lucide-ready)")) {
+          const wrap = root.parentNode;
+          if (wrap) convertMsElements(wrap);
+        } else {
+          convertMsElements(root);
+        }
+      }
     });
   }
 
@@ -26312,23 +26325,36 @@ ${JSON.stringify(payload, null, 2)}
     if (!listTab || listTab.dataset.v60NavBound) return;
     listTab.dataset.v60NavBound = "1";
     let lastTop = 0;
+    let ticking = false;
+    let hidden = false;
+    const setHidden = (h) => {
+      if (hidden === h) return;
+      hidden = h;
+      const nav = document.getElementById("nav");
+      if (nav) nav.classList.toggle("v60-hidden", h);
+    };
     listTab.addEventListener(
       "scroll",
       () => {
-        if (window.innerWidth > 639) {
-          document.body.classList.remove("v60-nav-hidden");
-          return;
-        }
-        const cur = listTab.scrollTop || 0;
-        const delta = cur - lastTop;
-        if (cur <= 24) {
-          document.body.classList.remove("v60-nav-hidden");
-        } else if (delta > 8 && cur > 40) {
-          document.body.classList.add("v60-nav-hidden");
-        } else if (delta < -10) {
-          document.body.classList.remove("v60-nav-hidden");
-        }
-        lastTop = cur;
+        if (ticking) return;
+        ticking = true;
+        requestAnimationFrame(() => {
+          ticking = false;
+          if (window.innerWidth > 639) {
+            setHidden(false);
+            return;
+          }
+          const cur = listTab.scrollTop || 0;
+          if (cur <= 24) {
+            setHidden(false);
+            lastTop = cur;
+            return;
+          }
+          const delta = cur - lastTop;
+          if (Math.abs(delta) < 20) return; // 20px 이상 확실히 움직일 때만
+          setHidden(delta > 0 && cur > 40);
+          lastTop = cur;
+        });
       },
       { passive: true }
     );
@@ -26336,7 +26362,7 @@ ${JSON.stringify(payload, null, 2)}
     if (typeof tab === "function") {
       const _origTabV60 = tab;
       tab = function (k, ...rest) {
-        document.body.classList.remove("v60-nav-hidden");
+        setHidden(false);
         lastTop = 0;
         return _origTabV60.apply(this, [k, ...rest]);
       };
