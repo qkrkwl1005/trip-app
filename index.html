@@ -4478,7 +4478,7 @@
         }
         renderRoomSyncInfo();
         const incomingRevision = Number(data.revision || 0);
-        if (sharedLocalDirty && Date.now() - (sharedDirtyAt || 0) > 4000) {
+        if (sharedLocalDirty && Date.now() - (sharedDirtyAt || 0) > 30000) {
           sharedLocalDirty = false;
         }
         if (sharedLocalDirty && sharedWriteRevision === incomingRevision) {
@@ -6089,7 +6089,7 @@
           valid
             .map(
               (i) =>
-                `${i.id}:${i._pinKey}:${i.lat}:${i.lng}:${i.category}:${i.v || 0}:${Boolean(getVidUrlStr(i.vid))}:${i.done ? 1 : 0}:${i.star ? 1 : 0}:${i.day || 0}`,
+                `${i.id}:${i._pinKey}:${i.name || ""}:${i.lat}:${i.lng}:${i.category}:${i.v || 0}:${Boolean(getVidUrlStr(i.vid))}:${i.done ? 1 : 0}:${i.star ? 1 : 0}:${i.day || 0}`,
             )
             .join("|") +
           `:${mapCat}:${mapOnlyVid ? 1 : 0}:${mapOnlyStar ? 1 : 0}:${mapOnlyTodo ? 1 : 0}:${mapDay}:${mapRouteOn ? 1 : 0}`;
@@ -9407,6 +9407,8 @@ ${caption || rawText}
             const vMeta = parseVideoMeta(vidUrl);
             const existingItem = items.find((it) => {
               if (!it.vid) return false;
+              // 이름이 실패 플레이스홀더면 재분석 허용
+              if (!it.name || /^\s*(저장된 장소|장소 미확인|이름 없음)\s*$/.test(String(it.name))) return false;
               if (it.vid === vidUrl) return true;
               const itMeta = parseVideoMeta(it.vid);
               return itMeta && vMeta && itMeta.platform === vMeta.platform && itMeta.id && itMeta.id === vMeta.id;
@@ -10515,13 +10517,19 @@ ${caption || rawText}
           return;
         }
         if (act === "del") {
-          const backup = [...items];
+          const delItem = curItem;
+          const delIdx = items.findIndex((x) => x.id === delItem.id);
           const delName = curItem.name;
-          items = items.filter((x) => x.id !== curItem.id);
+          items = items.filter((x) => x.id !== delItem.id);
           save();
           closeSheet();
           toast(`'${delName}' 삭제됨`, () => {
-            items = backup;
+            // 전체 배열을 덮어쓰지 않고 삭제한 1건만 원래 위치에 재삽입
+            if (!items.some((x) => x.id === delItem.id)) {
+              const at = delIdx < 0 ? items.length : Math.min(delIdx, items.length);
+              items.splice(at, 0, delItem);
+              try { if (window.__deletedItemIds) delete window.__deletedItemIds[delItem.id]; } catch (_) {}
+            }
             save();
             toast(`'${delName}' 항목을 복구했어요!`);
           });
@@ -11818,7 +11826,7 @@ ${caption || rawText}
           for (const it of items) {
             if (!it || !it.id) continue;
             curIds.add(it.id);
-            const sig = `${it.name}|${it.address}|${it.category}|${it.day || ""}|${it.star}|${it.done}|${it.note || ""}|${it.lat}|${it.lng}|${(it.places || []).length}`;
+            const sig = `${it.name}|${it.address}|${it.category}|${it.day || ""}|${it.star}|${it.done}|${it.note || ""}|${it.lat}|${it.lng}|${(it.places || []).length}|${it.vid || ""}|${it.price || ""}|${it.info || ""}|${it.mapVisible}|${it.img || ""}`;
             const oldSig = prevSnap.get(it.id);
             if (oldSig !== undefined && oldSig !== sig) {
               it.updatedAt = now;
@@ -15756,6 +15764,22 @@ ${caption || rawText}
         .filter(el => el.style.display !== "none")
         .map(el => String(el.dataset.id));
 
+      // 거리순/필터/검색 중에는 원본 순서가 꼬이므로 저장하지 않고 취소
+      if (domIds.length > 1 && Array.isArray(items)) {
+        const startIds = window.__v8DragStartIds || [];
+        const startSet = new Set(startIds);
+        const itemOrder = items.map(it => String(it.id)).filter(id => startSet.has(id));
+        const sortedByOther = startIds.length > 1 && startIds.join("|") !== itemOrder.join("|");
+        const filterOn = (typeof listFilter !== "undefined" && typeof listCat !== "undefined" && (listFilter[listCat] || "ALL") !== "ALL");
+        const searchOn = !!(document.getElementById("q-LIST")?.value || "").trim();
+        const nearOn = (typeof nearSortOn !== "undefined" && nearSortOn);
+        if (sortedByOther || filterOn || searchOn || nearOn) {
+          if (typeof toast === "function") toast("↕️ 필터·거리순 상태에서는 순서를 바꿀 수 없어요. 전체 보기에서 시도해 주세요.");
+          if (typeof render === "function") render();
+          return;
+        }
+      }
+
       if (domIds.length > 1 && Array.isArray(items)) {
         const visibleSet = new Set(domIds);
         const itemMap = new Map(items.map(it => [String(it.id), it]));
@@ -15786,6 +15810,9 @@ ${caption || rawText}
       if (!card) return;
       e.stopPropagation();
       dragCard = card;
+      window.__v8DragStartIds = Array.from(listEl.querySelectorAll(".item[data-id]"))
+        .filter(el => el.style.display !== "none")
+        .map(el => String(el.dataset.id));
       lastClientY = e.touches[0].clientY;
       dragCard.classList.add("v33-dragging");
       if (window.v8Haptic) window.v8Haptic(16);
@@ -16497,11 +16524,39 @@ ${caption || rawText}
         (p) => {
           const { latitude: lat, longitude: lng } = p.coords;
           userPos = { lat, lng, at: Date.now() };
-          if (typeof gmap !== "undefined" && gmap) { gmap.panTo({ lat, lng }); gmap.setZoom(15); }
+          if (typeof gmap !== "undefined" && gmap) {
+            gmap.panTo({ lat, lng });
+            gmap.setZoom(15);
+            // 내 위치 파란 점: 기존 마커 재사용/갱신
+            try {
+              if (window.__myLocGMarker) {
+                window.__myLocGMarker.setPosition({ lat, lng });
+                if (window.__myLocGMarker.getMap() !== gmap) window.__myLocGMarker.setMap(gmap);
+              } else if (window.google && google.maps) {
+                window.__myLocGMarker = new google.maps.Marker({
+                  position: { lat, lng },
+                  map: gmap,
+                  zIndex: 9999,
+                  clickable: false,
+                  title: "내 위치",
+                  icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: 8,
+                    fillColor: "#3b82f6",
+                    fillOpacity: 1,
+                    strokeColor: "#ffffff",
+                    strokeWeight: 3,
+                  },
+                });
+              }
+            } catch (_) {}
+          }
           else if (typeof nmap !== "undefined" && nmap) { nmap.setCenter(new naver.maps.LatLng(lat, lng)); nmap.setZoom(15); }
           else if (typeof lm !== "undefined" && lm) {
             lm.setView([lat, lng], 15);
-            L.circleMarker([lat, lng], { radius: 8, color: "#3b82f6", fillOpacity: 0.9 }).addTo(lm);
+            // 이전 내 위치 점 제거 후 새로 그려 중복 쌓임 방지
+            try { if (window.__myLocLMarker) lm.removeLayer(window.__myLocLMarker); } catch (_) {}
+            window.__myLocLMarker = L.circleMarker([lat, lng], { radius: 8, color: "#3b82f6", fillOpacity: 0.9 }).addTo(lm);
           }
           toast("📍 내 위치로 이동했습니다");
         },
@@ -17184,7 +17239,7 @@ ${caption || rawText}
       TripProgress.start({
         header: `스샷 ${fs.length}장 올리기 · AI 분석`,
         icon: "auto_awesome",
-        title: `여름·여행 사진 모음 (${fs.length}장)`,
+        title: `여행 사진 분석 (${fs.length}장)`,
         sub: "파일 업로드 후 AI 장소 추출을 진행해요",
         detail: `0 / ${fs.length}장`,
         pct: 5
@@ -17192,8 +17247,11 @@ ${caption || rawText}
       try {
         await runAnalyzeShare(fs);
         TripProgress.finish(`스샷 ${fs.length}장 분석·저장 완료!`);
-      } catch (_) {
+      } catch (err) {
         TripProgress.hide();
+        if (typeof toast === "function") {
+          toast("⚠️ 스샷 분석에 실패했어요: " + ((err && err.message) || "잠시 후 다시 시도해 주세요"));
+        }
       }
     };
   }
@@ -19340,6 +19398,12 @@ ${caption || rawText}
     const readoutEl = fxBox.querySelector("#v41FxReadout");
     const amtInput = document.getElementById("v32Amt");
     const curSelect = document.getElementById("v32Cur");
+
+    // 초기 표시도 저장된 환율을 반영 (입력창은 건드리지 않음)
+    if (readoutEl) {
+      const initRate = Number(window.__realJpyRate) || window.DEFAULT_JPY_RATE;
+      readoutEl.textContent = `¥1,000 ≈ ₩${Math.round(1000 * initRate).toLocaleString()}`;
+    }
 
     const syncFxVal = (jpyVal) => {
       const jpy = Number(jpyVal) || 0;
@@ -21969,22 +22033,28 @@ ${JSON.stringify(payload, null, 2)}
       document.getElementById("v47SetOledBtn")?.addEventListener("click", toggleOledMode);
       document.getElementById("v47OfflineWarmBtn")?.addEventListener("click", async () => {
         haptic(18);
+        let failed = 0;
         try {
           if ("caches" in window) {
-            const c = await caches.open("trip-v47-core");
-            await Promise.allSettled([
-              c.add("./"),
+            // sw.js의 APP_CACHE('trip-app-' + SW_VERSION)와 동일해야 activate 때 삭제되지 않음
+            const c = await caches.open(window.__SW_APP_CACHE || "trip-app-v20261115_160000");
+            const results = await Promise.allSettled([
               c.add("./index.html"),
               c.add("./manifest.json"),
               c.add("./icon-192.png")
             ]);
+            failed = results.filter(r => r.status === "rejected").length;
+          } else {
+            failed = 1;
           }
           if (typeof persistNow === "function") persistNow();
-          if (typeof toast === "function") {
-            toast("📦 모든 장소·바우처·패스권이 기기에 오프라인 보관되었어요! 비행기 모드에서도 100% 작동합니다.");
-          }
         } catch (e) {
-          if (typeof toast === "function") toast("📦 오프라인 저장 완료!");
+          failed = failed || 1;
+        }
+        if (typeof toast === "function") {
+          toast(failed
+            ? "⚠️ 일부 오프라인 저장 실패 (" + failed + "건). 네트워크 확인 후 다시 시도해 주세요."
+            : "📦 모든 장소·바우처·패스권이 기기에 오프라인 보관되었어요! 비행기 모드에서도 100% 작동합니다.");
         }
       });
     }
@@ -22249,7 +22319,7 @@ ${JSON.stringify(payload, null, 2)}
 
     bar.onclick = () => drawer.classList.toggle("on");
 
-    const rate = Number(window.__realJpyRate) || (typeof jpyRate !== "undefined" ? jpyRate : 9.0);
+    const rate = Number(window.__realJpyRate) || (typeof jpyRate !== "undefined" ? jpyRate : window.DEFAULT_JPY_RATE);
     const splitNumber = typeof splitCnt !== "undefined" ? Math.max(1, splitCnt) : 3;
 
     // 계산
@@ -22971,14 +23041,23 @@ ${JSON.stringify(payload, null, 2)}
       bottom: 0;
       height: calc(84px + env(safe-area-inset-bottom));
       pointer-events: none;
-      z-index: 150;
+      z-index: 100; /* #nav(220)보다 낮게 */
       background: linear-gradient(to top, #07090e 38%, rgba(7, 9, 14, 0));
+    }
+    /* #side가 z-index:20 쌓임 맥락을 만들어 #nav가 마스크 아래로 깔리는 문제 방지 */
+    #side {
+      z-index: auto !important;
     }
     [data-theme="light"] body::after {
       background: linear-gradient(to top, #f8fafc 38%, rgba(248, 250, 252, 0));
     }
   }
   /* 목록 카드 교통 배지: 오른쪽에서 잘리지 않고 말줄임 */
+  #list-LIST .item .ux7-meta-row {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+  }
   #list-LIST .item .v46-transit-badge {
     max-width: 100% !important;
     min-width: 0 !important;

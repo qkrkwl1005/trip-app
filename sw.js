@@ -4,8 +4,12 @@ const APP_CACHE = 'trip-app-' + SW_VERSION;
 // 서비스워커는 앱 화면(같은 사이트 페이지 이동)만 다룬다. 사진은 건드리지 않고
 // 브라우저 기본 캐시(wsrv·ytimg가 1년 보관 헤더를 줌)가 보관한다.
 
-self.addEventListener('install', () => {
-  self.skipWaiting();
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(APP_CACHE)
+      .then((cache) => cache.add('./index.html').catch(() => {}))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener('activate', (event) => {
