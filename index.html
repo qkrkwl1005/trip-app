@@ -22622,7 +22622,7 @@ ${JSON.stringify(payload, null, 2)}
         try {
           if ("caches" in window) {
             // sw.js의 APP_CACHE('trip-app-' + SW_VERSION)와 동일해야 activate 때 삭제되지 않음
-            const c = await caches.open(window.__SW_APP_CACHE || "trip-app-v20261120_v60");
+            const c = await caches.open(window.__SW_APP_CACHE || "trip-app-v20261120_v61");
             const results = await Promise.allSettled([
               c.add("./index.html"),
               c.add("./manifest.json"),
@@ -25915,9 +25915,9 @@ ${JSON.stringify(payload, null, 2)}
     --bd2: rgba(17, 17, 20, 0.12);
     --tx: #111114;
     --sub: #6b6b76;
-    --pr: #ff4d4f;
-    --pr-dark: #e03131;
-    --pr-soft: rgba(255, 77, 79, 0.11);
+    --pr: #2563eb;
+    --pr-dark: #1d4ed8;
+    --pr-soft: rgba(37, 99, 235, 0.12);
     --ok: #10b981;
     --dg: #ef4444;
     --PLACE: #0ea5e9;
@@ -25935,9 +25935,9 @@ ${JSON.stringify(payload, null, 2)}
     --bd2: rgba(255, 255, 255, 0.13);
     --tx: #fafafa;
     --sub: #9a9aa6;
-    --pr: #ff5a36;
-    --pr-dark: #ff3b5c;
-    --pr-soft: rgba(255, 90, 54, 0.15);
+    --pr: #3b82f6;
+    --pr-dark: #2563eb;
+    --pr-soft: rgba(59, 130, 246, 0.16);
     --ok: #2dd4bf;
     --dg: #ff4d4f;
     --PLACE: #38bdf8;
@@ -26103,7 +26103,7 @@ ${JSON.stringify(payload, null, 2)}
   }
   html body .v46-pass-card .v46-pass-ic,
   html body .v46-pass-card > div:first-child {
-    background: linear-gradient(135deg, rgba(255, 90, 54, 0.18), rgba(251, 191, 36, 0.18)) !important;
+    background: rgba(59, 130, 246, 0.14) !important;
     color: var(--pr) !important;
     border: none !important;
     border-radius: 14px !important;
@@ -26175,7 +26175,7 @@ ${JSON.stringify(payload, null, 2)}
   html body #v32BudgetToggleBtn {
     background: var(--pr-soft) !important;
     color: var(--pr) !important;
-    border: 1px solid rgba(255, 90, 54, 0.28) !important;
+    border: 1px solid rgba(59, 130, 246, 0.3) !important;
     border-radius: 999px !important;
     font-weight: 700 !important;
   }
@@ -26262,47 +26262,49 @@ ${JSON.stringify(payload, null, 2)}
     font-weight: 700 !important;
   }
   html body #list-LIST .item .mb.reel-jump {
-    background: var(--pr-soft) !important;
-    border-color: rgba(255, 90, 54, 0.3) !important;
-    color: var(--pr) !important;
+    background: rgba(99, 102, 241, 0.16) !important;
+    border-color: rgba(129, 140, 248, 0.34) !important;
+    color: #c7d2fe !important;
+  }
+  html[data-theme="light"] body #list-LIST .item .mb.reel-jump {
+    background: rgba(79, 70, 229, 0.1) !important;
+    border-color: rgba(79, 70, 229, 0.25) !important;
+    color: #4338ca !important;
   }
 
-  /* 5. 하단 플로팅 탭바 (#nav): 코랄 포인트 + 미니멀 캡슐 */
+  /* 5. 하단 탭바 (#nav): 이전 블루·글래스 스타일 유지 + 목록 스크롤 시 자연스럽게 숨김 */
   @media (max-width: 639px) {
     html body #nav {
-      background: rgba(19, 19, 22, 0.84) !important;
-      backdrop-filter: blur(28px) saturate(190%) !important;
-      -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
-      border: 1px solid rgba(255, 255, 255, 0.11) !important;
-      border-radius: 30px !important;
-      padding: 5px !important;
-      box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55) !important;
+      transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease !important;
+      will-change: transform, opacity;
     }
-    html[data-theme="light"] body #nav {
-      background: rgba(255, 255, 255, 0.9) !important;
-      border: 1px solid rgba(17, 17, 20, 0.08) !important;
-      box-shadow: 0 10px 30px rgba(17, 17, 20, 0.12) !important;
+    html body.v60-nav-hidden #nav {
+      transform: translateY(120px) !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
     }
-    html body #nav .tab-btn {
-      border-radius: 24px !important;
-      color: var(--sub) !important;
-      background: transparent !important;
+    html body.v60-nav-hidden::after {
+      opacity: 0 !important;
+      transition: opacity 0.22s ease !important;
     }
-    html body #nav .tab-btn.active {
-      background: var(--pr-soft) !important;
-      color: var(--pr) !important;
+    html body.v60-nav-hidden #v32FabBtn {
+      transform: translateY(62px) !important;
+      transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1) !important;
+    }
+    html body #v32FabBtn {
+      transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1) !important;
     }
   }
 
-  /* 6. 주요 액션 버튼 & FAB (선명한 코랄 그라데이션) */
+  /* 6. 주요 액션 버튼 & FAB (이전 블루 톤 유지) */
   html body .btn.pr,
   html body button.pr,
   html body .mb.pr,
   html body #v32FabBtn {
-    background: linear-gradient(135deg, var(--pr) 0%, var(--pr-dark) 100%) !important;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
     color: #ffffff !important;
     border: none !important;
-    box-shadow: 0 8px 22px rgba(255, 90, 54, 0.32) !important;
+    box-shadow: 0 8px 22px rgba(37, 99, 235, 0.32) !important;
   }
   html body #mapRegionBar button.active {
     background: var(--pr) !important;
@@ -26488,7 +26490,44 @@ ${JSON.stringify(payload, null, 2)}
     });
   }
 
+  function initListAutoHideNav() {
+    const listTab = document.getElementById("tab-list");
+    if (!listTab || listTab.dataset.v60NavBound) return;
+    listTab.dataset.v60NavBound = "1";
+    let lastTop = 0;
+    listTab.addEventListener(
+      "scroll",
+      () => {
+        if (window.innerWidth > 639) {
+          document.body.classList.remove("v60-nav-hidden");
+          return;
+        }
+        const cur = listTab.scrollTop || 0;
+        const delta = cur - lastTop;
+        if (cur <= 24) {
+          document.body.classList.remove("v60-nav-hidden");
+        } else if (delta > 8 && cur > 40) {
+          document.body.classList.add("v60-nav-hidden");
+        } else if (delta < -10) {
+          document.body.classList.remove("v60-nav-hidden");
+        }
+        lastTop = cur;
+      },
+      { passive: true }
+    );
+    // 다른 탭(홈/지도/설정)으로 이동하면 하단 탭바 즉시 복원
+    if (typeof tab === "function") {
+      const _origTabV60 = tab;
+      tab = function (k, ...rest) {
+        document.body.classList.remove("v60-nav-hidden");
+        lastTop = 0;
+        return _origTabV60.apply(this, [k, ...rest]);
+      };
+    }
+  }
+
   function start() {
+    initListAutoHideNav();
     if (!window.lucide) {
       setTimeout(start, 120);
       return;
