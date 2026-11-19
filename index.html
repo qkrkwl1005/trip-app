@@ -26424,7 +26424,7 @@ ${JSON.stringify(payload, null, 2)}
     smart_toy: "bot",
     troubleshoot: "wrench",
     cleaning_services: "sparkles",
-    edit_location_alt: "map-pin-pen",
+    edit_location_alt: "pencil",
     add_location_alt: "map-pin-plus",
     store: "store",
     view_sidebar: "panel-left",
@@ -26442,8 +26442,10 @@ ${JSON.stringify(payload, null, 2)}
     if (!lib || !lib.icons) return "";
     const iconData = lib.icons[toPascal(lucideName)] || lib.icons[lucideName];
     if (!iconData || !Array.isArray(iconData)) return "";
-    // lucide UMD icon format: Array of [tag, attrs]
-    const children = iconData
+    // lucide 0.4xx UMD format: ["svg", svgAttrs, [[tag, attrs], ...]]
+    const nodes = iconData[0] === "svg" && Array.isArray(iconData[2]) ? iconData[2] : iconData;
+    const children = nodes
+      .filter((n) => Array.isArray(n) && typeof n[0] === "string")
       .map(([tag, attrs]) => {
         const attrStr = Object.entries(attrs || {})
           .map(([k, v]) => `${k}="${String(v).replace(/"/g, "&quot;")}"`)
@@ -26451,6 +26453,7 @@ ${JSON.stringify(payload, null, 2)}
         return `<${tag} ${attrStr}></${tag}>`;
       })
       .join("");
+    if (!children) return "";
     return `<svg class="v60-svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${children}</svg>`;
   }
 
