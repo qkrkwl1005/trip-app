@@ -3170,15 +3170,22 @@
           .then(
             (r) => {
               // 릴스 캡션 실패 원인 구분용 집계 (analyzeContent가 켜 둘 때만)
-              if (window.__capNet) r.status >= 500 ? window.__capNet.server++ : window.__capNet.ok++;
+              if (window.__capNet) (r.status >= 500 || r.status === 429 || r.status === 403) ? window.__capNet.server++ : window.__capNet.ok++;
+              // 타임아웃은 본문을 다 읽을 때까지 유지 (본문 읽기 중 멈춤 방지)
+              ["text", "json", "blob", "arrayBuffer"].forEach((k) => {
+                const orig = r[k] && r[k].bind(r);
+                if (!orig) return;
+                r[k] = () => orig().finally(() => clearTimeout(tid));
+              });
+              if (!r.body) clearTimeout(tid);
               return r;
             },
             (e) => {
+              clearTimeout(tid);
               if (window.__capNet) window.__capNet.fail++;
               throw e;
             },
-          )
-          .finally(() => clearTimeout(tid));
+          );
       }
 
       // 캡션 가져오기 실패 원인: 오프라인 / 서버·네트워크 오류 / 비공개·보안 정책
@@ -5176,8 +5183,18 @@
         const s = getVidUrlStr(v);
         if (!s) return null;
         let m = s.match(
-          /(?:instagram\.com|instagr\.am)\/share\/(?:reel|reels|p|tv)\/([A-Za-z0-9_-]+)/i,
+          /(?:instagram\.com|instagr\.am)\/share\/(?:(?:reel|reels|p|tv)\/)?([A-Za-z0-9_-]+)/i,
         );
+        if (m) {
+          // 이미 shortcode가 확정된 share 링크는 정규화된 reel 메타로 바로 반환
+          const resolved = window.__igShareMap && window.__igShareMap[m[1]];
+          if (resolved)
+            return {
+              platform: "ig",
+              id: resolved,
+              url: `https://www.instagram.com/reel/${resolved}/`,
+            };
+        }
         if (m)
           return {
             platform: "ig",
@@ -5186,7 +5203,7 @@
             url: `https://www.instagram.com/share/reel/${m[1]}/`,
           };
         m = s.match(
-          /(?:instagram\.com|instagr\.am)\/(?:[A-Za-z0-9_.]+\/)?(?:reel|reels|p|tv)\/([A-Za-z0-9_-]{5,25})/i,
+          /(?:instagram\.com|instagr\.am)\/(?:[A-Za-z0-9_.]+\/)?(?:reel|reels|p|tv)\/(?!audio\/)([A-Za-z0-9_-]{5,25})/i,
         );
         if (m)
           return {
@@ -5194,9 +5211,11 @@
             id: m[1],
             url: `https://www.instagram.com/reel/${m[1]}/`,
           };
-        m = s.match(
-          /(?:youtube\.com\/shorts\/|youtu\.be\/|youtube\.com\/watch\?v=)([A-Za-z0-9_-]{11})/i,
-        );
+        m =
+          s.match(
+            /(?:youtube\.com\/(?:shorts|embed|live|v)\/|youtu\.be\/)([A-Za-z0-9_-]{11})/i,
+          ) ||
+          s.match(/youtube\.com\/watch\?(?:[^\s#]*&)?v=([A-Za-z0-9_-]{11})/i);
         if (m)
           return {
             platform: "yt",
@@ -5434,9 +5453,38 @@
         return "";
       }
 
+      // instagram.com/share/XXXX → 실제 shortcode 확정 (/api/ig?url= 이 리다이렉트를 해석)
+      async function resolveIgShare(meta) {
+        if (!meta || meta.platform !== "ig" || meta.id || !meta.shareId) return "";
+        window.__igShareMap = window.__igShareMap || {};
+        if (window.__igShareMap[meta.shareId]) return window.__igShareMap[meta.shareId];
+        try {
+          const b = location.hostname.includes("vercel.app") ? "" : "https://trip-app-psi-two.vercel.app";
+          const r = await fetchTO(`${b}/api/ig?url=${encodeURIComponent(meta.url)}`, {}, 6000);
+          if (!r.ok) return "";
+          const d = await r.json();
+          if (d && d.code) {
+            window.__igShareMap[meta.shareId] = d.code;
+            const th = d.weservThumb || d.thumb;
+            if (th) (window.__igThumbCache = window.__igThumbCache || {})[d.code] = th;
+            return d.code;
+          }
+        } catch (_) {}
+        return "";
+      }
+
       async function hydrateInstagramThumb(item) {
-        const meta = parseVideoMeta(item?.vid);
+        let meta = parseVideoMeta(item?.vid);
         if (!meta) return false;
+        // 타입 없는 /share/ 링크: shortcode를 확정해 item.vid를 정규화 reel URL로 교체
+        if (meta.platform === "ig" && !meta.id && meta.shareId) {
+          const code = await resolveIgShare(meta);
+          if (code) {
+            item.vid = `https://www.instagram.com/reel/${code}/`;
+            meta = parseVideoMeta(item.vid);
+            try { save(); } catch (_) {}
+          } else return false;
+        }
         // 이미 썸네일(img)이 있거나 캐시가 있으면 외부 API 호출 금지
         // 단, 저장된 인스타 주소가 만료됐으면 새로 받아옴 (전엔 만료 주소 때문에 영원히 아이콘으로 남았음)
         const imgExpired = typeof isExpiredIgUrl === "function" && isExpiredIgUrl(item.img);
@@ -5475,6 +5523,14 @@
         const apiBase = location.hostname.includes("vercel.app")
           ? ""
           : "https://trip-app-psi-two.vercel.app";
+
+        // 0순위: 캡션 호출에서 이미 받아 둔 썸네일 재사용 (/api/ig 중복 호출 방지)
+        const cachedTh = window.__igThumbCache && window.__igThumbCache[meta.id];
+        if (cachedTh && !isAvatarOrBadUrl(cachedTh)) {
+          reelThumbCache[meta.id] = cachedTh;
+          saveReelThumbCache();
+          return true;
+        }
 
         // 1순위: 초고속 Vercel 서버리스 /api/ig 직접 조회
         try {
@@ -5833,9 +5889,62 @@
         return `<div class="pinCard c-${CATS[i.category] ? i.category : "PLACE"}${i.star ? " starred" : ""}">${dayBadge}${starBadge}${placeNumber}<i><span class="ms" style="font-size:22px;color:#fff">${icName}</span></i>${thumb ? `<img loading="lazy" decoding="async" referrerpolicy="no-referrer" src="${esc(thumb)}"${altAttr} onerror="imgErr(this)">` : ""}${getVidUrlStr(i.vid) ? `<b><span class="ms fill" style="font-size:11px;color:#fff">play_circle</span></b>` : ""}</div>`;
       }
 
-      /* 지도 핀 팝업: '검색' 버튼을 '목록' 이동 버튼으로 교체 */
+      /* 네이버 지도 앱(nmap://) + 웹 폴백 공용 열기 헬퍼 (일본 좌표·검색 모두 지원) */
+      window.openNaverMap = function (target, mode = "route") {
+        if (!target) return;
+        const name = String(target.localName || target.hotelName || target.name || target.title || "장소").trim();
+        const addr = String(target.address || target.addr || "").trim();
+        const query = [name, addr].filter(Boolean).join(" ").trim() || name;
+        const lat = Number(target.lat);
+        const lng = Number(target.lng);
+        const hasCoord = Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0);
+        const appName = "trip-app-psi-two.vercel.app";
+        const webUrl = `https://map.naver.com/p/search/${encodeURIComponent(query)}`;
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent || "");
+
+        if (!isMobile) {
+          window.open(webUrl, "_blank", "noopener");
+          return;
+        }
+
+        let schemeUrl = "";
+        if (hasCoord) {
+          if (mode === "route") {
+            schemeUrl = `nmap://route/public?dlat=${lat}&dlng=${lng}&dname=${encodeURIComponent(name)}&appname=${appName}`;
+          } else {
+            schemeUrl = `nmap://place?lat=${lat}&lng=${lng}&name=${encodeURIComponent(name)}&appname=${appName}`;
+          }
+        } else {
+          schemeUrl = `nmap://search?query=${encodeURIComponent(query)}&appname=${appName}`;
+        }
+
+        let switched = false;
+        const onVis = () => {
+          if (document.hidden) switched = true;
+        };
+        document.addEventListener("visibilitychange", onVis, { once: true });
+        location.href = schemeUrl;
+        setTimeout(() => {
+          document.removeEventListener("visibilitychange", onVis);
+          if (!switched && !document.hidden) {
+            window.open(webUrl, "_blank", "noopener") || (location.href = webUrl);
+          }
+        }, 1200);
+      };
+
+      window.openNaverMapById = function (id, mode = "route", placeIdx = -1) {
+        const it = Array.isArray(items) ? items.find((x) => x.id === id) : null;
+        if (!it) return;
+        const target =
+          placeIdx >= 0 && Array.isArray(it.places) && it.places[placeIdx]
+            ? it.places[placeIdx]
+            : it;
+        window.openNaverMap(target, mode);
+      };
+
+      /* 지도 핀 팝업: '검색' 버튼을 '목록' 이동 버튼으로 교체 + 네이버지도 버튼 추가 */
       function mapPinPlaceHtml(item, place, index) {
-        return `<div class="mapPinPlace"><strong>${index + 1}. ${esc(place.name || "장소")}</strong><div class="mapPinAddress">${esc(place.address || "주소 미입력")}</div><div class="mapPinActions"><a class="mb pr" href="${esc(getGMapLink(place))}" target="_top"><span class="ms">map</span>구글지도</a><button type="button" class="mb" data-act="jumpToList" data-id="${esc(item.id)}"><span class="ms">format_list_bulleted</span>목록</button><a class="mb" href="${esc(getGMapDirLink(place))}" target="_top"><span class="ms">directions</span>길찾기</a><button type="button" class="mb" data-act="openGroupedItem" data-id="${esc(item.id)}" data-place-idx="${index}"><span class="ms">movie</span>릴스에서 보기</button></div></div>`;
+        return `<div class="mapPinPlace"><strong>${index + 1}. ${esc(place.name || "장소")}</strong><div class="mapPinAddress">${esc(place.address || "주소 미입력")}</div><div class="mapPinActions"><a class="mb pr" href="${esc(getGMapLink(place))}" target="_top"><span class="ms">map</span>구글지도</a><button type="button" class="mb" onclick="window.openNaverMapById('${esc(item.id)}','route',${index})" style="color:#03c75a;border-color:rgba(3,199,90,.35)"><span class="ms">navigation</span>네이버지도</button><button type="button" class="mb" data-act="jumpToList" data-id="${esc(item.id)}"><span class="ms">format_list_bulleted</span>목록</button><a class="mb" href="${esc(getGMapDirLink(place))}" target="_top"><span class="ms">directions</span>길찾기</a><button type="button" class="mb" data-act="openGroupedItem" data-id="${esc(item.id)}" data-place-idx="${index}"><span class="ms">movie</span>릴스에서 보기</button></div></div>`;
       }
       function mapPinPopupHtml(item, expanded = false) {
         const places = Array.isArray(item.places) ? item.places : [];
@@ -6531,9 +6640,10 @@
         <span style="flex:1;min-width:0">${esc(i.name)}</span>
         <button type="button" class="star-btn${i.star ? " on" : ""}" data-act="toggleStar" data-id="${i.id}" title="중요 표시"><span class="ms${i.star ? " fill" : ""}" style="font-size:21px">star</span></button>
       </div>
-      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
         ${vAction}
-        <a class="mb" href="${esc(dirHref)}" target="_top" onclick="event.stopPropagation()" style="padding:6px 13px;font-size:12px;min-height:36px"><span class="ms">explore</span>길찾기</a>
+        <a class="mb" href="${esc(dirHref)}" target="_top" onclick="event.stopPropagation()" style="padding:6px 11px;font-size:12px;min-height:36px"><span class="ms">explore</span>구글맵</a>
+        <button type="button" class="mb" onclick="event.stopPropagation();window.openNaverMapById('${esc(i.id)}','route')" style="padding:6px 11px;font-size:12px;min-height:36px;color:#03c75a;border-color:rgba(3,199,90,.35)"><span class="ms">navigation</span>네이버</button>
       </div>
     </div>
     <input type="checkbox" data-act="done" data-id="${i.id}"${i.done ? " checked" : ""} style="flex:none" aria-label="방문 완료 체크">
@@ -7173,9 +7283,12 @@
           <span class="ms fill" style="font-size:18px">play_circle</span>${esc(vLabel)} 보기
         </button>
       ` : ""}
-      <a class="btn" href="${esc(dirHref)}" target="_top" style="flex:1 1 140px;margin:0;min-height:46px;background:var(--pr);color:#fff;border-radius:14px;font-weight:700;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:5px;box-shadow:0 4px 12px rgba(37,99,235,0.25)">
-        <span class="ms" style="font-size:17px">explore</span>길찾기
+      <a class="btn" href="${esc(dirHref)}" target="_top" style="flex:1 1 110px;margin:0;min-height:46px;background:var(--pr);color:#fff;border-radius:14px;font-weight:700;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:5px;box-shadow:0 4px 12px rgba(37,99,235,0.25)">
+        <span class="ms" style="font-size:17px">explore</span>구글 길찾기
       </a>
+      <button type="button" class="btn" onclick="window.openNaverMapById('${esc(i.id)}','route')" style="flex:1 1 110px;margin:0;min-height:46px;background:#03c75a;color:#fff;border:none;border-radius:14px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:5px;box-shadow:0 4px 12px rgba(3,199,90,0.25)">
+        <span class="ms" style="font-size:17px">navigation</span>네이버지도
+      </button>
       <a class="btn g" href="${esc(gmapHref)}" target="_top" style="flex:0 0 52px;margin:0;min-height:46px;border-radius:14px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:0;font-size:11px;flex-direction:column;">
         <span class="ms" style="font-size:22px">map</span><span style="margin-top:2px">지도</span>
       </a>
@@ -7983,6 +8096,27 @@
         if (meta.platform === "ig") {
           let igId = meta.id;
           if (!igId && meta.shareId) {
+            window.__igShareMap = window.__igShareMap || {};
+            if (window.__igShareMap[meta.shareId]) igId = window.__igShareMap[meta.shareId];
+            // 서버리스 API가 /share/ 리다이렉트를 해석해 shortcode를 돌려준다
+            if (!igId) {
+              try {
+                const apiB = location.hostname.includes("vercel.app") ? "" : "https://trip-app-psi-two.vercel.app";
+                const ar = await fetchTO(`${apiB}/api/ig?url=${encodeURIComponent(meta.url)}`, {}, 6000);
+                if (ar.ok) {
+                  const ad = await ar.json();
+                  if (ad && ad.code) {
+                    igId = ad.code;
+                    window.__igShareMap[meta.shareId] = ad.code;
+                    window.__igThumbCache = window.__igThumbCache || {};
+                    const th = ad.weservThumb || ad.thumb;
+                    if (th) window.__igThumbCache[ad.code] = th;
+                  }
+                }
+              } catch (_) {}
+            }
+          }
+          if (!igId && meta.shareId) {
             const shareTargets = [
               ...(cfBase ? [cfBase + encodeURIComponent(meta.url)] : []),
               `https://api.allorigins.win/raw?url=${encodeURIComponent(meta.url)}`,
@@ -8015,6 +8149,11 @@
               const r = await fetchTO(`${apiBase}/api/ig?code=${encodeURIComponent(igId)}`, {}, 6000);
               if (!r.ok) throw new Error("api status");
               const d = await r.json();
+              const th = d && (d.weservThumb || d.thumb);
+              if (th) {
+                window.__igThumbCache = window.__igThumbCache || {};
+                window.__igThumbCache[igId] = th;
+              }
               if (d.caption && d.caption.trim().length >= 3 && !d.caption.includes("<html")) return d.caption;
               throw new Error("api empty");
             },
@@ -8074,6 +8213,7 @@
               const r = await fetchTO(`${apiBase}/api/yt?url=${encodeURIComponent(sUrl)}`, {}, 7000);
               if (!r.ok) throw new Error("api yt status " + r.status);
               const d = await r.json();
+              if (d.title === "YouTube Short" || (!d.caption && !d.title)) return "";
               const cap = d.caption || [d.title, d.description].filter(Boolean).join("\n\n");
               if (cap && cap.trim().length >= 3 && !cap.includes("<html")) return cap.trim();
               if (d.title && d.title.trim().length >= 3 && !d.title.includes("<html")) return d.title.trim();
@@ -8139,18 +8279,31 @@
             }
           ];
 
-          try {
-            const out = await Promise.any(jobs.map((fn) => fn()));
-            if (typeof out === "string" && out.trim().length >= 3 && !out.includes("<html")) {
-              const resText = out.trim();
-              mediaCaptionCache[cKey] = resText;
+          // 설명란(개행 포함)이 있는 결과만 "완전한 캡션"으로 보고 캐시한다. 제목만이면 캐시 금지.
+          const isFullCap = (s) => typeof s === "string" && s.trim().length >= 3 && !s.includes("<html") && /\n/.test(s.trim());
+          const okCap = (s) => typeof s === "string" && s.trim().length >= 3 && !s.includes("<html");
+          const finishYt = (s, cache) => {
+            const t = s.trim();
+            if (cache) {
+              mediaCaptionCache[cKey] = t;
               saveMediaCaptionCache();
-              return resText;
             }
-            return typeof out === "string" && out.trim().length >= 3 && !out.includes("<html") ? out.trim() : "";
+            return t;
+          };
+          // 1) /api/yt(제목+설명란) 우선
+          let primary = "";
+          try { primary = await jobs[0](); } catch (_) {}
+          if (isFullCap(primary)) return finishYt(primary, true);
+          // 2) 실패/제목만일 때 나머지 폴백 (jina·cf는 설명란까지 줄 수 있음)
+          try {
+            const out = await Promise.any(jobs.slice(1).map((fn) => fn()));
+            if (isFullCap(out)) return finishYt(out, true);
+            if (okCap(primary)) return finishYt(primary, false);
+            if (okCap(out)) return finishYt(out, false);
           } catch (_) {
-            return "";
+            if (okCap(primary)) return finishYt(primary, false);
           }
+          return "";
         }
         if (meta.platform === "tt") {
           try {
@@ -9445,6 +9598,16 @@ ${caption || rawText}
             hint,
           });
 
+          // /share/ 링크가 캡션 단계에서 shortcode로 확정됐다면 vidUrl도 정규화 reel URL로 교체
+          if (vidUrl) {
+            const nm = parseVideoMeta(vidUrl);
+            if (nm && nm.id && nm.url !== vidUrl) {
+              vidUrl = nm.url;
+              lastSharedVid = vidUrl;
+              $("reelLinkBox").value = vidUrl;
+            }
+          }
+
           if (cands.length && (cands[0].name || cands[0].address)) {
             const limited = cands
               .slice(0, MAX_MULTI_PLACES)
@@ -9459,8 +9622,19 @@ ${caption || rawText}
                 : rawPName) || rawPName || "저장된 장소";
               const cleanPName = pName.replace(/\s*외\s*\d+\s*곳\s*$/, "").trim();
 
-              const existing = items.find((x) => samePlace(x, place) || (x.name && x.name === cleanPName));
+              const isGenericName =
+                (typeof isGenericSharedName === "function" && isGenericSharedName(cleanPName)) ||
+                /^\s*(저장된 장소|공유된 장소|장소 미확인|이름 없음)\s*$/.test(cleanPName);
+              // 일반 이름은 이름만으로 병합하지 않는다 (서로 다른 장소가 한 카드로 합쳐지는 것 방지)
+              const existing = items.find((x) => samePlace(x, place) || (!isGenericName && x.name && x.name === cleanPName));
               if (existing) {
+                if (vidUrl) {
+                  if (!existing.vid) existing.vid = vidUrl;
+                  else if (existing.vid !== vidUrl) {
+                    const ev = (existing.extraVids = Array.isArray(existing.extraVids) ? existing.extraVids : []);
+                    if (!ev.includes(vidUrl)) ev.push(vidUrl);
+                  }
+                }
                 if (!existing.localName && place.localName) existing.localName = place.localName;
                 if (!existing.address && place.address) existing.address = place.address;
                 if (!existing.price && place.price) existing.price = place.price;
@@ -11653,9 +11827,13 @@ ${caption || rawText}
 
       (function checkShareParam() {
         const p = new URLSearchParams(location.search);
-        const s = p.get("share") || p.get("text") || p.get("url");
+        // share/title/text/url 전부 합쳐서 영상 링크를 찾는다 (링크가 title이나 url에만 있어도 유실 방지)
+        const parts = ["share", "title", "text", "url"].map((k) => (p.get(k) || "").trim()).filter(Boolean);
+        const joined = parts.join("\n");
+        const linkPart = parts.find((x) => parseVideoMeta(x));
+        const s = linkPart && !parts.every((x) => x === linkPart) ? joined : joined || "";
         if (s && s.trim()) {
-          const m = parseVideoMeta(s.trim());
+          const m = parseVideoMeta(linkPart || s.trim());
           if (m) {
             lastSharedVid = m.url;
             $("reelLinkBox").value = m.url;
@@ -14701,7 +14879,7 @@ ${caption || rawText}
     };
   }
 
-  let gHotelOverlays = [], lHotelMarkers = [];
+  let gHotelOverlays = [], lHotelMarkers = [], nHotelMarkers = [];
   let GHotelOverlayClass = null;
 
   function hotelPinHtml(h) {
@@ -14718,12 +14896,20 @@ ${caption || rawText}
         <div style="font-size:11.5px;color:#475569;margin-bottom:8px;word-break:break-all">${esc(h.address)}</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button type="button" class="mb pr" onclick="window.openExternalCleanNoBlank('${gmapUrl}')" style="min-height:32px;padding:4px 10px;font-size:11.5px"><span class="ms">map</span>구글맵 열기</button>
+          <button type="button" class="mb" onclick="window.openHotelNaverV32('${h.key}')" style="min-height:32px;padding:4px 10px;font-size:11.5px;color:#03c75a;border-color:rgba(3,199,90,.4)"><span class="ms">navigation</span>네이버지도</button>
           <button type="button" class="mb" onclick="navigator.clipboard?.writeText('${esc(h.address)}');toast('📋 숙소 주소를 복사했습니다')" style="min-height:32px;padding:4px 10px;font-size:11.5px"><span class="ms">content_copy</span>주소복사</button>
           <button type="button" class="mb" onclick="window.openHotelTaxiV32('${h.key}')" style="min-height:32px;padding:4px 10px;font-size:11.5px"><span class="ms">local_taxi</span>택시화면</button>
         </div>
       </div>
     `;
   }
+
+  window.openHotelNaverV32 = function(key) {
+    const h = HOTELS[key];
+    if (h && typeof window.openNaverMap === "function") {
+      window.openNaverMap({ name: h.hotelName || h.title, address: h.address, lat: h.lat, lng: h.lng }, "place");
+    }
+  };
 
   window.openHotelTaxiV32 = function(key) {
     const h = HOTELS[key];
@@ -14740,6 +14926,17 @@ ${caption || rawText}
       mapInfoWindow.setContent(hotelPopupHtml(h));
       mapInfoWindow.setPosition({ lat: h.lat, lng: h.lng });
       mapInfoWindow.open({ map: gmap });
+    } else if (typeof nmap !== "undefined" && nmap && window.naver?.maps) {
+      if (!nMapInfoWindow) {
+        nMapInfoWindow = new naver.maps.InfoWindow({
+          maxWidth: 280,
+          backgroundColor: "#fff",
+          borderColor: "#d1d5db",
+          anchorSize: new naver.maps.Size(10, 10),
+        });
+      }
+      nMapInfoWindow.setContent(hotelPopupHtml(h));
+      nMapInfoWindow.open(nmap, new naver.maps.LatLng(h.lat, h.lng));
     } else if (typeof lm !== "undefined" && lm && h._lMarker) {
       h._lMarker.setPopupContent(hotelPopupHtml(h));
       try { h._lMarker.openPopup(); } catch (_) {}
@@ -14778,7 +14975,25 @@ ${caption || rawText}
           gHotelOverlays.push(new GHotelOverlayClass(gmap, h));
         });
       }
-      // 2) Leaflet (lm)
+      // 2) Naver Maps (nmap)
+      if (typeof nmap !== "undefined" && nmap && window.naver?.maps) {
+        nHotelMarkers.forEach(m => { try { m.setMap(null); } catch (_) {} });
+        nHotelMarkers = [];
+        Object.values(HOTELS).forEach(h => {
+          const m = new naver.maps.Marker({
+            position: new naver.maps.LatLng(h.lat, h.lng),
+            map: nmap,
+            zIndex: 9999,
+            icon: {
+              content: hotelPinHtml(h),
+              anchor: new naver.maps.Point(0, 0),
+            },
+          });
+          naver.maps.Event.addListener(m, "click", () => openHotelPopupOnMap(h));
+          nHotelMarkers.push(m);
+        });
+      }
+      // 3) Leaflet (lm)
       if (typeof lm !== "undefined" && lm && window.L) {
         lHotelMarkers.forEach(m => { try { lm.removeLayer(m); } catch (_) {} });
         lHotelMarkers = [];
@@ -14807,6 +15022,10 @@ ${caption || rawText}
         google.maps.event.trigger(gmap, "resize");
         gmap.panTo({ lat: h.lat, lng: h.lng });
         gmap.setZoom(17);
+      } else if (typeof nmap !== "undefined" && nmap && window.naver?.maps) {
+        naver.maps.Event.trigger(nmap, "resize");
+        nmap.setCenter(new naver.maps.LatLng(h.lat, h.lng));
+        nmap.setZoom(17);
       } else if (typeof lm !== "undefined" && lm) {
         lm.invalidateSize();
         lm.setView([h.lat, h.lng], 17);
@@ -16551,7 +16770,27 @@ ${caption || rawText}
               }
             } catch (_) {}
           }
-          else if (typeof nmap !== "undefined" && nmap) { nmap.setCenter(new naver.maps.LatLng(lat, lng)); nmap.setZoom(15); }
+          else if (typeof nmap !== "undefined" && nmap && window.naver?.maps) {
+            const pos = new naver.maps.LatLng(lat, lng);
+            nmap.setCenter(pos);
+            nmap.setZoom(15);
+            try {
+              if (window.__myLocNMarker) {
+                window.__myLocNMarker.setPosition(pos);
+                if (window.__myLocNMarker.getMap() !== nmap) window.__myLocNMarker.setMap(nmap);
+              } else {
+                window.__myLocNMarker = new naver.maps.Marker({
+                  position: pos,
+                  map: nmap,
+                  zIndex: 9999,
+                  icon: {
+                    content: '<div style="width:16px;height:16px;border-radius:50%;background:#3b82f6;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.35)"></div>',
+                    anchor: new naver.maps.Point(8, 8),
+                  },
+                });
+              }
+            } catch (_) {}
+          }
           else if (typeof lm !== "undefined" && lm) {
             lm.setView([lat, lng], 15);
             // 이전 내 위치 점 제거 후 새로 그려 중복 쌓임 방지
