@@ -40,8 +40,22 @@ function isGarbageContent(text) {
   return false;
 }
 
+const ALLOWED_ORIGINS = [
+  "https://trip-app-psi-two.vercel.app",
+  "https://qkrkwl1005.github.io",
+];
+
 async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  const origin = req.headers?.origin || "";
+  if (
+    ALLOWED_ORIGINS.includes(origin) ||
+    /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
+  ) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  } else {
+    res.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGINS[0]);
+  }
+  res.setHeader("Vary", "Origin");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 

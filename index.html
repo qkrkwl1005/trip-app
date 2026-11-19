@@ -266,7 +266,7 @@
         /* border removed */
         border-radius: var(--r-ctrl);
         font: inherit;
-        font-size: 15px;
+        font-size: 16px;
         color: var(--tx);
         background: var(--s2);
         margin-bottom: 12px;
@@ -1677,9 +1677,9 @@
 
           <!-- 연결 상태 및 방 번호 칩 -->
           <div style="background:var(--s2);border:1px solid var(--bd2);border-radius:18px;padding:12px 14px;margin-bottom:12px">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-              <span id="sharedRoomStatus" style="font-weight: 700;font-size:13.5px;color:var(--tx)">연결 확인 중…</span>
-              <span id="v49RoomBadge" style="font-size:11px;font-weight: 700;padding:2px 8px;border-radius:999px;background:var(--s);color:var(--tx);/* border removed */">🔒 비공개 링크</span>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px">
+              <span id="sharedRoomStatus" style="font-weight: 700;font-size:13.5px;color:var(--tx);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">연결 확인 중…</span>
+              <span id="v49RoomBadge" style="white-space:nowrap;flex:none;font-size:11px;font-weight: 700;padding:2px 8px;border-radius:999px;background:var(--s);color:var(--tx);/* border removed */">🔒 비공개 링크</span>
             </div>
             <div style="font-size:12px;color:var(--sub);line-height:1.45">
               함께하는 친구와 일정 및 가계부를 실시간으로 같이 봅니다.
@@ -3166,9 +3166,28 @@
       function fetchTO(url, opt = {}, ms = 7500) {
         const ctrl = new AbortController();
         const tid = setTimeout(() => ctrl.abort(), ms);
-        return fetch(url, { ...opt, signal: ctrl.signal }).finally(() =>
-          clearTimeout(tid),
-        );
+        return fetch(url, { ...opt, signal: ctrl.signal })
+          .then(
+            (r) => {
+              // 릴스 캡션 실패 원인 구분용 집계 (analyzeContent가 켜 둘 때만)
+              if (window.__capNet) r.status >= 500 ? window.__capNet.server++ : window.__capNet.ok++;
+              return r;
+            },
+            (e) => {
+              if (window.__capNet) window.__capNet.fail++;
+              throw e;
+            },
+          )
+          .finally(() => clearTimeout(tid));
+      }
+
+      // 캡션 가져오기 실패 원인: 오프라인 / 서버·네트워크 오류 / 비공개·보안 정책
+      function explainCaptionFailure(net) {
+        if (typeof navigator !== "undefined" && navigator.onLine === false)
+          return { kind: "offline", msg: "📴 오프라인 상태예요. 인터넷에 연결한 뒤 다시 시도하거나 캡션을 직접 붙여넣어 주세요" };
+        if (net && (net.fail > 0 || net.server > 0) && net.ok === 0)
+          return { kind: "network", msg: "⚠️ 서버/네트워크 오류로 캡션을 가져오지 못했어요. 잠시 후 다시 시도하거나 캡션을 직접 붙여넣어 주세요" };
+        return { kind: "private", msg: "🔒 비공개 게시물이거나 인스타 보안 정책으로 캡션을 가져오지 못했어요. 캡션·고정댓글을 직접 붙여넣어 주세요" };
       }
 
       function normalizeCfProxy(raw) {
@@ -3693,7 +3712,8 @@
       function setSharedRoomStatus(message, kind = "") {
         const el = $("sharedRoomStatus");
         if (!el) return;
-        el.textContent = message;
+        // 32자 방 ID는 앞4자…뒤4자로 축약해서 표시
+        el.textContent = String(message).replace(/[A-Za-z0-9_-]{16,}/g, (m) => m.slice(0, 4) + "…" + m.slice(-4));
         el.style.color =
           kind === "ok"
             ? "var(--ok)"
@@ -8798,7 +8818,7 @@
                   </div>
                   <button type="button" id="mcapCloseBtn" style="background:none;border:none;color:var(--sub, #888);font-size:20px;cursor:pointer;padding:4px;"><span class="ms">close</span></button>
                 </div>
-                <div style="font-size:13px;color:var(--sub, #a1a1a6);line-height:1.45;">
+                <div id="mcapReason" style="font-size:13px;color:var(--sub, #a1a1a6);line-height:1.45;">
                   인스타그램 보안 정책으로 본문을 자동 추출하지 못했습니다.<br>
                   릴스 본문이나 고정 댓글, 또는 매장명을 편하게 붙여넣어 주세요.
                 </div>
@@ -8817,6 +8837,16 @@
             document.body.appendChild(modal);
           }
 
+          const reasonEl = modal.querySelector("#mcapReason");
+          if (reasonEl) {
+            const why = window.__capFailReason;
+            window.__capFailReason = null;
+            reasonEl.innerHTML =
+              (why ? why.msg.replace(/[<>&]/g, "") : "인스타그램 보안 정책으로 본문을 자동 추출하지 못했습니다.") +
+              "<br>릴스 본문이나 고정 댓글, 또는 매장명을 편하게 붙여넣어 주세요.";
+          }
+          // 뒤로가기로 닫히도록 history 연동 (열림/닫힘은 style.opacity로 판정)
+          window.__watchBackModal?.(modal, (m) => m.style.opacity === "1" && m.style.pointerEvents !== "none");
           const tx = modal.querySelector("#mcapTextarea");
           const btnSubmit = modal.querySelector("#mcapSubmitBtn");
           const btnCancel = modal.querySelector("#mcapCancelBtn");
@@ -8893,7 +8923,14 @@
             window.__v8AiSetStep("1단계: 영상 메타데이터 및 캡션 추출 중...", 28);
           }
           toast("릴스/쇼츠 캡션 정보를 불러오는 중...");
-          const fetched = await fetchVideoCaption(vidUrl);
+          window.__capNet = { fail: 0, server: 0, ok: 0 };
+          let fetched = "";
+          try {
+            fetched = await fetchVideoCaption(vidUrl);
+          } finally {
+            var capNet = window.__capNet;
+            window.__capNet = null;
+          }
           if (fetched && fetched.trim().length >= 3 && !fetched.includes("<html")) {
             captionText = (captionText + "\n" + fetched).trim();
             caption = captionText;
@@ -8904,8 +8941,10 @@
               window.__v8AiSetStep("1단계: 캡션 추출 완료, AI 분석 준비 중...", 45);
             }
           } else {
-            capStatus =
-              "🔒 인스타 차단으로 캡션을 가져오지 못했습니다. 캡션·고정댓글을 직접 붙여넣어 주세요";
+            const why = explainCaptionFailure(capNet);
+            capStatus = why.msg;
+            window.__capFailReason = why;
+            toast(why.msg);
           }
         }
 
@@ -10069,15 +10108,16 @@ ${caption || rawText}
               clearTimeout(_drawT);
               _drawT = setTimeout(() => { persistNow(); draw(); }, 150);
             }
-            if (actEl.checked)
-              toast(`✅ '${it.name}' 방문 완료!`, () => {
-                it.done = prevDone;
-                persist();
-                save();
-                render(true);
-                draw(true);
-                toast("완료 표시를 되돌렸어요");
-              });
+            toast(actEl.checked ? `✅ '${it.name}' 방문 완료!` : `↩️ '${it.name}' 미방문으로 변경`, () => {
+              it.done = prevDone;
+              it.updatedAt = Date.now();
+              it._localTouch = Date.now();
+              persist();
+              save();
+              render(true);
+              draw(true);
+              toast("완료 표시를 되돌렸어요");
+            });
           }
           return;
         }
@@ -11826,7 +11866,21 @@ ${caption || rawText}
           if (mode === "GPS" && typeof userPos === "object" && userPos && userPos.lat && userPos.lng) {
             return { label: "내 위치", lat: Number(userPos.lat), lng: Number(userPos.lng) };
           }
+          if (mode === "GPS" && typeof toast === "function") {
+            // 위치 권한/좌표가 없어 오사카 기준으로 정렬되는 경우 사용자에게 안내 (30초에 1번)
+            const now = Date.now();
+            if (!window.__gpsFallbackToastAt || now - window.__gpsFallbackToastAt > 30000) {
+              window.__gpsFallbackToastAt = now;
+              toast("📍 위치 권한이 없어 오사카 기준으로 정렬했어요");
+            }
+          }
           return BASE_COORDS.osaka;
+        }
+
+        // 정렬용 임시 거리값은 열거되지 않는 속성으로 붙여 저장/동기화(JSON·Firestore)에 섞이지 않게 함
+        function setSmartDist(it, dist, label) {
+          Object.defineProperty(it, "_smartDist", { value: dist, writable: true, configurable: true, enumerable: false });
+          Object.defineProperty(it, "_smartDistLabel", { value: label, writable: true, configurable: true, enumerable: false });
         }
 
         function computeSortedItems(list, mode) {
@@ -11845,10 +11899,8 @@ ${caption || rawText}
               if (!ha && !hb) return 0;
               const da = distKm(anchor.lat, anchor.lng, Number(a.lat), Number(a.lng));
               const db = distKm(anchor.lat, anchor.lng, Number(b.lat), Number(b.lng));
-              a._smartDist = da;
-              b._smartDist = db;
-              a._smartDistLabel = `${anchor.label}에서 ${da < 1 ? Math.round(da * 1000) + "m" : da.toFixed(1) + "km"}`;
-              b._smartDistLabel = `${anchor.label}에서 ${db < 1 ? Math.round(db * 1000) + "m" : db.toFixed(1) + "km"}`;
+              setSmartDist(a, da, `${anchor.label}에서 ${da < 1 ? Math.round(da * 1000) + "m" : da.toFixed(1) + "km"}`);
+              setSmartDist(b, db, `${anchor.label}에서 ${db < 1 ? Math.round(db * 1000) + "m" : db.toFixed(1) + "km"}`);
               return da - db;
             });
           }
@@ -11879,8 +11931,7 @@ ${caption || rawText}
                 }
               }
               const picked = pool.splice(bestIdx, 1)[0];
-              picked._smartDist = bestDist;
-              picked._smartDistLabel = `코스 #${step} · ${curLabel}에서 ${bestDist < 1 ? Math.round(bestDist * 1000) + "m" : bestDist.toFixed(1) + "km"}`;
+              setSmartDist(picked, bestDist, `코스 #${step} · ${curLabel}에서 ${bestDist < 1 ? Math.round(bestDist * 1000) + "m" : bestDist.toFixed(1) + "km"}`);
               ordered.push(picked);
               curLat = Number(picked.lat);
               curLng = Number(picked.lng);
@@ -13299,7 +13350,28 @@ ${caption || rawText}
     };
   }
 
+  // ✕/닫기 버튼 등 UI로 닫았을 때 남은 history 항목을 소비하고 플래그를 리셋
+  const _isV7ModalOpen = () =>
+    !!document.getElementById("taxiModal")?.classList.contains("show") ||
+    !!document.getElementById("myMapsOverlay")?.classList.contains("show") ||
+    !!document.getElementById("sheet")?.classList.contains("on");
+  const _releaseModalHistory = () => {
+    if (!_modalHistoryPushed || _isV7ModalOpen()) return;
+    _modalHistoryPushed = false;
+    window.__ignorePop = true;
+    try { history.back(); } catch (_) { window.__ignorePop = false; }
+  };
+  [["taxiModal", "class"], ["myMapsOverlay", "class"], ["sheet", "class"]].forEach(([id, attr]) => {
+    const el = document.getElementById(id);
+    if (el) new MutationObserver(_releaseModalHistory).observe(el, { attributes: true, attributeFilter: [attr] });
+  });
+
   window.addEventListener("popstate", () => {
+    if (window.__ignorePop) {
+      // 코드가 직접 호출한 history.back() → 모달을 건드리지 않음 (V37 핸들러도 같은 이벤트에서 확인)
+      setTimeout(() => { window.__ignorePop = false; }, 0);
+      return;
+    }
     _modalHistoryPushed = false;
     if (document.getElementById("taxiModal")?.classList.contains("show")) {
       document.getElementById("taxiModal").classList.remove("show");
@@ -13891,7 +13963,7 @@ ${caption || rawText}
       if (swiping) {
         const clamped = Math.max(-110, Math.min(110, dx));
         activeCard.style.transform = `translateX(${clamped}px)`;
-        activeCard.style.background = dx > 50 ? "rgba(16, 185, 129, 0.18)" : dx < -50 ? "rgba(239, 68, 68, 0.18)" : "";
+        activeCard.style.background = dx > 110 ? "rgba(16, 185, 129, 0.18)" : dx < -110 ? "rgba(239, 68, 68, 0.18)" : "";
       }
     }, { passive: true });
 
@@ -13909,20 +13981,35 @@ ${caption || rawText}
       const it = items.find(x => String(x.id) === String(id));
       if (!it) return;
 
-      if (dx > 85) {
+      if (dx > 110) {
         v8Haptic(20);
-        it.done = !it.done;
+        const prevDone = !!it.done;
+        it.done = !prevDone;
         it.updatedAt = Date.now();
         save();
-        toast(it.done ? `✅ '${it.name}' 방문 완료!` : `↩️ '${it.name}' 미방문으로 변경`);
-      } else if (dx < -85) {
+        draw(true);
+        toast(it.done ? `✅ '${it.name}' 방문 완료!` : `↩️ '${it.name}' 미방문으로 변경`, () => {
+          const cur = items.find(x => String(x.id) === String(id));
+          if (!cur) return;
+          cur.done = prevDone;
+          cur.updatedAt = Date.now();
+          save();
+          draw(true);
+          toast("방문 상태를 되돌렸어요");
+        });
+      } else if (dx < -110) {
         v8Haptic(25);
-        const backup = [...items];
+        // 전체 배열 덮어쓰기 대신 삭제한 1건만 원래 위치에 재삽입 (공유방의 다른 변경을 되돌리지 않도록)
+        const delIdx = items.findIndex(x => String(x.id) === String(id));
+        const removed = items[delIdx];
         items = items.filter(x => String(x.id) !== String(id));
         save();
         draw(true);
         toast(`🗑️ '${it.name}' 삭제됨`, () => {
-          items = backup;
+          if (items.some(x => String(x.id) === String(id))) return;
+          removed.updatedAt = Date.now();
+          items.splice(Math.min(Math.max(delIdx, 0), items.length), 0, removed);
+          if (window.__deletedItemIds) delete window.__deletedItemIds[removed.id];
           save();
           draw(true);
           toast("복구 완료!");
@@ -14840,7 +14927,8 @@ ${caption || rawText}
   /* =========================================================================
    * 6. 목록 1/N 정산 바 & 홈 대시보드 렌더링
    * ========================================================================= */
-  let jpyRate = 8.48, splitCnt = 3, calcAmt = 0, calcCur = "JPY";
+  window.DEFAULT_JPY_RATE = window.DEFAULT_JPY_RATE || 8.58; // 환율 폴백 단일 상수
+  let jpyRate = window.DEFAULT_JPY_RATE, splitCnt = 3, calcAmt = 0, calcCur = "JPY";
   function renderSplitBar() {
     const searchRow = document.querySelector("#tab-list .search-row");
     const topCard = searchRow?.closest(".card");
@@ -14866,7 +14954,7 @@ ${caption || rawText}
     const tKrw = calcCur === "JPY" ? Math.round(calcAmt * activeRate) : Math.round(calcAmt);
     const pKrw = Math.round(tKrw / Math.max(1, splitCnt));
 
-    bar.innerHTML = `<span style="font-size:13px;font-weight: 700;">1인 ₩${pKrw.toLocaleString()} (${splitCnt}명)</span><span class="ux7-badge places">1/N 정산 ▾</span>`;
+    bar.innerHTML = `<span style="font-size:13px;font-weight: 700;">1인 ₩${pKrw.toLocaleString()} (${splitCnt}명)</span><span class="ux7-badge places">1/N 정산 ${drawer.classList.contains("on") ? "▴" : "▾"}</span>`;
     bar.onclick = () => drawer.classList.toggle("on");
 
     if (!drawer.dataset.bound) {
@@ -16041,7 +16129,7 @@ ${caption || rawText}
 
   /* 6. 상세 바텀 시트(#sheet) 하단 고정 바 겹침 해결 및 정돈 */
   .ux-stab-pane {
-    padding-bottom: 32px !important;
+    padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important;
   }
   .ux-sheet-footer {
     background: rgba(19, 24, 34, 0.96) !important;
@@ -16299,34 +16387,72 @@ ${caption || rawText}
   /* -----------------------------------------------------------------------
    * 2. iOS & 안드로이드 뒤로가기(제스처/하단 버튼) 완벽 통일
    * ----------------------------------------------------------------------- */
-  let modalDepth = 0;
-  function pushSafeBackState() {
-    try {
-      history.pushState({ v37Modal: true }, "");
-      modalDepth++;
-    } catch (_) {}
+  let modalDepth = 0; // 현재 history 항목을 점유 중인 모달 수 (열림 +1 / 닫힘 -1)
+  const _modalHist = new Map(); // el -> history 항목을 push했는지
+  // 가져오기 시트·지도 추가 모달·1/N 정산 드로어·수동 캡션 모달: 열리면 push, 어떤 경로로 닫혀도 항목 소비 + 카운터 리셋
+  function watchBackModal(el, isOpen) {
+    if (!el || _modalHist.has(el)) return;
+    _modalHist.set(el, false);
+    const sync = () => {
+      const open = isOpen(el), pushed = _modalHist.get(el);
+      if (open && !pushed) {
+        try { history.pushState({ v37Modal: true }, ""); } catch (_) { return; }
+        _modalHist.set(el, true);
+        modalDepth++;
+      } else if (!open && pushed) {
+        _modalHist.set(el, false);
+        modalDepth = Math.max(0, modalDepth - 1);
+        window.__ignorePop = true;
+        try { history.back(); } catch (_) { window.__ignorePop = false; }
+      }
+    };
+    new MutationObserver(sync).observe(el, { attributes: true, attributeFilter: ["class", "style"] });
+    sync();
   }
-
-  // 장소 가져오기 시트, 지도 추가 모달, 1/N 정산 드로어 열릴 때도 히스토리 푸시
-  document.addEventListener("click", (e) => {
-    if (e.target.closest("#v32FabBtn, #v32HeroAdd")) {
-      pushSafeBackState();
+  // 뒤로가기로 이미 닫는 중이면 history.back()을 또 부르지 않도록 표시 후 닫기
+  const _closedByPop = (el) => {
+    if (_modalHist.get(el)) {
+      _modalHist.set(el, false);
+      modalDepth = Math.max(0, modalDepth - 1);
     }
-  }, true);
+  };
+  window.__watchBackModal = watchBackModal;
+  const _onClassOn = (el) => el.classList.contains("on");
+  [
+    ["v32ImportSheetWrap", _onClassOn],
+    ["v8MapAddModal", _onClassOn],
+    ["v32ListBudgetDrawer", _onClassOn]
+  ].forEach(([id, fn]) => watchBackModal(document.getElementById(id), fn));
+  // 지연 생성되는 요소(정산 드로어 등)를 위해 몇 차례 재시도
+  [400, 1200, 2500].forEach((ms) => setTimeout(() => {
+    watchBackModal(document.getElementById("v32ImportSheetWrap"), _onClassOn);
+    watchBackModal(document.getElementById("v8MapAddModal"), _onClassOn);
+    watchBackModal(document.getElementById("v32ListBudgetDrawer"), _onClassOn);
+  }, ms));
 
   window.addEventListener("popstate", (e) => {
+    if (window.__ignorePop) return;
+    const mcap = document.getElementById("manualCaptionModal");
+    if (mcap && mcap.style.opacity === "1") {
+      _closedByPop(mcap);
+      mcap.querySelector("#mcapCancelBtn")?.click();
+      return;
+    }
     const importSheet = document.getElementById("v32ImportSheetWrap");
     if (importSheet && importSheet.classList.contains("on")) {
+      _closedByPop(importSheet);
       importSheet.classList.remove("on");
       return;
     }
     const mapAddModal = document.getElementById("v8MapAddModal");
     if (mapAddModal && mapAddModal.classList.contains("on")) {
+      _closedByPop(mapAddModal);
       mapAddModal.classList.remove("on");
       return;
     }
     const budgetDrawer = document.getElementById("v32ListBudgetDrawer");
     if (budgetDrawer && budgetDrawer.classList.contains("on")) {
+      _closedByPop(budgetDrawer);
       budgetDrawer.classList.remove("on");
       return;
     }
@@ -18553,11 +18679,16 @@ ${caption || rawText}
     input[type="search"],
     input[type="number"],
     input[type="url"],
+    input[type="tel"],
+    input[type="email"],
+    input[type="password"],
+    input:not([type]),
+    select,
     textarea {
       font-size: 16px !important;
     }
     #v35SearchInput {
-      font-size: 15px !important;
+      font-size: 16px !important;
     }
   }
 
@@ -19192,7 +19323,7 @@ ${caption || rawText}
     fxBox.innerHTML = `
       <div class="v41-fx-head">
         <span>💴 엔화 드래그 즉시 환산</span>
-        <span class="v41-fx-val" id="v41FxReadout">¥1,000 ≈ ₩8,480</span>
+        <span class="v41-fx-val" id="v41FxReadout">¥1,000 ≈ ₩8,580</span>
       </div>
       <input type="range" class="v41-fx-range" id="v41FxRange" min="0" max="30000" step="100" value="1000" />
       <div class="v41-fx-presets">
@@ -19212,7 +19343,7 @@ ${caption || rawText}
 
     const syncFxVal = (jpyVal) => {
       const jpy = Number(jpyVal) || 0;
-      const liveRate = Number(window.__realJpyRate) || 8.58;
+      const liveRate = Number(window.__realJpyRate) || window.DEFAULT_JPY_RATE;
       const krw = Math.round(jpy * liveRate);
       if (readoutEl) readoutEl.textContent = `¥${jpy.toLocaleString()} ≈ ₩${krw.toLocaleString()}`;
       if (amtInput && curSelect) {
@@ -19390,6 +19521,14 @@ ${caption || rawText}
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
   }
+  #v42VoiceBackdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 9994;
+    display: none;
+  }
+  body:has(#v42VoicePopover.on) #v42VoiceBackdrop { display: block; }
   #v42VoicePopover.on {
     display: flex;
     animation: v42PopIn 0.2s cubic-bezier(0.22, 1, 0.36, 1);
@@ -19486,6 +19625,7 @@ ${caption || rawText}
           <button type="button" class="v41-phrase-btn" data-v42-phrase="${i}">
             <div style="min-width:0">
               <span class="v41-phrase-kr">${p.kr}</span>
+              <span class="v41-phrase-jp" lang="ja" style="display:block;font-weight:700;color:var(--tx)">${p.jp}</span>
               <span class="v41-phrase-jp">${p.pron}</span>
             </div>
             <span class="v41-voice-orb"><span class="ms" style="font-size:15px">volume_up</span></span>
@@ -19493,6 +19633,11 @@ ${caption || rawText}
         `).join("")}
       </div>
     `;
+    if (!document.getElementById("v42VoiceBackdrop")) {
+      const bd = document.createElement("div");
+      bd.id = "v42VoiceBackdrop";
+      document.body.appendChild(bd);
+    }
     document.body.appendChild(pop);
 
     pop.querySelector("#v42CloseVoicePop").onclick = (e) => {
@@ -19593,7 +19738,7 @@ ${caption || rawText}
   /* =========================================================================
    * 3. [Frankfurter API] 유럽중앙은행 실시간 엔화(JPY ➔ KRW) 환율 자동 반영
    * ========================================================================= */
-  window.__realJpyRate = Number(localStorage.getItem("TRIP_V42_JPY_RATE")) || 8.58;
+  window.__realJpyRate = Number(localStorage.getItem("TRIP_V42_JPY_RATE")) || window.DEFAULT_JPY_RATE;
   async function fetchRealTimeJpyRate() {
     try {
       const r = await fetch("https://api.frankfurter.dev/v1/latest?from=JPY&to=KRW");
@@ -21642,15 +21787,23 @@ ${JSON.stringify(payload, null, 2)}
       if (swiping && itemId) {
         const it = (Array.isArray(items) ? items : []).find(x => String(x.id) === String(itemId));
         if (it) {
-          if (dx > 68) {
-            // 오른쪽 스와이프 -> 방문 완료 토글
-            it.done = !it.done;
+          if (dx > 110) {
+            // 오른쪽 스와이프 -> 방문 완료 토글 (실행취소 가능)
+            const prevDone = !!it.done;
+            it.done = !prevDone;
+            it.updatedAt = Date.now();
             haptic(20);
             if (typeof save === "function") save();
             if (typeof toast === "function") {
-              toast(it.done ? `✅ '${it.name}' 방문 완료!` : `↩️ '${it.name}' 미방문으로 변경`);
+              toast(it.done ? `✅ '${it.name}' 방문 완료!` : `↩️ '${it.name}' 미방문으로 변경`, () => {
+                it.done = prevDone;
+                it.updatedAt = Date.now();
+                if (typeof save === "function") save();
+                if (typeof draw === "function") draw(true);
+                toast("방문 상태를 되돌렸어요");
+              });
             }
-          } else if (dx < -68) {
+          } else if (dx < -110) {
             // 왼쪽 스와이프 -> 중요(★) 토글
             it.star = !it.star;
             haptic(20);
@@ -21930,7 +22083,10 @@ ${JSON.stringify(payload, null, 2)}
     display: flex;
     flex-direction: column;
     gap: 12px;
+    min-width: 0;
+    max-width: 100%;
   }
+  #v32ListBudgetDrawer { min-width: 0; max-width: 100%; box-sizing: border-box; overflow: hidden; }
   .v50-ledger-summary {
     display: flex;
     justify-content: space-between;
@@ -22111,17 +22267,29 @@ ${JSON.stringify(payload, null, 2)}
     });
 
     const perPersonKrw = Math.round(totalKrw / splitNumber);
+    const perPersonJpy = Math.round(totalJpy / splitNumber);
+    const hasJpyExp = tripExpenses.some(it => it.cur === "JPY");
+    const arrow = drawer.classList.contains("on") ? "▴" : "▾";
+
+    // 드로어 열림/닫힘 상태(어느 경로로 바뀌든)에 맞춰 ▾/▴ 화살표 동기화
+    if (!drawer.dataset.arrowObs) {
+      drawer.dataset.arrowObs = "1";
+      new MutationObserver(() => {
+        const badge = bar.querySelector(".ux7-badge");
+        if (badge) badge.textContent = badge.textContent.replace(/[▾▴]\s*$/, drawer.classList.contains("on") ? "▴" : "▾");
+      }).observe(drawer, { attributes: true, attributeFilter: ["class"] });
+    }
 
     // 1) 상단 바 갱신
     if (tripExpenses.length > 0) {
       bar.innerHTML = `
         <span style="font-size:13px;font-weight: 700;white-space:nowrap">1인 ₩${perPersonKrw.toLocaleString()} (${splitNumber}명)</span>
-        <span class="ux7-badge places" style="white-space:nowrap">가계부 ${tripExpenses.length}건 ▾</span>
+        <span class="ux7-badge places" style="white-space:nowrap">가계부 ${tripExpenses.length}건 ${arrow}</span>
       `;
     } else {
       bar.innerHTML = `
         <span style="font-size:13px;font-weight: 700;white-space:nowrap">1인 ₩0 (${splitNumber}명)</span>
-        <span class="ux7-badge places" style="white-space:nowrap">1/N 가계부 ▾</span>
+        <span class="ux7-badge places" style="white-space:nowrap">1/N 가계부 ${arrow}</span>
       `;
     }
 
@@ -22137,27 +22305,28 @@ ${JSON.stringify(payload, null, 2)}
           <div style="text-align:right">
             <div style="font-size:11.5px;color:#3b82f6;font-weight: 700;">1인 분담액 (${splitNumber}명)</div>
             <div style="font-size:17px;font-weight: 700;color:#3b82f6">₩${perPersonKrw.toLocaleString()}</div>
+            ${hasJpyExp ? `<div style="font-size:12.5px;font-weight:700;color:#3b82f6">¥${perPersonJpy.toLocaleString()} /인</div>` : ""}
           </div>
         </div>
 
         <!-- 빠른 지출 입력 폼 -->
-        <div style="display:flex;gap:6px;flex-direction:column;background:var(--s);padding:12px;border-radius:14px;border:1px solid var(--bd2)">
-          <div style="display:flex;gap:6px">
-            <input type="text" id="v50ExpTitle" placeholder="지출 내역 (예: 이치란 라멘 3인, 편의점, 택시)" style="flex:2;margin:0;min-height:38px;padding:6px 12px;font-size:13px">
-            <select id="v50ExpPayer" class="btn g" style="flex:1;margin:0;min-height:38px;padding:4px 6px;font-size:12px;font-weight:700">
+        <div style="display:flex;gap:6px;flex-direction:column;background:var(--s);padding:12px;border-radius:14px;border:1px solid var(--bd2);min-width:0;max-width:100%;box-sizing:border-box">
+          <div style="display:flex;gap:6px;min-width:0">
+            <input type="text" id="v50ExpTitle" placeholder="지출 내역 (예: 이치란 라멘 3인, 편의점, 택시)" style="flex:2 1 0;min-width:0;width:auto;margin:0;min-height:38px;padding:6px 12px;font-size:16px;box-sizing:border-box">
+            <select id="v50ExpPayer" class="btn g" style="flex:1 1 0;min-width:0;width:auto;margin:0;min-height:38px;padding:4px 6px;font-size:16px;font-weight:700;box-sizing:border-box">
               <option value="공동">공동 부담</option>
               <option value="내가 결제">내가 결제</option>
               <option value="친구 결제">친구 결제</option>
               <option value="공금 지출">공금 지출</option>
             </select>
           </div>
-          <div style="display:flex;gap:6px">
-            <input type="number" id="v50ExpAmt" placeholder="금액 입력" inputmode="numeric" style="flex:2;margin:0;min-height:38px;padding:6px 12px;font-size:14px;font-weight: 700;">
-            <select id="v50ExpCur" class="btn g" style="width:78px;flex:none;margin:0;min-height:38px;padding:4px 6px;font-size:12.5px;font-weight: 700;">
+          <div style="display:flex;gap:6px;min-width:0">
+            <input type="number" id="v50ExpAmt" placeholder="금액 입력" inputmode="numeric" style="flex:2 1 0;min-width:0;width:auto;margin:0;min-height:38px;padding:6px 12px;font-size:16px;font-weight: 700;box-sizing:border-box">
+            <select id="v50ExpCur" class="btn g" style="width:78px;flex:none;margin:0;min-height:38px;padding:4px 6px;font-size:16px;font-weight: 700;box-sizing:border-box">
               <option value="JPY">¥ 엔</option>
               <option value="KRW">₩ 원</option>
             </select>
-            <button type="button" class="btn" id="v50ExpAddBtn" style="flex:1;margin:0;min-height:38px;background:var(--pr);color:#fff;font-weight: 700;font-size:13px">
+            <button type="button" class="btn" id="v50ExpAddBtn" style="flex:1 1 0;min-width:0;width:auto;padding:0 6px;white-space:nowrap;box-sizing:border-box;margin:0;min-height:38px;background:var(--pr);color:#fff;font-weight: 700;font-size:13px">
               + 등록
             </button>
           </div>
@@ -22791,6 +22960,32 @@ ${JSON.stringify(payload, null, 2)}
       display: grid !important;
       grid-template-columns: repeat(4, 1fr) !important;
     }
+  }
+  /* 하단 플로팅 탭바 뒤로 카드가 비쳐 지저분해 보이지 않도록 하단 그라데이션 마스크 */
+  @media (max-width: 820px) {
+    body::after {
+      content: "";
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: calc(84px + env(safe-area-inset-bottom));
+      pointer-events: none;
+      z-index: 150;
+      background: linear-gradient(to top, #07090e 38%, rgba(7, 9, 14, 0));
+    }
+    [data-theme="light"] body::after {
+      background: linear-gradient(to top, #f8fafc 38%, rgba(248, 250, 252, 0));
+    }
+  }
+  /* 목록 카드 교통 배지: 오른쪽에서 잘리지 않고 말줄임 */
+  #list-LIST .item .v46-transit-badge {
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    box-sizing: border-box !important;
   }
   @media (min-width: 821px) {
     #nav {
@@ -23792,7 +23987,7 @@ ${JSON.stringify(payload, null, 2)}
     padding-bottom: 24px !important;
   }
   #sbody .ux-stab-pane {
-    padding-bottom: 12px !important;
+    padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important;
   }
   /* 상세창 사진이 화면 대부분을 차지해 탭·버튼이 아래로 밀리던 문제 → 높이 제한 */
   #sbody .pic.big:has(img) {

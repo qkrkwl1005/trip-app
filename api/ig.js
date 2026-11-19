@@ -244,8 +244,29 @@ async function resolveIgData(code) {
   return resolveViaIgPages(code, { thumb: "", caption: "" });
 }
 
+const ALLOWED_ORIGINS = [
+  "https://trip-app-psi-two.vercel.app",
+  "https://qkrkwl1005.github.io",
+];
+
+function applyCors(req, res) {
+  const origin = req.headers?.origin || "";
+  if (
+    ALLOWED_ORIGINS.includes(origin) ||
+    /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
+  ) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  } else {
+    res.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGINS[0]);
+  }
+  res.setHeader("Vary", "Origin");
+  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+}
+
 async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  applyCors(req, res);
+  if (req.method === "OPTIONS") return res.status(200).end();
   const code = String(req.query.code || "").trim();
 
   if (!code) return res.status(400).json({ ok: false });
