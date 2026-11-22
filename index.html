@@ -7066,9 +7066,11 @@
           ? ""
           : String(i.name || "").trim();
         // 괄호 안 한국어 수식어('(바다뷰 감성 카페)' 등)는 구글맵 장소 매칭을 방해하므로 제거
-        const cleanNm = rawNm.replace(/\s*\([^)]*\)/g, "").trim() || rawNm;
+        const cleanNm = rawNm.replace(/\s*[(（][^)）]*[)）]/g, "").trim() || rawNm;
         const lnm = String(i.localName || "").trim();
-        const ad = normalizeOcrAddr(i.address || "");
+        let ad = normalizeOcrAddr(i.address || "");
+        // 캡션 문장이 주소 칸에 들어간 경우(번지 숫자 없음/너무 김/해시태그)는 검색어에서 제외 — 광고만 뜨는 원인
+        if (ad && (ad.length > 100 || /#/.test(ad) || (ad.length > 25 && !/\d/.test(ad)))) ad = "";
         if (lnm) {
           // 현지 상호명(일본어) + 주소 조합이 구글맵 비즈니스 카드 적중률이 가장 높음
           return [lnm, ad].filter(Boolean).join(" ").trim();
