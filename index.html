@@ -13541,7 +13541,9 @@ ${caption || rawText}
       if (Array.isArray(it.places) && it.places.length > 1) {
         badges.push(`<span class="ux7-badge places">📍 ${it.places.length}곳 묶음</span>`);
       }
-      if (!Number(it.lat) || !Number(it.lng)) {
+      // 편의점 음식·특정 가게가 없는 항목(주소 비어 있음)은 좌표가 필요 없으니 경고를 띄우지 않음
+      const needsCoord = it.category !== "CONV" && String(it.address || "").trim() !== "";
+      if (needsCoord && (!Number(it.lat) || !Number(it.lng))) {
         badges.push(`<span class="ux7-badge" style="color:var(--dg)">🔴 좌표미설정</span>`);
       }
       const shortAddr = (it.address || "").replace(/^일본\s*/, "").slice(0, 28);
