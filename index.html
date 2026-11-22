@@ -15278,6 +15278,12 @@ ${caption || rawText}
     bar.innerHTML = `<span style="font-size:13px;font-weight: 700;">1인 ₩${pKrw.toLocaleString()} (${splitCnt}명)</span><span class="ux7-badge places">1/N 정산 ${drawer.classList.contains("on") ? "▴" : "▾"}</span>`;
     bar.onclick = () => drawer.classList.toggle("on");
 
+    // 가계부(V50)가 로드된 뒤에는 바·서랍을 그쪽이 그린다 (탭 이동 때 합계가 ₩0으로 덮이던 문제)
+    if (typeof window.__v50RenderBudget === "function") {
+      window.__v50RenderBudget();
+      return;
+    }
+
     if (!drawer.dataset.bound) {
       drawer.dataset.bound = "1";
       drawer.innerHTML = `
@@ -22704,10 +22710,14 @@ ${JSON.stringify(payload, null, 2)}
       window.firestoreDb.collection("rooms").doc(sharedRoomId).update({
         expenses: tripExpenses,
         updatedAt: Date.now()
-      }).catch(() => {});
+      }).catch(() => {
+        if (typeof toast === "function") toast("⚠️ 친구들에게 동기화하지 못했어요. 이 기기에만 저장됐어요");
+      });
     }
     renderV50BudgetUI();
   }
+
+  window.__v50RenderBudget = () => renderV50BudgetUI();
 
   window.__v50ApplyRemoteExpenses = function(remoteList) {
     if (!Array.isArray(remoteList)) return;
@@ -22769,7 +22779,15 @@ ${JSON.stringify(payload, null, 2)}
       `;
     }
 
-    // 2) 드로어 내부 렌더링
+    // 2) 드로어 내부 렌더링 (입력 중이던 값·포커스는 보존)
+    const _formIds = ["v50ExpTitle", "v50ExpAmt", "v50ExpCur", "v50ExpPayer"];
+    const _saved = {};
+    _formIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) _saved[id] = el.value;
+    });
+    const _focusId = _formIds.includes(document.activeElement && document.activeElement.id)
+      ? document.activeElement.id : "";
     drawer.innerHTML = `
       <div class="v50-ledger-wrap">
         <!-- 상단 요약 배너 -->
@@ -22842,6 +22860,12 @@ ${JSON.stringify(payload, null, 2)}
         </div>
       </div>
     `;
+
+    _formIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el && _saved[id] !== undefined) el.value = _saved[id];
+    });
+    if (_focusId) document.getElementById(_focusId)?.focus();
 
     // 이벤트 리스너 바인딩
     document.getElementById("v50ExpAddBtn")?.addEventListener("click", () => {
