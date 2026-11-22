@@ -26848,6 +26848,75 @@ ${JSON.stringify(payload, null, 2)}
     width: calc(100% - 24px) !important;
     justify-content: center !important;
   }
+
+  /* 4. 스크롤바 커스텀: 다크/라이트 모두 밝은 흰색 기본 스크롤바 트랙 제거 */
+  html body ::-webkit-scrollbar {
+    width: 4px !important;
+    height: 4px !important;
+  }
+  html body ::-webkit-scrollbar-track {
+    background: transparent !important;
+  }
+  html body ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.16) !important;
+    border-radius: 999px !important;
+  }
+  html[data-theme="light"] body ::-webkit-scrollbar-thumb {
+    background: rgba(15, 23, 42, 0.16) !important;
+  }
+  html body .tab-content,
+  html body #sheet .sh {
+    scrollbar-width: thin !important;
+    scrollbar-color: rgba(255, 255, 255, 0.16) transparent !important;
+  }
+  html[data-theme="light"] body .tab-content,
+  html[data-theme="light"] body #sheet .sh {
+    scrollbar-color: rgba(15, 23, 42, 0.16) transparent !important;
+  }
+
+  /* 5. 상세 모달 (#sheet .sh) 액션 버튼: 지도·택시·복사 세로 막대 방지 → 1줄 나란히 */
+  html body #sheet .sh a.btn.g,
+  html body #sheet .sh button.btn.g[data-act="openTaxi"],
+  html body #sheet .sh button.btn.g[data-act="copyAddr"] {
+    width: auto !important;
+    flex: 1 1 0 !important;
+    min-height: 36px !important;
+    font-size: 12.5px !important;
+    padding: 0 10px !important;
+  }
+
+  /* 6. 목록 탭 상단 필터 줄 압축 */
+  html body #tab-list > .card:first-of-type {
+    padding: 0 2px 2px !important;
+  }
+  html body #tab-list > .card:first-of-type .mb[data-act="nearSort"],
+  html body #tab-list > .card:first-of-type .mb[data-act="toggleEdit"] {
+    min-height: 34px !important;
+    font-size: 12px !important;
+  }
+  html body #v32ListBudgetBar {
+    padding: 8px 12px !important;
+  }
+
+  /* 7. 설정 탭 '화면 테마 설정' 하단 버튼 2열 컴팩트 배치 */
+  html body #v47SetOledCard {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    margin-top: 8px !important;
+  }
+  html body #v47SetOledCard .btn.g {
+    width: auto !important;
+    min-height: 38px !important;
+    padding: 0 10px !important;
+    font-size: 12px !important;
+    margin: 0 !important;
+    white-space: nowrap !important;
+  }
+  html body #v47SetOledCard #v47SetOledBtn[style*="display: none"],
+  html body #v47SetOledCard #v47SetOledBtn[style*="display:none"] {
+    display: none !important;
+  }
 </style>
 <!-- === V61_UI_POLISH_END === -->
 
