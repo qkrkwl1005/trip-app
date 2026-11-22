@@ -5370,20 +5370,70 @@
         iframe.src = embedSrc;
         extLink.href = vidUrl;
 
+        modal.style.display = "flex";
         modal.style.opacity = "1";
         modal.style.pointerEvents = "auto";
+        modal.__open = true;
+        // 폰의 뒤로가기로도 닫히도록 history 항목을 하나 쌓음
+        if (!modal.__histPushed) {
+          try { history.pushState({ vidModal: true }, ""); modal.__histPushed = true; } catch (_) {}
+        }
 
-        const closeModal = () => {
+        const closeModal = (fromPop) => {
+          if (!modal.__open) return;
+          modal.__open = false;
           modal.style.opacity = "0";
           modal.style.pointerEvents = "none";
-          setTimeout(() => { iframe.src = ""; }, 200);
+          // 닫으면 화면 전체를 덮던 fixed 레이어를 레이아웃에서 완전히 빼서 목록 스크롤을 막지 않게 함
+          try { iframe.src = "about:blank"; } catch (_) {}
+          setTimeout(() => { if (!modal.__open) modal.style.display = "none"; }, 260);
+          if (modal.__histPushed) {
+            modal.__histPushed = false;
+            if (fromPop !== true) {
+              window.__ignorePop = true;
+              try { history.back(); } catch (_) { window.__ignorePop = false; }
+              setTimeout(() => { window.__ignorePop = false; }, 300);
+            }
+          }
+          if (typeof window.__restoreScroll === "function") window.__restoreScroll();
         };
+        modal.__close = closeModal;
 
-        closeBtn.onclick = closeModal;
+        closeBtn.onclick = () => closeModal();
         modal.onclick = (e) => {
           if (e.target === modal) closeModal();
         };
       }
+      // 릴스 팝업이 열려 있을 때 뒤로가기: 팝업만 닫고 다른 뒤로가기 처리기는 건너뛰게 함
+      window.addEventListener("popstate", () => {
+        const m = document.getElementById("inAppVideoModal");
+        if (m && m.__open && typeof m.__close === "function") {
+          window.__ignorePop = true;
+          setTimeout(() => { window.__ignorePop = false; }, 0);
+          m.__histPushed = false;
+          m.__close(true);
+        }
+      });
+      // 목록/본문 스크롤 컨테이너가 "overflow:hidden" 인라인으로 잠긴 채 남거나(앱 복귀 시 rAF 정지 등)
+      // 포커스가 iframe에 남아 드래그가 안 되는 경우를 풀어 줌
+      window.__restoreScroll = function () {
+        try {
+          ["tab-list", "side", "list-LIST"].forEach((id) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (el.style.overflowY === "hidden") el.style.overflowY = "";
+            el.style.webkitOverflowScrolling = "";
+            void el.offsetHeight;
+          });
+          const ae = document.activeElement;
+          if (ae && ae !== document.body && ae.tagName === "IFRAME" && ae.blur) ae.blur();
+        } catch (_) {}
+      };
+      window.addEventListener("pageshow", () => window.__restoreScroll());
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") window.__restoreScroll();
+      });
+      window.addEventListener("focus", () => window.__restoreScroll());
       function vidEmbedUrl(v, captioned = false) {
         const meta = parseVideoMeta(v);
         if (!meta) return "";
@@ -14910,12 +14960,15 @@ ${caption || rawText}
       el.style.webkitOverflowScrolling = "auto";
       el.scrollTop = 0;
       void el.offsetHeight; // iOS 관성 스크롤 즉시 중단
-      requestAnimationFrame(() => {
+      const _unlock = () => {
         el.scrollTop = 0;
         el.style.overflowY = "auto";
         el.style.webkitOverflowScrolling = "touch";
         el.scrollTop = 0;
-      });
+      };
+      requestAnimationFrame(_unlock);
+      // 화면이 가려진 상태에서는 rAF가 멈춰 overflow:hidden 이 영원히 남을 수 있어 타이머로도 한 번 더 복구
+      setTimeout(_unlock, 120);
       setTimeout(() => { el.scrollTop = 0; }, 40);
     });
     if (tabKey === "list") savedListScrollTop = 0;
