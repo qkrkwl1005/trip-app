@@ -6775,11 +6775,23 @@
         ["강릉·강원", /강릉|속초|양양|삼척|원주|태백/i],
         ["부산·제주", /부산|해운대|광안리|제주/i],
       ];
+      // 좌표로도 지역을 판별 (영어 주소·이름에 지역명이 없는 항목도 필터에 잡히도록)
+      // [남쪽위도, 북쪽위도, 서쪽경도, 동쪽경도]
+      const REGION_BOX = {
+        "오사카": [34.55, 34.85, 135.3, 135.65],
+        "난바·도톤보리": [34.655, 34.678, 135.493, 135.512],
+        "우메다": [34.695, 34.71, 135.488, 135.505],
+        "교토": [34.85, 35.2, 135.55, 135.95],
+      };
       function matchRegionTag(item, tagLabel) {
         const found = REGION_TAGS.find((x) => x[0] === tagLabel);
         if (!found) return false;
         const hay = `${item.name || ""} ${item.address || ""} ${item.note || ""}`;
-        return found[1].test(hay);
+        if (found[1].test(hay)) return true;
+        const b = REGION_BOX[tagLabel];
+        const la = Number(item.lat),
+          lo = Number(item.lng);
+        return Boolean(b && la && lo && la >= b[0] && la <= b[1] && lo >= b[2] && lo <= b[3]);
       }
 
       /* 목록 카드: 주소·설명 없이 오직 '제목 + 릴스 버튼 + 길찾기 버튼'만 표시 */
@@ -6874,10 +6886,8 @@
           days.forEach((d) =>
             chips.push(["DAY:" + d, "calendar_today", `D${d}`]),
           );
-          REGION_TAGS.forEach(([lbl, re]) => {
-            const cnt = all.filter((x) =>
-              re.test(`${x.name || ""} ${x.address || ""} ${x.note || ""}`),
-            ).length;
+          REGION_TAGS.forEach(([lbl]) => {
+            const cnt = all.filter((x) => matchRegionTag(x, lbl)).length;
             if (cnt > 0)
               chips.push(["REG:" + lbl, "location_on", `${lbl} ${cnt}`]);
           });
