@@ -78,6 +78,7 @@
         --CAFE: #db2777;
         --FOOD: #d97706;
         --SHOP: #7c3aed;
+        --CONV: #0d9488;
         --pr-soft: rgba(37, 99, 235, 0.12);
         --sh-card: 0 4px 20px rgba(15, 23, 42, 0.05);
         --r-card: 24px;
@@ -100,6 +101,7 @@
         --CAFE: #FF6482;
         --FOOD: #FF9F0A;
         --SHOP: #BF5AF2;
+        --CONV: #2DD4BF;
         --pr-soft: rgba(10, 132, 255, 0.15);
         --sh-card: 0 8px 32px rgba(0, 0, 0, 0.6);
       }
@@ -345,7 +347,7 @@
         margin-bottom: 16px;
       }
       .seg.seg5 {
-        grid-template-columns: repeat(5, 1fr);
+        grid-template-columns: repeat(6, 1fr);
         margin-bottom: 4px;
       }
       .seg div {
@@ -1125,6 +1127,9 @@
       .pinCard.c-FOOD {
         background: rgba(217, 119, 6, 0.92);
       }
+      .pinCard.c-CONV {
+        background: rgba(13, 148, 136, 0.92);
+      }
       .pinCard.c-SHOP {
         background: rgba(124, 58, 237, 0.92);
       }
@@ -1667,6 +1672,7 @@
             <div data-cat="CAFE"><span class="ms">local_cafe</span>카페</div>
             <div data-cat="FOOD"><span class="ms">restaurant</span>음식</div>
             <div data-cat="SHOP"><span class="ms">shopping_bag</span>쇼핑</div>
+            <div data-cat="CONV"><span class="ms">storefront</span>편의점</div>
           </div>
           <label style="color:var(--tx);font-size:12px;margin-bottom:6px">🔗 영상 링크 (선택)</label>
           <div style="display: flex; gap: 8px; margin-bottom: 16px">
@@ -3223,6 +3229,7 @@
         CAFE: { n: "카페", e: "☕", ic: "local_cafe", b: "카페/디저트" },
         FOOD: { n: "음식", e: "🍙", ic: "restaurant", b: "식당/간식" },
         SHOP: { n: "쇼핑", e: "🛍️", ic: "shopping_bag", b: "구매 물건" },
+        CONV: { n: "편의점", e: "🏪", ic: "storefront", b: "편의점 음식·간식" },
       };
       const MAX_MULTI_PLACES = 10;
       const msIcon = (name, fill = false) =>
@@ -3723,6 +3730,7 @@
         CAFE: "ALL",
         FOOD: "ALL",
         SHOP: "ALL",
+        CONV: "ALL",
       };
       let sharedRoomId = "",
         sharedUnsubscribe = null,
@@ -5784,6 +5792,7 @@
               <div data-lcat="CAFE"><span class="ms">local_cafe</span>카페 <span id="cnt-CAFE">0</span></div>
               <div data-lcat="FOOD"><span class="ms">restaurant</span>음식 <span id="cnt-FOOD">0</span></div>
               <div data-lcat="SHOP"><span class="ms">shopping_bag</span>쇼핑 <span id="cnt-SHOP">0</span></div>
+              <div data-lcat="CONV"><span class="ms">storefront</span>편의점 <span id="cnt-CONV">0</span></div>
             </div>
             <div style="display:flex;gap:8px;align-items:center">
               <div class="search-row"><input type="text" id="q-LIST" placeholder="이름·주소·메뉴 검색..." oninput="window.__debouncedRenderList ? window.__debouncedRenderList() : renderListTab()"><button type="button" class="mb clear-search" data-act="clearSearch" data-cat="LIST" aria-label="검색어 지우기"><span class="ms">close</span></button></div>
@@ -6692,6 +6701,7 @@
           CAFE: 0,
           FOOD: 0,
           SHOP: 0,
+          CONV: 0,
         };
         expanded.forEach((i) => {
           if (cnt[i.category] !== undefined) cnt[i.category]++;
@@ -8690,8 +8700,10 @@
             )
           )
             category = "CAFE";
+          else if (/편의점|로손|세븐일레븐|패밀리마트|미니스톱|コンビニ|lawson|familymart/i.test(norm))
+            category = "CONV";
           else if (
-            /편의점|로손|세븐일레븐|패밀리마트|길거리음식|간식|정식|스시|라멘|야키니쿠|이자카야|우동|소바|식당|맛집|조식/i.test(norm)
+            /길거리음식|간식|정식|스시|라멘|야키니쿠|이자카야|우동|소바|식당|맛집|조식/i.test(norm)
           )
             category = "FOOD";
           else if (
@@ -9317,7 +9329,7 @@ ${caption || rawText}
     "address": "입력에 적혀 있거나 웹 검색으로 확인한 실제 주소(우편번호·번지 포함). 확인하지 못했으면 반드시 빈 문자열 \"\"",
     "price": "한국어로 번역된 가격·대표메뉴 요약",
     "info": "한국어로 요약된 영업시간·휴무일·특징",
-    "category": "PLACE 또는 CAFE 또는 FOOD 또는 SHOP",
+    "category": "PLACE 또는 CAFE 또는 FOOD 또는 SHOP 또는 CONV(편의점 상품·편의점 자체)",
     "lat": null,
     "lng": null
   }
@@ -11851,7 +11863,7 @@ ${caption || rawText}
       const savedTab = ls.get("TRIP_LAST_TAB");
       if (
         savedTab &&
-        ["add", "list", "PLACE", "CAFE", "FOOD", "SHOP", "set", "map"].includes(
+        ["add", "list", "PLACE", "CAFE", "FOOD", "SHOP", "CONV", "set", "map"].includes(
           savedTab,
         )
       )
@@ -13850,6 +13862,7 @@ ${caption || rawText}
         <option value="CAFE">☕ 카페</option>
         <option value="FOOD">🍙 음식</option>
         <option value="SHOP">🛍️ 쇼핑</option>
+        <option value="CONV">🏪 편의점</option>
       </select>
       <select id="v8MapAddDay" class="btn g" style="margin:0;min-height:42px;padding:6px 10px">
         <option value="0">일차 미정</option>
@@ -15608,7 +15621,7 @@ ${caption || rawText}
     decorateCardsV32();
     if (!activeTab) {
       const savedTab = ls.get("TRIP_LAST_TAB");
-      if (savedTab && ["add", "list", "PLACE", "CAFE", "FOOD", "SHOP", "set", "map"].includes(savedTab)) {
+      if (savedTab && ["add", "list", "PLACE", "CAFE", "FOOD", "SHOP", "CONV", "set", "map"].includes(savedTab)) {
         tab(savedTab);
       } else {
         tab("add");
@@ -19062,6 +19075,7 @@ ${caption || rawText}
       FOOD: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=600&q=75",
       CAFE: "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=600&q=75",
       SHOP: "https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=600&q=75",
+      CONV: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=600&q=75",
       PLACE: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=600&q=75"
     };
 
@@ -24745,6 +24759,22 @@ ${JSON.stringify(payload, null, 2)}
   html body #listCatSeg.seg.seg5 > div {
     font-size: 12.5px !important;
     min-height: 38px !important;
+  }
+  /* 칸이 6개(편의점 추가)가 되어도 좁은 폰에서 안 잘리게: 열을 균등 분할하고 아이콘은 숨김 */
+  @media (max-width: 480px) {
+    html body #listCatSeg.seg.seg5 {
+      grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+      gap: 2px !important;
+    }
+    html body #listCatSeg.seg.seg5 > div {
+      font-size: 11.5px !important;
+      padding: 4px 0 !important;
+      white-space: nowrap;
+      letter-spacing: -0.04em !important;
+    }
+    html body #listCatSeg.seg.seg5 > div .ms {
+      display: none !important;
+    }
   }
   .ux7-badge {
     font-size: 12px !important;
