@@ -26565,5 +26565,291 @@ ${JSON.stringify(payload, null, 2)}
 </script>
 <!-- === V60_EDITORIAL_OVERHAUL_END === -->
 
+<!-- === V61_UI_POLISH_START === -->
+<style id="v61UiPolish">
+  /* =========================================================================
+   * V61 UI POLISH — Refined Palette, Pill Category Strip, Compact Cards,
+   *                 Tonal Buttons & iOS Grouped Settings Rows
+   * ========================================================================= */
+
+  :root {
+    --bg: #f4f6f9;
+    --s: #ffffff;
+    --s2: #eef1f6;
+    --s3: #e3e7ef;
+    --bd: rgba(15, 23, 42, 0.07);
+    --bd2: rgba(15, 23, 42, 0.13);
+    --tx: #0f172a;
+    --sub: #64748b;
+    --pr: #2563eb;
+    --pr-soft: rgba(37, 99, 235, 0.10);
+    --ok: #10b981;
+    --dg: #dc2626;
+    --PLACE: #2563eb;
+    --CAFE: #db2777;
+    --FOOD: #d97706;
+    --SHOP: #7c3aed;
+    --CONV: #0d9488;
+    --r-card: 18px;
+    --r-ctrl: 12px;
+    --r-pill: 999px;
+  }
+
+  html[data-theme="dark"] {
+    --bg: #0b0d12;
+    --s: #13161f;
+    --s2: #1c202c;
+    --s3: #262b3a;
+    --bd: rgba(255, 255, 255, 0.075);
+    --bd2: rgba(255, 255, 255, 0.13);
+    --tx: #f3f5f9;
+    --sub: #8f98ab;
+    --pr: #3b82f6;
+    --pr-soft: rgba(59, 130, 246, 0.15);
+    --ok: #2dd4bf;
+    --dg: #f87171;
+    --PLACE: #60a5fa;
+    --CAFE: #f472b6;
+    --FOOD: #fbbf24;
+    --SHOP: #a78bfa;
+    --CONV: #2dd4bf;
+  }
+
+  /* 1. 버튼 위계 정리: 과한 블루 네온 그림자 제거 + 깔끔한 토널/플랫 스타일 */
+  html body .btn {
+    border-radius: 12px !important;
+    min-height: 44px !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    box-shadow: none !important;
+    transition: transform 0.14s ease, background 0.16s ease, opacity 0.16s ease !important;
+  }
+  html body .btn.pr,
+  html body button.pr,
+  html body .mb.pr {
+    background: var(--pr) !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 2px 8px rgba(0, 0, 0, 0.18) !important;
+  }
+  html body #v32FabBtn {
+    background: var(--pr) !important;
+    box-shadow: 0 6px 18px rgba(37, 99, 235, 0.28) !important;
+  }
+  html body .btn.g {
+    background: var(--s2) !important;
+    color: var(--tx) !important;
+    border: 1px solid var(--bd) !important;
+    box-shadow: none !important;
+  }
+  html body .btn.g:hover {
+    background: var(--s3) !important;
+  }
+
+  /* 2. 목록 탭 (#tab-list): 가로 스크롤 알약 카테고리 바 + 컴팩트 카드 */
+  html body #listCatSeg.seg.seg5 {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 2px 0 4px !important;
+    gap: 6px !important;
+    margin-bottom: 10px !important;
+  }
+  html body #listCatSeg.seg.seg5::-webkit-scrollbar {
+    display: none !important;
+  }
+  html body #listCatSeg.seg.seg5 > div {
+    flex: 0 0 auto !important;
+    padding: 7px 13px !important;
+    min-height: 34px !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    border-radius: 999px !important;
+    background: var(--s) !important;
+    border: 1px solid var(--bd) !important;
+    color: var(--sub) !important;
+    gap: 5px !important;
+  }
+  html body #listCatSeg.seg.seg5 > div .ms {
+    font-size: 15px !important;
+  }
+  html body #listCatSeg.seg.seg5 > div > span:last-child {
+    font-size: 11.5px !important;
+    opacity: 0.72;
+  }
+  html body #listCatSeg.seg.seg5 > div.on,
+  html[data-theme="dark"] body #listCatSeg.seg.seg5 > div.on {
+    background: #f3f5f9 !important;
+    color: #0b0d12 !important;
+    border-color: transparent !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+  }
+  html[data-theme="light"] body #listCatSeg.seg.seg5 > div.on {
+    background: #0f172a !important;
+    color: #ffffff !important;
+    border-color: transparent !important;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.14) !important;
+  }
+
+  /* 목록 상단 검색바 & 보조 알약 버튼 */
+  html body #tab-list .search-row {
+    border-radius: 12px !important;
+    background: var(--s) !important;
+    border: 1px solid var(--bd) !important;
+  }
+  html body #tab-list > .card:first-of-type .mb {
+    border-radius: 999px !important;
+    min-height: 38px !important;
+    padding: 0 12px !important;
+    font-size: 12.5px !important;
+    font-weight: 600 !important;
+    background: var(--s) !important;
+    border: 1px solid var(--bd) !important;
+    color: var(--tx) !important;
+    box-shadow: none !important;
+  }
+
+  /* 장소 카드 (#list-LIST .item) */
+  html body #list-LIST {
+    gap: 10px !important;
+  }
+  html body #list-LIST .item,
+  html[data-oled="true"] body #list-LIST .item {
+    border-radius: 18px !important;
+    padding: 12px 14px !important;
+    border: 1px solid var(--bd) !important;
+    background: var(--s) !important;
+    box-shadow: none !important;
+  }
+  html[data-theme="light"] body #list-LIST .item {
+    border: 1px solid rgba(15, 23, 42, 0.06) !important;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04) !important;
+  }
+  html body #list-LIST .item .pic {
+    width: 66px !important;
+    height: 66px !important;
+    min-width: 66px !important;
+    border-radius: 12px !important;
+  }
+  html body #list-LIST .item .pic img {
+    border-radius: 12px !important;
+  }
+  html body #list-LIST .item.done {
+    opacity: 0.66 !important;
+  }
+  html body #list-LIST .item.done .nm {
+    text-decoration: line-through;
+    text-decoration-color: var(--sub);
+  }
+  html body #list-LIST .item .mb {
+    min-height: 30px !important;
+    padding: 0 11px !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    border-radius: 999px !important;
+    box-shadow: none !important;
+  }
+
+  /* 3. 설정 탭 (#tab-set): iOS 설정앱 스타일 그룹 카드 & 깔끔한 행 리스트 */
+  html body #tab-set {
+    gap: 12px !important;
+  }
+  html body #tab-set .card,
+  html[data-oled="true"] body #tab-set .card {
+    border-radius: 20px !important;
+    padding: 16px !important;
+    background: var(--s) !important;
+    border: 1px solid var(--bd) !important;
+    box-shadow: none !important;
+  }
+  html[data-theme="light"] body #tab-set .card {
+    border: 1px solid rgba(15, 23, 42, 0.06) !important;
+    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04) !important;
+  }
+  html body #tab-set .sec-title {
+    font-size: 14.5px !important;
+    margin-bottom: 12px !important;
+    letter-spacing: -0.02em !important;
+  }
+  html body #tab-set .btn {
+    border-radius: 12px !important;
+    min-height: 42px !important;
+    font-size: 13.5px !important;
+  }
+  html body #tab-set .mb {
+    border-radius: 999px !important;
+    min-height: 35px !important;
+    padding: 0 13px !important;
+    font-size: 12.5px !important;
+    font-weight: 600 !important;
+    box-shadow: none !important;
+  }
+
+  /* 설정 탭 아코디언 (details.acc) & 내부 버튼 iOS 그룹 리스트화 */
+  html body #tab-set details.acc {
+    background: var(--s2) !important;
+    border: 1px solid var(--bd) !important;
+    border-radius: 14px !important;
+    overflow: hidden !important;
+  }
+  html body #tab-set details.acc > summary {
+    padding: 11px 14px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: var(--sub) !important;
+    list-style: none !important;
+  }
+  html body #tab-set details.acc[open] > summary {
+    border-bottom: 1px solid var(--bd) !important;
+    color: var(--tx) !important;
+  }
+  html body #tab-set #v49SharedRoomCard details.acc .acc-in {
+    padding: 0 !important;
+  }
+  html body #tab-set #v49SharedRoomCard details.acc .acc-in .btn.g {
+    width: 100% !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
+    margin: 0 !important;
+    padding: 12px 14px !important;
+    min-height: 44px !important;
+    border-radius: 0 !important;
+    border: none !important;
+    border-bottom: 1px solid var(--bd) !important;
+    background: transparent !important;
+    font-size: 13.5px !important;
+    font-weight: 600 !important;
+    gap: 10px !important;
+  }
+  html body #tab-set #v49SharedRoomCard details.acc .acc-in .btn.g:hover {
+    background: rgba(255, 255, 255, 0.04) !important;
+  }
+  html[data-theme="light"] body #tab-set #v49SharedRoomCard details.acc .acc-in .btn.g:hover {
+    background: rgba(15, 23, 42, 0.03) !important;
+  }
+  html body #tab-set #v49SharedRoomCard details.acc .acc-in #deleteRoomBtn {
+    color: var(--dg) !important;
+  }
+  html body #tab-set #v49SharedRoomCard details.acc .acc-in #deleteRoomBtn:hover {
+    background: rgba(239, 68, 68, 0.09) !important;
+  }
+  html body #tab-set #v49SharedRoomCard details.acc .acc-in #sharedUserStatus {
+    padding: 6px 14px 10px !important;
+    margin: 0 !important;
+    border-bottom: 1px solid var(--bd) !important;
+  }
+  html body #tab-set #v49SharedRoomCard details.acc .acc-in #loginDiagCopyBtn {
+    margin: 8px 12px 10px !important;
+    width: calc(100% - 24px) !important;
+    justify-content: center !important;
+  }
+</style>
+<!-- === V61_UI_POLISH_END === -->
+
 </body>
 </html>
